@@ -5,6 +5,13 @@
   "shape": "review",
   "document_type": "journal article",
   "meta_analysis": false,
+  "key_findings": [
+    "Fasted cardio does burn more fat during the session (27 studies, 273 participants, low intensity).",
+    "Over weeks it doesn't matter: the best-controlled trial lost 26.3→25.0% body fat fasted vs 24.8→24.1% fed in 4 weeks — no meaningful difference.",
+    "Pooled trials (5 studies, 96 people) show trivial-to-small differences in weight, body fat and lean mass.",
+    "Fasted work has costs: ~14 g of amino acids lost per hour, and eating first raises post-exercise energy burn.",
+    "Protein before cardio raised post-exercise energy expenditure — a practical middle ground the authors suggest for physique athletes."
+  ],
   "header": {
     "title_plain": "Fasted cardio burns more fat during the session — and doesn't change how much fat you lose",
     "citation": {

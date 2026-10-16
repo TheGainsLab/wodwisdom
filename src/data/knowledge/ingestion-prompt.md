@@ -26,6 +26,8 @@ Also record `document_type` (journal article / book chapter / position stand / t
 ### 2. Header fields
 
 - `title_plain`: one sentence, in plain English, stating the finding or the claim. Not the paper's title. Lead with the result. For reviews, state the claim. For references, state what it explains. Target 12–25 words.
+- `key_findings` (top level, beside `header`): **required for every shape.** Three to six one-line bullets, each a single claim with its number attached (e.g. "A 10-second all-out effort is 94% anaerobic — but by 75 seconds the split is already 50/50 (±10%)."). This is the fixed-format core the reader absorbs first; every number must also appear in Layer 1, and no bullet may carry a claim Layer 1 doesn't support. Select for what changes coaching, not for completeness — the full record lives in Layer 1.
+- `setup_plain`: **required for `intervention` and `comparison` shapes; omit for `review` and `reference`.** Two to four plain sentences overviewing what was done: who or what was studied, the protocol, the duration, what was measured, and whether there was a control. Written as flowing prose, not field notation. Strictly descriptive — no question framing, no stakes, no interpretation. Every number in it must also appear in Layer 1. This renders as the page's opening paragraph.
 - `citation`: title, authors (surname + initials), year, journal, volume(issue): pages, DOI. `title` is **required** and is the document's own title, copied verbatim from the source — never paraphrased, never reconstructed from memory. (It is what makes the entry identifiable when the DOI is missing; `title_plain` above never replaces it.) If any element is missing from the document, write `"not printed in source"` for that element rather than guessing.
 - `topics`: 5–12 lowercase tags. Include both physiological terms and the phrasings coaches use (e.g. both `fat-oxidation` and `fasted-cardio`; both `sprint-interval` and `hiit`).
 - `evidence_type`: one line in plain words describing the design, including sample size, control group, randomisation, and blinding where stated. Say "not stated as randomised" rather than assuming.
@@ -130,8 +132,10 @@ Confirm: (1) shape chosen and only that block populated; (2) every Layer-2 numbe
   "shape": "intervention | comparison | review | reference",
   "document_type": "journal article | book chapter | position stand | thesis | other",
   "meta_analysis": false,
+  "key_findings": ["3–6 one-line bullets, each one claim with its number"],
   "header": {
     "title_plain": "",
+    "setup_plain": "(intervention/comparison only — omit for review/reference)",
     "citation": {
       "title": "", "authors": "", "year": "", "journal": "", "volume_issue_pages": "", "doi": ""
     },

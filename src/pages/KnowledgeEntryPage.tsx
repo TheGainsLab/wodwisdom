@@ -591,6 +591,7 @@ export default function KnowledgeEntryPage({ signedIn = false }: { signedIn?: bo
         {(() => {
           const paras = entry.layer1.review?.claim ? [entry.layer1.review.claim]
             : entry.layer1.reference?.what_it_explains ? [entry.layer1.reference.what_it_explains]
+            : h.setup_plain ? [h.setup_plain]
             : setupNarrative(entry);
           if (!paras.length) return null;
           return (
@@ -611,12 +612,45 @@ export default function KnowledgeEntryPage({ signedIn = false }: { signedIn?: bo
         {/* One results section for every shape: charts lead, receipts
             follow. population_card no longer renders — the setup lede
             carries who was studied; the data stays in the entry. */}
+        {/* Fixed format, every entry: key-finding bullets → one chart →
+            everything else behind All the data. Entries without
+            key_findings fall back to the full layout until populated. */}
         <SectionTitle>What they found</SectionTitle>
-        {entry.charts.filter((c) => c.template !== 'population_card').map((c, i) => <ChartBlock key={i} c={c} />)}
-        {entry.layer1.intervention && <InterventionFacts l={entry.layer1.intervention} />}
-        {entry.layer1.comparison && <ComparisonFacts l={entry.layer1.comparison} />}
-        {entry.layer1.review && <ReviewFacts l={entry.layer1.review} />}
-        {entry.layer1.reference && <ReferenceFacts l={entry.layer1.reference} />}
+        {(() => {
+          const charts = entry.charts.filter((c) => c.template !== 'population_card');
+          const facts = (
+            <>
+              {entry.layer1.intervention && <InterventionFacts l={entry.layer1.intervention} />}
+              {entry.layer1.comparison && <ComparisonFacts l={entry.layer1.comparison} />}
+              {entry.layer1.review && <ReviewFacts l={entry.layer1.review} />}
+              {entry.layer1.reference && <ReferenceFacts l={entry.layer1.reference} />}
+            </>
+          );
+          if (!entry.key_findings?.length) {
+            return <>{charts.map((c, i) => <ChartBlock key={i} c={c} />)}{facts}</>;
+          }
+          return (
+            <>
+              <ul style={{ margin: '0 0 16px', paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 9 }}>
+                {entry.key_findings.map((f, i) => (
+                  <li key={i} style={{ fontSize: 14.5, lineHeight: 1.55, color: 'var(--text)' }}>
+                    {linkifyGlossary(f)}
+                  </li>
+                ))}
+              </ul>
+              {charts.length > 0 && <ChartBlock c={charts[0]} />}
+              <details style={{ marginTop: 4 }}>
+                <summary style={{ fontSize: 12.5, color: 'var(--text-muted)', cursor: 'pointer' }}>
+                  All the data — every number from the paper
+                </summary>
+                <div style={{ marginTop: 12 }}>
+                  {charts.slice(1).map((c, i) => <ChartBlock key={i} c={c} />)}
+                  {facts}
+                </div>
+              </details>
+            </>
+          );
+        })()}
 
         <SectionTitle>What it means</SectionTitle>
         <p style={{ fontSize: 14, lineHeight: 1.65, color: 'var(--text)', margin: 0 }}>
@@ -628,17 +662,21 @@ export default function KnowledgeEntryPage({ signedIn = false }: { signedIn?: bo
           {linkifyGlossary(entry.layer2.what_it_doesnt_mean)}
         </p>
 
-        {entry.translation.length > 0 && (
-          <>
-            <SectionTitle>Say it to a member</SectionTitle>
-            <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {entry.translation.map((t, i) => (
-                <li key={i} style={{ fontSize: 13.5, lineHeight: 1.6, color: 'var(--text-dim)' }}>
-                  {linkifyGlossary(t)}
-                </li>
-              ))}
-            </ul>
-          </>
+        {/* Always rendered — the spine is identical on every page. A paper
+            with no gym-floor line says so instead of hiding the section. */}
+        <SectionTitle>Say it to a member</SectionTitle>
+        {entry.translation.length > 0 ? (
+          <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {entry.translation.map((t, i) => (
+              <li key={i} style={{ fontSize: 13.5, lineHeight: 1.6, color: 'var(--text-dim)' }}>
+                {linkifyGlossary(t)}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p style={{ fontSize: 13.5, lineHeight: 1.6, color: 'var(--text-muted)', fontStyle: 'italic', margin: 0 }}>
+            Nothing to repeat on the gym floor — this one is background that makes the other papers make sense.
+          </p>
         )}
 
         {/* The trust block in full: badges in the header give the glance,
@@ -647,6 +685,9 @@ export default function KnowledgeEntryPage({ signedIn = false }: { signedIn?: bo
         <p style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--text)', margin: '0 0 10px' }}>
           {linkifyGlossary(h.evidence_type)}
         </p>
+        {(entry.layer1.intervention || entry.layer1.comparison) && setupNarrative(entry).map((p, i) => (
+          <p key={i} style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.6, margin: '0 0 8px' }}>{p}</p>
+        ))}
         <p style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)', margin: '0 0 6px' }}>
           <strong style={{ color: 'var(--text)' }}>Confidence: {h.confidence.level}</strong>
           {h.confidence.why && <> — {h.confidence.why}</>}

@@ -5,6 +5,13 @@
   "shape": "review",
   "document_type": "journal article",
   "meta_analysis": false,
+  "key_findings": [
+    "Lactate comes from glycogen turnover feeding fast contractions — not from muscle running out of oxygen (oxygen stays above mitochondrial needs even at VO2max).",
+    "Only glycogen is fast enough: PCr swings within ~30 ms of each twitch, and free glucose in muscle (<0.3 mmol) is far too little to supply it.",
+    "People whose muscle can't break down glycogen fail even mild exercise — with pH staying high.",
+    "Glycogen keeps turning over even when its level is flat; it settles at a lower plateau the harder the exercise.",
+    "Carbohydrate feeding delayed exhaustion by about an hour — without slowing the fall of muscle glycogen."
+  ],
   "header": {
     "title_plain": "A different story about lactate: it's made by glycogen turnover feeding fast contractions, not by running out of oxygen",
     "citation": {

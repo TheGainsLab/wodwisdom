@@ -5,6 +5,13 @@
   "shape": "reference",
   "document_type": "book chapter",
   "meta_analysis": false,
+  "key_findings": [
+    "Oxygen falls in pressure at every step from air (~159 mmHg) to the alveoli (~100) to the tissues — that staircase is the oxygen cascade.",
+    "Nearly all oxygen travels on haemoglobin: ~20 mL per 100 mL of blood, vs ~0.3 dissolved.",
+    "Rest to maximal exercise: cardiac output rises ~5× (4.5 → 22.5 L/min) and whole-body oxygen use ~10×.",
+    "Unloading gets easier exactly where it's needed — heat, acid and CO2 shift the curve toward release.",
+    "The heart already extracts ~60% of the oxygen in its own blood at rest — its only reserve is more flow."
+  ],
   "header": {
     "title_plain": "How oxygen gets from the air to your mitochondria, and why a tenfold range in demand needs a five-fold range in cardiac output",
     "citation": {

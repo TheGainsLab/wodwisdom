@@ -59,11 +59,15 @@ export interface KnowledgeChart {
 export interface KnowledgeEntry {
   id: string;
   slug: string;
+  /** 3–6 one-line findings, each a claim with its number; the fixed-format core of What they found. */
+  key_findings?: string[];
   shape: KnowledgeIndexRow['shape'];
   document_type: string;
   meta_analysis: boolean;
   header: {
     title_plain: string;
+    /** Study shapes only: 2–4 plain sentences overviewing what was done. The page's lede. */
+    setup_plain?: string;
     citation: {
       /** The paper's own title, verbatim from the source ("" until entered). */
       title: string;

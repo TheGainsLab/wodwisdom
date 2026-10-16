@@ -5,6 +5,13 @@
   "shape": "review",
   "document_type": "journal article",
   "meta_analysis": false,
+  "key_findings": [
+    "Sustainable power is roughly ⅓ of your best few-second power; trained cyclists hold ~80% of VO2max-test power for 30 minutes.",
+    "Even in steady state, glycolysis supplies 10–12% of ATP (up to ~20%) — and the acid it makes suppresses ADP, the signal that drives the mitochondria.",
+    "Mitochondria in sustained exercise run well below capacity: peak steady-state ADP is 0.06–0.11 mmol/L vs ~0.3 needed for full drive — oxygen isn't the limiter.",
+    "Full mitochondrial drive is reachable (quads at VO2max: ADP 0.25, pH 6.5) but sustainable for under 5 minutes.",
+    "Raising the ceiling means making less acid per watt and clearing it faster — the snake muscle that sustains >80% of capacity for hours has half-diameter fibres (33 vs 67 µm) and ~35% more blood flow."
+  ],
   "header": {
     "title_plain": "Why you can't hold your top aerobic pace: acid from glycolysis blunts the signal that drives the mitochondria",
     "citation": {

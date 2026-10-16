@@ -5,6 +5,14 @@
   "shape": "review",
   "document_type": "position stand",
   "meta_analysis": false,
+  "key_findings": [
+    "Not all muscle growth is equal: heavy loads grow fast-twitch (type II) fibres; light loads grow relatively more slow-twitch.",
+    "Strength athletes carry ~20% larger type II fibres than bodybuilders, whose growth is more even — same size, different machinery.",
+    "Muscle size tracks the big lifts (r = 0.63–0.91 with squat, bench and deadlift in national powerlifters).",
+    "High-volume growth can be partly non-contractile: six weeks of it grew muscle with a lower concentration of force-producing protein.",
+    "Training to failure wasn't better — the non-failure group showed greater type II growth and performance.",
+    "Their prescription for strength-power athletes — ~80–95% 1RM at low reps — is a theoretical threshold, not a tested comparison."
+  ],
   "header": {
     "title_plain": "Not all muscle growth is equal: for strength and power, grow the fast fibres with heavy loads, not everything with high reps",
     "citation": {

@@ -5,6 +5,13 @@
   "shape": "review",
   "document_type": "journal article",
   "meta_analysis": false,
+  "key_findings": [
+    "A 10-second all-out effort is 94% anaerobic — but by 75 seconds the split is already 50/50 (±10%).",
+    "By 4 minutes of maximal work, aerobic metabolism supplies ~79% of the energy.",
+    "Inside any effort over ~30 seconds, the second half runs mostly on oxygen: a 90-second sprint is 73% aerobic in seconds 30–60 and 91% in seconds 60–90.",
+    "Even the 30-second Wingate test is 16–33% aerobic (29% by direct muscle measurement).",
+    "Repeated sprints lean more aerobic each round — by the tenth 6-second sprint, glycolysis has nearly shut down."
+  ],
   "header": {
     "title_plain": "Aerobic energy matters much sooner than coaches think: a 75-second all-out effort is already half aerobic",
     "citation": {
