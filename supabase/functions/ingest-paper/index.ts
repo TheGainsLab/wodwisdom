@@ -275,7 +275,7 @@ Deno.serve(async (req) => {
 
         // Slug: derive from citation, honor the model's own if it's free.
         const { data: existing } = await supa.from("knowledge_entries").select("slug");
-        const taken = new Set(
+        const taken = new Set<string>(
           (existing ?? []).map((r: { slug: string }) => r.slug).filter((s: string) => s !== stubSlug),
         );
         const slug = typeof entry.slug === "string" && /^[a-z0-9][a-z0-9-]*$/.test(entry.slug as string) && !taken.has(entry.slug as string)
