@@ -1,17 +1,17 @@
 /**
- * /knowledge v0 — data access for the research library.
+ * /knowledge — data access for the research library.
  *
- * The corpus ships as static JSON in src/data/knowledge (twelve hand-built
- * entries, a topic index, and a candidate glossary — see the design handoff
- * and data/knowledge/README provenance). No DB, no auth: the content is free
- * by construction; only the future "Discuss this paper" chat is gated.
+ * The corpus lives in the knowledge_entries table (published rows are
+ * world-readable via RLS; drafts are invisible), so an approved entry
+ * publishes instantly with no deploy. src/data/knowledge keeps the founding
+ * twelve as the versioned archive plus the ingestion contract
+ * (ingestion-prompt.md, build.py); the app no longer imports entries from it.
  *
- * index/topics load eagerly (small); full entries load lazily per slug so
- * the corpus doesn't ride in the main bundle.
+ * The glossary stays static for now — it merges on publish once the
+ * ingestion pipeline lands (step 4).
  */
 
-import indexJson from '../data/knowledge/index.json';
-import topicsJson from '../data/knowledge/topics.json';
+import { supabase } from './supabase';
 import glossaryJson from '../data/knowledge/glossary.json';
 
 export interface KnowledgeIndexRow {
@@ -129,23 +129,49 @@ export interface KnowledgeEntry {
   charts: KnowledgeChart[];
 }
 
-export const KNOWLEDGE_INDEX = indexJson as KnowledgeIndexRow[];
-export const KNOWLEDGE_TOPICS = topicsJson as Record<string, string[]>;
 export const KNOWLEDGE_GLOSSARY = glossaryJson as GlossaryTerm[];
 
-// Lazy per-entry loading: each entry becomes its own chunk.
-const entryModules = import.meta.glob('../data/knowledge/entries/*.json');
+const REL_RANK: Record<string, number> = { high: 0, medium: 1, low: 2 };
 
-export async function loadKnowledgeEntry(slug: string): Promise<KnowledgeEntry | null> {
-  const key = `../data/knowledge/entries/${slug}.json`;
-  const loader = entryModules[key];
-  if (!loader) return null;
-  const mod = (await loader()) as { default: KnowledgeEntry };
-  return mod.default;
+function toIndexRow(slug: string, e: KnowledgeEntry): KnowledgeIndexRow {
+  return {
+    id: e.id, slug,
+    title: e.header.title_plain,
+    paper_title: e.header.citation.title,
+    authors: e.header.citation.authors,
+    year: e.header.citation.year,
+    journal: e.header.citation.journal,
+    shape: e.shape,
+    confidence: e.header.confidence.level,
+    practical_relevance: e.header.practical_relevance.level,
+    topics: e.header.topics,
+    chart_count: e.charts.length,
+  };
 }
 
-export function knowledgeIndexRow(slug: string): KnowledgeIndexRow | undefined {
-  return KNOWLEDGE_INDEX.find((r) => r.slug === slug);
+/** Published entries projected to list rows, relevance-first then title. */
+export async function fetchKnowledgeIndex(): Promise<KnowledgeIndexRow[]> {
+  const { data, error } = await supabase
+    .from('knowledge_entries')
+    .select('slug, entry')
+    .eq('status', 'published');
+  if (error || !data) return [];
+  return data
+    .map((r) => toIndexRow(r.slug as string, r.entry as KnowledgeEntry))
+    .sort((a, b) =>
+      (REL_RANK[a.practical_relevance] ?? 3) - (REL_RANK[b.practical_relevance] ?? 3) ||
+      a.title.localeCompare(b.title));
+}
+
+export async function loadKnowledgeEntry(slug: string): Promise<KnowledgeEntry | null> {
+  const { data, error } = await supabase
+    .from('knowledge_entries')
+    .select('entry')
+    .eq('slug', slug)
+    .eq('status', 'published')
+    .maybeSingle();
+  if (error || !data) return null;
+  return data.entry as KnowledgeEntry;
 }
 
 /** "sprint-intervals" → "sprint intervals" for chip display. */

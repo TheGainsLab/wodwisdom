@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
-  loadKnowledgeEntry, knowledgeIndexRow, topicLabel,
+  loadKnowledgeEntry, topicLabel,
   type KnowledgeEntry, type KnowledgeChart,
 } from '../lib/knowledgeLibrary';
 import { QAHeader } from '../components/QAShared';
@@ -546,7 +546,6 @@ export default function KnowledgeEntryPage({ signedIn = false }: { signedIn?: bo
 
   const h = entry.header;
   const cite = h.citation;
-  const idx = knowledgeIndexRow(entry.slug);
   const showStance = h.author_stance && !/^none apparent/i.test(h.author_stance);
 
   return (
@@ -712,9 +711,9 @@ export default function KnowledgeEntryPage({ signedIn = false }: { signedIn?: bo
           </p>
         )}
 
-        {idx && idx.topics.length > 0 && (
+        {h.topics.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 24 }}>
-            {idx.topics.map((t) => (
+            {h.topics.map((t) => (
               <span key={t} style={{ padding: '3px 10px', borderRadius: 999, fontSize: 11.5, border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
                 {topicLabel(t)}
               </span>

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { KNOWLEDGE_INDEX, KNOWLEDGE_TOPICS, topicLabel } from '../lib/knowledgeLibrary';
+import { fetchKnowledgeIndex, topicLabel, type KnowledgeIndexRow } from '../lib/knowledgeLibrary';
 import { QAHeader } from '../components/QAShared';
 import { KnowledgeBadge } from '../components/KnowledgeShared';
 import '../features.css';
@@ -14,6 +14,13 @@ import '../qa.css';
 export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boolean }) {
   const [query, setQuery] = useState('');
   const [topic, setTopic] = useState<string | null>(null);
+  const [index, setIndex] = useState<KnowledgeIndexRow[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchKnowledgeIndex().then((rows) => { if (!cancelled) setIndex(rows); });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     document.body.classList.add('feature-body');
@@ -25,18 +32,16 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
   }, []);
 
   // Topic chips: only topics carried by more than one entry are useful
-  // filters at corpus size twelve; the rest stay reachable via text search.
-  const chipTopics = useMemo(
-    () => Object.entries(KNOWLEDGE_TOPICS)
-      .filter(([, slugs]) => slugs.length > 1)
-      .map(([t]) => t)
-      .sort(),
-    [],
-  );
+  // filters; the rest stay reachable via text search.
+  const chipTopics = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const r of index ?? []) for (const t of r.topics) counts.set(t, (counts.get(t) ?? 0) + 1);
+    return [...counts.entries()].filter(([, n]) => n > 1).map(([t]) => t).sort();
+  }, [index]);
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return KNOWLEDGE_INDEX.filter((r) => {
+    return (index ?? []).filter((r) => {
       if (topic && !r.topics.includes(topic)) return false;
       if (!q) return true;
       return (
@@ -46,7 +51,7 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
         r.topics.some((t) => topicLabel(t).includes(q))
       );
     });
-  }, [query, topic]);
+  }, [index, query, topic]);
 
   return (
     <div className="feature-page">
@@ -130,7 +135,7 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
           ))}
           {rows.length === 0 && (
             <div style={{ color: 'var(--text-dim)', fontSize: 14, padding: '20px 0' }}>
-              Nothing matches — try a broader term, or clear the topic filter.
+              {index === null ? 'Loading the library…' : 'Nothing matches — try a broader term, or clear the topic filter.'}
             </div>
           )}
         </div>
