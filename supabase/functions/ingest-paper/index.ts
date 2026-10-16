@@ -229,15 +229,32 @@ Deno.serve(async (req) => {
         entry.id = slug;
         report = validateKnowledgeEntry(entry);
 
-        const { error: upErr2 } = await supa.from("knowledge_entries").update({
-          slug,
-          status: "draft",
-          entry,
-          validator_report: { ...report, model, repaired },
-          updated_at: new Date().toISOString(),
-        }).eq("slug", stubSlug);
-        if (upErr2) throw new Error(`draft save failed: ${upErr2.message}`);
-        console.log(`ingest-paper: drafted ${slug} (${model}${repaired ? ", repaired" : ""}, ${report.errors.length} errors)`);
+        // A concurrent ingest (or the dedup read missing rows) can collide on
+        // the slug primary key: retry with a numeric suffix rather than
+        // failing a successfully drafted entry.
+        let saved = false;
+        let lastSaveErr = "";
+        for (let n = 0; n < 5 && !saved; n++) {
+          const candidate = n === 0 ? slug : `${slug}-${n + 1}`;
+          entry.slug = candidate;
+          entry.id = candidate;
+          const { error: upErr2 } = await supa.from("knowledge_entries").update({
+            slug: candidate,
+            status: "draft",
+            entry,
+            validator_report: { ...report, model, repaired },
+            updated_at: new Date().toISOString(),
+          }).eq("slug", stubSlug);
+          if (!upErr2) {
+            saved = true;
+            console.log(`ingest-paper: drafted ${candidate} (${model}${repaired ? ", repaired" : ""}, ${report.errors.length} errors)`);
+          } else if (upErr2.code === "23505") {
+            lastSaveErr = upErr2.message;
+          } else {
+            throw new Error(`draft save failed: ${upErr2.message}`);
+          }
+        }
+        if (!saved) throw new Error(`draft save failed after slug retries: ${lastSaveErr}`);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         console.error("ingest-paper background failure:", msg);

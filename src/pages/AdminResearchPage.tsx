@@ -117,7 +117,7 @@ export default function AdminResearchPage({ session }: { session: Session }) {
     if (!selected || !draft) return;
     if (status === 'published' && (selected.validator_report?.errors?.length ?? 0) > 0) {
       const ok = window.confirm(
-        `This draft still has ${selected.validator_report!.errors.length} validator error(s) — publish anyway?`,
+        `This draft had ${selected.validator_report!.errors.length} validator error(s) when drafted — publish anyway?`,
       );
       if (!ok) return;
     }
@@ -272,7 +272,7 @@ export default function AdminResearchPage({ session }: { session: Session }) {
                 <span style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>{selected.slug} · {selected.status}</span>
                 <div style={{ flex: 1 }} />
                 <button disabled={saving} onClick={() => saveEntry()} style={{ ...field, width: 'auto', cursor: 'pointer' }}>Save edits</button>
-                {selected.status !== 'published' && selected.status !== 'failed' && (
+                {selected.status !== 'published' && selected.status !== 'failed' && selected.status !== 'drafting' && (
                   <button disabled={saving} onClick={() => saveEntry('published')} style={{ ...field, width: 'auto', cursor: 'pointer', borderColor: '#4ade80', color: '#4ade80', fontWeight: 700 }}>
                     Approve &amp; publish
                   </button>

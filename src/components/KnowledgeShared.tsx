@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { getGlossaryTerms } from '../lib/knowledgeLibrary';
+import { getGlossaryTerms, type GlossaryTerm } from '../lib/knowledgeLibrary';
 import { logKnowledgeEvent } from '../lib/knowledgeEvents';
 
 /** Shape / confidence / relevance badges for the research library. */
@@ -34,9 +34,41 @@ export function KnowledgeBadge({ kind, value, why }: { kind: 'shape' | 'confiden
 // (works on mobile where hover doesn't exist). First occurrence per
 // section only — a linkify() call is one section.
 
-// Resolved at call time: pages await ensureGlossary() before rendering prose.
+// Resolved at call time (pages await ensureGlossary() first), with the sort
+// and compiled patterns cached per glossary load — linkify runs per prose
+// block and table cell, and in the admin editor on every keystroke.
+let termsCache: GlossaryTerm[] | null = null;
+let termsCacheSrc: GlossaryTerm[] | null = null;
+const reCache = new Map<string, RegExp>();
+
+// Safari before 16.4 throws on lookbehind at construction time; fall back to
+// a word-boundary approximation there rather than crash the page.
+const [WB_BEFORE, WB_AFTER] = (() => {
+  try {
+    new RegExp('(?<![\\w-])x(?![\\w-])');
+    return ['(?<![\\w-])', '(?![\\w-])'];
+  } catch {
+    return ['\\b', '\\b'];
+  }
+})();
+
 function TERMS() {
-  return [...getGlossaryTerms()].sort((a, b) => b.term.length - a.term.length);
+  const src = getGlossaryTerms();
+  if (src !== termsCacheSrc) {
+    termsCacheSrc = src;
+    termsCache = [...src].sort((a, b) => b.term.length - a.term.length);
+    reCache.clear();
+  }
+  return termsCache!;
+}
+
+function termRegExp(term: string): RegExp {
+  let re = reCache.get(term);
+  if (!re) {
+    re = new RegExp(`${WB_BEFORE}${escapeRegExp(term)}${WB_AFTER}`, 'i');
+    reCache.set(term, re);
+  }
+  return re;
 }
 
 function escapeRegExp(s: string): string {
@@ -102,8 +134,7 @@ export function linkifyGlossary(
   for (const t of TERMS()) {
     const key = t.term.toLowerCase();
     if (opts?.seen?.has(key)) continue;
-    const re = new RegExp(`(?<![\\w-])${escapeRegExp(t.term)}(?![\\w-])`, 'i');
-    const m = re.exec(text);
+    const m = termRegExp(t.term).exec(text);
     if (!m) continue;
     const start = m.index;
     const end = start + m[0].length;

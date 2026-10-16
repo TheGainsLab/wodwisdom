@@ -7,8 +7,8 @@
  * twelve as the versioned archive plus the ingestion contract
  * (ingestion-prompt.md, build.py); the app no longer imports entries from it.
  *
- * The glossary stays static for now — it merges on publish once the
- * ingestion pipeline lands (step 4).
+ * The glossary lives in knowledge_glossary and merges on publish via the
+ * admin review screen.
  */
 
 import { supabase } from './supabase';

@@ -53,8 +53,9 @@ function FactsTable({ columns, rows }: { columns: Array<{ key: string; label: st
 }
 
 /** "approx." / "from Fig" values get a read-from-figure marker (honesty rule 3). */
-function val(v: string | undefined): React.ReactNode {
-  if (!v) return '';
+function val(v: string | number | undefined): React.ReactNode {
+  if (v === undefined || v === null || v === '') return '';
+  v = String(v);
   if (/approx\.|from fig/i.test(v)) {
     return <span>≈ {v.replace(/^approx\.\s*/i, '')}</span>;
   }
@@ -79,7 +80,9 @@ export function setupNarrative(entry: KnowledgeEntry): string[] {
   const cp = entry.layer1.comparison;
   if (iv) {
     for (const g of iv.groups ?? []) {
-      const n = g.n_enrolled === g.n_analysed ? `n ${g.n_enrolled}` : `${g.n_enrolled} enrolled / ${g.n_analysed} analysed`;
+      const n = !usable(g.n_enrolled) ? ''
+        : g.n_enrolled === g.n_analysed ? `n ${g.n_enrolled}`
+        : `${g.n_enrolled} enrolled / ${g.n_analysed} analysed`;
       const demo = [usable(g.age) && `age ${g.age}`, usable(g.sex) && g.sex, usable(g.training_status) && g.training_status]
         .filter(Boolean).join(', ');
       const bits = [[n, demo].filter(Boolean).join(', '), g.protocol, g.per_week, g.other]
@@ -239,7 +242,7 @@ function chartRows(c: KnowledgeChart): { columns: Array<{ key: string; label: st
         columns: [{ key: 'group', label: 'Group' }, { key: 'values', label: 'Change' }],
         rows: s.map((x) => ({
           group: x.group,
-          values: ((x.values ?? []) as Array<{ label: string; value: number }>)
+          values: ((x.values ?? []) as Array<{ label: string; value: number }>).filter(Boolean)
             .map((v) => `${v.label}: ${v.value > 0 ? '+' : ''}${v.value}%`).join(' · '),
         })),
       };
@@ -248,7 +251,7 @@ function chartRows(c: KnowledgeChart): { columns: Array<{ key: string; label: st
         columns: [{ key: 'label', label: '' }, { key: 'values', label: 'By condition' }],
         rows: s.map((x) => ({
           label: x.label,
-          values: ((x.values ?? []) as Array<{ condition: string; value: number }>)
+          values: ((x.values ?? []) as Array<{ condition: string; value: number }>).filter(Boolean)
             .map((v) => `${v.condition}: ${v.value}`).join(' · '),
         })),
       };
@@ -257,7 +260,7 @@ function chartRows(c: KnowledgeChart): { columns: Array<{ key: string; label: st
         columns: [{ key: 'label', label: '' }, { key: 'parts', label: 'Share' }],
         rows: s.map((x) => ({
           label: x.label,
-          parts: ((x.parts ?? []) as Array<{ name: string; value: number }>)
+          parts: ((x.parts ?? []) as Array<{ name: string; value: number }>).filter(Boolean)
             .map((p) => `${p.name} ${p.value}%`).join(' · '),
         })),
       };
@@ -276,6 +279,10 @@ function chartRows(c: KnowledgeChart): { columns: Array<{ key: string; label: st
       };
     case 'concept_curve':
       // A schematic has no honest table form; the note carries the meaning.
+      return { columns: [], rows: [] };
+    default:
+      // Unknown template (deviant draft): render nothing rather than crash;
+      // the validator report names the problem.
       return { columns: [], rows: [] };
   }
 }
@@ -398,9 +405,10 @@ function renderBeforeAfterBars(c: KnowledgeChart): React.ReactNode | null {
 
 /** grouped_change_bars: signed change bars per outcome, one color per group. */
 function renderGroupedChangeBars(c: KnowledgeChart): React.ReactNode | null {
-  const series = (c.series ?? []) as Array<{ group: string; values: Array<{ label: string; value: number | null }> }>;
+  const series = ((c.series ?? []) as Array<{ group: string; values: Array<{ label: string; value: number | null }> }>)
+    .filter((s) => !!s && typeof s.group === 'string' && Array.isArray(s.values))
+    .map((s) => ({ ...s, values: s.values.filter((v) => !!v && typeof v.label === 'string') }));
   if (!series.length || series.length > SHARE_SLOTS.length) return null;
-  if (series.some((s) => !Array.isArray(s.values))) return null;
   const outcomes: string[] = [];
   for (const s of series) for (const v of s.values) if (!outcomes.includes(v.label)) outcomes.push(v.label);
   const all = series.flatMap((s) => s.values.map((v) => v.value)).filter((v): v is number => typeof v === 'number');
@@ -580,11 +588,11 @@ export function KnowledgeEntryView({ entry, signedIn = false }: { entry: Knowled
           </div>
         )}
         <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '0 0 14px', lineHeight: 1.5 }}>
-          {cite.authors !== NOT_PRINTED && <>{cite.authors}</>}
-          {cite.year !== NOT_PRINTED && <> · {cite.year}</>}
-          {cite.journal !== NOT_PRINTED && <> · {cite.journal}</>}
-          {cite.volume_issue_pages !== NOT_PRINTED && <> {cite.volume_issue_pages}</>}
-          {cite.doi !== NOT_PRINTED && (
+          {!!cite.authors && cite.authors !== NOT_PRINTED && <>{cite.authors}</>}
+          {!!cite.year && cite.year !== NOT_PRINTED && <> · {cite.year}</>}
+          {!!cite.journal && cite.journal !== NOT_PRINTED && <> · {cite.journal}</>}
+          {!!cite.volume_issue_pages && cite.volume_issue_pages !== NOT_PRINTED && <> {cite.volume_issue_pages}</>}
+          {!!cite.doi && cite.doi !== NOT_PRINTED && (
             <>
               {' · '}
               <a href={`https://doi.org/${cite.doi}`} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>
