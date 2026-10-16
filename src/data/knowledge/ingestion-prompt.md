@@ -47,6 +47,7 @@ Also record `document_type` (journal article / book chapter / position stand / t
 Populate only the block for the chosen shape. Rules that apply to every shape:
 
 - **Numbers live here.** Every quantitative result in the document that bears on the claim appears in Layer 1 with its value, units and direction. If the document gives a percentage and absolute values, give both.
+- **Tables are extracted whole.** Every row of every numbered table becomes a Layer 1 row — secondary outcomes, subgroup rows and non-significant results included. Never triage a table: if the paper printed it, the entry carries it. The same applies to figures whose panels report per-outcome results (e.g. a panel of protein subunits with significance marks): one row per reported outcome, values marked approximate when read from the figure.
 - **Every number gets a locator** in `verification_notes` (page, table or figure). Values you read from a chart rather than from text or a table are suffixed `" (approx., from Fig N)"`.
 - **Include what did not change.** Any outcome the authors measured and found unchanged or non-significant is listed, marked `"no"` in the significance column. Omitting null results is the most common way a summary misleads.
 - **Significance is reported as the authors report it.** Use `yes` / `no` / `not tested` / `not reported`. Do not infer significance from the size of a change.
