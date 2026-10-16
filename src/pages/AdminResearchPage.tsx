@@ -67,16 +67,17 @@ export default function AdminResearchPage({ session }: { session: Session }) {
 
   const onUpload = async (file: File) => {
     setError('');
-    setUploading(`Drafting "${file.name}" — this takes a few minutes…`);
+    setUploading(`Uploading "${file.name}"…`);
     try {
-      const b64 = await new Promise<string>((resolve, reject) => {
-        const r = new FileReader();
-        r.onload = () => resolve(String(r.result).split(',')[1] ?? '');
-        r.onerror = () => reject(new Error('could not read file'));
-        r.readAsDataURL(file);
-      });
+      // Straight to storage (no base64-through-the-function), so file size
+      // is never capped by the function's request body.
+      const storagePath = `${Date.now()}-${file.name.replace(/[^A-Za-z0-9._-]/g, '_')}`;
+      const { error: upErr } = await supabase.storage
+        .from('knowledge-pdfs')
+        .upload(storagePath, file, { contentType: 'application/pdf' });
+      if (upErr) throw new Error(`upload failed: ${upErr.message}`);
       const { data, error: err } = await supabase.functions.invoke('ingest-paper', {
-        body: { pdf_base64: b64, filename: file.name },
+        body: { storage_path: storagePath },
       });
       if (err) throw new Error(err.message ?? 'ingestion failed');
       if (data?.error) throw new Error(data.error);
@@ -125,6 +126,12 @@ export default function AdminResearchPage({ session }: { session: Session }) {
 
   const saveEntry = async (status?: 'published' | 'rejected') => {
     if (!selected || !draft) return;
+    if (status === 'published' && (selected.validator_report?.errors?.length ?? 0) > 0) {
+      const ok = window.confirm(
+        `This draft still has ${selected.validator_report!.errors.length} validator error(s) — publish anyway?`,
+      );
+      if (!ok) return;
+    }
     setSaving(true);
     setError('');
     const patch: Record<string, unknown> = { entry: draft, updated_at: new Date().toISOString() };
@@ -216,6 +223,9 @@ export default function AdminResearchPage({ session }: { session: Session }) {
                           : r.status === 'drafting' ? '#a5b4fc'
                           : '#fdba74',
                       }}>{r.status === 'drafting' ? 'drafting…' : r.status}</span>
+                      {r.status === 'drafting' && Date.now() - new Date(r.created_at).getTime() > 12 * 60_000 && (
+                        <span style={{ color: 'var(--accent)' }}>stalled? open it and delete, then re-upload</span>
+                      )}
                       <span>{r.slug}</span>
                       {r.validator_report && (
                         <span>
