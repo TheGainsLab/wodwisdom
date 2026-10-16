@@ -22,6 +22,11 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 
+// Bumped with every change to this function. The admin System Check compares
+// it against the version the app expects, so "did the deploy happen?" is a
+// question the system answers about itself.
+export const FUNCTION_VERSION = "2026-10-16.4";
+
 // The hardest extraction + judgment in the app: quality profile (Opus
 // primary, Sonnet fallback). One attempt each — a PDF pass is slow, and the
 // edge wall clock is ~400s.
@@ -159,6 +164,57 @@ Deno.serve(async (req) => {
     if (!profile || profile.role !== "admin") return json({ error: "Forbidden" }, 403);
 
     const body = await req.json();
+
+    // ── System check: verify every link in the pipeline, server side ──────
+    if (body.action === "selftest") {
+      const checks: Array<{ name: string; ok: boolean; detail: string }> = [];
+      const add = (name: string, ok: boolean, detail = "") => checks.push({ name, ok, detail });
+
+      add("function: env ANTHROPIC_API_KEY", !!ANTHROPIC_API_KEY);
+      add("function: env service role", !!SUPABASE_SERVICE_KEY && !!SUPABASE_URL);
+
+      // Storage round trip (the client uploaded a tiny probe first).
+      if (body.probe_path) {
+        const { data: blob, error: dlErr } = await supa.storage.from("knowledge-pdfs").download(body.probe_path);
+        add("storage: function can read uploads", !!blob && !dlErr, dlErr?.message ?? "");
+        const { error: rmErr } = await supa.storage.from("knowledge-pdfs").remove([body.probe_path]);
+        add("storage: function can delete", !rmErr, rmErr?.message ?? "");
+      } else {
+        add("storage: probe missing", false, "client did not upload a probe");
+      }
+
+      // DB: drafting/failed statuses allowed (the status migration), row lifecycle.
+      const probeSlug = `selftest-${Date.now()}`;
+      const { error: insErr } = await supa.from("knowledge_entries").insert({
+        slug: probeSlug, status: "drafting", entry: { header: { title_plain: "selftest" } },
+      });
+      add("db: knowledge_entries insert + drafting status", !insErr, insErr?.message ?? "");
+      if (!insErr) {
+        const { error: updErr } = await supa.from("knowledge_entries").update({ status: "failed" }).eq("slug", probeSlug);
+        add("db: failed status allowed", !updErr, updErr?.message ?? "");
+        const { error: delErr } = await supa.from("knowledge_entries").delete().eq("slug", probeSlug);
+        add("db: delete", !delErr, delErr?.message ?? "");
+      }
+      const { error: glosErr } = await supa.from("knowledge_glossary").select("term_key").limit(1);
+      add("db: knowledge_glossary exists", !glosErr, glosErr?.message ?? "");
+      const { error: evErr } = await supa.from("knowledge_events").insert({ event_type: "selftest" });
+      add("db: knowledge_events insert", !evErr, evErr?.message ?? "");
+
+      // Model reachable with the configured key (1-token ping, pennies).
+      try {
+        const ping = await fetchWithTimeout("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_API_KEY!, "anthropic-version": "2023-06-01" },
+          body: JSON.stringify({ model: PROFILE.fallback ?? PROFILE.primary, max_tokens: 1, messages: [{ role: "user", content: "ping" }] }),
+        }, 20_000);
+        const pj = await ping.json().catch(() => ({}));
+        add("model: API key + model reachable", ping.ok, ping.ok ? "" : JSON.stringify(pj).slice(0, 200));
+      } catch (e) {
+        add("model: API key + model reachable", false, e instanceof Error ? e.message : String(e));
+      }
+
+      return json({ version: FUNCTION_VERSION, checks, ok: checks.every((c) => c.ok) });
+    }
     let storagePath: string = body.storage_path ?? "";
     let pdfBase64: string;
 

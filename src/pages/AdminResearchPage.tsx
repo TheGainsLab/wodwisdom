@@ -25,6 +25,32 @@ interface Row {
   published_at: string | null;
 }
 
+// Must match FUNCTION_VERSION in supabase/functions/ingest-paper/index.ts.
+// The System Check flags a mismatch, which means "redeploy the function".
+const EXPECTED_FUNCTION_VERSION = '2026-10-16.4';
+
+/** Invoke ingest-paper surfacing the function's real error body. */
+async function invokeIngest(body: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const { data, error: err } = await supabase.functions.invoke('ingest-paper', { body });
+  if (err) {
+    let msg = err.message ?? 'function call failed';
+    const ctx = (err as { context?: Response }).context;
+    if (ctx) {
+      let detail = '';
+      if (typeof ctx.json === 'function') {
+        try {
+          const b = await ctx.json();
+          if (b?.error) detail = String(b.error);
+        } catch { /* non-JSON body (e.g. gateway 404) */ }
+      }
+      msg = `${detail || msg} (HTTP ${ctx.status}${ctx.status === 404 ? ' — function not deployed?' : ''})`;
+    }
+    throw new Error(msg);
+  }
+  if (data?.error) throw new Error(String(data.error));
+  return data ?? {};
+}
+
 const field: React.CSSProperties = {
   width: '100%', padding: '8px 10px', fontSize: 13, fontFamily: 'inherit',
   background: 'var(--surface)', color: 'var(--text)',
@@ -76,29 +102,51 @@ export default function AdminResearchPage({ session }: { session: Session }) {
         .from('knowledge-pdfs')
         .upload(storagePath, file, { contentType: 'application/pdf' });
       if (upErr) throw new Error(`upload failed: ${upErr.message}`);
-      const { data, error: err } = await supabase.functions.invoke('ingest-paper', {
-        body: { storage_path: storagePath },
-      });
-      if (err) {
-        // The function always says WHY in its JSON body; surface that, never
-        // the generic "non-2xx" string.
-        let msg = err.message ?? 'ingestion failed';
-        const ctx = (err as { context?: Response }).context;
-        if (ctx && typeof ctx.json === 'function') {
-          try {
-            const body = await ctx.json();
-            if (body?.error) msg = `${body.error} (HTTP ${ctx.status})`;
-          } catch { /* keep generic message */ }
-        }
-        throw new Error(msg);
-      }
-      if (data?.error) throw new Error(data.error);
+      await invokeIngest({ storage_path: storagePath });
       await refresh();
       setUploading(null); // the queue now shows a 'drafting' row that polls itself in
     } catch (e) {
       setUploading(null);
       setError(e instanceof Error ? e.message : 'Ingestion failed');
     }
+  };
+
+  // ── System check: one click verifies every link in the pipeline ───────
+  type Check = { name: string; ok: boolean; detail?: string };
+  const [sysCheck, setSysCheck] = useState<Check[] | null>(null);
+  const [checking, setChecking] = useState(false);
+
+  const runSystemCheck = async () => {
+    setChecking(true);
+    setSysCheck(null);
+    const results: Check[] = [];
+    const probePath = `selftest-${Date.now()}.txt`;
+
+    // Client-side: the admin's own permissions.
+    const { error: upErr } = await supabase.storage
+      .from('knowledge-pdfs')
+      .upload(probePath, new Blob(['selftest']), { contentType: 'text/plain' });
+    results.push({ name: 'you: can upload to storage', ok: !upErr, detail: upErr?.message });
+    const { error: selErr } = await supabase.from('knowledge_entries').select('slug').limit(1);
+    results.push({ name: 'you: can read the queue (admin RLS)', ok: !selErr, detail: selErr?.message });
+    const { error: gloErr } = await supabase.from('knowledge_glossary').select('term_key').limit(1);
+    results.push({ name: 'app: glossary table reachable', ok: !gloErr, detail: gloErr?.message });
+
+    // Server-side: the function checks itself (storage, DB, statuses, model key).
+    try {
+      const data = await invokeIngest({ action: 'selftest', probe_path: upErr ? undefined : probePath });
+      const version = String(data.version ?? 'unknown');
+      results.push({
+        name: 'function: deployed version matches the app',
+        ok: version === EXPECTED_FUNCTION_VERSION,
+        detail: version === EXPECTED_FUNCTION_VERSION ? version : `function is ${version}, app expects ${EXPECTED_FUNCTION_VERSION} — redeploy ingest-paper`,
+      });
+      for (const c of (data.checks as Check[] | undefined) ?? []) results.push(c);
+    } catch (e) {
+      results.push({ name: 'function: reachable', ok: false, detail: e instanceof Error ? e.message : String(e) });
+    }
+    setSysCheck(results);
+    setChecking(false);
   };
 
   const open = (r: Row) => {
@@ -209,6 +257,26 @@ export default function AdminResearchPage({ session }: { session: Session }) {
 
           {!selected && (
             <>
+              {/* One click answers "is every part of the pipeline working?" */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '14px 0 0' }}>
+                <button disabled={checking} onClick={runSystemCheck} style={{ ...field, width: 'auto', cursor: 'pointer' }}>
+                  {checking ? 'Checking…' : 'Run system check'}
+                </button>
+                {sysCheck && (
+                  <span style={{ fontSize: 12.5, fontWeight: 700, color: sysCheck.every((c) => c.ok) ? '#4ade80' : 'var(--accent)' }}>
+                    {sysCheck.every((c) => c.ok) ? 'All systems go' : `${sysCheck.filter((c) => !c.ok).length} problem(s) found`}
+                  </span>
+                )}
+              </div>
+              {sysCheck && (
+                <div style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '10px 14px', margin: '10px 0 0', fontSize: 12.5, lineHeight: 1.7 }}>
+                  {sysCheck.map((c, i) => (
+                    <div key={i} style={{ color: c.ok ? 'var(--text-dim)' : 'var(--accent)' }}>
+                      {c.ok ? '✓' : '✗'} {c.name}{!c.ok && c.detail ? ` — ${c.detail}` : ''}
+                    </div>
+                  ))}
+                </div>
+              )}
               {/* Upload */}
               <label
                 onDragOver={(e) => e.preventDefault()}
