@@ -300,3 +300,6 @@ verify_jwt = false
 # (bearer token -> auth.getUser), per house convention; rate limit + Resend
 # send to the coach inbox with Reply-To the user.
 verify_jwt = false
+
+[functions.ingest-paper]
+verify_jwt = false
