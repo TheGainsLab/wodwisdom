@@ -10,7 +10,7 @@
 import { useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
-import { ensureGlossary, type KnowledgeEntry } from '../lib/knowledgeLibrary';
+import { ensureGlossary, normalizeKnowledgeEntry, type KnowledgeEntry } from '../lib/knowledgeLibrary';
 import { KnowledgeEntryView } from './KnowledgeEntryPage';
 import Nav from '../components/Nav';
 import '../features.css';
@@ -53,7 +53,7 @@ export default function AdminResearchPage({ session }: { session: Session }) {
       .select('slug, status, entry, validator_report, created_at, published_at')
       .order('created_at', { ascending: false });
     if (err) setError(err.message);
-    else setRows((data ?? []) as Row[]);
+    else setRows(((data ?? []) as Row[]).map((r) => ({ ...r, entry: normalizeKnowledgeEntry(r.entry) })));
   };
   useEffect(() => { if (role === 'admin') { refresh(); ensureGlossary(); } }, [role]);
 
@@ -91,20 +91,9 @@ export default function AdminResearchPage({ session }: { session: Session }) {
 
   const open = (r: Row) => {
     setSelected(r);
-    // Normalize so an imperfect draft renders instead of crashing the
-    // preview — the validator flags what's missing; the screen must still show it.
-    const d = JSON.parse(JSON.stringify(r.entry)) as KnowledgeEntry;
-    d.key_findings = Array.isArray(d.key_findings) ? d.key_findings : [];
-    d.translation = Array.isArray(d.translation) ? d.translation : [];
-    d.charts = Array.isArray(d.charts) ? d.charts : [];
-    d.layer1 = d.layer1 ?? {};
-    d.layer2 = d.layer2 ?? { what_it_means: '', what_it_doesnt_mean: '', questions_raised: [] };
-    d.header = d.header ?? ({} as KnowledgeEntry['header']);
-    d.header.topics = Array.isArray(d.header.topics) ? d.header.topics : [];
-    d.header.citation = d.header.citation ?? ({} as KnowledgeEntry['header']['citation']);
-    d.header.confidence = d.header.confidence ?? { level: '', why: '' };
-    d.header.practical_relevance = d.header.practical_relevance ?? { level: '', why: '' };
-    setDraft(d);
+    // The shared boundary normalizer guarantees the full entry shape, so
+    // the preview and the edit form can never crash on a deviant draft.
+    setDraft(normalizeKnowledgeEntry(JSON.parse(JSON.stringify(r.entry))));
   };
 
   const deleteEntry = async () => {
