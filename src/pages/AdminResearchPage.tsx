@@ -27,7 +27,7 @@ interface Row {
 
 // Must match FUNCTION_VERSION in supabase/functions/ingest-paper/index.ts.
 // The System Check flags a mismatch, which means "redeploy the function".
-const EXPECTED_FUNCTION_VERSION = '2026-10-16.4';
+const EXPECTED_FUNCTION_VERSION = '2026-10-16.5';
 
 /** Invoke ingest-paper surfacing the function's real error body. */
 async function invokeIngest(body: Record<string, unknown>): Promise<Record<string, unknown>> {
