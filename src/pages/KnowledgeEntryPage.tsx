@@ -817,7 +817,7 @@ export function KnowledgeEntryView({ entry, signedIn = false }: { entry: Knowled
 
         {/* Always rendered — the spine is identical on every page. A paper
             with no gym-floor line says so instead of hiding the section. */}
-        <SectionTitle>Say it to a member</SectionTitle>
+        <SectionTitle>Coach's guide</SectionTitle>
         {(entry.translation ?? []).length > 0 ? (
           <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 8 }}>
             {(entry.translation ?? []).map((t, i) => (

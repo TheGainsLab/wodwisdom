@@ -407,7 +407,7 @@ export default function AdminResearchPage({ session }: { session: Session }) {
                 <textarea style={{ ...field, minHeight: 100 }} value={draft.layer2.what_it_means} onChange={(e) => setL2('what_it_means', e.target.value)} />
                 <span style={label}>What it doesn&apos;t mean</span>
                 <textarea style={{ ...field, minHeight: 100 }} value={draft.layer2.what_it_doesnt_mean} onChange={(e) => setL2('what_it_doesnt_mean', e.target.value)} />
-                <span style={label}>Say it to a member (one per line)</span>
+                <span style={label}>Coach's guide (one per line)</span>
                 <textarea style={{ ...field, minHeight: 70 }} value={lines(draft.translation)} onChange={(e) => setDraft({ ...draft, translation: unlines(e.target.value) })} />
               </details>
 
