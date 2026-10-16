@@ -89,9 +89,38 @@ export default function AdminResearchPage({ session }: { session: Session }) {
   };
 
   const open = (r: Row) => {
-    if (r.status === 'drafting') return; // nothing to review yet
     setSelected(r);
-    setDraft(JSON.parse(JSON.stringify(r.entry)) as KnowledgeEntry);
+    // Normalize so an imperfect draft renders instead of crashing the
+    // preview — the validator flags what's missing; the screen must still show it.
+    const d = JSON.parse(JSON.stringify(r.entry)) as KnowledgeEntry;
+    d.key_findings = Array.isArray(d.key_findings) ? d.key_findings : [];
+    d.translation = Array.isArray(d.translation) ? d.translation : [];
+    d.charts = Array.isArray(d.charts) ? d.charts : [];
+    d.layer1 = d.layer1 ?? {};
+    d.layer2 = d.layer2 ?? { what_it_means: '', what_it_doesnt_mean: '', questions_raised: [] };
+    d.header = d.header ?? ({} as KnowledgeEntry['header']);
+    d.header.topics = Array.isArray(d.header.topics) ? d.header.topics : [];
+    d.header.citation = d.header.citation ?? ({} as KnowledgeEntry['header']['citation']);
+    d.header.confidence = d.header.confidence ?? { level: '', why: '' };
+    d.header.practical_relevance = d.header.practical_relevance ?? { level: '', why: '' };
+    setDraft(d);
+  };
+
+  const deleteEntry = async () => {
+    if (!selected) return;
+    if (!window.confirm(`Delete "${selected.slug}" permanently? This removes it from the library${selected.status === 'published' ? ' — it is currently LIVE' : ''}.`)) return;
+    setSaving(true);
+    setError('');
+    const { data: row } = await supabase.from('knowledge_entries').select('source_pdf_path').eq('slug', selected.slug).maybeSingle();
+    const { error: err } = await supabase.from('knowledge_entries').delete().eq('slug', selected.slug);
+    if (!err && row?.source_pdf_path) {
+      await supabase.storage.from('knowledge-pdfs').remove([row.source_pdf_path]);
+    }
+    setSaving(false);
+    if (err) { setError(err.message); return; }
+    setSelected(null);
+    setDraft(null);
+    await refresh();
   };
 
   const saveEntry = async (status?: 'published' | 'rejected') => {
@@ -218,6 +247,7 @@ export default function AdminResearchPage({ session }: { session: Session }) {
                 {(selected.status === 'draft' || selected.status === 'failed') && (
                   <button disabled={saving} onClick={() => saveEntry('rejected')} style={{ ...field, width: 'auto', cursor: 'pointer', color: 'var(--text-muted)' }}>Reject</button>
                 )}
+                <button disabled={saving} onClick={deleteEntry} style={{ ...field, width: 'auto', cursor: 'pointer', borderColor: 'var(--accent)', color: 'var(--accent)' }}>Delete</button>
               </div>
 
               {report && (report.errors.length > 0 || report.warnings.length > 0) && (
