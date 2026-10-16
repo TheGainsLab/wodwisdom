@@ -79,7 +79,19 @@ export default function AdminResearchPage({ session }: { session: Session }) {
       const { data, error: err } = await supabase.functions.invoke('ingest-paper', {
         body: { storage_path: storagePath },
       });
-      if (err) throw new Error(err.message ?? 'ingestion failed');
+      if (err) {
+        // The function always says WHY in its JSON body; surface that, never
+        // the generic "non-2xx" string.
+        let msg = err.message ?? 'ingestion failed';
+        const ctx = (err as { context?: Response }).context;
+        if (ctx && typeof ctx.json === 'function') {
+          try {
+            const body = await ctx.json();
+            if (body?.error) msg = `${body.error} (HTTP ${ctx.status})`;
+          } catch { /* keep generic message */ }
+        }
+        throw new Error(msg);
+      }
       if (data?.error) throw new Error(data.error);
       await refresh();
       setUploading(null); // the queue now shows a 'drafting' row that polls itself in
