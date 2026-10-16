@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
-  loadKnowledgeEntry, topicLabel,
+  loadKnowledgeEntry, ensureGlossary, topicLabel,
   type KnowledgeEntry, type KnowledgeChart,
 } from '../lib/knowledgeLibrary';
 import { QAHeader } from '../components/QAShared';
@@ -508,7 +508,9 @@ export default function KnowledgeEntryPage({ signedIn = false }: { signedIn?: bo
     let cancelled = false;
     setEntry(null); setMissing(false);
     if (!slug) { setMissing(true); return; }
-    loadKnowledgeEntry(slug).then((e) => {
+    // Glossary loads alongside the entry so tap-to-define terms are linkable
+    // on first paint.
+    Promise.all([loadKnowledgeEntry(slug), ensureGlossary()]).then(([e]) => {
       if (cancelled) return;
       if (e) setEntry(e); else setMissing(true);
     });

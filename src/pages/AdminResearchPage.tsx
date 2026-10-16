@@ -10,7 +10,7 @@
 import { useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
-import type { KnowledgeEntry } from '../lib/knowledgeLibrary';
+import { ensureGlossary, type KnowledgeEntry } from '../lib/knowledgeLibrary';
 import { KnowledgeEntryView } from './KnowledgeEntryPage';
 import Nav from '../components/Nav';
 import '../features.css';
@@ -55,7 +55,7 @@ export default function AdminResearchPage({ session }: { session: Session }) {
     if (err) setError(err.message);
     else setRows((data ?? []) as Row[]);
   };
-  useEffect(() => { if (role === 'admin') refresh(); }, [role]);
+  useEffect(() => { if (role === 'admin') { refresh(); ensureGlossary(); } }, [role]);
 
   // While anything is drafting in the background, poll for it to land.
   const anyDrafting = rows.some((r) => r.status === 'drafting');
@@ -140,10 +140,44 @@ export default function AdminResearchPage({ session }: { session: Session }) {
       if (status === 'published') patch.published_at = new Date().toISOString();
     }
     const { error: err } = await supabase.from('knowledge_entries').update(patch).eq('slug', selected.slug);
+    if (!err && status === 'published') await mergeGlossary(draft);
     setSaving(false);
     if (err) { setError(err.message); return; }
     await refresh();
     if (status) { setSelected(null); setDraft(null); }
+  };
+
+  // Publish-time glossary merge: first definition wins, alternates recorded
+  // for reconciliation — the same rule build.py used for the founding twelve.
+  const mergeGlossary = async (entry: KnowledgeEntry) => {
+    const candidates = entry.glossary_candidates ?? [];
+    for (const g of candidates) {
+      if (!g?.term || !g?.definition) continue;
+      const key = g.term.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+      if (!key) continue;
+      const { data: existing } = await supabase
+        .from('knowledge_glossary')
+        .select('term_key, definition, sources, alt_definitions')
+        .eq('term_key', key)
+        .maybeSingle();
+      if (!existing) {
+        await supabase.from('knowledge_glossary').insert({
+          term_key: key, term: g.term, definition: g.definition,
+          status: 'candidate', sources: [entry.slug], alt_definitions: [],
+        });
+      } else {
+        const sources: string[] = Array.isArray(existing.sources) ? existing.sources : [];
+        const alts: Array<{ entry: string; definition: string }> =
+          Array.isArray(existing.alt_definitions) ? existing.alt_definitions : [];
+        if (!sources.includes(entry.slug)) sources.push(entry.slug);
+        if (existing.definition !== g.definition && !alts.some((a) => a.entry === entry.slug)) {
+          alts.push({ entry: entry.slug, definition: g.definition });
+        }
+        await supabase.from('knowledge_glossary').update({
+          sources, alt_definitions: alts, updated_at: new Date().toISOString(),
+        }).eq('term_key', key);
+      }
+    }
   };
 
   const setHeader = (k: string, v: unknown) => draft && setDraft({ ...draft, header: { ...draft.header, [k]: v } });

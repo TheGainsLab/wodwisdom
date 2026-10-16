@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { KNOWLEDGE_GLOSSARY } from '../lib/knowledgeLibrary';
+import { getGlossaryTerms } from '../lib/knowledgeLibrary';
 
 /** Shape / confidence / relevance badges for the research library. */
 export function KnowledgeBadge({ kind, value, why }: { kind: 'shape' | 'confidence' | 'relevance'; value: string; why?: string }) {
@@ -33,7 +33,10 @@ export function KnowledgeBadge({ kind, value, why }: { kind: 'shape' | 'confiden
 // (works on mobile where hover doesn't exist). First occurrence per
 // section only — a linkify() call is one section.
 
-const TERMS = [...KNOWLEDGE_GLOSSARY].sort((a, b) => b.term.length - a.term.length);
+// Resolved at call time: pages await ensureGlossary() before rendering prose.
+function TERMS() {
+  return [...getGlossaryTerms()].sort((a, b) => b.term.length - a.term.length);
+}
 
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -94,7 +97,7 @@ export function linkifyGlossary(
   // Collect first-occurrence matches, longest terms first so "VO2peak"
   // beats "VO2"; overlapping later matches are discarded.
   const matches: Array<{ start: number; end: number; term: string; definition: string }> = [];
-  for (const t of TERMS) {
+  for (const t of TERMS()) {
     const key = t.term.toLowerCase();
     if (opts?.seen?.has(key)) continue;
     const re = new RegExp(`(?<![\\w-])${escapeRegExp(t.term)}(?![\\w-])`, 'i');
