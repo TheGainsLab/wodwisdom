@@ -283,11 +283,6 @@ function chartRows(c: KnowledgeChart): { columns: Array<{ key: string; label: st
             .map((p) => `${p.name} ${p.value}%`).join(' · '),
         })),
       };
-    case 'timeline':
-      return {
-        columns: [{ key: 'label', label: '' }, { key: 'span', label: `Span (${c.units})` }, { key: 'note', label: 'Note' }],
-        rows: s.map((x) => ({ label: x.label, span: `${x.start} → ${x.end}`, note: x.note ?? '' })),
-      };
     case 'population_card':
       return {
         columns: [
@@ -495,6 +490,71 @@ function renderGroupedChangeBars(c: KnowledgeChart): React.ReactNode | null {
   );
 }
 
+/** values_by_condition: grouped bars per outcome, one color per condition. */
+function renderValuesByCondition(c: KnowledgeChart): React.ReactNode | null {
+  const series = ((c.series ?? []) as Array<{ label: string; values: Array<{ condition: string; value: number | null }> }>)
+    .filter((s) => !!s && typeof s.label === 'string' && Array.isArray(s.values))
+    .map((s) => ({ ...s, values: s.values.filter((v) => !!v && typeof v.condition === 'string') }));
+  if (!series.length) return null;
+  // Conditions take colors by first appearance in the data, never cycled.
+  const conditions: string[] = [];
+  for (const s of series) for (const v of s.values) if (!conditions.includes(v.condition)) conditions.push(v.condition);
+  if (conditions.length < 2 || conditions.length > SHARE_SLOTS.length) return null;
+  const nums = series.flatMap((s) => s.values.map((v) => v.value)).filter((v): v is number => typeof v === 'number');
+  // Bars grow from zero, so negative values fall back to the honest table.
+  if (!nums.length || nums.some((v) => v < 0) || Math.max(...nums) <= 0) return null;
+  const mixed = c.units.trim().toLowerCase().startsWith('mixed');
+  const sharedMax = Math.max(...nums);
+  const color = (cond: string) => SHARE_SLOTS[conditions.indexOf(cond)];
+  return (
+    <div style={{ margin: '2px 0 10px' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginBottom: 10 }}>
+        {conditions.map((cond) => (
+          <span key={cond} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'var(--text-dim)' }}>
+            <span style={{ width: 10, height: 10, borderRadius: 3, background: color(cond), flexShrink: 0 }} />{cond}
+          </span>
+        ))}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {series.map((s) => {
+          // "mixed" units can't share a scale: each outcome scales to itself
+          // and only the within-outcome comparison is meaningful.
+          const rowNums = s.values.map((v) => v.value).filter((v): v is number => typeof v === 'number');
+          const max = (mixed ? Math.max(...rowNums, 0) : sharedMax) || 1;
+          return (
+            <div key={s.label}>
+              <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 4 }}>{s.label}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {conditions.map((cond) => {
+                  const v = s.values.find((x) => x.condition === cond)?.value;
+                  if (v === undefined) return null;
+                  if (v === null) {
+                    return (
+                      <div key={cond} style={{ display: 'flex', alignItems: 'center', gap: 6, height: 14 }}>
+                        <span style={{ width: 10, height: 10, borderRadius: 3, background: color(cond), flexShrink: 0, opacity: 0.5 }} />
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic' }}>not reported</span>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div key={cond} style={{ display: 'flex', alignItems: 'center', gap: 6, height: 14 }}>
+                      <div style={{
+                        width: `${Math.max((v / max) * 86, 0.5)}%`, minWidth: 2, height: 12,
+                        background: color(cond), borderRadius: '0 4px 4px 0', flexShrink: 0,
+                      }} />
+                      <span style={{ fontSize: 11, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{v}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function ChartBlock({ c }: { c: KnowledgeChart }) {
   const { columns, rows } = chartRows(c);
   // A row where every cell is blank carries no information — a mis-shaped
@@ -514,10 +574,11 @@ function ChartBlock({ c }: { c: KnowledgeChart }) {
     c.template === 'stacked_share' ? renderStackedShare(c)
     : c.template === 'before_after_bars' ? renderBeforeAfterBars(c)
     : c.template === 'grouped_change_bars' ? renderGroupedChangeBars(c)
+    : c.template === 'values_by_condition' ? renderValuesByCondition(c)
     : null;
   const drawn = byTemplate
     ?? (c.template !== 'population_card' && c.template !== 'concept_curve'
-      ? renderBeforeAfterBars(c) ?? renderStackedShare(c) ?? renderGroupedChangeBars(c)
+      ? renderBeforeAfterBars(c) ?? renderStackedShare(c) ?? renderValuesByCondition(c) ?? renderGroupedChangeBars(c)
       : null);
   // An empty or broken chart helps no reader: nothing drawable and no table
   // rows means the block doesn't render at all. (concept_curve is note-only

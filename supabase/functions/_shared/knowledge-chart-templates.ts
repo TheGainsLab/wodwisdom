@@ -54,14 +54,6 @@ export const CHART_TEMPLATES: Record<string, ChartTemplateSpec> = {
     },
     "shape_text": "{label, parts: [{name, value}]}"
   },
-  "timeline": {
-    "shape": {
-      "label": "string",
-      "start": "any",
-      "end": "any"
-    },
-    "shape_text": "{label, start, end, note}"
-  },
   "population_card": {
     "shape": {
       "n": "any"

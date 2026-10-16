@@ -43,7 +43,6 @@ export interface KnowledgeChart {
     | 'grouped_change_bars'
     | 'values_by_condition'
     | 'stacked_share'
-    | 'timeline'
     | 'population_card'
     | 'concept_curve';
   title: string;
