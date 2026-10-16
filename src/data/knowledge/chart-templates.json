@@ -24,12 +24,6 @@
     "example": [{ "label": "0–30 s", "parts": [{ "name": "aerobic", "value": 45 }, { "name": "anaerobic", "value": 55 }] }],
     "doc": "each row's parts sum to 100"
   },
-  "timeline": {
-    "shape": { "label": "string", "start": "any", "end": "any" },
-    "shape_text": "{label, start, end, note}",
-    "example": [{ "label": "Training block", "start": 0, "end": 14, "note": "" }],
-    "doc": "`start`/`end` are numbers in the chart's `units`"
-  },
   "population_card": {
     "shape": { "n": "any" },
     "shape_text": "{n, sex_split, age, status, other}",

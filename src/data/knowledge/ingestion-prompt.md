@@ -100,7 +100,9 @@ Voice for Layer 2: neutral, specific, plain. Write the honest version; the edito
 
 ### 7. Chart data
 
-`charts[]`: 1–4 chart specifications for fixed templates. Each: `template` (one of `before_after_bars`, `grouped_change_bars`, `values_by_condition`, `stacked_share`, `timeline`, `population_card`, `concept_curve`), `title`, `series`, `units`, `approximate` (true if any value was read from a figure), `note`.
+`charts[]`: 1–4 chart specifications for fixed templates. Each: `template` (one of `before_after_bars`, `grouped_change_bars`, `values_by_condition`, `stacked_share`, `population_card`, `concept_curve`), `title`, `series`, `units`, `approximate` (true if any value was read from a figure), `note`.
+
+A chart carries a **finding** — something the paper measured and a reader needs to compare. Logistics, methods and schedules are never charts: scheduling facts belong in `setup_plain` and the design notes, with their consequences (e.g. a test taken one day after training) stated in Layer 2 where they affect interpretation.
 
 `series` must match its template's exact shape — the renderer reads these keys and no others, and any other shape fails validation:
 
@@ -109,7 +111,6 @@ Voice for Layer 2: neutral, specific, plain. Write the honest version; the edito
 - `grouped_change_bars`: `[{"group":"Sprint training","values":[{"label":"PFK","value":106}]}]` — one item per group, **even when the study has a single group**; each `label` is an outcome and `value` its signed change in the chart's `units`
 - `values_by_condition`: `[{"label":"Peak power (W)","values":[{"condition":"45-s rest","value":723}]}]`
 - `stacked_share`: `[{"label":"0–30 s","parts":[{"name":"aerobic","value":45},{"name":"anaerobic","value":55}]}]` — each row's parts sum to 100
-- `timeline`: `[{"label":"Training block","start":0,"end":14,"note":""}]` — `start`/`end` are numbers in the chart's `units`
 - `population_card`: `[{"n":"5","sex_split":"5 M","age":"20.8 (2.9)","status":"active, not in regular training","other":""}]` — one item per group
 - `concept_curve`: `series` may be `[]`; the `note` carries the meaning
 <!-- chart-shapes:end -->

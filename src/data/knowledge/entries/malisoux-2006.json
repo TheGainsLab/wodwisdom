@@ -128,20 +128,6 @@
       "note": "% change: SJ +9, CMJ +13, shuttle −4, leg press +12."
     },
     {
-      "template": "timeline",
-      "title": "Study timeline",
-      "series": [
-        { "label": "Pre-tests", "start": 0, "end": 0, "note": "" },
-        { "label": "Biopsy", "start": 0, "end": 0, "note": "+3 d after pre-tests" },
-        { "label": "Training: 3×/wk", "start": 0, "end": 8, "note": "Ramp over first 4 weeks" },
-        { "label": "Post-tests", "start": 8, "end": 8, "note": "4 d after last session" },
-        { "label": "Biopsy", "start": 8, "end": 8, "note": "+3 d after post-tests" }
-      ],
-      "units": "weeks",
-      "approximate": false,
-      "note": "Day offsets (+3 d, 4 d) are in each row's note; week positions are schematic."
-    },
-    {
       "template": "population_card",
       "title": "Who was studied",
       "series": [

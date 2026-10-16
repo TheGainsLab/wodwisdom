@@ -185,20 +185,6 @@
       "note": "SIT/MICT percentages as printed (pp.5-8); GLUT4 printed as '~50%' for both. Control percentages are not printed except beta-HAD (-2%): VO2peak, CSI and GLUT4 control values calculated from Table 2 means (2.5 -> 2.5 L/min; 7.4 -> 7.0; 1.0 -> 0.9); control citrate synthase read from Fig 3A (approx.). Beta-HAD change was not significant (interaction p = 0.16)."
     },
     {
-      "template": "timeline",
-      "title": "Study timeline",
-      "series": [
-        { "label": "Baseline testing", "start": 0, "end": 0, "note": "VO2peak test; ~5 days later body composition and IVGTT; ~2 days later muscle biopsy; at least 5 days later exercise familiarisation." },
-        { "label": "Lead-in", "start": 1, "end": 2, "note": "1 session in week 1, 2 sessions in week 2." },
-        { "label": "Training, 3 sessions per week", "start": 3, "end": 12, "note": "SIT 10 min / MICT 50 min per session; loads adjusted to keep relative intensity." },
-        { "label": "Mid-training VO2peak test", "start": 7, "end": 7, "note": "Two week-7 sessions replaced by testing; controls attended only this visit during the 12 weeks. VO2peak ~+12% at 6 weeks in both training groups." },
-        { "label": "Post-testing", "start": 12, "end": 13, "note": "Body composition and IVGTT 72 h after last session; biopsy 96 h after; VO2peak test ~1 week after training." }
-      ],
-      "units": "weeks",
-      "approximate": false,
-      "note": "Baseline test day intervals are given in days in the paper and are not placed on a week number; shown at week 0."
-    },
-    {
       "template": "population_card",
       "title": "Who was studied",
       "series": [
