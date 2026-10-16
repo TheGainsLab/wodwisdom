@@ -116,6 +116,11 @@ def check(e, path):
     stray = {n for n in stray if not re.fullmatch(r"\d{1,2}", n)}  # ignore small counts like "8 weeks" -> still flagged if >2 digits
     if stray:
         warns.append(f"numbers in layer2 not found in layer1: {sorted(stray)[:12]}")
+    # Key findings make the same promise (mirror of knowledge-validate.ts).
+    kf_stray = {n for n in numbers_in(e.get("key_findings", [])) - l1nums
+                if not re.fullmatch(r"\d{1,2}", n)}
+    if kf_stray:
+        warns.append(f"numbers in key_findings not found in layer1: {sorted(kf_stray)[:12]}")
     # measured rows
     for row in l1.get("intervention", {}).get("measured", []):
         if row.get("significant") not in SIG:

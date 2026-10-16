@@ -85,7 +85,11 @@ export function setupNarrative(entry: KnowledgeEntry): string[] {
         : `${g.n_enrolled} enrolled / ${g.n_analysed} analysed`;
       const demo = [usable(g.age) && `age ${g.age}`, usable(g.sex) && g.sex, usable(g.training_status) && g.training_status]
         .filter(Boolean).join(', ');
-      const bits = [[n, demo].filter(Boolean).join(', '), g.protocol, g.per_week, g.other]
+      // per_week is a bare count in most entries ("3"); spelled out so the
+      // narrative doesn't read "…over 2 weeks. 3. Weight 78 kg".
+      const perWeek = usable(g.per_week) && /^\d+(\.\d+)?$/.test(g.per_week.trim())
+        ? `${g.per_week.trim()} sessions/week` : g.per_week;
+      const bits = [[n, demo].filter(Boolean).join(', '), g.protocol, perWeek, g.other]
         .filter((s) => usable(s as string));
       out.push(`${g.name} — ${bits.join('. ').replace(/\.\./g, '.')}.`);
     }
@@ -276,7 +280,11 @@ function chartRows(c: KnowledgeChart): { columns: Array<{ key: string; label: st
         rows: groupedChangeSeries(c).map((x) => ({
           group: x.group || '—',
           values: x.values
-            .map((v) => `${v.label}: ${v.value === null ? 'not reported' : `${typeof v.value === 'number' && v.value > 0 ? '+' : ''}${v.value}%`}`).join(' · '),
+            .map((v) => {
+              if (v.value === null) return `${v.label}: not reported`;
+              const plus = (c.units.includes('%') || c.units.toLowerCase().includes('change')) && typeof v.value === 'number' && v.value > 0 ? '+' : '';
+              return `${v.label}: ${plus}${v.value}${c.units.includes('%') ? '%' : ''}`;
+            }).join(' · '),
         })),
       };
     case 'values_by_condition':
@@ -445,6 +453,9 @@ function renderGroupedChangeBars(c: KnowledgeChart): React.ReactNode | null {
   const pct = (v: number) => ((v - minV) / span) * 86; // leave room for tip labels
   const zero = pct(0);
   const suffix = c.units.includes('%') ? '%' : '';
+  // "+186 minutes" misreads an absolute value as a gain: the + prefix only
+  // belongs on values whose units declare them changes.
+  const signed = c.units.includes('%') || c.units.toLowerCase().includes('change');
   const color = (g: string) => SHARE_SLOTS[series.findIndex((s) => s.group === g)];
   return (
     <div style={{ margin: '2px 0 10px' }}>
@@ -491,7 +502,7 @@ function renderGroupedChangeBars(c: KnowledgeChart): React.ReactNode | null {
                         ? { left: `${zero + width}%`, paddingLeft: 6 }
                         : { right: `${100 - left}%`, paddingRight: 6 }),
                     }}>
-                      {v > 0 ? '+' : ''}{v}{suffix}
+                      {signed && v > 0 ? '+' : ''}{v}{suffix}
                     </span>
                   </div>
                 );
@@ -806,7 +817,7 @@ export function KnowledgeEntryView({ entry, signedIn = false }: { entry: Knowled
 
         {/* Always rendered — the spine is identical on every page. A paper
             with no gym-floor line says so instead of hiding the section. */}
-        <SectionTitle>Say it to a member</SectionTitle>
+        <SectionTitle>Coach's guide</SectionTitle>
         {(entry.translation ?? []).length > 0 ? (
           <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 8 }}>
             {(entry.translation ?? []).map((t, i) => (
@@ -822,8 +833,15 @@ export function KnowledgeEntryView({ entry, signedIn = false }: { entry: Knowled
         )}
 
         {/* The trust block in full: badges in the header give the glance,
-            this section gives the depth, out of the reading flow. */}
-        <SectionTitle>About this paper</SectionTitle>
+            this section gives the depth. Collapsed like ALL THE DATA — a
+            spine section whose detail never interrupts the reading flow. */}
+        <details style={{ marginTop: 4 }} onToggle={(e) => (e.target as HTMLDetailsElement).open && logKnowledgeEvent('about_view', entry.slug)}>
+          <summary style={{ cursor: 'pointer', margin: '24px 0 10px' }}>
+            <span style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)' }}>
+              About this paper
+            </span>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 8 }}>— design, who was studied, confidence, funding</span>
+          </summary>
         <p style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--text)', margin: '0 0 10px' }}>
           {linkifyGlossary(h.evidence_type)}
         </p>
@@ -853,6 +871,7 @@ export function KnowledgeEntryView({ entry, signedIn = false }: { entry: Knowled
             <strong style={{ color: 'var(--text)' }}>Funding &amp; conflicts</strong> — {h.funding_and_conflicts}
           </p>
         )}
+        </details>
 
         {(h.topics ?? []).length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 24 }}>
