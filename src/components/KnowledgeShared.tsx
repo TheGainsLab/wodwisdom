@@ -95,6 +95,7 @@ export function linkifyGlossary(
   text: string,
   opts?: { inline?: boolean; seen?: Set<string> },
 ): React.ReactNode[] {
+  if (typeof text !== 'string' || !text) return [text ?? ''];
   // Collect first-occurrence matches, longest terms first so "VO2peak"
   // beats "VO2"; overlapping later matches are discarded.
   const matches: Array<{ start: number; end: number; term: string; definition: string }> = [];
