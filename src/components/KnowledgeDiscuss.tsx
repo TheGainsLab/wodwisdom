@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DISCUSS_PAPER_ENDPOINT, getAuthHeaders, supabase } from '../lib/supabase';
 import { formatMarkdown } from '../lib/formatMarkdown';
+import { logKnowledgeEvent } from '../lib/knowledgeEvents';
 
 /**
  * Discuss this paper — the research chat panel on a knowledge entry page.
@@ -33,7 +34,7 @@ function renderAssistantHtml(text: string): string {
   return formatMarkdown(cleaned);
 }
 
-export default function KnowledgeDiscuss({ slug }: { slug: string }) {
+export default function KnowledgeDiscuss({ slug, signedIn }: { slug: string; signedIn: boolean }) {
   const navigate = useNavigate();
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState('');
@@ -43,10 +44,18 @@ export default function KnowledgeDiscuss({ slug }: { slug: string }) {
   const [freeLimit, setFreeLimit] = useState(FREE_LIMIT_DEFAULT);
   const [entitled, setEntitled] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
+  const clickLogged = useRef(false);
+
+  const logOnce = () => {
+    if (clickLogged.current) return;
+    clickLogged.current = true;
+    logKnowledgeEvent('discuss_click', slug, { signedIn });
+  };
 
   // Saved thread + current meter position, so a returning member sees
   // their history and the true remaining count before the first send.
   useEffect(() => {
+    if (!signedIn) return;
     let cancelled = false;
     (async () => {
       const [{ data: thread }, { data: meterRows }] = await Promise.all([
@@ -62,7 +71,7 @@ export default function KnowledgeDiscuss({ slug }: { slug: string }) {
       }
     })();
     return () => { cancelled = true; };
-  }, [slug]);
+  }, [slug, signedIn]);
 
   useEffect(() => { endRef.current?.scrollIntoView({ block: 'nearest' }); }, [messages]);
 
@@ -71,6 +80,7 @@ export default function KnowledgeDiscuss({ slug }: { slug: string }) {
   const send = async () => {
     const question = input.trim();
     if (!question || sending || paywalled) return;
+    if (!signedIn) { navigate(`/auth?signup=1&next=/knowledge/${slug}`); return; }
     setError('');
     setInput('');
     setSending(true);
@@ -173,28 +183,24 @@ export default function KnowledgeDiscuss({ slug }: { slug: string }) {
         </div>
       ) : (
         <>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input
+          <div className="input-row">
+            <textarea
+              rows={1}
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
-              placeholder="Ask about this paper…"
-              disabled={sending}
-              style={{
-                flex: 1, minWidth: 0, padding: '10px 12px', borderRadius: 8, fontSize: 13.5,
-                background: 'var(--surface2, #1a1a1f)', border: '1px solid var(--border)', color: 'var(--text)',
+              onFocus={() => {
+                logOnce();
+                if (!signedIn) navigate(`/auth?signup=1&next=/knowledge/${slug}`);
               }}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
+              placeholder={signedIn ? 'Ask this paper a question…' : 'Ask this paper a question — free account to start'}
+              disabled={sending}
             />
-            <button
-              onClick={send}
-              disabled={sending || !input.trim()}
-              className="feature-cta"
-              style={{ opacity: sending || !input.trim() ? 0.6 : 1 }}
-            >
-              {sending ? '…' : 'Ask'}
+            <button className="send-btn" onClick={send} disabled={sending || !input.trim()}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
             </button>
           </div>
-          {!entitled && used !== null && (
+          {signedIn && !entitled && used !== null && (
             <p style={{ fontSize: 11.5, color: 'var(--text-muted)', margin: '8px 0 0' }}>
               {Math.max(freeLimit - used, 0)} of {freeLimit} free research questions left — answers come from this paper's verified record.
             </p>

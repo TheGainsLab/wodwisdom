@@ -895,48 +895,16 @@ export function KnowledgeEntryView({ entry, signedIn = false }: { entry: Knowled
 }
 
 /**
- * Discuss this paper — the one gated action. Signed-in members chat with
- * the paper right here (grounded in its verified record, 3 free questions
- * across the library); signed-out readers go to signup and land back on
- * this page.
+ * Discuss this paper — presented like the main AI Coach: a spine header
+ * and the house chat input, nothing louder. Signed-in members chat right
+ * here; signed-out readers are routed to signup on first touch and land
+ * back on this page.
  */
 function DiscussBlock({ slug, signedIn }: { slug: string; signedIn: boolean }) {
-  const [open, setOpen] = useState(false);
   return (
-    <div style={{ marginTop: 28, padding: '16px', borderRadius: 12, border: '1px solid var(--accent)', background: 'var(--surface)' }}>
-      {signedIn ? (
-        <>
-          {!open && (
-            <button
-              className="feature-cta"
-              style={{ display: 'inline-block' }}
-              onClick={() => { setOpen(true); logKnowledgeEvent('discuss_click', slug, { signedIn }); }}
-            >
-              Discuss this paper with the AI Coach
-            </button>
-          )}
-          {!open && (
-            <p style={{ fontSize: 12.5, color: 'var(--text-dim)', margin: '10px 0 0', lineHeight: 1.5 }}>
-              Ask this paper questions — answers come from its verified record, with anything beyond it clearly labeled.
-            </p>
-          )}
-          {open && <KnowledgeDiscuss slug={slug} />}
-        </>
-      ) : (
-        <>
-          <Link
-            to={`/auth?signup=1&next=/knowledge/${slug}`}
-            className="feature-cta"
-            style={{ display: 'inline-block' }}
-            onClick={() => logKnowledgeEvent('discuss_click', slug, { signedIn })}
-          >
-            Discuss this paper with the AI Coach
-          </Link>
-          <p style={{ fontSize: 12.5, color: 'var(--text-dim)', margin: '10px 0 0', lineHeight: 1.5 }}>
-            Create a free account to ask this paper questions — 3 free research questions, answers grounded in the study you're reading.
-          </p>
-        </>
-      )}
+    <div style={{ marginTop: 8 }}>
+      <SectionTitle>Discuss with the AI Coach</SectionTitle>
+      <KnowledgeDiscuss slug={slug} signedIn={signedIn} />
     </div>
   );
 }
