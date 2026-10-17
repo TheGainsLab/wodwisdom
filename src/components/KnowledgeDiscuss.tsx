@@ -23,8 +23,14 @@ const FREE_LIMIT_DEFAULT = 3;
  * links first, so sibling-paper pointers are always tappable.
  */
 function renderAssistantHtml(text: string): string {
-  const linked = text.replace(/(^|[\s(])(\/knowledge\/[a-z0-9][a-z0-9-]*)/g, '$1[$2]($2)');
-  return formatMarkdown(linked);
+  const cleaned = text
+    // The prompt forbids headings and rules; the renderer guarantees it.
+    // A heading the model slips through becomes a bold line, a divider
+    // disappears — a literal ## or --- never reaches the member.
+    .replace(/^#{1,6}\s*(.+)$/gm, '**$1**')
+    .replace(/^\s*(?:---+|\*\*\*+)\s*$/gm, '')
+    .replace(/(^|[\s(])(\/knowledge\/[a-z0-9][a-z0-9-]*)/g, '$1[$2]($2)');
+  return formatMarkdown(cleaned);
 }
 
 export default function KnowledgeDiscuss({ slug }: { slug: string }) {
