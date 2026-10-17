@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { DISCUSS_PAPER_ENDPOINT, getAuthHeaders, supabase } from '../lib/supabase';
+import { formatMarkdown } from '../lib/formatMarkdown';
+import { logKnowledgeEvent } from '../lib/knowledgeEvents';
 
 /**
  * Discuss this paper — the research chat panel on a knowledge entry page.
@@ -16,22 +18,23 @@ type Msg = { role: 'user' | 'assistant'; content: string; streaming?: boolean };
 
 const FREE_LIMIT_DEFAULT = 3;
 
-/** Assistant answers point to siblings as /knowledge/<slug> — make them tappable. */
-function renderWithLinks(text: string): React.ReactNode[] {
-  const out: React.ReactNode[] = [];
-  const re = /\/knowledge\/[a-z0-9][a-z0-9-]*/g;
-  let cursor = 0;
-  for (const m of text.matchAll(re)) {
-    const start = m.index ?? 0;
-    if (start > cursor) out.push(text.slice(cursor, start));
-    out.push(<Link key={start} to={m[0]} style={{ color: 'var(--slot1, #3987e5)' }}>{m[0]}</Link>);
-    cursor = start + m[0].length;
-  }
-  if (cursor < text.length) out.push(text.slice(cursor));
-  return out;
+/**
+ * Answers render through the house markdown formatter (same as the main
+ * chat). Bare /knowledge/<slug> paths the model emits become markdown
+ * links first, so sibling-paper pointers are always tappable.
+ */
+function renderAssistantHtml(text: string): string {
+  const cleaned = text
+    // The prompt forbids headings and rules; the renderer guarantees it.
+    // A heading the model slips through becomes a bold line, a divider
+    // disappears — a literal ## or --- never reaches the member.
+    .replace(/^#{1,6}\s*(.+)$/gm, '**$1**')
+    .replace(/^\s*(?:---+|\*\*\*+)\s*$/gm, '')
+    .replace(/(^|[\s(])(\/knowledge\/[a-z0-9][a-z0-9-]*)/g, '$1[$2]($2)');
+  return formatMarkdown(cleaned);
 }
 
-export default function KnowledgeDiscuss({ slug }: { slug: string }) {
+export default function KnowledgeDiscuss({ slug, signedIn }: { slug: string; signedIn: boolean }) {
   const navigate = useNavigate();
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState('');
@@ -41,10 +44,18 @@ export default function KnowledgeDiscuss({ slug }: { slug: string }) {
   const [freeLimit, setFreeLimit] = useState(FREE_LIMIT_DEFAULT);
   const [entitled, setEntitled] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
+  const clickLogged = useRef(false);
+
+  const logOnce = () => {
+    if (clickLogged.current) return;
+    clickLogged.current = true;
+    logKnowledgeEvent('discuss_click', slug, { signedIn });
+  };
 
   // Saved thread + current meter position, so a returning member sees
   // their history and the true remaining count before the first send.
   useEffect(() => {
+    if (!signedIn) return;
     let cancelled = false;
     (async () => {
       const [{ data: thread }, { data: meterRows }] = await Promise.all([
@@ -60,7 +71,7 @@ export default function KnowledgeDiscuss({ slug }: { slug: string }) {
       }
     })();
     return () => { cancelled = true; };
-  }, [slug]);
+  }, [slug, signedIn]);
 
   useEffect(() => { endRef.current?.scrollIntoView({ block: 'nearest' }); }, [messages]);
 
@@ -69,6 +80,7 @@ export default function KnowledgeDiscuss({ slug }: { slug: string }) {
   const send = async () => {
     const question = input.trim();
     if (!question || sending || paywalled) return;
+    if (!signedIn) { navigate(`/auth?signup=1&next=/knowledge/${slug}`); return; }
     setError('');
     setInput('');
     setSending(true);
@@ -126,7 +138,10 @@ export default function KnowledgeDiscuss({ slug }: { slug: string }) {
       }
       setMessages((prev) => prev.map((m, i) => (i === prev.length - 1 ? { ...m, streaming: false } : m)));
     } catch (e) {
-      setMessages((prev) => prev.slice(0, -1));
+      // Remove BOTH pending bubbles and restore the question to the input —
+      // leaving the user bubble behind doubled the question on retry.
+      setMessages((prev) => prev.slice(0, -2));
+      setInput(question);
       setError(e instanceof Error ? e.message : 'Something went wrong');
     } finally {
       setSending(false);
@@ -140,12 +155,16 @@ export default function KnowledgeDiscuss({ slug }: { slug: string }) {
           {messages.map((m, i) => (
             <div
               key={i}
+              className={m.role === 'assistant' ? 'msg-body assistant' : undefined}
               style={m.role === 'user'
                 ? { alignSelf: 'flex-end', maxWidth: '85%', padding: '8px 12px', borderRadius: 10, background: 'var(--surface2, #222)', border: '1px solid var(--border)', fontSize: 13.5, lineHeight: 1.55 }
-                : { alignSelf: 'stretch', fontSize: 13.5, lineHeight: 1.6, color: 'var(--text)', whiteSpace: 'pre-wrap' }}
+                : { alignSelf: 'stretch', fontSize: 13.5, lineHeight: 1.6, color: 'var(--text)' }}
             >
-              {m.role === 'assistant' ? renderWithLinks(m.content) : m.content}
-              {m.streaming && !m.content && <span style={{ color: 'var(--text-muted)' }}>thinking…</span>}
+              {m.role === 'assistant' ? (
+                m.streaming && !m.content
+                  ? <span style={{ color: 'var(--text-muted)' }}>thinking…</span>
+                  : <div dangerouslySetInnerHTML={{ __html: renderAssistantHtml(m.content) }} />
+              ) : m.content}
             </div>
           ))}
           <div ref={endRef} />
@@ -164,28 +183,24 @@ export default function KnowledgeDiscuss({ slug }: { slug: string }) {
         </div>
       ) : (
         <>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input
+          <div className="input-row">
+            <textarea
+              rows={1}
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
-              placeholder="Ask about this paper…"
-              disabled={sending}
-              style={{
-                flex: 1, minWidth: 0, padding: '10px 12px', borderRadius: 8, fontSize: 13.5,
-                background: 'var(--surface2, #1a1a1f)', border: '1px solid var(--border)', color: 'var(--text)',
+              onFocus={() => {
+                logOnce();
+                if (!signedIn) navigate(`/auth?signup=1&next=/knowledge/${slug}`);
               }}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
+              placeholder={signedIn ? 'Ask this paper a question…' : 'Ask this paper a question — free account to start'}
+              disabled={sending}
             />
-            <button
-              onClick={send}
-              disabled={sending || !input.trim()}
-              className="feature-cta"
-              style={{ opacity: sending || !input.trim() ? 0.6 : 1 }}
-            >
-              {sending ? '…' : 'Ask'}
+            <button className="send-btn" onClick={send} disabled={sending || !input.trim()}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
             </button>
           </div>
-          {!entitled && used !== null && (
+          {signedIn && !entitled && used !== null && (
             <p style={{ fontSize: 11.5, color: 'var(--text-muted)', margin: '8px 0 0' }}>
               {Math.max(freeLimit - used, 0)} of {freeLimit} free research questions left — answers come from this paper's verified record.
             </p>
