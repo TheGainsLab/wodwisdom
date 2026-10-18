@@ -9,6 +9,18 @@ import '../qa.css';
 import { logKnowledgeEvent } from '../lib/knowledgeEvents';
 import { supabase } from '../lib/supabase';
 
+/**
+ * "Schumann et al. (2022)" — card-level provenance. A card needs "real
+ * paper, real year", not the full roster; the complete citation stays on
+ * the entry page's ABOUT THIS PAPER.
+ */
+function shortCitation(authors: string, year: string): string {
+  if (!authors || /not printed/i.test(authors)) return year ? `(${year})` : '';
+  const parts = authors.split(',');
+  const surname = parts[0].trim().split(/\s+/)[0];
+  return `${surname}${parts.length > 1 ? ' et al.' : ''}${year ? ` (${year})` : ''}`;
+}
+
 /** A saved research conversation, as "My research" lists it. */
 type MyThread = {
   slug: string;
@@ -130,9 +142,7 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
                 if (isLibrary) {
                   name = 'Ask the library';
                 } else if (row) {
-                  const authors = row.authors.split(',');
-                  const surname = authors[0].trim().split(/\s+/)[0];
-                  name = `${surname}${authors.length > 1 ? ' et al.' : ''}${row.year ? ` ${row.year}` : ''}`;
+                  name = shortCitation(row.authors, row.year) || t.slug;
                 }
                 const inner = (
                   <>
@@ -196,7 +206,7 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
                 {r.title}
               </div>
               <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginBottom: 8 }}>
-                {r.authors} ({r.year}){r.journal ? ` · ${r.journal}` : ''}
+                {shortCitation(r.authors, r.year)}{r.journal ? ` · ${r.journal}` : ''}
               </div>
               {/* Topic tags are data, not card copy: they feed search and the
                   Ask-the-library router, but printed on the card they were
