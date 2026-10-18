@@ -122,22 +122,26 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {myThreads.map((t) => {
                 const isLibrary = t.slug === '_library';
-                const title = isLibrary
-                  ? 'Ask the library'
-                  : (index?.find((r) => r.slug === t.slug)?.title ?? t.slug);
+                // The meta line is a NAME (first author + year), never the
+                // entry's headline — headlines are finding-carrying sentences
+                // and drowned the member's own question on these cards.
+                const row = index?.find((r) => r.slug === t.slug);
+                let name = t.slug;
+                if (isLibrary) {
+                  name = 'Ask the library';
+                } else if (row) {
+                  const authors = row.authors.split(',');
+                  const surname = authors[0].trim().split(/\s+/)[0];
+                  name = `${surname}${authors.length > 1 ? ' et al.' : ''}${row.year ? ` ${row.year}` : ''}`;
+                }
                 const inner = (
                   <>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}>
-                      <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text)' }}>{title}</span>
-                      <span style={{ fontSize: 11.5, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-                        {t.questionCount} {t.questionCount === 1 ? 'question' : 'questions'}
-                      </span>
+                    <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text)', lineHeight: 1.45 }}>
+                      {t.lastQuestion ? `“${t.lastQuestion}”` : name}
                     </div>
-                    {!!t.lastQuestion && (
-                      <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 3, lineHeight: 1.45 }}>
-                        “{t.lastQuestion}”
-                      </div>
-                    )}
+                    <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 3 }}>
+                      {name} · {t.questionCount} {t.questionCount === 1 ? 'question' : 'questions'}
+                    </div>
                   </>
                 );
                 const cardStyle = {
