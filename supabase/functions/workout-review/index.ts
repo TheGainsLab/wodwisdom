@@ -822,10 +822,15 @@ Deno.serve(async (req) => {
     const profileStr = formatAthleteProfile(athleteProfile);
     const recentStr = recentTraining || "No recent workouts logged.";
 
-    const isFreeTier = profileRes.data?.role !== "admin" && (!entitlementRes.data || entitlementRes.data.length === 0);
+    const isAdmin = profileRes.data?.role === "admin";
+    const isFreeTier = !isAdmin && (!entitlementRes.data || entitlementRes.data.length === 0);
 
-    // Usage limits: count chat_messages + workout_reviews
-    if (isFreeTier) {
+    // Usage limits: count chat_messages + workout_reviews.
+    // INVARIANT (project law): no limit ever applies to an admin — free OR
+    // daily — on any access point, client or server.
+    if (isAdmin) {
+      // unlimited — skip both meters
+    } else if (isFreeTier) {
       const [{ count: chatCount }, { count: reviewCount }] = await Promise.all([
         supa.from("chat_messages").select("id", { count: "exact", head: true }).eq("user_id", user.id),
         supa.from("workout_reviews").select("id", { count: "exact", head: true }).eq("user_id", user.id),
