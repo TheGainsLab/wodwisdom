@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { fetchKnowledgeIndex, topicLabel, type KnowledgeIndexRow } from '../lib/knowledgeLibrary';
 import { QAHeader } from '../components/QAShared';
 import { KnowledgeBadge } from '../components/KnowledgeShared';
-import KnowledgeDiscuss from '../components/KnowledgeDiscuss';
+import KnowledgeDiscuss, { renderAssistantHtml } from '../components/KnowledgeDiscuss';
 import '../features.css';
 import '../qa.css';
 import { logKnowledgeEvent } from '../lib/knowledgeEvents';
@@ -27,7 +27,11 @@ type MyThread = {
   questionCount: number;
   updatedAt: string;
   lastQuestion: string;
+  messages: Array<{ role: string; content: string }>;
 };
+
+/** How many papers the landing page shows before "show all". */
+const DEFAULT_VISIBLE_PAPERS = 20;
 
 /**
  * /knowledge — the research library list. Free to browse, no account.
@@ -38,6 +42,8 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
   const [query, setQuery] = useState('');
   const [index, setIndex] = useState<KnowledgeIndexRow[] | null>(null);
   const [myThreads, setMyThreads] = useState<MyThread[]>([]);
+  const [expandedThread, setExpandedThread] = useState<string | null>(null);
+  const [showAllPapers, setShowAllPapers] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -66,6 +72,7 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
           questionCount: r.question_count || 0,
           updatedAt: r.updated_at as string,
           lastQuestion: lastQ.length > 90 ? lastQ.slice(0, 90) + '…' : lastQ,
+          messages: msgs,
         };
       }));
     })();
@@ -85,7 +92,7 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
   // open questions, the chips had become 50+ pieces of wallpaper (removed
   // at the founder's call). Topic tags stay in the data — they feed search
   // here and the Ask-the-library router server-side.
-  const rows = useMemo(() => {
+  const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
     return (index ?? []).filter((r) => {
       if (!q) return true;
@@ -97,6 +104,14 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
       );
     });
   }, [index, query]);
+
+  // The library grows fast; the landing page shouldn't. By default show
+  // the DEFAULT_VISIBLE_PAPERS most relevant entries (the index arrives
+  // sorted by practical relevance) — searching always searches everything
+  // and shows every match.
+  const searching = query.trim() !== '';
+  const capped = !searching && !showAllPapers && matches.length > DEFAULT_VISIBLE_PAPERS;
+  const rows = capped ? matches.slice(0, DEFAULT_VISIBLE_PAPERS) : matches;
 
   return (
     <div className="feature-page">
@@ -120,7 +135,7 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
             Not sure which paper? Ask your question — the AI Coach answers from the
             studies here and links the ones it draws on.
           </p>
-          <KnowledgeDiscuss signedIn={signedIn} startCollapsed />
+          <KnowledgeDiscuss signedIn={signedIn} noHistory />
         </div>
 
         {/* My research — the member's saved conversations, each reopening
@@ -144,25 +159,53 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
                 } else if (row) {
                   name = shortCitation(row.authors, row.year) || t.slug;
                 }
-                const inner = (
-                  <>
-                    <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text)', lineHeight: 1.45 }}>
-                      {t.lastQuestion ? `“${t.lastQuestion}”` : name}
+                // My research is the ONE home for conversation history (the
+                // Ask panel never replays it). Each card starts collapsed to
+                // the member's question; tapping expands the full transcript
+                // in place. Paper threads also link out to continue on the
+                // paper's page.
+                const expanded = expandedThread === t.slug;
+                return (
+                  <div
+                    key={t.slug}
+                    style={{
+                      padding: '10px 14px', borderRadius: 10,
+                      border: '1px solid var(--border)', background: 'var(--surface)',
+                    }}
+                  >
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setExpandedThread(expanded ? null : t.slug)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpandedThread(expanded ? null : t.slug); } }}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text)', lineHeight: 1.45 }}>
+                        {t.lastQuestion ? `“${t.lastQuestion}”` : name}
+                      </div>
+                      <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 3 }}>
+                        {name} · {t.questionCount} {t.questionCount === 1 ? 'question' : 'questions'} · {expanded ? 'hide' : 'view'}
+                      </div>
                     </div>
-                    <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 3 }}>
-                      {name} · {t.questionCount} {t.questionCount === 1 ? 'question' : 'questions'}
-                    </div>
-                  </>
-                );
-                const cardStyle = {
-                  display: 'block', padding: '10px 14px', borderRadius: 10,
-                  border: '1px solid var(--border)', background: 'var(--surface)', textDecoration: 'none',
-                } as const;
-                return isLibrary ? (
-                  // The library thread already renders in the panel above.
-                  <div key={t.slug} style={cardStyle}>{inner}</div>
-                ) : (
-                  <Link key={t.slug} to={`/knowledge/${t.slug}`} style={cardStyle}>{inner}</Link>
+                    {expanded && (
+                      <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 10, borderTop: '1px solid var(--border)', paddingTop: 10 }}>
+                        {t.messages.map((m, i) => (
+                          m.role === 'assistant' ? (
+                            <div key={i} className="msg-body assistant" style={{ fontSize: 13, lineHeight: 1.55 }} dangerouslySetInnerHTML={{ __html: renderAssistantHtml(m.content) }} />
+                          ) : (
+                            <div key={i} style={{ alignSelf: 'flex-end', maxWidth: '85%', padding: '6px 10px', borderRadius: 10, background: 'var(--surface2, #222)', border: '1px solid var(--border)', fontSize: 13, lineHeight: 1.5 }}>
+                              {m.content}
+                            </div>
+                          )
+                        ))}
+                        {!isLibrary && (
+                          <Link to={`/knowledge/${t.slug}`} style={{ fontSize: 12.5, color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>
+                            Open this paper →
+                          </Link>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </div>
@@ -218,6 +261,19 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
               </div>
             </Link>
           ))}
+          {capped && (
+            <button
+              type="button"
+              onClick={() => setShowAllPapers(true)}
+              style={{
+                padding: '10px 14px', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit',
+                border: '1px dashed var(--border)', background: 'transparent',
+                color: 'var(--text-dim)', fontSize: 13.5,
+              }}
+            >
+              Showing the {DEFAULT_VISIBLE_PAPERS} most relevant of {matches.length} papers — show all
+            </button>
+          )}
           {rows.length === 0 && (
             <div style={{ color: 'var(--text-dim)', fontSize: 14, padding: '20px 0' }}>
               {index === null ? 'Loading the library…' : 'Nothing matches — try a broader term.'}

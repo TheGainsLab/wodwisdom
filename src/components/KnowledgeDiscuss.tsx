@@ -28,7 +28,7 @@ const FREE_LIMIT_DEFAULT = 3;
  * chat). Bare /knowledge/<slug> paths the model emits become markdown
  * links first, so sibling-paper pointers are always tappable.
  */
-function renderAssistantHtml(text: string): string {
+export function renderAssistantHtml(text: string): string {
   const cleaned = text
     // The prompt forbids headings and rules; the renderer guarantees it.
     // A heading the model slips through becomes a bold line, a divider
@@ -44,17 +44,12 @@ function renderAssistantHtml(text: string): string {
   return formatMarkdown(cleaned);
 }
 
-export default function KnowledgeDiscuss({ slug, signedIn, startCollapsed = false }: { slug?: string; signedIn: boolean; startCollapsed?: boolean }) {
+export default function KnowledgeDiscuss({ slug, signedIn, noHistory = false }: { slug?: string; signedIn: boolean; noHistory?: boolean }) {
   const navigate = useNavigate();
   // No slug = library mode. Library threads persist under the reserved
   // slug '_library' (paper slugs can never start with an underscore).
   const threadSlug = slug ?? '_library';
   const authNext = slug ? `/knowledge/${slug}` : '/knowledge';
-  // startCollapsed: the library landing page offers the conversation
-  // instead of replaying it — a saved thread hides behind one line until
-  // tapped, and a new question opens it. (A full thread auto-expanding
-  // pushed the actual library half a screen down.)
-  const [threadOpen, setThreadOpen] = useState(!startCollapsed);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
@@ -79,14 +74,18 @@ export default function KnowledgeDiscuss({ slug, signedIn, startCollapsed = fals
 
   // Saved thread + current meter position, so a returning member sees
   // their history and the true remaining count before the first send.
+  // noHistory (the library landing page): the box is for ASKING — the
+  // saved thread never replays there; reviewing history is My research's
+  // job. Only the meter loads. This session's own Q&A still displays.
   useEffect(() => {
     if (!signedIn) return;
     let cancelled = false;
     (async () => {
-      const [{ data: thread }, { data: meterRows }] = await Promise.all([
-        supabase.from('knowledge_conversations').select('messages').eq('slug', threadSlug).maybeSingle(),
-        supabase.from('knowledge_conversations').select('question_count'),
-      ]);
+      const threadPromise = noHistory
+        ? null
+        : supabase.from('knowledge_conversations').select('messages').eq('slug', threadSlug).maybeSingle();
+      const { data: meterRows } = await supabase.from('knowledge_conversations').select('question_count');
+      const thread = threadPromise ? (await threadPromise).data : null;
       if (cancelled) return;
       if (thread?.messages) {
         setMessages((thread.messages as Msg[]).map((m) => ({ role: m.role, content: m.content })));
@@ -96,7 +95,7 @@ export default function KnowledgeDiscuss({ slug, signedIn, startCollapsed = fals
       }
     })();
     return () => { cancelled = true; };
-  }, [slug, signedIn]);
+  }, [slug, signedIn, noHistory]);
 
   useEffect(() => { endRef.current?.scrollIntoView({ block: 'nearest' }); }, [messages]);
 
@@ -109,7 +108,6 @@ export default function KnowledgeDiscuss({ slug, signedIn, startCollapsed = fals
     setError('');
     setInput('');
     setSending(true);
-    setThreadOpen(true);
     setMessages((prev) => [...prev, { role: 'user', content: question }, { role: 'assistant', content: '', streaming: true }]);
     try {
       const resp = await fetch(DISCUSS_PAPER_ENDPOINT, {
@@ -176,20 +174,7 @@ export default function KnowledgeDiscuss({ slug, signedIn, startCollapsed = fals
 
   return (
     <div style={{ marginTop: 14 }}>
-      {messages.length > 0 && !threadOpen && (
-        <button
-          type="button"
-          onClick={() => setThreadOpen(true)}
-          style={{
-            display: 'block', width: '100%', textAlign: 'left', cursor: 'pointer',
-            background: 'transparent', border: 'none', fontFamily: 'inherit',
-            fontSize: 12.5, color: 'var(--text-muted)', padding: '0 2px', marginBottom: 10,
-          }}
-        >
-          Your conversation ({Math.ceil(messages.length / 2)} {messages.length > 2 ? 'questions' : 'question'}) — tap to view
-        </button>
-      )}
-      {messages.length > 0 && threadOpen && (
+      {messages.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 420, overflowY: 'auto', padding: '2px 2px 8px' }}>
           {messages.map((m, i) => (
             <div
