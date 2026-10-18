@@ -9,6 +9,18 @@ import '../qa.css';
 import { logKnowledgeEvent } from '../lib/knowledgeEvents';
 import { supabase } from '../lib/supabase';
 
+/**
+ * "Schumann et al. (2022)" — card-level provenance. A card needs "real
+ * paper, real year", not the full roster; the complete citation stays on
+ * the entry page's ABOUT THIS PAPER.
+ */
+function shortCitation(authors: string, year: string): string {
+  if (!authors || /not printed/i.test(authors)) return year ? `(${year})` : '';
+  const parts = authors.split(',');
+  const surname = parts[0].trim().split(/\s+/)[0];
+  return `${surname}${parts.length > 1 ? ' et al.' : ''}${year ? ` (${year})` : ''}`;
+}
+
 /** A saved research conversation, as "My research" lists it. */
 type MyThread = {
   slug: string;
@@ -24,7 +36,6 @@ type MyThread = {
  */
 export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boolean }) {
   const [query, setQuery] = useState('');
-  const [topic, setTopic] = useState<string | null>(null);
   const [index, setIndex] = useState<KnowledgeIndexRow[] | null>(null);
   const [myThreads, setMyThreads] = useState<MyThread[]>([]);
 
@@ -70,18 +81,13 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
     };
   }, []);
 
-  // Topic chips: only topics carried by more than one entry are useful
-  // filters; the rest stay reachable via text search.
-  const chipTopics = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const r of index ?? []) for (const t of r.topics) counts.set(t, (counts.get(t) ?? 0) + 1);
-    return [...counts.entries()].filter(([, n]) => n > 1).map(([t]) => t).sort();
-  }, [index]);
-
+  // No chip row: with search matching topics and Ask-the-library answering
+  // open questions, the chips had become 50+ pieces of wallpaper (removed
+  // at the founder's call). Topic tags stay in the data — they feed search
+  // here and the Ask-the-library router server-side.
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
     return (index ?? []).filter((r) => {
-      if (topic && !r.topics.includes(topic)) return false;
       if (!q) return true;
       return (
         r.title.toLowerCase().includes(q) ||
@@ -90,7 +96,7 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
         r.topics.some((t) => topicLabel(t).includes(q))
       );
     });
-  }, [index, query, topic]);
+  }, [index, query]);
 
   return (
     <div className="feature-page">
@@ -128,22 +134,24 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {myThreads.map((t) => {
                 const isLibrary = t.slug === '_library';
-                const title = isLibrary
-                  ? 'Ask the library'
-                  : (index?.find((r) => r.slug === t.slug)?.title ?? t.slug);
+                // The meta line is a NAME (first author + year), never the
+                // entry's headline — headlines are finding-carrying sentences
+                // and drowned the member's own question on these cards.
+                const row = index?.find((r) => r.slug === t.slug);
+                let name = t.slug;
+                if (isLibrary) {
+                  name = 'Ask the library';
+                } else if (row) {
+                  name = shortCitation(row.authors, row.year) || t.slug;
+                }
                 const inner = (
                   <>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}>
-                      <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text)' }}>{title}</span>
-                      <span style={{ fontSize: 11.5, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-                        {t.questionCount} {t.questionCount === 1 ? 'question' : 'questions'}
-                      </span>
+                    <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text)', lineHeight: 1.45 }}>
+                      {t.lastQuestion ? `“${t.lastQuestion}”` : name}
                     </div>
-                    {!!t.lastQuestion && (
-                      <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 3, lineHeight: 1.45 }}>
-                        “{t.lastQuestion}”
-                      </div>
-                    )}
+                    <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 3 }}>
+                      {name} · {t.questionCount} {t.questionCount === 1 ? 'question' : 'questions'}
+                    </div>
                   </>
                 );
                 const cardStyle = {
@@ -170,28 +178,10 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
           style={{
             width: '100%', padding: '10px 14px', fontSize: 14, fontFamily: 'inherit',
             background: 'var(--surface)', color: 'var(--text)',
-            border: '1px solid var(--border)', borderRadius: 10, marginBottom: 12,
+            border: '1px solid var(--border)', borderRadius: 10, marginBottom: 20,
           }}
         />
 
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 20 }}>
-          {chipTopics.map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => { setTopic(topic === t ? null : t); if (topic !== t) logKnowledgeEvent('topic_filter', undefined, { topic: t }); }}
-              style={{
-                padding: '4px 10px', borderRadius: 999, fontSize: 12, cursor: 'pointer',
-                fontFamily: 'inherit',
-                border: `1px solid ${topic === t ? 'var(--accent)' : 'var(--border)'}`,
-                background: topic === t ? 'var(--accent)' : 'transparent',
-                color: topic === t ? 'white' : 'var(--text-dim)',
-              }}
-            >
-              {topicLabel(t)}
-            </button>
-          ))}
-        </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {rows.map((r) => (
@@ -216,23 +206,21 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
                 {r.title}
               </div>
               <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginBottom: 8 }}>
-                {r.authors} ({r.year}){r.journal ? ` · ${r.journal}` : ''}
+                {shortCitation(r.authors, r.year)}{r.journal ? ` · ${r.journal}` : ''}
               </div>
+              {/* Topic tags are data, not card copy: they feed search and the
+                  Ask-the-library router, but printed on the card they were
+                  unexplained jargon ("mtorc1 ampk") once the chip row went. */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
                 <KnowledgeBadge kind="shape" value={r.shape} />
                 <KnowledgeBadge kind="confidence" value={r.confidence} />
                 <KnowledgeBadge kind="relevance" value={r.practical_relevance} />
-                {r.topics.slice(0, 4).map((t) => (
-                  <span key={t} style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
-                    {topicLabel(t)}
-                  </span>
-                ))}
               </div>
             </Link>
           ))}
           {rows.length === 0 && (
             <div style={{ color: 'var(--text-dim)', fontSize: 14, padding: '20px 0' }}>
-              {index === null ? 'Loading the library…' : 'Nothing matches — try a broader term, or clear the topic filter.'}
+              {index === null ? 'Loading the library…' : 'Nothing matches — try a broader term.'}
             </div>
           )}
         </div>
