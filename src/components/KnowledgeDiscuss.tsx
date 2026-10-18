@@ -35,7 +35,12 @@ function renderAssistantHtml(text: string): string {
     // disappears — a literal ## or --- never reaches the member.
     .replace(/^#{1,6}\s*(.+)$/gm, '**$1**')
     .replace(/^\s*(?:---+|\*\*\*+)\s*$/gm, '')
-    .replace(/(^|[\s(])(\/knowledge\/[a-z0-9][a-z0-9-]*)/g, '$1[$2]($2)');
+    // Linkify BARE paths only. A path that is already a markdown link's URL
+    // is preceded by "](": wrapping it again nested a link inside a link and
+    // the formatter garbled every citation ("Schumann et al. 2022)" with a
+    // swallowed paren and no link). Skip those; they're already tappable.
+    .replace(/(^|[\s(])(\/knowledge\/[a-z0-9][a-z0-9-]*)/g, (m, pre, path, offset, str) =>
+      pre === '(' && str[offset - 1] === ']' ? m : `${pre}[${path}](${path})`);
   return formatMarkdown(cleaned);
 }
 
