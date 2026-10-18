@@ -24,7 +24,6 @@ type MyThread = {
  */
 export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boolean }) {
   const [query, setQuery] = useState('');
-  const [topic, setTopic] = useState<string | null>(null);
   const [index, setIndex] = useState<KnowledgeIndexRow[] | null>(null);
   const [myThreads, setMyThreads] = useState<MyThread[]>([]);
 
@@ -70,36 +69,13 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
     };
   }, []);
 
-  // Topic chips: only topics carried by more than one entry are useful
-  // filters; the rest stay reachable via text search.
-  const [showAllTopics, setShowAllTopics] = useState(false);
-
-  // Topic chips were drowning the page as the library grew (50+ chips in a
-  // dozen rows before the first paper). Show the TOP_CHIPS most-used topics
-  // — the best filters are the ones carried by the most papers — behind a
-  // "more" expander for the rest. Everything stays reachable via search.
-  const chipTopics = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const r of index ?? []) for (const t of r.topics) counts.set(t, (counts.get(t) ?? 0) + 1);
-    return [...counts.entries()]
-      .filter(([, n]) => n > 1)
-      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-      .map(([t]) => t);
-  }, [index]);
-  const TOP_CHIPS = 12;
-  const visibleChips = useMemo(() => {
-    if (showAllTopics) return chipTopics;
-    const top = chipTopics.slice(0, TOP_CHIPS);
-    // The active filter always stays visible, even if it was picked from
-    // the expanded set and the list has since collapsed.
-    if (topic && chipTopics.includes(topic) && !top.includes(topic)) top.push(topic);
-    return top;
-  }, [chipTopics, showAllTopics, topic]);
-
+  // No chip row: with search matching topics and Ask-the-library answering
+  // open questions, the chips had become 50+ pieces of wallpaper (removed
+  // at the founder's call). Topic tags stay in the data — they feed search
+  // here and the Ask-the-library router server-side.
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
     return (index ?? []).filter((r) => {
-      if (topic && !r.topics.includes(topic)) return false;
       if (!q) return true;
       return (
         r.title.toLowerCase().includes(q) ||
@@ -108,7 +84,7 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
         r.topics.some((t) => topicLabel(t).includes(q))
       );
     });
-  }, [index, query, topic]);
+  }, [index, query]);
 
   return (
     <div className="feature-page">
@@ -188,41 +164,10 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
           style={{
             width: '100%', padding: '10px 14px', fontSize: 14, fontFamily: 'inherit',
             background: 'var(--surface)', color: 'var(--text)',
-            border: '1px solid var(--border)', borderRadius: 10, marginBottom: 12,
+            border: '1px solid var(--border)', borderRadius: 10, marginBottom: 20,
           }}
         />
 
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 20 }}>
-          {visibleChips.map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => { setTopic(topic === t ? null : t); if (topic !== t) logKnowledgeEvent('topic_filter', undefined, { topic: t }); }}
-              style={{
-                padding: '4px 10px', borderRadius: 999, fontSize: 12, cursor: 'pointer',
-                fontFamily: 'inherit',
-                border: `1px solid ${topic === t ? 'var(--accent)' : 'var(--border)'}`,
-                background: topic === t ? 'var(--accent)' : 'transparent',
-                color: topic === t ? 'white' : 'var(--text-dim)',
-              }}
-            >
-              {topicLabel(t)}
-            </button>
-          ))}
-          {chipTopics.length > TOP_CHIPS && (
-            <button
-              type="button"
-              onClick={() => setShowAllTopics((v) => !v)}
-              style={{
-                padding: '4px 10px', borderRadius: 999, fontSize: 12, cursor: 'pointer',
-                fontFamily: 'inherit', border: '1px dashed var(--border)',
-                background: 'transparent', color: 'var(--text-muted)',
-              }}
-            >
-              {showAllTopics ? 'fewer topics' : `+${chipTopics.length - TOP_CHIPS} more`}
-            </button>
-          )}
-        </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {rows.map((r) => (
@@ -263,7 +208,7 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
           ))}
           {rows.length === 0 && (
             <div style={{ color: 'var(--text-dim)', fontSize: 14, padding: '20px 0' }}>
-              {index === null ? 'Loading the library…' : 'Nothing matches — try a broader term, or clear the topic filter.'}
+              {index === null ? 'Loading the library…' : 'Nothing matches — try a broader term.'}
             </div>
           )}
         </div>
