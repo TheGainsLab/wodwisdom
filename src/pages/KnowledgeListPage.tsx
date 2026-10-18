@@ -7,6 +7,15 @@ import KnowledgeDiscuss from '../components/KnowledgeDiscuss';
 import '../features.css';
 import '../qa.css';
 import { logKnowledgeEvent } from '../lib/knowledgeEvents';
+import { supabase } from '../lib/supabase';
+
+/** A saved research conversation, as "My research" lists it. */
+type MyThread = {
+  slug: string;
+  questionCount: number;
+  updatedAt: string;
+  lastQuestion: string;
+};
 
 /**
  * /knowledge — the research library list. Free to browse, no account.
@@ -17,6 +26,7 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
   const [query, setQuery] = useState('');
   const [topic, setTopic] = useState<string | null>(null);
   const [index, setIndex] = useState<KnowledgeIndexRow[] | null>(null);
+  const [myThreads, setMyThreads] = useState<MyThread[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -24,6 +34,32 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
     logKnowledgeEvent('list_view');
     return () => { cancelled = true; };
   }, []);
+
+  // My research — the member's saved threads (RLS: own rows only). The last
+  // question is the scannable line; the thread itself reopens on the paper's
+  // page (or in the Ask-the-library panel above for the `_library` thread).
+  useEffect(() => {
+    if (!signedIn) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('knowledge_conversations')
+        .select('slug, question_count, updated_at, messages')
+        .order('updated_at', { ascending: false });
+      if (cancelled || !data) return;
+      setMyThreads(data.map((r) => {
+        const msgs = Array.isArray(r.messages) ? r.messages as Array<{ role: string; content: string }> : [];
+        const lastQ = [...msgs].reverse().find((m) => m.role === 'user')?.content ?? '';
+        return {
+          slug: r.slug as string,
+          questionCount: r.question_count || 0,
+          updatedAt: r.updated_at as string,
+          lastQuestion: lastQ.length > 90 ? lastQ.slice(0, 90) + '…' : lastQ,
+        };
+      }));
+    })();
+    return () => { cancelled = true; };
+  }, [signedIn]);
 
   useEffect(() => {
     document.body.classList.add('feature-body');
@@ -80,6 +116,50 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
           </p>
           <KnowledgeDiscuss signedIn={signedIn} />
         </div>
+
+        {/* My research — the member's saved conversations, each reopening
+            where it lives: the paper's Discuss panel, or (for the library
+            thread) the Ask-the-library panel just above. */}
+        {signedIn && myThreads.length > 0 && (
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: 0.4, textTransform: 'uppercase', color: 'var(--accent)', marginBottom: 8 }}>
+              My research
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {myThreads.map((t) => {
+                const isLibrary = t.slug === '_library';
+                const title = isLibrary
+                  ? 'Ask the library'
+                  : (index?.find((r) => r.slug === t.slug)?.title ?? t.slug);
+                const inner = (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}>
+                      <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text)' }}>{title}</span>
+                      <span style={{ fontSize: 11.5, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                        {t.questionCount} {t.questionCount === 1 ? 'question' : 'questions'}
+                      </span>
+                    </div>
+                    {!!t.lastQuestion && (
+                      <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 3, lineHeight: 1.45 }}>
+                        “{t.lastQuestion}”
+                      </div>
+                    )}
+                  </>
+                );
+                const cardStyle = {
+                  display: 'block', padding: '10px 14px', borderRadius: 10,
+                  border: '1px solid var(--border)', background: 'var(--surface)', textDecoration: 'none',
+                } as const;
+                return isLibrary ? (
+                  // The library thread already renders in the panel above.
+                  <div key={t.slug} style={cardStyle}>{inner}</div>
+                ) : (
+                  <Link key={t.slug} to={`/knowledge/${t.slug}`} style={cardStyle}>{inner}</Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         <input
           type="search"
