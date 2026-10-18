@@ -120,7 +120,7 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
             Not sure which paper? Ask your question — the AI Coach answers from the
             studies here and links the ones it draws on.
           </p>
-          <KnowledgeDiscuss signedIn={signedIn} />
+          <KnowledgeDiscuss signedIn={signedIn} startCollapsed />
         </div>
 
         {/* My research — the member's saved conversations, each reopening

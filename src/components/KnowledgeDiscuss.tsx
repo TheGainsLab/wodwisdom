@@ -44,12 +44,17 @@ function renderAssistantHtml(text: string): string {
   return formatMarkdown(cleaned);
 }
 
-export default function KnowledgeDiscuss({ slug, signedIn }: { slug?: string; signedIn: boolean }) {
+export default function KnowledgeDiscuss({ slug, signedIn, startCollapsed = false }: { slug?: string; signedIn: boolean; startCollapsed?: boolean }) {
   const navigate = useNavigate();
   // No slug = library mode. Library threads persist under the reserved
   // slug '_library' (paper slugs can never start with an underscore).
   const threadSlug = slug ?? '_library';
   const authNext = slug ? `/knowledge/${slug}` : '/knowledge';
+  // startCollapsed: the library landing page offers the conversation
+  // instead of replaying it — a saved thread hides behind one line until
+  // tapped, and a new question opens it. (A full thread auto-expanding
+  // pushed the actual library half a screen down.)
+  const [threadOpen, setThreadOpen] = useState(!startCollapsed);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
@@ -104,6 +109,7 @@ export default function KnowledgeDiscuss({ slug, signedIn }: { slug?: string; si
     setError('');
     setInput('');
     setSending(true);
+    setThreadOpen(true);
     setMessages((prev) => [...prev, { role: 'user', content: question }, { role: 'assistant', content: '', streaming: true }]);
     try {
       const resp = await fetch(DISCUSS_PAPER_ENDPOINT, {
@@ -170,7 +176,20 @@ export default function KnowledgeDiscuss({ slug, signedIn }: { slug?: string; si
 
   return (
     <div style={{ marginTop: 14 }}>
-      {messages.length > 0 && (
+      {messages.length > 0 && !threadOpen && (
+        <button
+          type="button"
+          onClick={() => setThreadOpen(true)}
+          style={{
+            display: 'block', width: '100%', textAlign: 'left', cursor: 'pointer',
+            background: 'transparent', border: 'none', fontFamily: 'inherit',
+            fontSize: 12.5, color: 'var(--text-muted)', padding: '0 2px', marginBottom: 10,
+          }}
+        >
+          Your conversation ({Math.ceil(messages.length / 2)} {messages.length > 2 ? 'questions' : 'question'}) — tap to view
+        </button>
+      )}
+      {messages.length > 0 && threadOpen && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 420, overflowY: 'auto', padding: '2px 2px 8px' }}>
           {messages.map((m, i) => (
             <div
