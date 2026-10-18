@@ -72,11 +72,29 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
 
   // Topic chips: only topics carried by more than one entry are useful
   // filters; the rest stay reachable via text search.
+  const [showAllTopics, setShowAllTopics] = useState(false);
+
+  // Topic chips were drowning the page as the library grew (50+ chips in a
+  // dozen rows before the first paper). Show the TOP_CHIPS most-used topics
+  // — the best filters are the ones carried by the most papers — behind a
+  // "more" expander for the rest. Everything stays reachable via search.
   const chipTopics = useMemo(() => {
     const counts = new Map<string, number>();
     for (const r of index ?? []) for (const t of r.topics) counts.set(t, (counts.get(t) ?? 0) + 1);
-    return [...counts.entries()].filter(([, n]) => n > 1).map(([t]) => t).sort();
+    return [...counts.entries()]
+      .filter(([, n]) => n > 1)
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([t]) => t);
   }, [index]);
+  const TOP_CHIPS = 12;
+  const visibleChips = useMemo(() => {
+    if (showAllTopics) return chipTopics;
+    const top = chipTopics.slice(0, TOP_CHIPS);
+    // The active filter always stays visible, even if it was picked from
+    // the expanded set and the list has since collapsed.
+    if (topic && chipTopics.includes(topic) && !top.includes(topic)) top.push(topic);
+    return top;
+  }, [chipTopics, showAllTopics, topic]);
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -175,7 +193,7 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
         />
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 20 }}>
-          {chipTopics.map((t) => (
+          {visibleChips.map((t) => (
             <button
               key={t}
               type="button"
@@ -191,6 +209,19 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
               {topicLabel(t)}
             </button>
           ))}
+          {chipTopics.length > TOP_CHIPS && (
+            <button
+              type="button"
+              onClick={() => setShowAllTopics((v) => !v)}
+              style={{
+                padding: '4px 10px', borderRadius: 999, fontSize: 12, cursor: 'pointer',
+                fontFamily: 'inherit', border: '1px dashed var(--border)',
+                background: 'transparent', color: 'var(--text-muted)',
+              }}
+            >
+              {showAllTopics ? 'fewer topics' : `+${chipTopics.length - TOP_CHIPS} more`}
+            </button>
+          )}
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
