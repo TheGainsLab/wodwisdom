@@ -198,15 +198,13 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
               <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginBottom: 8 }}>
                 {r.authors} ({r.year}){r.journal ? ` · ${r.journal}` : ''}
               </div>
+              {/* Topic tags are data, not card copy: they feed search and the
+                  Ask-the-library router, but printed on the card they were
+                  unexplained jargon ("mtorc1 ampk") once the chip row went. */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
                 <KnowledgeBadge kind="shape" value={r.shape} />
                 <KnowledgeBadge kind="confidence" value={r.confidence} />
                 <KnowledgeBadge kind="relevance" value={r.practical_relevance} />
-                {r.topics.slice(0, 4).map((t) => (
-                  <span key={t} style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
-                    {topicLabel(t)}
-                  </span>
-                ))}
               </div>
             </Link>
           ))}
