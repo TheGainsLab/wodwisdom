@@ -100,20 +100,24 @@ Deno.serve(async (req) => {
   // Rate limit — 2 DELIVERED sends per rolling 24h. send_failed rows don't
   // count: "try again in a minute" after a Resend hiccup must not burn the
   // day's quota (two failures would otherwise lock the user out with zero
-  // messages delivered).
-  const since = new Date(Date.now() - 24 * 3600_000).toISOString();
-  const { count: recentCount, error: countErr } = await supa
-    .from("coach_messages")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", user.id)
-    .eq("status", "sent")
-    .gte("created_at", since);
-  if (countErr) return json(cors, 500, { error: "Could not check your send limit — try again." });
-  if ((recentCount ?? 0) >= DAILY_LIMIT) {
-    return json(cors, 429, {
-      error: "You've reached today's limit — your earlier message is with the coach.",
-      code: "LIMIT",
-    });
+  // messages delivered). INVARIANT (project law): no limit ever applies to
+  // an admin, on any access point, client or server.
+  const { data: roleRow } = await supa.from("profiles").select("role").eq("id", user.id).maybeSingle();
+  if (roleRow?.role !== "admin") {
+    const since = new Date(Date.now() - 24 * 3600_000).toISOString();
+    const { count: recentCount, error: countErr } = await supa
+      .from("coach_messages")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .eq("status", "sent")
+      .gte("created_at", since);
+    if (countErr) return json(cors, 500, { error: "Could not check your send limit — try again." });
+    if ((recentCount ?? 0) >= DAILY_LIMIT) {
+      return json(cors, 429, {
+        error: "You've reached today's limit — your earlier message is with the coach.",
+        code: "LIMIT",
+      });
+    }
   }
 
   // Context: account header + recent chat.

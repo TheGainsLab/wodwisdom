@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { DISCUSS_PAPER_ENDPOINT, getAuthHeaders, supabase } from '../lib/supabase';
 import { formatMarkdown } from '../lib/formatMarkdown';
 import { logKnowledgeEvent } from '../lib/knowledgeEvents';
+import { useEntitlements } from '../hooks/useEntitlements';
 
 /**
  * Discuss this paper — the research chat panel on a knowledge entry page —
@@ -50,7 +51,13 @@ export default function KnowledgeDiscuss({ slug, signedIn }: { slug?: string; si
   const [error, setError] = useState('');
   const [used, setUsed] = useState<number | null>(null);
   const [freeLimit, setFreeLimit] = useState(FREE_LIMIT_DEFAULT);
-  const [entitled, setEntitled] = useState(false);
+  // Server-confirmed paid tier (from the stream's `done` usage). The session's
+  // entitlements (below) cover the page-load case: without them, an admin or
+  // research_chat member who had already used 3 questions was paywalled by the
+  // CLIENT on mount — the server (the real authority) never saw a request.
+  const [entitledFromStream, setEntitledFromStream] = useState(false);
+  const { hasFeature, loading: entitlementsLoading } = useEntitlements();
+  const entitled = entitledFromStream || hasFeature('research_chat');
   const endRef = useRef<HTMLDivElement>(null);
   const clickLogged = useRef(false);
 
@@ -83,7 +90,7 @@ export default function KnowledgeDiscuss({ slug, signedIn }: { slug?: string; si
 
   useEffect(() => { endRef.current?.scrollIntoView({ block: 'nearest' }); }, [messages]);
 
-  const paywalled = !entitled && used !== null && used >= freeLimit;
+  const paywalled = !entitled && !entitlementsLoading && used !== null && used >= freeLimit;
 
   const send = async () => {
     const question = input.trim();
@@ -134,7 +141,7 @@ export default function KnowledgeDiscuss({ slug, signedIn }: { slug?: string; si
                 setUsed(ev.usage.total_questions);
                 setFreeLimit(ev.usage.free_limit ?? FREE_LIMIT_DEFAULT);
               } else {
-                setEntitled(true);
+                setEntitledFromStream(true);
               }
             }
             if (ev.type === 'error') throw new Error(ev.error || 'Stream error');
