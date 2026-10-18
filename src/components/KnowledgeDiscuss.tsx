@@ -5,13 +5,17 @@ import { formatMarkdown } from '../lib/formatMarkdown';
 import { logKnowledgeEvent } from '../lib/knowledgeEvents';
 
 /**
- * Discuss this paper — the research chat panel on a knowledge entry page.
+ * Discuss this paper — the research chat panel on a knowledge entry page —
+ * and, with no slug, "Ask the library" on the list page: the server routes
+ * the question across the whole catalog and answers from the papers that
+ * bear on it, with links.
  *
- * Grounded server-side in the entry's verified record (discuss-paper
- * function). The free tier is 3 questions lifetime across the whole
- * library, mirroring the main coach's meter contract (402 + FREE_LIMIT);
- * the research_chat entitlement is unlimited. Threads persist server-side,
- * one per paper, and reload here on return visits.
+ * Grounded server-side in verified records (discuss-paper function). The
+ * free tier is 3 questions lifetime across the whole library (library-mode
+ * questions included), mirroring the main coach's meter contract (402 +
+ * FREE_LIMIT); the research_chat entitlement is unlimited. Threads persist
+ * server-side, one per paper plus one library thread (slug "_library"),
+ * and reload here on return visits.
  */
 
 type Msg = { role: 'user' | 'assistant'; content: string; streaming?: boolean };
@@ -34,8 +38,12 @@ function renderAssistantHtml(text: string): string {
   return formatMarkdown(cleaned);
 }
 
-export default function KnowledgeDiscuss({ slug, signedIn }: { slug: string; signedIn: boolean }) {
+export default function KnowledgeDiscuss({ slug, signedIn }: { slug?: string; signedIn: boolean }) {
   const navigate = useNavigate();
+  // No slug = library mode. Library threads persist under the reserved
+  // slug '_library' (paper slugs can never start with an underscore).
+  const threadSlug = slug ?? '_library';
+  const authNext = slug ? `/knowledge/${slug}` : '/knowledge';
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
@@ -49,7 +57,7 @@ export default function KnowledgeDiscuss({ slug, signedIn }: { slug: string; sig
   const logOnce = () => {
     if (clickLogged.current) return;
     clickLogged.current = true;
-    logKnowledgeEvent('discuss_click', slug, { signedIn });
+    logKnowledgeEvent('discuss_click', slug, { signedIn, library: !slug });
   };
 
   // Saved thread + current meter position, so a returning member sees
@@ -59,7 +67,7 @@ export default function KnowledgeDiscuss({ slug, signedIn }: { slug: string; sig
     let cancelled = false;
     (async () => {
       const [{ data: thread }, { data: meterRows }] = await Promise.all([
-        supabase.from('knowledge_conversations').select('messages').eq('slug', slug).maybeSingle(),
+        supabase.from('knowledge_conversations').select('messages').eq('slug', threadSlug).maybeSingle(),
         supabase.from('knowledge_conversations').select('question_count'),
       ]);
       if (cancelled) return;
@@ -80,7 +88,7 @@ export default function KnowledgeDiscuss({ slug, signedIn }: { slug: string; sig
   const send = async () => {
     const question = input.trim();
     if (!question || sending || paywalled) return;
-    if (!signedIn) { navigate(`/auth?signup=1&next=/knowledge/${slug}`); return; }
+    if (!signedIn) { navigate(`/auth?signup=1&next=${authNext}`); return; }
     setError('');
     setInput('');
     setSending(true);
@@ -89,7 +97,7 @@ export default function KnowledgeDiscuss({ slug, signedIn }: { slug: string; sig
       const resp = await fetch(DISCUSS_PAPER_ENDPOINT, {
         method: 'POST',
         headers: await getAuthHeaders(),
-        body: JSON.stringify({ slug, question, history: messages.slice(-10) }),
+        body: JSON.stringify({ ...(slug ? { slug } : {}), question, history: messages.slice(-10) }),
       });
       if (!resp.ok) {
         const data = await resp.json().catch(() => ({}));
@@ -190,10 +198,12 @@ export default function KnowledgeDiscuss({ slug, signedIn }: { slug: string; sig
               onChange={(e) => setInput(e.target.value)}
               onFocus={() => {
                 logOnce();
-                if (!signedIn) navigate(`/auth?signup=1&next=/knowledge/${slug}`);
+                if (!signedIn) navigate(`/auth?signup=1&next=${authNext}`);
               }}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
-              placeholder={signedIn ? 'Ask this paper a question…' : 'Ask this paper a question — free account to start'}
+              placeholder={slug
+                ? (signedIn ? 'Ask this paper a question…' : 'Ask this paper a question — free account to start')
+                : (signedIn ? 'Ask the library anything…' : 'Ask the library anything — free account to start')}
               disabled={sending}
             />
             <button className="send-btn" onClick={send} disabled={sending || !input.trim()}>
@@ -202,7 +212,7 @@ export default function KnowledgeDiscuss({ slug, signedIn }: { slug: string; sig
           </div>
           {signedIn && !entitled && used !== null && (
             <p style={{ fontSize: 11.5, color: 'var(--text-muted)', margin: '8px 0 0' }}>
-              {Math.max(freeLimit - used, 0)} of {freeLimit} free research questions left — answers come from this paper's verified record.
+              {Math.max(freeLimit - used, 0)} of {freeLimit} free research questions left — answers come from {slug ? "this paper's verified record" : "the library's verified records"}.
             </p>
           )}
         </>

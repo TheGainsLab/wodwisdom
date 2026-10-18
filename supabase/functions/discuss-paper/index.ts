@@ -1,21 +1,35 @@
 /**
- * discuss-paper — "Discuss this paper with the AI Coach".
+ * discuss-paper — "Discuss this paper with the AI Coach", and "Ask the
+ * library" when the request carries no slug.
  *
- * The member is reading one published research entry; this function runs a
- * conversation grounded in that entry's verified JSON. Three-tier honesty:
- * the paper first, explicitly fenced general knowledge second, pointers to
- * other library entries third. The entry travels whole in the system prompt
- * (entries are small by design) — no retrieval infrastructure.
+ * Paper mode (slug present): the member is reading one published research
+ * entry; the conversation is grounded in that entry's verified JSON. Three-
+ * tier honesty: the paper first, explicitly fenced general knowledge second,
+ * pointers to other library entries third. The entry travels whole in the
+ * system prompt (entries are small by design).
+ *
+ * Library mode (no slug): a routing pass — a small model reading the WHOLE
+ * catalog of published titles/topics — picks the 0–MAX_ROUTED_PAPERS entries
+ * that bear on the question, and those full verified records travel whole
+ * into the answer context. No embeddings, no chunks: the answering model
+ * only ever sees complete entries with their caveats attached. Every number
+ * cited must name its paper; disagreements between papers are presented as
+ * disagreement, never blended.
+ *
+ * Both modes inject the member's athlete profile (same fields the main
+ * coach uses) so "how does this apply to ME" gets a real answer — with a
+ * hard labeling rule: application to the member is coaching inference,
+ * opened "For your training:", never presented as the paper's finding.
  *
  * Access: signed-in required. The `research_chat` entitlement (or admin)
  * is unlimited; everyone else gets a lifetime total of FREE_LIMIT questions
  * across the whole library, metered by summing question_count over the
- * member's knowledge_conversations rows. Mirrors the main coach's meter
- * contract (402 + code FREE_LIMIT) so the client handling is identical.
+ * member's knowledge_conversations rows (library-mode rows included — one
+ * meter, as decided). Mirrors the main coach's contract (402 + FREE_LIMIT).
  *
- * Conversations persist server-side: one thread per (user, slug), appended
- * on every answered question — saved history is a day-one property, not a
- * paid feature toggle.
+ * Conversations persist server-side: one thread per (user, slug); library-
+ * mode threads persist under the reserved slug "_library" (paper slugs are
+ * [a-z0-9][a-z0-9-]*, so it can never collide with a real entry).
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -23,7 +37,7 @@ import { MODELS } from "../_shared/model-profiles.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { fetchWithTimeout } from "../_shared/fetch-with-timeout.ts";
 
-export const FUNCTION_VERSION = "2026-10-16.1";
+export const FUNCTION_VERSION = "2026-10-18.1";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -33,42 +47,157 @@ const FREE_LIMIT = 3;
 const MAX_TOKENS = 1024;
 const MAX_HISTORY_TURNS = 10;
 const MAX_QUESTION_CHARS = 2000;
+// Library mode: how many papers the router may hand the answering model.
+// The router is told to over-include borderline papers up to this cap —
+// an irrelevant entry in context costs pennies; a wrongly excluded one
+// costs the answer. Revisit upward as the library grows.
+const MAX_ROUTED_PAPERS = 3;
+// Reserved thread slug for library-mode conversations. Paper slugs match
+// /^[a-z0-9][a-z0-9-]*$/, so the leading underscore can never collide.
+const LIBRARY_SLUG = "_library";
 
 // deno-lint-ignore no-explicit-any
 type Json = any;
 
-function buildSystemPrompt(entry: Json, index: Array<{ slug: string; title: string; topics: string[] }>): string {
+type CatalogRow = { slug: string; title: string; topics: string[] };
+
+/**
+ * The member's athlete profile as a compact prompt block — the same fields
+ * the main coach injects (chat's buildAthleteContext), trimmed to what a
+ * research answer needs. Empty string when the profile has nothing.
+ */
+function buildMemberContext(p: Json): string {
+  if (!p) return "";
+  const u = p.units === "kg" ? "kg" : "lbs";
+  const parts: string[] = [];
+  if (p.age != null && p.age > 0) parts.push(`Age: ${p.age}`);
+  if (p.gender) parts.push(`Gender: ${p.gender}`);
+  if (p.bodyweight != null && p.bodyweight > 0) parts.push(`Bodyweight: ${p.bodyweight} ${u}`);
+  const lifts = Object.entries(p.lifts ?? {}).filter(([, v]) => typeof v === "number" && v > 0)
+    .map(([k, v]) => `${k.replace(/_/g, " ")}: ${v} ${u}`).join(", ");
+  if (lifts) parts.push("1RM lifts — " + lifts);
+  const skills = Object.entries(p.skills ?? {}).filter(([, v]) => v !== "" && v != null)
+    .map(([k, v]) => `${k.replace(/_/g, " ")}: ${v}`).join(", ");
+  if (skills) parts.push("Skills — " + skills);
+  const cond = Object.entries(p.conditioning ?? {}).filter(([, v]) => v !== "" && v != null)
+    .map(([k, v]) => `${k.replace(/_/g, " ")}: ${v}`).join(", ");
+  if (cond) parts.push("Conditioning — " + cond);
+  if (parts.length === 0) return "";
+  return "\n\nTHE MEMBER'S ATHLETE PROFILE (for applying research to them — see the application rule):\n" + parts.join("\n");
+}
+
+/**
+ * Library-mode routing pass: a small model reads the ENTIRE catalog (titles
+ * and topics — a page of text) with the question and names the papers that
+ * bear on it. Not embedding retrieval: nothing is invisible to the router,
+ * it can only misjudge, so it is instructed to over-include borderline
+ * papers. Any failure degrades to [] — the answer then runs fenced, with
+ * index pointers only.
+ */
+async function routeLibraryQuestion(question: string, catalog: CatalogRow[]): Promise<string[]> {
+  const catalogText = catalog.map((r) => `- ${r.slug} — ${r.title} — topics: ${r.topics.join(", ")}`).join("\n");
+  try {
+    const resp = await fetchWithTimeout("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_API_KEY!, "anthropic-version": "2023-06-01" },
+      body: JSON.stringify({
+        model: MODELS.haiku,
+        max_tokens: 300,
+        temperature: 0,
+        system:
+          "You route a member's question to the papers in a research library for strength & conditioning athletes. " +
+          "The full catalog is given (slug — title — topics). Name every paper that plausibly bears on the question, " +
+          `up to ${MAX_ROUTED_PAPERS}, most relevant first. Include borderline papers: wrongly excluding one is worse ` +
+          "than including one that turns out not to help. If nothing in the catalog plausibly relates, return none. " +
+          'Return ONLY JSON, no prose: {"slugs": ["slug-a", "slug-b"]}',
+        messages: [{ role: "user", content: `CATALOG:\n${catalogText}\n\nQUESTION: ${question}` }],
+      }),
+    }, 20_000);
+    if (!resp.ok) {
+      console.warn("[discuss-paper] router HTTP", resp.status);
+      return [];
+    }
+    const data = await resp.json();
+    const text = (data.content ?? []).filter((b: Json) => b.type === "text").map((b: Json) => b.text).join("");
+    const m = text.match(/\{[\s\S]*\}/);
+    if (!m) return [];
+    const parsed = JSON.parse(m[0]);
+    const known = new Set(catalog.map((r) => r.slug));
+    return (Array.isArray(parsed.slugs) ? parsed.slugs : [])
+      .filter((s: Json) => typeof s === "string" && known.has(s))
+      .slice(0, MAX_ROUTED_PAPERS);
+  } catch (e) {
+    console.warn("[discuss-paper] router failed, answering without papers:", e);
+    return [];
+  }
+}
+
+function buildSystemPrompt(
+  papers: Array<{ slug: string; title: string; entry: Json }>,
+  index: CatalogRow[],
+  memberContext: string,
+  libraryMode: boolean,
+): string {
   const indexLines = index
     .map((r) => `- ${r.title} — /knowledge/${r.slug} — topics: ${r.topics.join(", ")}`)
     .join("\n");
+  const fence = libraryMode ? "Beyond the library:" : "Beyond this paper:";
+  const intro = libraryMode
+    ? "You are The Gains Lab's AI Coach in research-discussion mode. The member is asking the research library as a " +
+      "whole (from its front page, not inside one paper). A routing step picked the published papers most likely to " +
+      "bear on their question; each is reproduced below as a verified structured record. There may be none."
+    : "You are The Gains Lab's AI Coach in research-discussion mode. The member is reading ONE specific paper " +
+      "from the research library, reproduced below as a verified structured record, and your job is to discuss that paper.";
+  const tier1 = libraryMode
+    ? "   - Lead with what the papers below say that bears on the question. Use only numbers that appear in their " +
+      "records, exactly as printed — and EVERY number or finding you cite must name which paper it comes from. " +
+      "If no papers are reproduced below, say plainly that the library doesn't cover this directly.\n"
+    : "   - Lead with what THIS paper says that bears on the question — including partial bearings the member may have " +
+      "missed. Use only numbers that appear in the record, exactly as it prints them.\n";
+  const multiPaperRule = libraryMode
+    ? "6. MULTI-PAPER HONESTY. Never blend findings from several papers into a conclusion no single paper drew. " +
+      "When the papers disagree, present the disagreement and name each side — the library deliberately holds both " +
+      "sides of live debates. Link each paper you draw on: [Paper title](/knowledge/slug).\n"
+    : "";
+  const applyRule = memberContext
+    ? (libraryMode ? "7" : "6") + ". APPLYING RESEARCH TO THIS MEMBER. Their athlete profile is below. When they ask how " +
+      "research applies to them, use it — but application to the member is YOUR coaching inference, never a paper's " +
+      "finding. Open those passages with \"For your training:\" and keep them visibly separate from what the research " +
+      "showed. Never imply a paper studied people like this member unless its record says so.\n"
+    : "";
+  const papersBlock = papers.length > 0
+    ? (libraryMode ? "THE PAPERS (verified structured records — your primary sources):\n" : "THE PAPER (verified structured record — your primary source):\n") +
+      papers.map((p) => `=== ${p.title} (/knowledge/${p.slug}) ===\n${JSON.stringify(p.entry)}`).join("\n\n")
+    : "THE PAPERS: none were routed to this question — answer behind the \"" + fence + "\" fence and point to index entries only if genuinely adjacent.";
   return (
-    "You are The Gains Lab's AI Coach in research-discussion mode. The member is reading ONE specific paper " +
-    "from the research library, reproduced below as a verified structured record, and your job is to discuss that paper.\n\n" +
+    intro + "\n\n" +
     "THE LIBRARY'S HONESTY LAWS — these bind every sentence you write:\n" +
     "1. THREE TIERS, ALWAYS LABELED.\n" +
-    "   - Lead with what THIS paper says that bears on the question — including partial bearings the member may have " +
-    "missed. Use only numbers that appear in the record, exactly as it prints them.\n" +
-    "   - Where the question genuinely runs past the paper, you may add general exercise-science background, but ONLY " +
-    "behind an explicit fence that opens with \"Beyond this paper:\" — the member must always know whose claim is whose. " +
-    "Never attribute a beyond-the-paper claim to this study.\n" +
+    tier1 +
+    "   - Where the question genuinely runs past the paper" + (libraryMode ? "s" : "") + ", you may add general exercise-science background, but ONLY " +
+    `behind an explicit fence that opens with "${fence}" — the member must always know whose claim is whose. ` +
+    "Never attribute a beyond-the-" + (libraryMode ? "library" : "paper") + " claim to a study.\n" +
     "   - When another library paper (index below) covers the question more directly, point to it by its title with its " +
     "link path. Only point to papers in the index; the index is the whole library.\n" +
-    "2. THE RECORD'S CAVEATS BIND YOU. What the entry's 'what_it_doesnt_mean' rules out, you may not claim. " +
-    "'No significant difference' is never 'proven equal'. Do not extend findings to populations or conditions the paper " +
+    "2. THE RECORDS' CAVEATS BIND YOU. What an entry's 'what_it_doesnt_mean' rules out, you may not claim. " +
+    "'No significant difference' is never 'proven equal'. Do not extend findings to populations or conditions a paper " +
     "didn't study without saying you are doing so.\n" +
-    "3. NEVER INVENT. No fabricated numbers, citations, study details, or quotations — from this paper or any other. " +
-    "If the paper doesn't say, say that it doesn't say.\n" +
+    "3. NEVER INVENT. No fabricated numbers, citations, study details, or quotations — from these papers or any other. " +
+    "If a paper doesn't say, say that it doesn't say.\n" +
     "4. COACH VOICE, COMPACT FORMAT. Plain, direct, member-facing; explain jargon in passing. Usually under 200 words. " +
     "Your answer renders in a small chat panel: NO markdown headings (#, ##) and NO horizontal rules (---). Open with " +
     "the answer itself, never a title line. Short paragraphs; simple dash lists when they genuinely help; bold sparingly. " +
     "When you point to a library paper, write a markdown link: [Paper title](/knowledge/slug).\n" +
     "5. SCOPE. You cannot change programs, logs, or accounts, and you never discuss pricing or plans. If the member " +
-    "asks for personal programming, answer what the research supports and suggest asking their AI Coach in the main " +
-    "chat, which knows their training.\n\n" +
-    "THE PAPER (verified structured record — your primary source):\n" +
-    JSON.stringify(entry) +
+    "asks for personal programming beyond what the research supports, suggest asking their AI Coach in the main " +
+    "chat, which knows their full training.\n" +
+    multiPaperRule +
+    applyRule +
+    "\n" +
+    papersBlock +
     "\n\nTHE LIBRARY INDEX (the only other papers you may reference or link):\n" +
-    indexLines
+    indexLines +
+    memberContext
   );
 }
 
@@ -96,6 +225,9 @@ Deno.serve(async (req) => {
       const { error: convErr } = await supa
         .from("knowledge_conversations").select("id", { count: "exact", head: true });
       checks.push({ name: "conversations table", ok: !convErr, detail: convErr?.message });
+      const { error: apErr } = await supa
+        .from("athlete_profiles").select("user_id", { count: "exact", head: true });
+      checks.push({ name: "athlete_profiles readable", ok: !apErr, detail: apErr?.message });
       try {
         const ping = await fetchWithTimeout("https://api.anthropic.com/v1/messages", {
           method: "POST",
@@ -109,18 +241,23 @@ Deno.serve(async (req) => {
       return json({ version: FUNCTION_VERSION, checks, ok: checks.every((c) => c.ok) });
     }
 
+    // No slug = library mode ("Ask the library" on the list page).
     const slug = typeof body.slug === "string" ? body.slug : "";
+    const libraryMode = !slug;
     const question = typeof body.question === "string" ? body.question.trim().slice(0, MAX_QUESTION_CHARS) : "";
-    if (!slug || !question) return json({ error: "slug and question are required" }, 400);
+    if (!question) return json({ error: "question is required" }, 400);
 
     // ── Access: entitlement or lifetime free meter ──────────────────────
     const nowIso = new Date().toISOString();
-    const [{ data: profile }, { data: entitlements }] = await Promise.all([
+    const [{ data: profile }, { data: entitlements }, { data: athleteProfile }] = await Promise.all([
       supa.from("profiles").select("role").eq("id", user.id).maybeSingle(),
       supa.from("user_entitlements").select("feature")
         .eq("user_id", user.id)
         .eq("feature", "research_chat")
         .or("expires_at.is.null,expires_at.gt." + nowIso),
+      supa.from("athlete_profiles")
+        .select("lifts, skills, conditioning, bodyweight, units, gender, age")
+        .eq("user_id", user.id).maybeSingle(),
     ]);
     const entitled = profile?.role === "admin" || (entitlements ?? []).length > 0;
 
@@ -137,20 +274,35 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── The paper and the library index ─────────────────────────────────
-    const [{ data: entryRow, error: entryErr }, { data: indexRows }] = await Promise.all([
-      supa.from("knowledge_entries").select("entry").eq("slug", slug).eq("status", "published").maybeSingle(),
-      supa.from("knowledge_entries").select("slug, entry").eq("status", "published"),
-    ]);
-    if (entryErr || !entryRow) return json({ error: "Paper not found or not published" }, 404);
-
-    const index = (indexRows ?? [])
-      .filter((r: Json) => r.slug !== slug)
-      .map((r: Json) => ({
-        slug: r.slug as string,
-        title: (r.entry?.header?.citation?.title || r.entry?.header?.title_plain || r.slug) as string,
+    // ── The paper(s) and the library index ──────────────────────────────
+    const { data: indexRows } = await supa
+      .from("knowledge_entries").select("slug, entry").eq("status", "published");
+    const published = (indexRows ?? []) as Array<{ slug: string; entry: Json }>;
+    const titleOf = (r: { slug: string; entry: Json }) =>
+      (r.entry?.header?.citation?.title || r.entry?.header?.title_plain || r.slug) as string;
+    const catalogOf = (rows: Array<{ slug: string; entry: Json }>): CatalogRow[] =>
+      rows.map((r) => ({
+        slug: r.slug,
+        title: titleOf(r),
         topics: Array.isArray(r.entry?.header?.topics) ? r.entry.header.topics as string[] : [],
       }));
+
+    let papers: Array<{ slug: string; title: string; entry: Json }>;
+    let routedSlugs: string[] = [];
+    if (libraryMode) {
+      routedSlugs = await routeLibraryQuestion(question, catalogOf(published));
+      papers = published
+        .filter((r) => routedSlugs.includes(r.slug))
+        .map((r) => ({ slug: r.slug, title: titleOf(r), entry: r.entry }));
+    } else {
+      const entryRow = published.find((r) => r.slug === slug);
+      if (!entryRow) return json({ error: "Paper not found or not published" }, 404);
+      papers = [{ slug, title: titleOf(entryRow), entry: entryRow.entry }];
+    }
+    // The index the model may point to: everything published except what's
+    // already reproduced whole above.
+    const inPapers = new Set(papers.map((p) => p.slug));
+    const index = catalogOf(published.filter((r) => !inPapers.has(r.slug)));
 
     // History is client-supplied display state; the server-stored thread is
     // canonical for persistence, but the model sees what the member sees.
@@ -169,7 +321,7 @@ Deno.serve(async (req) => {
         max_tokens: MAX_TOKENS,
         temperature: 0.3,
         stream: true,
-        system: buildSystemPrompt(entryRow.entry, index),
+        system: buildSystemPrompt(papers, index, buildMemberContext(athleteProfile), libraryMode),
         messages: [...history, { role: "user", content: question }],
       }),
     });
@@ -188,12 +340,13 @@ Deno.serve(async (req) => {
       ? { tier: "paid" }
       : { tier: "free", total_questions: totalQuestions + 1, free_limit: FREE_LIMIT };
 
+    const threadSlug = libraryMode ? LIBRARY_SLUG : slug;
     const persist = async () => {
       try {
         const at = new Date().toISOString();
         const { data: existing } = await supa
           .from("knowledge_conversations").select("id, messages, question_count")
-          .eq("user_id", user.id).eq("slug", slug).maybeSingle();
+          .eq("user_id", user.id).eq("slug", threadSlug).maybeSingle();
         const turn = [
           { role: "user", content: question, at },
           { role: "assistant", content: fullAnswer, at },
@@ -206,11 +359,13 @@ Deno.serve(async (req) => {
           }).eq("id", existing.id);
         } else {
           await supa.from("knowledge_conversations").insert({
-            user_id: user.id, slug, messages: turn, question_count: 1,
+            user_id: user.id, slug: threadSlug, messages: turn, question_count: 1,
           });
         }
         await supa.from("knowledge_events").insert({
-          event_type: "discuss_question", slug, meta: { chars: question.length, entitled },
+          event_type: "discuss_question",
+          slug: libraryMode ? null : slug,
+          meta: { chars: question.length, entitled, ...(libraryMode ? { library: true, routed: routedSlugs } : {}) },
         });
       } catch (e) {
         console.error("[discuss-paper] persist failed:", e);

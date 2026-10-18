@@ -55,7 +55,7 @@ const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 // Bumped with every change to this function. The admin System Check compares
 // it against the version the app expects, so "did the deploy happen?" is a
 // question the system answers about itself.
-export const FUNCTION_VERSION = "2026-10-16.5";
+export const FUNCTION_VERSION = "2026-10-18.1";
 
 // The hardest extraction + judgment in the app: quality profile (Opus
 // primary, Sonnet fallback). One attempt each — a PDF pass is slow, and the
@@ -150,16 +150,34 @@ function extractJson(text: string): Record<string, unknown> {
   throw new Error("unbalanced JSON in model output");
 }
 
-/** first-author surname + year, deduped against existing slugs. */
-function deriveSlug(entry: Record<string, unknown>, taken: Set<string>): string {
+/** first-author surname + year — the slug before dedup suffixing. */
+function slugBase(entry: Record<string, unknown>): string {
   const header = entry.header as Record<string, unknown> | undefined;
   const cite = header?.citation as Record<string, string> | undefined;
   const surname = (cite?.authors ?? "paper").split(/[,\s]+/)[0]?.toLowerCase().replace(/[^a-z0-9]/g, "") || "paper";
   const year = /^\d{4}$/.test(cite?.year ?? "") ? cite!.year : "";
-  const base = year ? `${surname}-${year}` : surname;
+  return year ? `${surname}-${year}` : surname;
+}
+
+/** first-author surname + year, deduped against existing slugs. */
+function deriveSlug(entry: Record<string, unknown>, taken: Set<string>): string {
+  const base = slugBase(entry);
   let slug = base;
   for (let n = 2; taken.has(slug); n++) slug = `${base}-${n}`;
   return slug;
+}
+
+/**
+ * DOI normalized for duplicate comparison: lowercased, URL/"doi:" prefixes
+ * stripped. Returns "" for anything that isn't a real DOI (empty, or the
+ * contract's "not printed in source").
+ */
+function normalizeDoi(raw: unknown): string {
+  if (typeof raw !== "string") return "";
+  const d = raw.trim().toLowerCase()
+    .replace(/^https?:\/\/(dx\.)?doi\.org\//, "")
+    .replace(/^doi:\s*/, "");
+  return d.startsWith("10.") ? d : "";
 }
 
 function b64encode(buf: ArrayBuffer): string {
@@ -307,9 +325,11 @@ Deno.serve(async (req) => {
         }
 
         // Slug: derive from citation, honor the model's own if it's free.
-        const { data: existing } = await supa.from("knowledge_entries").select("slug");
+        const { data: existing } = await supa.from("knowledge_entries")
+          .select("slug, doi:entry->header->citation->>doi");
+        const existingRows = (existing ?? []) as unknown as Array<{ slug: string; doi: string | null }>;
         const taken = new Set<string>(
-          (existing ?? []).map((r: { slug: string }) => r.slug).filter((s: string) => s !== stubSlug),
+          existingRows.map((r) => r.slug).filter((s) => s !== stubSlug),
         );
         const slug = typeof entry.slug === "string" && /^[a-z0-9][a-z0-9-]*$/.test(entry.slug as string) && !taken.has(entry.slug as string)
           ? entry.slug as string
@@ -319,6 +339,25 @@ Deno.serve(async (req) => {
         report = validateKnowledgeEntry(entry);
         if (stripped.length) {
           report.warnings.push(`layer1 sections stripped mechanically: ${stripped.join(", ")} (model emitted extra blocks beside '${entry.shape}')`);
+        }
+
+        // Duplicate-upload signals — WARNINGS, never blocks, so the editor's
+        // delete-and-re-drop workflow keeps working. Two independent checks:
+        // the paper's DOI matching an existing entry's (near-certain dup),
+        // and the natural surname-year slug already being taken (likely dup
+        // or same lab/year — human judges).
+        const header = entry.header as Record<string, unknown> | undefined;
+        const cite = header?.citation as Record<string, unknown> | undefined;
+        const newDoi = normalizeDoi(cite?.doi);
+        if (newDoi) {
+          const doiHit = existingRows.find((r) => r.slug !== stubSlug && normalizeDoi(r.doi) === newDoi);
+          if (doiHit) {
+            report.warnings.push(`possible duplicate upload: DOI ${newDoi} matches existing entry '${doiHit.slug}'`);
+          }
+        }
+        const base = slugBase(entry);
+        if (taken.has(base)) {
+          report.warnings.push(`possible duplicate upload: an entry '${base}' already exists (same first author + year) — this draft saved under a suffixed slug`);
         }
 
         // A concurrent ingest (or the dedup read missing rows) can collide on

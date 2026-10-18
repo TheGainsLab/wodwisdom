@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { fetchKnowledgeIndex, topicLabel, type KnowledgeIndexRow } from '../lib/knowledgeLibrary';
 import { QAHeader } from '../components/QAShared';
 import { KnowledgeBadge } from '../components/KnowledgeShared';
+import KnowledgeDiscuss from '../components/KnowledgeDiscuss';
 import '../features.css';
 import '../qa.css';
 import { logKnowledgeEvent } from '../lib/knowledgeEvents';
@@ -65,6 +66,20 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
           Papers worth knowing, summarized honestly: what was studied, what was found,
           and what it doesn&apos;t show. Every number traced to its page in the source.
         </p>
+
+        {/* Ask the library — same Discuss panel, no slug: the server routes
+            the question across the whole catalog and answers from the papers
+            that bear on it, with links to each. */}
+        <div style={{ border: '1px solid var(--border)', borderRadius: 12, background: 'var(--surface)', padding: '14px 16px', marginBottom: 24 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: 0.4, textTransform: 'uppercase', color: 'var(--accent)', marginBottom: 2 }}>
+            Ask the library
+          </div>
+          <p style={{ fontSize: 12.5, color: 'var(--text-dim)', margin: '0 0 4px', lineHeight: 1.5 }}>
+            Not sure which paper? Ask your question — the AI Coach answers from the
+            studies here and links the ones it draws on.
+          </p>
+          <KnowledgeDiscuss signedIn={signedIn} />
+        </div>
 
         <input
           type="search"
