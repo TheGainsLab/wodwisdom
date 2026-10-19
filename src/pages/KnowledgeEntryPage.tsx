@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
-  loadKnowledgeEntry, ensureGlossary, topicLabel,
+  loadKnowledgeEntry, ensureGlossary,
   type KnowledgeEntry, type KnowledgeChart,
 } from '../lib/knowledgeLibrary';
 import { QAHeader } from '../components/QAShared';
