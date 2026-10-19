@@ -121,8 +121,7 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
       <div className="qa-entry-container" style={{ paddingTop: 36, paddingBottom: 60 }}>
         <h1 style={{ fontSize: 26, fontWeight: 800, margin: '0 0 8px' }}>Research Library</h1>
         <p style={{ color: 'var(--text-dim)', fontSize: 15, lineHeight: 1.55, margin: '0 0 20px' }}>
-          Papers worth knowing, summarized honestly: what was studied, what was found,
-          and what it doesn&apos;t show. Every number traced to its page in the source.
+          Science for coaches and athletes.
         </p>
 
         {/* Ask the library — same Discuss panel, no slug: the server routes
