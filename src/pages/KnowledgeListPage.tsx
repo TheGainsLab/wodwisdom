@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchKnowledgeIndex, topicLabel, type KnowledgeIndexRow } from '../lib/knowledgeLibrary';
 import { QAHeader } from '../components/QAShared';
-import { KnowledgeBadge } from '../components/KnowledgeShared';
 import KnowledgeDiscuss, { renderAssistantHtml } from '../components/KnowledgeDiscuss';
 import '../features.css';
 import '../qa.css';
@@ -256,16 +255,13 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
               <div style={{ fontSize: 15.5, fontWeight: 700, lineHeight: 1.4, marginBottom: 6 }}>
                 {r.title}
               </div>
-              <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginBottom: 8 }}>
+              {/* No badges on list cards (founder's call): inclusion in the
+                  library IS the relevance statement, and "confidence:
+                  conceptual" misleads without the entry page's context. The
+                  judgment still works invisibly — relevance drives the sort.
+                  All three badges render on the entry page. */}
+              <div style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>
                 {shortCitation(r.authors, r.year)}{r.journal ? ` · ${r.journal}` : ''}
-              </div>
-              {/* Topic tags are data, not card copy: they feed search and the
-                  Ask-the-library router, but printed on the card they were
-                  unexplained jargon ("mtorc1 ampk") once the chip row went. */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-                <KnowledgeBadge kind="shape" value={r.shape} />
-                <KnowledgeBadge kind="confidence" value={r.confidence} />
-                <KnowledgeBadge kind="relevance" value={r.practical_relevance} />
               </div>
             </Link>
           ))}
