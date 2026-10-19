@@ -28,7 +28,7 @@ const FREE_LIMIT_DEFAULT = 3;
  * chat). Bare /knowledge/<slug> paths the model emits become markdown
  * links first, so sibling-paper pointers are always tappable.
  */
-function renderAssistantHtml(text: string): string {
+export function renderAssistantHtml(text: string): string {
   const cleaned = text
     // The prompt forbids headings and rules; the renderer guarantees it.
     // A heading the model slips through becomes a bold line, a divider
@@ -44,7 +44,7 @@ function renderAssistantHtml(text: string): string {
   return formatMarkdown(cleaned);
 }
 
-export default function KnowledgeDiscuss({ slug, signedIn }: { slug?: string; signedIn: boolean }) {
+export default function KnowledgeDiscuss({ slug, signedIn, noHistory = false }: { slug?: string; signedIn: boolean; noHistory?: boolean }) {
   const navigate = useNavigate();
   // No slug = library mode. Library threads persist under the reserved
   // slug '_library' (paper slugs can never start with an underscore).
@@ -74,14 +74,18 @@ export default function KnowledgeDiscuss({ slug, signedIn }: { slug?: string; si
 
   // Saved thread + current meter position, so a returning member sees
   // their history and the true remaining count before the first send.
+  // noHistory (the library landing page): the box is for ASKING — the
+  // saved thread never replays there; reviewing history is My research's
+  // job. Only the meter loads. This session's own Q&A still displays.
   useEffect(() => {
     if (!signedIn) return;
     let cancelled = false;
     (async () => {
-      const [{ data: thread }, { data: meterRows }] = await Promise.all([
-        supabase.from('knowledge_conversations').select('messages').eq('slug', threadSlug).maybeSingle(),
-        supabase.from('knowledge_conversations').select('question_count'),
-      ]);
+      const threadPromise = noHistory
+        ? null
+        : supabase.from('knowledge_conversations').select('messages').eq('slug', threadSlug).maybeSingle();
+      const { data: meterRows } = await supabase.from('knowledge_conversations').select('question_count');
+      const thread = threadPromise ? (await threadPromise).data : null;
       if (cancelled) return;
       if (thread?.messages) {
         setMessages((thread.messages as Msg[]).map((m) => ({ role: m.role, content: m.content })));
@@ -91,7 +95,7 @@ export default function KnowledgeDiscuss({ slug, signedIn }: { slug?: string; si
       }
     })();
     return () => { cancelled = true; };
-  }, [slug, signedIn]);
+  }, [slug, signedIn, noHistory]);
 
   useEffect(() => { endRef.current?.scrollIntoView({ block: 'nearest' }); }, [messages]);
 
