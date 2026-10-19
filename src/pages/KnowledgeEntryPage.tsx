@@ -791,22 +791,6 @@ export function KnowledgeEntryView({ entry, signedIn = false }: { entry: Knowled
                 ))}
               </ul>
               {charts.length > 0 && <ChartBlock c={charts[0]} />}
-              {/* A spine section, not a footnote: the full-record promise is
-                  the page's trust anchor, so it wears the section header
-                  style — but stays collapsed so the dense tables never
-                  interrupt the reading path. */}
-              <details style={{ marginTop: 4 }} onToggle={(e) => (e.target as HTMLDetailsElement).open && logKnowledgeEvent('all_data_view', entry.slug)}>
-                <summary style={{ cursor: 'pointer', margin: '24px 0 10px' }}>
-                  <span style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)' }}>
-                    All the data
-                  </span>
-                  <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 8 }}>— every number from the paper</span>
-                </summary>
-                <div style={{ marginTop: 12 }}>
-                  {charts.slice(1).map((c, i) => <ChartBlock key={i} c={c} />)}
-                  {facts}
-                </div>
-              </details>
             </>
           );
         })()}
@@ -837,6 +821,33 @@ export function KnowledgeEntryView({ entry, signedIn = false }: { entry: Knowled
             Nothing to repeat on the gym floor — this one is background that makes the other papers make sense.
           </p>
         )}
+
+        {/* ALL THE DATA sits BELOW the narrative (founder's call): the
+            reader who wants every number is the one who just finished the
+            summaries and wants to go deeper — the appendix belongs after
+            the story, next to ABOUT THIS PAPER. Collapsed, as always.
+            (When a paper has no key findings, its data already rendered
+            inline under What they found.) */}
+        {(entry.key_findings?.length ?? 0) > 0 && (() => {
+          const charts = entry.charts.filter((c) => c.template !== 'population_card');
+          return (
+            <details style={{ marginTop: 4 }} onToggle={(e) => (e.target as HTMLDetailsElement).open && logKnowledgeEvent('all_data_view', entry.slug)}>
+              <summary style={{ cursor: 'pointer', margin: '24px 0 10px' }}>
+                <span style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)' }}>
+                  All the data
+                </span>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 8 }}>— every number from the paper</span>
+              </summary>
+              <div style={{ marginTop: 12 }}>
+                {charts.slice(1).map((c, i) => <ChartBlock key={i} c={c} />)}
+                {entry.layer1.intervention && <InterventionFacts l={entry.layer1.intervention} />}
+                {entry.layer1.comparison && <ComparisonFacts l={entry.layer1.comparison} />}
+                {entry.layer1.review && <ReviewFacts l={entry.layer1.review} />}
+                {entry.layer1.reference && <ReferenceFacts l={entry.layer1.reference} />}
+              </div>
+            </details>
+          );
+        })()}
 
         {/* The trust block in full: badges in the header give the glance,
             this section gives the depth. Collapsed like ALL THE DATA — a
