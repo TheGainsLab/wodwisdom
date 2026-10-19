@@ -131,10 +131,6 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
           <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: 0.4, textTransform: 'uppercase', color: 'var(--accent)', marginBottom: 2 }}>
             Ask the library
           </div>
-          <p style={{ fontSize: 12.5, color: 'var(--text-dim)', margin: '0 0 4px', lineHeight: 1.5 }}>
-            Not sure which paper? Ask your question — the AI Coach answers from the
-            studies here and links the ones it draws on.
-          </p>
           <KnowledgeDiscuss signedIn={signedIn} noHistory />
         </div>
 

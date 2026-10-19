@@ -87,15 +87,15 @@ export default function KnowledgeDiscuss({ slug, signedIn, noHistory = false }: 
 
   useEffect(() => { endRef.current?.scrollIntoView({ block: 'nearest' }); }, [messages]);
 
-  // Signed-out visitors keep the input (it routes to signup — the funnel's
-  // first step); a signed-in member WITHOUT the entitlement sees the
-  // upgrade card instead.
-  const paywalled = signedIn && !entitled && !entitlementsLoading;
+  // Asking is locked for everyone without the entitlement: no input to
+  // type into and bounce from — a compact card says what members get and
+  // offers the one next step (signup for visitors, checkout for free
+  // members). Saved threads on paper pages stay readable above it.
+  const locked = !entitled && (!signedIn || !entitlementsLoading);
 
   const send = async () => {
     const question = input.trim();
-    if (!question || sending || paywalled) return;
-    if (!signedIn) { navigate(`/auth?signup=1&next=${authNext}`); return; }
+    if (!question || sending || locked) return;
     setError('');
     setInput('');
     setSending(true);
@@ -180,38 +180,37 @@ export default function KnowledgeDiscuss({ slug, signedIn, noHistory = false }: 
         </div>
       )}
 
-      {paywalled ? (
-        <div style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '14px 16px', textAlign: 'center' }}>
-          <p style={{ fontSize: 13.5, margin: '0 0 10px', color: 'var(--text)' }}>
-            Research discussions are a member feature.
+      {locked ? (
+        <div style={{ padding: '4px 2px 2px' }}>
+          <p style={{ fontSize: 13, margin: '0 0 10px', color: 'var(--text-dim)', lineHeight: 1.5 }}>
+            🔒 Answers from the research, applied to your training.
           </p>
-          <p style={{ fontSize: 12.5, margin: '0 0 12px', color: 'var(--text-dim)' }}>
-            Ask unlimited questions of any study — answers grounded in the research, applied to your training, with every conversation saved.
-          </p>
-          <button className="paywall-btn" onClick={() => navigate('/checkout')}>Upgrade Now</button>
+          <button
+            className="paywall-btn"
+            onClick={() => {
+              logOnce();
+              if (!signedIn) navigate(`/auth?signup=1&next=${authNext}`);
+              else navigate('/checkout');
+            }}
+          >
+            {signedIn ? 'Upgrade Now' : 'Create Free Account'}
+          </button>
         </div>
       ) : (
-        <>
-          <div className="input-row">
-            <textarea
-              rows={1}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onFocus={() => {
-                logOnce();
-                if (!signedIn) navigate(`/auth?signup=1&next=${authNext}`);
-              }}
-              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
-              placeholder={slug
-                ? (signedIn ? 'Ask this paper a question…' : 'Ask this paper a question — a member feature')
-                : (signedIn ? 'Ask the library anything…' : 'Ask the library anything — a member feature')}
-              disabled={sending}
-            />
-            <button className="send-btn" onClick={send} disabled={sending || !input.trim()}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
-            </button>
-          </div>
-        </>
+        <div className="input-row">
+          <textarea
+            rows={1}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onFocus={logOnce}
+            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
+            placeholder={slug ? 'Ask this paper a question…' : 'Ask the library anything…'}
+            disabled={sending}
+          />
+          <button className="send-btn" onClick={send} disabled={sending || !input.trim()}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
+          </button>
+        </div>
       )}
       {error && <p style={{ color: 'var(--accent)', fontSize: 12.5, margin: '8px 0 0' }}>{error}</p>}
     </div>
