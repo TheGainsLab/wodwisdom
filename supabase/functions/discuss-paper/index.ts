@@ -21,10 +21,18 @@
  * hard labeling rule: application to the member is coaching inference,
  * opened "For your training:", never presented as the paper's finding.
  *
- * Access: PAID-ONLY (founder's call, 2026-10-19 — supersedes the earlier
- * 3-free-questions meter). Signed-in with the `research_chat` entitlement
- * (or admin) asks unlimited questions; everyone else gets 402 PAID_ONLY.
- * Reading and searching the library stay free — asking is the product.
+ * Find mode (action "find"): the ROUTER ALONE — Haiku reads the catalog,
+ * returns matching slugs, no answer, nothing persisted. Free for any
+ * signed-in account (a tenth of a cent per call): semantic paper-finding,
+ * the step between word-search and the paid coached answer.
+ *
+ * Access (founder's final matrix, 2026-10-19): any signed-in account may
+ * search and find. COACHED ANSWERS are free for FREE_LIMIT questions
+ * lifetime PER SURFACE — two separate pools: FREE_LIMIT in-paper Discuss
+ * questions (summed across every paper thread) and FREE_LIMIT library
+ * Ask questions (the _library thread) — so each hook gets its own taste.
+ * Then 402 FREE_LIMIT. The research_chat entitlement (or admin — no
+ * limit ever applies to an admin) is unlimited.
  *
  * Conversations persist server-side: one thread per (user, slug); library-
  * mode threads persist under the reserved slug "_library" (paper slugs are
@@ -36,12 +44,13 @@ import { MODELS } from "../_shared/model-profiles.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { fetchWithTimeout } from "../_shared/fetch-with-timeout.ts";
 
-export const FUNCTION_VERSION = "2026-10-19.1";
+export const FUNCTION_VERSION = "2026-10-19.3";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 
+const FREE_LIMIT = 3;
 const MAX_TOKENS = 1024;
 const MAX_HISTORY_TURNS = 10;
 const MAX_QUESTION_CHARS = 2000;
@@ -245,7 +254,25 @@ Deno.serve(async (req) => {
     const question = typeof body.question === "string" ? body.question.trim().slice(0, MAX_QUESTION_CHARS) : "";
     if (!question) return json({ error: "question is required" }, 400);
 
-    // ── Access: entitlement or lifetime free meter ──────────────────────
+    // ── Find: the router alone — free for any signed-in account ─────────
+    // Returns matching slugs, no coached answer, nothing persisted, not
+    // metered. Semantic paper-finding for a tenth of a cent.
+    if (body.action === "find") {
+      const { data: findRows } = await supa
+        .from("knowledge_entries").select("slug, entry").eq("status", "published");
+      const catalog = ((findRows ?? []) as Array<{ slug: string; entry: Json }>).map((r) => ({
+        slug: r.slug,
+        title: (r.entry?.header?.citation?.title || r.entry?.header?.title_plain || r.slug) as string,
+        topics: Array.isArray(r.entry?.header?.topics) ? r.entry.header.topics as string[] : [],
+      }));
+      const slugs = await routeLibraryQuestion(question, catalog);
+      await supa.from("knowledge_events").insert({
+        event_type: "library_find", slug: null, meta: { chars: question.length, found: slugs },
+      }).then(() => {}, () => {});
+      return json({ slugs });
+    }
+
+    // ── Access: entitlement, or the lifetime free meter ─────────────────
     const nowIso = new Date().toISOString();
     const [{ data: profile }, { data: entitlements }, { data: athleteProfile }] = await Promise.all([
       supa.from("profiles").select("role").eq("id", user.id).maybeSingle(),
@@ -258,10 +285,23 @@ Deno.serve(async (req) => {
         .eq("user_id", user.id).maybeSingle(),
     ]);
     const entitled = profile?.role === "admin" || (entitlements ?? []).length > 0;
-    // Paid-only: no free questions. INVARIANT: no limit ever applies to an
-    // admin (entitled covers it — admins are always entitled).
+    // Free accounts: FREE_LIMIT lifetime per SURFACE — the library thread
+    // meters library mode, the paper threads (summed) meter paper mode.
+    // Each hook keeps its own taste. INVARIANT: no limit ever applies to
+    // an admin (entitled covers it — admins are always entitled).
+    let totalQuestions = 0;
     if (!entitled) {
-      return json({ error: "Research discussions are a member feature", code: "PAID_ONLY" }, 402);
+      const { data: rows } = await supa
+        .from("knowledge_conversations").select("slug, question_count").eq("user_id", user.id);
+      totalQuestions = (rows ?? [])
+        .filter((r: { slug: string }) => libraryMode ? r.slug === LIBRARY_SLUG : r.slug !== LIBRARY_SLUG)
+        .reduce((a: number, r: { question_count: number }) => a + (r.question_count || 0), 0);
+      if (totalQuestions >= FREE_LIMIT) {
+        return json(
+          { error: "Free limit reached", code: "FREE_LIMIT", usage: { tier: "free", total_questions: totalQuestions, free_limit: FREE_LIMIT } },
+          402,
+        );
+      }
     }
 
     // ── The paper(s) and the library index ──────────────────────────────
@@ -326,7 +366,9 @@ Deno.serve(async (req) => {
     const enc = new TextEncoder();
     const dec = new TextDecoder();
     let fullAnswer = "";
-    const usagePayload = { tier: "paid" };
+    const usagePayload = entitled
+      ? { tier: "paid" }
+      : { tier: "free", total_questions: totalQuestions + 1, free_limit: FREE_LIMIT };
 
     const threadSlug = libraryMode ? LIBRARY_SLUG : slug;
     const persist = async () => {

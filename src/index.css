@@ -140,6 +140,10 @@ body.landing-body{overflow:auto;height:auto}
 .msg-body.assistant p{margin-bottom:12px}
 .msg-body.assistant p:last-child{margin-bottom:0}
 .msg-body.assistant strong{color:var(--accent);font-weight:600}
+/* Links fell back to browser-default navy — invisible on the dark theme.
+   House accent, like strong above; covers coach chat and Discuss alike. */
+.msg-body.assistant a{color:var(--accent);font-weight:600;text-decoration:underline;text-underline-offset:2px}
+.msg-body.assistant a:hover{color:var(--accent-hover)}
 .sources-bar{margin-top:12px;padding-top:12px;border-top:1px solid var(--border);display:flex;flex-wrap:wrap;align-items:center;gap:6px}
 .sources-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted)}
 .source-chip{font-size:11px;color:var(--text-dim);background:var(--surface2);border:1px solid var(--border);padding:3px 9px;border-radius:4px}
