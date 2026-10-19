@@ -42,7 +42,16 @@ export function renderAssistantHtml(text: string): string {
   return formatMarkdown(cleaned);
 }
 
-export default function KnowledgeDiscuss({ slug, signedIn, noHistory = false }: { slug?: string; signedIn: boolean; noHistory?: boolean }) {
+export default function KnowledgeDiscuss({ slug, signedIn, noHistory = false, dormantUntilAsked = false, pendingQuestion, onPendingConsumed }: {
+  slug?: string;
+  signedIn: boolean;
+  noHistory?: boolean;
+  /** Render nothing until a question arrives (the one-box page owns the input). */
+  dormantUntilAsked?: boolean;
+  /** A question handed in from outside (the one-box's Ask row) — sent on arrival. */
+  pendingQuestion?: string;
+  onPendingConsumed?: () => void;
+}) {
   const navigate = useNavigate();
   // No slug = library mode. Library threads persist under the reserved
   // slug '_library' (paper slugs can never start with an underscore).
@@ -52,10 +61,14 @@ export default function KnowledgeDiscuss({ slug, signedIn, noHistory = false }: 
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
-  // Paid-only (founder's call): asking requires the research_chat
-  // entitlement or admin. No free questions, no meter. The server is the
-  // authority (402 PAID_ONLY); the hook (admin bypass included) decides
-  // what this component renders. INVARIANT: never paywall an admin.
+  // Final access matrix (founder, 2026-10-19): entitled/admin unlimited;
+  // free accounts get FREE_LIMIT coached answers lifetime, ONE pool across
+  // paper and library modes; then the upgrade row. Signed-out gets the
+  // signup row. The server is the authority (402 FREE_LIMIT); the hook
+  // (admin bypass included) and the meter decide what renders. INVARIANT:
+  // never paywall an admin.
+  const [used, setUsed] = useState<number | null>(null);
+  const [freeLimit, setFreeLimit] = useState(3);
   const { hasFeature, loading: entitlementsLoading } = useEntitlements();
   const entitled = hasFeature('research_chat');
   const endRef = useRef<HTMLDivElement>(null);
@@ -67,34 +80,38 @@ export default function KnowledgeDiscuss({ slug, signedIn, noHistory = false }: 
     logKnowledgeEvent('discuss_click', slug, { signedIn, library: !slug });
   };
 
-  // Saved thread, so a returning member sees their history on a paper
-  // page. noHistory (the library landing page): the box is for ASKING —
-  // the saved thread never replays there; reviewing history is My
-  // research's job. This session's own Q&A still displays.
+  // Saved thread + meter position, so a returning member sees their
+  // history and true remaining count. noHistory (the library landing
+  // page): the box is for ASKING — the saved thread never replays there;
+  // reviewing history is My research's job. The meter still loads.
   useEffect(() => {
-    if (!signedIn || noHistory) return;
+    if (!signedIn) return;
     let cancelled = false;
     (async () => {
-      const { data: thread } = await supabase
-        .from('knowledge_conversations').select('messages').eq('slug', threadSlug).maybeSingle();
+      const threadPromise = noHistory
+        ? null
+        : supabase.from('knowledge_conversations').select('messages').eq('slug', threadSlug).maybeSingle();
+      const { data: meterRows } = await supabase.from('knowledge_conversations').select('question_count');
+      const thread = threadPromise ? (await threadPromise).data : null;
       if (cancelled) return;
       if (thread?.messages) {
         setMessages((thread.messages as Msg[]).map((m) => ({ role: m.role, content: m.content })));
       }
+      if (meterRows) setUsed(meterRows.reduce((a, r) => a + (r.question_count || 0), 0));
     })();
     return () => { cancelled = true; };
   }, [slug, signedIn, noHistory]);
 
   useEffect(() => { endRef.current?.scrollIntoView({ block: 'nearest' }); }, [messages]);
 
-  // Asking is locked for everyone without the entitlement: no input to
-  // type into and bounce from — a compact card says what members get and
-  // offers the one next step (signup for visitors, checkout for free
-  // members). Saved threads on paper pages stay readable above it.
-  const locked = !entitled && (!signedIn || !entitlementsLoading);
+  // Locked = no input to type into and bounce from; a compact row offers
+  // the one next step. Signed-out: create an account. Free member over
+  // the lifetime pool: upgrade. Saved threads stay readable above it.
+  const locked = !signedIn ||
+    (!entitlementsLoading && !entitled && used !== null && used >= freeLimit);
 
-  const send = async () => {
-    const question = input.trim();
+  const send = async (questionArg?: string) => {
+    const question = (questionArg ?? input).trim();
     if (!question || sending || locked) return;
     setError('');
     setInput('');
@@ -109,9 +126,12 @@ export default function KnowledgeDiscuss({ slug, signedIn, noHistory = false }: 
       if (!resp.ok) {
         const data = await resp.json().catch(() => ({}));
         if (resp.status === 402) {
-          // Stale client state — the server is the authority. Roll back the
-          // pending bubbles; the entitlements hook will catch up and show
-          // the upgrade card.
+          // Server is the meter's authority: sync and roll back the
+          // pending bubbles; the locked row takes over.
+          if (data.code === 'FREE_LIMIT') {
+            setUsed(data.usage?.total_questions ?? freeLimit);
+            setFreeLimit(data.usage?.free_limit ?? freeLimit);
+          }
           setMessages((prev) => prev.slice(0, -2));
           return;
         }
@@ -137,7 +157,10 @@ export default function KnowledgeDiscuss({ slug, signedIn, noHistory = false }: 
               acc += ev.text;
               setMessages((prev) => prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: acc } : m)));
             }
-            // 'done' carries usage {tier:"paid"}; nothing to track client-side.
+            if (ev.type === 'done' && ev.usage?.tier === 'free') {
+              setUsed(ev.usage.total_questions);
+              setFreeLimit(ev.usage.free_limit ?? freeLimit);
+            }
             if (ev.type === 'error') throw new Error(ev.error || 'Stream error');
           } catch (e) {
             if (e instanceof Error && e.message !== 'Stream error') continue;
@@ -156,6 +179,23 @@ export default function KnowledgeDiscuss({ slug, signedIn, noHistory = false }: 
       setSending(false);
     }
   };
+
+  // A question handed in by the one-box page: send it the moment it arrives.
+  const lastPending = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!pendingQuestion) { lastPending.current = undefined; return; }
+    if (pendingQuestion === lastPending.current) return;
+    lastPending.current = pendingQuestion;
+    void send(pendingQuestion);
+    onPendingConsumed?.();
+    // send/onPendingConsumed are stable enough per render; firing once per
+    // distinct pendingQuestion is the contract.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingQuestion]);
+
+  // Dormant (one-box page): invisible until a conversation exists — the
+  // page owns the input and the locked/ask rows until then.
+  if (dormantUntilAsked && messages.length === 0) return null;
 
   return (
     <div style={{ marginTop: 14 }}>
@@ -213,10 +253,15 @@ export default function KnowledgeDiscuss({ slug, signedIn, noHistory = false }: 
             placeholder={slug ? 'Ask this paper a question…' : 'Ask the library anything…'}
             disabled={sending}
           />
-          <button className="send-btn" onClick={send} disabled={sending || !input.trim()}>
+          <button className="send-btn" onClick={() => send()} disabled={sending || !input.trim()}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
           </button>
         </div>
+      )}
+      {signedIn && !entitled && !locked && used !== null && (
+        <p style={{ fontSize: 11.5, color: 'var(--text-muted)', margin: '8px 0 0' }}>
+          {Math.max(freeLimit - used, 0)} of {freeLimit} free research questions left.
+        </p>
       )}
       {error && <p style={{ color: 'var(--accent)', fontSize: 12.5, margin: '8px 0 0' }}>{error}</p>}
     </div>
