@@ -40,6 +40,7 @@ const AdminWorkoutLogsPage = lazy(() => import('./pages/AdminWorkoutLogsPage'));
 const AdminWorkoutLogDetailPage = lazy(() => import('./pages/AdminWorkoutLogDetailPage'));
 const AdminProgramsPage = lazy(() => import('./pages/AdminProgramsPage'));
 const AdminNutritionPage = lazy(() => import('./pages/AdminNutritionPage'));
+const AdminProgramScorePage = lazy(() => import('./pages/AdminProgramScorePage'));
 const AthletePage = lazy(() => import('./pages/AthletePage'));
 const AthleteDataPage = lazy(() => import('./pages/AthleteDataPage'));
 const WorkoutReviewPage = lazy(() => import('./pages/WorkoutReviewPage'));
@@ -322,6 +323,7 @@ function AuthenticatedApp({ session }: { session: Session }) {
             <Route path="/admin/activity" element={<AdminActivityFeedPage session={session} />} />
             <Route path="/admin/ops" element={<AdminOpsPage session={session} />} />
             <Route path="/admin/research" element={<AdminResearchPage session={session} />} />
+            <Route path="/admin/program-score" element={<AdminProgramScorePage session={session} />} />
             <Route path="/admin/outreach" element={<AdminOutreachPage session={session} />} />
             <Route path="/admin/users/:id" element={<AdminUserDetailPage session={session} />} />
             <Route path="/admin/users/:id/timeline" element={<AdminUserTimelinePage session={session} />} />

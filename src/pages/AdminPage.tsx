@@ -418,6 +418,17 @@ export default function AdminPage({ session }: { session: Session }) {
                     Research Library →
                   </button>
                   <button
+                    onClick={() => navigate('/admin/program-score')}
+                    style={{
+                      background: 'var(--accent-glow)', color: 'var(--accent)',
+                      border: '1px solid var(--border)', borderRadius: 8,
+                      padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                      fontFamily: "'Outfit', sans-serif",
+                    }}
+                  >
+                    Program Score →
+                  </button>
+                  <button
                     onClick={() => navigate('/admin/reports')}
                     style={{
                       background: 'var(--accent-glow)', color: 'var(--accent)',
