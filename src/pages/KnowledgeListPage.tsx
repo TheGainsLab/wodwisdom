@@ -199,7 +199,7 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
                           m.role === 'assistant' ? (
                             <div key={i} className="msg-body assistant" style={{ fontSize: 13, lineHeight: 1.55 }} dangerouslySetInnerHTML={{ __html: renderAssistantHtml(m.content) }} />
                           ) : (
-                            <div key={i} style={{ alignSelf: 'flex-end', maxWidth: '85%', padding: '6px 10px', borderRadius: 10, background: 'var(--surface2, #222)', border: '1px solid var(--border)', fontSize: 13, lineHeight: 1.5 }}>
+                            <div key={i} className="msg-body user" style={{ alignSelf: 'flex-end', maxWidth: '85%', fontSize: 13 }}>
                               {m.content}
                             </div>
                           )

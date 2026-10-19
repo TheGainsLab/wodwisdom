@@ -164,9 +164,9 @@ export default function KnowledgeDiscuss({ slug, signedIn, noHistory = false }: 
           {messages.map((m, i) => (
             <div
               key={i}
-              className={m.role === 'assistant' ? 'msg-body assistant' : undefined}
+              className={m.role === 'assistant' ? 'msg-body assistant' : 'msg-body user'}
               style={m.role === 'user'
-                ? { alignSelf: 'flex-end', maxWidth: '85%', padding: '8px 12px', borderRadius: 10, background: 'var(--surface2, #222)', border: '1px solid var(--border)', fontSize: 13.5, lineHeight: 1.55 }
+                ? { alignSelf: 'flex-end', maxWidth: '85%', fontSize: 13.5 }
                 : { alignSelf: 'stretch', fontSize: 13.5, lineHeight: 1.6, color: 'var(--text)' }}
             >
               {m.role === 'assistant' ? (
