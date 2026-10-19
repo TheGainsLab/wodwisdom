@@ -27,12 +27,12 @@
  * the step between word-search and the paid coached answer.
  *
  * Access (founder's final matrix, 2026-10-19): any signed-in account may
- * search and find. COACHED ANSWERS — paper mode and library mode alike —
- * are free for FREE_LIMIT questions lifetime (one pool across the whole
- * library: 3 on one paper, 1 on each of 3, any mix), then 402 FREE_LIMIT;
- * the research_chat entitlement (or admin — no limit ever applies to an
- * admin) is unlimited. Metered by summing question_count over the
- * member's knowledge_conversations rows.
+ * search and find. COACHED ANSWERS are free for FREE_LIMIT questions
+ * lifetime PER SURFACE — two separate pools: FREE_LIMIT in-paper Discuss
+ * questions (summed across every paper thread) and FREE_LIMIT library
+ * Ask questions (the _library thread) — so each hook gets its own taste.
+ * Then 402 FREE_LIMIT. The research_chat entitlement (or admin — no
+ * limit ever applies to an admin) is unlimited.
  *
  * Conversations persist server-side: one thread per (user, slug); library-
  * mode threads persist under the reserved slug "_library" (paper slugs are
@@ -44,7 +44,7 @@ import { MODELS } from "../_shared/model-profiles.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { fetchWithTimeout } from "../_shared/fetch-with-timeout.ts";
 
-export const FUNCTION_VERSION = "2026-10-19.2";
+export const FUNCTION_VERSION = "2026-10-19.3";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -285,14 +285,17 @@ Deno.serve(async (req) => {
         .eq("user_id", user.id).maybeSingle(),
     ]);
     const entitled = profile?.role === "admin" || (entitlements ?? []).length > 0;
-    // Free accounts: FREE_LIMIT coached answers lifetime, ONE pool across
-    // paper mode and library mode alike. INVARIANT: no limit ever applies
-    // to an admin (entitled covers it — admins are always entitled).
+    // Free accounts: FREE_LIMIT lifetime per SURFACE — the library thread
+    // meters library mode, the paper threads (summed) meter paper mode.
+    // Each hook keeps its own taste. INVARIANT: no limit ever applies to
+    // an admin (entitled covers it — admins are always entitled).
     let totalQuestions = 0;
     if (!entitled) {
       const { data: rows } = await supa
-        .from("knowledge_conversations").select("question_count").eq("user_id", user.id);
-      totalQuestions = (rows ?? []).reduce((a: number, r: { question_count: number }) => a + (r.question_count || 0), 0);
+        .from("knowledge_conversations").select("slug, question_count").eq("user_id", user.id);
+      totalQuestions = (rows ?? [])
+        .filter((r: { slug: string }) => libraryMode ? r.slug === LIBRARY_SLUG : r.slug !== LIBRARY_SLUG)
+        .reduce((a: number, r: { question_count: number }) => a + (r.question_count || 0), 0);
       if (totalQuestions >= FREE_LIMIT) {
         return json(
           { error: "Free limit reached", code: "FREE_LIMIT", usage: { tier: "free", total_questions: totalQuestions, free_limit: FREE_LIMIT } },

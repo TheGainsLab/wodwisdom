@@ -53,13 +53,14 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
   const [findError, setFindError] = useState('');
   const [askQuestion, setAskQuestion] = useState<string | undefined>(undefined);
 
-  // Can this member ask a coached question right now? Entitled/admin:
-  // always. Free: while the lifetime pool (summed thread counts) lasts.
+  // Can this member ask a LIBRARY question right now? Entitled/admin:
+  // always. Free: while the library's own lifetime pool lasts (the
+  // _library thread's count — paper Discuss has its own separate pool).
   // Client-side optimism only — the server (402 FREE_LIMIT) is authority.
   const { hasFeature } = useEntitlements();
   const entitled = hasFeature('research_chat');
-  const usedQuestions = myThreads.reduce((a, t) => a + t.questionCount, 0);
-  const canAsk = entitled || usedQuestions < 3;
+  const usedLibraryQuestions = myThreads.find((t) => t.slug === '_library')?.questionCount ?? 0;
+  const canAsk = entitled || usedLibraryQuestions < 3;
 
   useEffect(() => {
     let cancelled = false;

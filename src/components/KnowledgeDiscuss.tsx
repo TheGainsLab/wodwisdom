@@ -91,13 +91,19 @@ export default function KnowledgeDiscuss({ slug, signedIn, noHistory = false, do
       const threadPromise = noHistory
         ? null
         : supabase.from('knowledge_conversations').select('messages').eq('slug', threadSlug).maybeSingle();
-      const { data: meterRows } = await supabase.from('knowledge_conversations').select('question_count');
+      const { data: meterRows } = await supabase.from('knowledge_conversations').select('slug, question_count');
       const thread = threadPromise ? (await threadPromise).data : null;
       if (cancelled) return;
       if (thread?.messages) {
         setMessages((thread.messages as Msg[]).map((m) => ({ role: m.role, content: m.content })));
       }
-      if (meterRows) setUsed(meterRows.reduce((a, r) => a + (r.question_count || 0), 0));
+      // Two separate lifetime pools (founder's call): the library thread
+      // meters Ask-the-library; the paper threads, summed, meter Discuss.
+      if (meterRows) {
+        setUsed(meterRows
+          .filter((r) => (slug ? r.slug !== '_library' : r.slug === '_library'))
+          .reduce((a, r) => a + (r.question_count || 0), 0));
+      }
     })();
     return () => { cancelled = true; };
   }, [slug, signedIn, noHistory]);
