@@ -43,6 +43,7 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
   const [index, setIndex] = useState<KnowledgeIndexRow[] | null>(null);
   const [myThreads, setMyThreads] = useState<MyThread[]>([]);
   const [expandedThread, setExpandedThread] = useState<string | null>(null);
+  const [myResearchOpen, setMyResearchOpen] = useState(false);
   const [showAllPapers, setShowAllPapers] = useState(false);
 
   useEffect(() => {
@@ -138,14 +139,25 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
           <KnowledgeDiscuss signedIn={signedIn} noHistory />
         </div>
 
-        {/* My research — the member's saved conversations, each reopening
-            where it lives: the paper's Discuss panel, or (for the library
-            thread) the Ask-the-library panel just above. */}
+        {/* My research — the ONE home of the member's saved conversations.
+            Collapsed to a single header line by default: thread cards grow
+            with every paper questioned, and uncollapsed they'd become the
+            page's next clutter. */}
         {signedIn && myThreads.length > 0 && (
           <div style={{ marginBottom: 24 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: 0.4, textTransform: 'uppercase', color: 'var(--accent)', marginBottom: 8 }}>
-              My research
-            </div>
+            <button
+              type="button"
+              onClick={() => setMyResearchOpen((v) => !v)}
+              style={{
+                display: 'block', width: '100%', textAlign: 'left', cursor: 'pointer',
+                background: 'transparent', border: 'none', padding: 0, fontFamily: 'inherit',
+                fontSize: 13, fontWeight: 700, letterSpacing: 0.4, textTransform: 'uppercase',
+                color: 'var(--accent)', marginBottom: myResearchOpen ? 8 : 0,
+              }}
+            >
+              My research ({myThreads.length}) {myResearchOpen ? '▾' : '▸'}
+            </button>
+            {myResearchOpen && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {myThreads.map((t) => {
                 const isLibrary = t.slug === '_library';
@@ -209,6 +221,7 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
                 );
               })}
             </div>
+            )}
           </div>
         )}
 
