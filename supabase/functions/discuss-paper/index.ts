@@ -21,11 +21,10 @@
  * hard labeling rule: application to the member is coaching inference,
  * opened "For your training:", never presented as the paper's finding.
  *
- * Access: signed-in required. The `research_chat` entitlement (or admin)
- * is unlimited; everyone else gets a lifetime total of FREE_LIMIT questions
- * across the whole library, metered by summing question_count over the
- * member's knowledge_conversations rows (library-mode rows included — one
- * meter, as decided). Mirrors the main coach's contract (402 + FREE_LIMIT).
+ * Access: PAID-ONLY (founder's call, 2026-10-19 — supersedes the earlier
+ * 3-free-questions meter). Signed-in with the `research_chat` entitlement
+ * (or admin) asks unlimited questions; everyone else gets 402 PAID_ONLY.
+ * Reading and searching the library stay free — asking is the product.
  *
  * Conversations persist server-side: one thread per (user, slug); library-
  * mode threads persist under the reserved slug "_library" (paper slugs are
@@ -37,13 +36,12 @@ import { MODELS } from "../_shared/model-profiles.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { fetchWithTimeout } from "../_shared/fetch-with-timeout.ts";
 
-export const FUNCTION_VERSION = "2026-10-18.1";
+export const FUNCTION_VERSION = "2026-10-19.1";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 
-const FREE_LIMIT = 3;
 const MAX_TOKENS = 1024;
 const MAX_HISTORY_TURNS = 10;
 const MAX_QUESTION_CHARS = 2000;
@@ -260,18 +258,10 @@ Deno.serve(async (req) => {
         .eq("user_id", user.id).maybeSingle(),
     ]);
     const entitled = profile?.role === "admin" || (entitlements ?? []).length > 0;
-
-    let totalQuestions = 0;
+    // Paid-only: no free questions. INVARIANT: no limit ever applies to an
+    // admin (entitled covers it — admins are always entitled).
     if (!entitled) {
-      const { data: rows } = await supa
-        .from("knowledge_conversations").select("question_count").eq("user_id", user.id);
-      totalQuestions = (rows ?? []).reduce((a: number, r: { question_count: number }) => a + (r.question_count || 0), 0);
-      if (totalQuestions >= FREE_LIMIT) {
-        return json(
-          { error: "Free limit reached", code: "FREE_LIMIT", usage: { tier: "free", total_questions: totalQuestions, free_limit: FREE_LIMIT } },
-          402,
-        );
-      }
+      return json({ error: "Research discussions are a member feature", code: "PAID_ONLY" }, 402);
     }
 
     // ── The paper(s) and the library index ──────────────────────────────
@@ -336,9 +326,7 @@ Deno.serve(async (req) => {
     const enc = new TextEncoder();
     const dec = new TextDecoder();
     let fullAnswer = "";
-    const usagePayload = entitled
-      ? { tier: "paid" }
-      : { tier: "free", total_questions: totalQuestions + 1, free_limit: FREE_LIMIT };
+    const usagePayload = { tier: "paid" };
 
     const threadSlug = libraryMode ? LIBRARY_SLUG : slug;
     const persist = async () => {
