@@ -890,16 +890,10 @@ export function KnowledgeEntryView({ entry, signedIn = false }: { entry: Knowled
         )}
         </details>
 
-        {(h.topics ?? []).length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 24 }}>
-            {(h.topics ?? []).map((t) => (
-              <span key={t} style={{ padding: '3px 10px', borderRadius: 999, fontSize: 11.5, border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
-                {topicLabel(t)}
-              </span>
-            ))}
-          </div>
-        )}
-
+        {/* No topic chips on the paper (founder's call, matching the list
+            cards): untappable jargon pills added nothing for the reader.
+            Topics keep working as data — library search and the
+            Ask-the-library router both read them. */}
         <DiscussBlock slug={entry.slug} signedIn={signedIn} />
     </>
   );
