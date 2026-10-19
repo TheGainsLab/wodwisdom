@@ -11,17 +11,15 @@ import { useEntitlements } from '../hooks/useEntitlements';
  * the question across the whole catalog and answers from the papers that
  * bear on it, with links.
  *
- * Grounded server-side in verified records (discuss-paper function). The
- * free tier is 3 questions lifetime across the whole library (library-mode
- * questions included), mirroring the main coach's meter contract (402 +
- * FREE_LIMIT); the research_chat entitlement is unlimited. Threads persist
- * server-side, one per paper plus one library thread (slug "_library"),
- * and reload here on return visits.
+ * Grounded server-side in verified records (discuss-paper function).
+ * Asking is PAID-ONLY: the research_chat entitlement (or admin) asks
+ * unlimited questions; signed-in members without it see the upgrade card,
+ * signed-out visitors are routed to signup. Threads persist server-side,
+ * one per paper plus one library thread (slug "_library"), and reload on
+ * paper pages on return visits.
  */
 
 type Msg = { role: 'user' | 'assistant'; content: string; streaming?: boolean };
-
-const FREE_LIMIT_DEFAULT = 3;
 
 /**
  * Answers render through the house markdown formatter (same as the main
@@ -54,15 +52,12 @@ export default function KnowledgeDiscuss({ slug, signedIn, noHistory = false }: 
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
-  const [used, setUsed] = useState<number | null>(null);
-  const [freeLimit, setFreeLimit] = useState(FREE_LIMIT_DEFAULT);
-  // Server-confirmed paid tier (from the stream's `done` usage). The session's
-  // entitlements (below) cover the page-load case: without them, an admin or
-  // research_chat member who had already used 3 questions was paywalled by the
-  // CLIENT on mount — the server (the real authority) never saw a request.
-  const [entitledFromStream, setEntitledFromStream] = useState(false);
+  // Paid-only (founder's call): asking requires the research_chat
+  // entitlement or admin. No free questions, no meter. The server is the
+  // authority (402 PAID_ONLY); the hook (admin bypass included) decides
+  // what this component renders. INVARIANT: never paywall an admin.
   const { hasFeature, loading: entitlementsLoading } = useEntitlements();
-  const entitled = entitledFromStream || hasFeature('research_chat');
+  const entitled = hasFeature('research_chat');
   const endRef = useRef<HTMLDivElement>(null);
   const clickLogged = useRef(false);
 
@@ -72,26 +67,19 @@ export default function KnowledgeDiscuss({ slug, signedIn, noHistory = false }: 
     logKnowledgeEvent('discuss_click', slug, { signedIn, library: !slug });
   };
 
-  // Saved thread + current meter position, so a returning member sees
-  // their history and the true remaining count before the first send.
-  // noHistory (the library landing page): the box is for ASKING — the
-  // saved thread never replays there; reviewing history is My research's
-  // job. Only the meter loads. This session's own Q&A still displays.
+  // Saved thread, so a returning member sees their history on a paper
+  // page. noHistory (the library landing page): the box is for ASKING —
+  // the saved thread never replays there; reviewing history is My
+  // research's job. This session's own Q&A still displays.
   useEffect(() => {
-    if (!signedIn) return;
+    if (!signedIn || noHistory) return;
     let cancelled = false;
     (async () => {
-      const threadPromise = noHistory
-        ? null
-        : supabase.from('knowledge_conversations').select('messages').eq('slug', threadSlug).maybeSingle();
-      const { data: meterRows } = await supabase.from('knowledge_conversations').select('question_count');
-      const thread = threadPromise ? (await threadPromise).data : null;
+      const { data: thread } = await supabase
+        .from('knowledge_conversations').select('messages').eq('slug', threadSlug).maybeSingle();
       if (cancelled) return;
       if (thread?.messages) {
         setMessages((thread.messages as Msg[]).map((m) => ({ role: m.role, content: m.content })));
-      }
-      if (meterRows) {
-        setUsed(meterRows.reduce((a, r) => a + (r.question_count || 0), 0));
       }
     })();
     return () => { cancelled = true; };
@@ -99,12 +87,15 @@ export default function KnowledgeDiscuss({ slug, signedIn, noHistory = false }: 
 
   useEffect(() => { endRef.current?.scrollIntoView({ block: 'nearest' }); }, [messages]);
 
-  const paywalled = !entitled && !entitlementsLoading && used !== null && used >= freeLimit;
+  // Asking is locked for everyone without the entitlement: no input to
+  // type into and bounce from — a compact card says what members get and
+  // offers the one next step (signup for visitors, checkout for free
+  // members). Saved threads on paper pages stay readable above it.
+  const locked = !entitled && (!signedIn || !entitlementsLoading);
 
   const send = async () => {
     const question = input.trim();
-    if (!question || sending || paywalled) return;
-    if (!signedIn) { navigate(`/auth?signup=1&next=${authNext}`); return; }
+    if (!question || sending || locked) return;
     setError('');
     setInput('');
     setSending(true);
@@ -117,9 +108,10 @@ export default function KnowledgeDiscuss({ slug, signedIn, noHistory = false }: 
       });
       if (!resp.ok) {
         const data = await resp.json().catch(() => ({}));
-        if (resp.status === 402 && data.code === 'FREE_LIMIT') {
-          setUsed(data.usage?.total_questions ?? freeLimit);
-          setFreeLimit(data.usage?.free_limit ?? freeLimit);
+        if (resp.status === 402) {
+          // Stale client state — the server is the authority. Roll back the
+          // pending bubbles; the entitlements hook will catch up and show
+          // the upgrade card.
           setMessages((prev) => prev.slice(0, -2));
           return;
         }
@@ -145,14 +137,7 @@ export default function KnowledgeDiscuss({ slug, signedIn, noHistory = false }: 
               acc += ev.text;
               setMessages((prev) => prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: acc } : m)));
             }
-            if (ev.type === 'done' && ev.usage) {
-              if (ev.usage.tier === 'free') {
-                setUsed(ev.usage.total_questions);
-                setFreeLimit(ev.usage.free_limit ?? FREE_LIMIT_DEFAULT);
-              } else {
-                setEntitledFromStream(true);
-              }
-            }
+            // 'done' carries usage {tier:"paid"}; nothing to track client-side.
             if (ev.type === 'error') throw new Error(ev.error || 'Stream error');
           } catch (e) {
             if (e instanceof Error && e.message !== 'Stream error') continue;
@@ -195,43 +180,37 @@ export default function KnowledgeDiscuss({ slug, signedIn, noHistory = false }: 
         </div>
       )}
 
-      {paywalled ? (
-        <div style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '14px 16px', textAlign: 'center' }}>
-          <p style={{ fontSize: 13.5, margin: '0 0 10px', color: 'var(--text)' }}>
-            You've used your {freeLimit} free research questions.
+      {locked ? (
+        <div style={{ padding: '4px 2px 2px' }}>
+          <p style={{ fontSize: 13, margin: '0 0 10px', color: 'var(--text-dim)', lineHeight: 1.5 }}>
+            🔒 Answers from the research, applied to your training.
           </p>
-          <p style={{ fontSize: 12.5, margin: '0 0 12px', color: 'var(--text-dim)' }}>
-            Upgrade for unlimited paper discussions with your conversations saved to every study.
-          </p>
-          <button className="paywall-btn" onClick={() => navigate('/checkout')}>Upgrade Now</button>
+          <button
+            className="paywall-btn"
+            onClick={() => {
+              logOnce();
+              if (!signedIn) navigate(`/auth?signup=1&next=${authNext}`);
+              else navigate('/checkout');
+            }}
+          >
+            {signedIn ? 'Upgrade Now' : 'Create Free Account'}
+          </button>
         </div>
       ) : (
-        <>
-          <div className="input-row">
-            <textarea
-              rows={1}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onFocus={() => {
-                logOnce();
-                if (!signedIn) navigate(`/auth?signup=1&next=${authNext}`);
-              }}
-              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
-              placeholder={slug
-                ? (signedIn ? 'Ask this paper a question…' : 'Ask this paper a question — free account to start')
-                : (signedIn ? 'Ask the library anything…' : 'Ask the library anything — free account to start')}
-              disabled={sending}
-            />
-            <button className="send-btn" onClick={send} disabled={sending || !input.trim()}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
-            </button>
-          </div>
-          {signedIn && !entitled && used !== null && (
-            <p style={{ fontSize: 11.5, color: 'var(--text-muted)', margin: '8px 0 0' }}>
-              {Math.max(freeLimit - used, 0)} of {freeLimit} free research questions left — answers come from {slug ? "this paper's verified record" : "the library's verified records"}.
-            </p>
-          )}
-        </>
+        <div className="input-row">
+          <textarea
+            rows={1}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onFocus={logOnce}
+            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
+            placeholder={slug ? 'Ask this paper a question…' : 'Ask the library anything…'}
+            disabled={sending}
+          />
+          <button className="send-btn" onClick={send} disabled={sending || !input.trim()}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
+          </button>
+        </div>
       )}
       {error && <p style={{ color: 'var(--accent)', fontSize: 12.5, margin: '8px 0 0' }}>{error}</p>}
     </div>
