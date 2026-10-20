@@ -49,56 +49,56 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
   evaluations: {
     title: 'A real evaluation, start to finish',
     intro:
-      'This entire evaluation was generated from about five minutes of self-reported information \u2014 the same information we\u2019ll ask you for.\n\nFollow along as the AI analyzes the athlete\u2019s strengths and weaknesses, identifies what\u2019s holding this athlete back, and determines where training will make the biggest difference.\n\nIt doesn\u2019t just report the numbers. It interprets them, makes coaching decisions, and builds a roadmap for improvement.\n\nAnd if you choose AI Programming, this evaluation becomes the foundation for your personalized training.',
+      'Follow along as the AI analyzes strengths and weaknesses, identifies what\u2019s holding this athlete back, and determines where training will make the biggest difference.',
     steps: [
       {
         image: '/images/eval-intake-profile.png',
         alt: 'Athlete profile intake — basics and athletic data steps',
         title: 'Tell us about yourself',
         caption:
-          'We begin with the same information you’d expect to give a coach: age, height, weight, lifts, skills, and a few conditioning benchmarks.\n\nYou don’t need perfect data. If you only know roughly where you stand, that’s enough to get started.\n\nComplete the basics and the system can already begin tailoring its answers to you.',
+          'We begin with the same information you’d expect to give a coach: age, height, weight, lifts, skills, and a few conditioning benchmarks.\n\nYou don’t need perfect data. Complete the basics and the system can already begin tailoring its answers to you.',
       },
       {
         image: '/images/eval-intake-benchmarks.png',
         alt: 'Conditioning benchmarks — running and rowing times entered in the profile',
         title: 'Show us what you can do',
         caption:
-          'We ask for the basics of your athletic profile: your lifts, skills, and a few conditioning benchmarks.\n\nEnter as much as you know. You don’t need every number, and you don’t need perfect precision — a reasonable estimate is enough to get started.\n\nThe inputs are simple. What we do with them is different.',
+          'We ask for the basics of your athletic profile: your lifts, skills, and a few conditioning benchmarks.\n\nEnter as much as you know. The inputs are simple. What we do with them is different.',
       },
       {
         image: '/images/eval-summary.png',
         alt: 'Evaluation opening verdict',
         title: 'See where you stand',
         caption:
-          'The Evaluation opens with the big picture.\n\nBefore it gets into the details, it tells you what matters most: where you’re already strong, where the biggest opportunity is, and what should drive the training next.\n\nHere, the verdict is one sentence: pressing is the clearest gap in an otherwise well-rounded profile — light for this athlete’s size next to his pulling and squatting base.\n\nIt doesn’t just score the inputs. It interprets them and makes a coaching judgment.',
+          'The Evaluation opens with the big picture: where you’re already strong, where the biggest opportunity is, and what should drive the training next.\n\nThe verdict: pressing is the clearest gap in an otherwise well-rounded profile — light for this athlete’s size next to his pulling and squatting base. It doesn’t just score the inputs. It interprets them and makes a coaching judgment.',
       },
       {
         image: '/images/eval-strengths.png',
         alt: 'Evaluation strengths section',
         title: 'Know your strengths',
         caption:
-          'A good evaluation doesn’t just find weaknesses. It recognizes what’s already working — and decides how much attention it still needs.\n\nHere, advanced pulling and midline work and a hinge that’s the athlete’s strongest pattern are identified as strengths. They stay in the program, but they don’t need to drive it.\n\nThe system keeps them sharp with maintenance doses while the training time goes toward the bigger opportunities.\n\nThat’s coaching judgment: maintain what’s already strong, and spend your time where the gains are.',
+          'A good evaluation recognizes what’s already working and decides how much attention it still needs.\n\nThis athlete has advanced pulling, a strong midline and a powerful hinge. They stay sharp with maintenance doses while the training time goes toward the bigger opportunities.\n\nThat’s coaching judgment: maintain what’s already strong, and spend your time where the gains are.',
       },
       {
         image: '/images/eval-weaknesses.png',
         alt: 'Evaluation weaknesses and priorities, ranked',
         title: 'Find your biggest opportunities',
         caption:
-          'The Evaluation doesn’t just list weaknesses. It ranks them, explains why they matter, and decides which ones deserve the most training attention.\n\nHere, pressing strength is the biggest gap. The Olympic lifts come next — a 165 snatch against a 325 back squat is technique and confidence, not leg strength, and the overhead squat proves it. Then more absolute leg strength, and finally a conditioning finding most athletes would never spot: the run holds pace over distance, but the row fades from the 2k to the 5k.\n\nThat distinction matters because the program won’t treat everything equally.\n\nThese priorities become the work — the things the AI programs to improve first.',
+          'You probably know your weaknesses. Our evaluation explains why they matter and decides which ones deserve the most training attention.\n\nHere, pressing strength is the biggest gap. Then come the Olympic lifts, where the limitation is technical, not raw strength.\n\nNext is more absolute strength, and finally a conditioning finding most athletes might overlook: the run holds pace over distance, but the row fades from the 2k to the 5k.\n\nThese priorities become the work — the things the AI programs to improve first.',
       },
       {
         image: '/images/eval-analysis.png',
         alt: 'Evaluation analysis — the full reasoning across strengths, weaknesses, and conditioning',
         title: 'Understand what matters most',
         caption:
-          'This is where the Evaluation goes deeper.\n\nThe AI weighs the athlete as a whole — strengths, weaknesses, the relationships between lifts, and how confident it is in the underlying data — then decides what to push, what to maintain, and what comes first.\n\nIt also explains the tradeoffs. Pressing gets the emphasis. The Olympic lifts are treated as technique work — the strength is already there, and the overhead squat exceeding the snatch proves the positions are too. The squat comes third, because more leg strength lifts the ceiling on everything else. And conditioning minutes get aimed at the specific gap the numbers revealed: sustained aerobic output.\n\nAnd when the evidence is uncertain, it says so. Self-reported lifts start as a sketch; logged training sharpens the picture over time.\n\nThis is the reasoning behind the program — not just what to train, but why, how much, and what comes first.',
+          'This is where the Evaluation goes deeper. The AI sees the whole athlete — including the relationships among lifts, skills, and conditioning — then decides what to push, what to maintain, and where to spend valuable training time.\n\nIt also explains the tradeoffs. Pressing gets regular attention. Olympic lifting gets technical work to better express the strength that’s already there. Squats raise the ceiling. And conditioning minutes go toward the specific gap the numbers revealed: sustained aerobic output.\n\nThis is the reasoning behind the program — not just what to train, but why, how much, and what comes first.',
       },
       {
         image: '/images/eval-recommendations.png',
         alt: 'Evaluation recommendations — four prioritized prescriptions',
         title: 'Your roadmap to improvement',
         caption:
-          'The Evaluation finishes by turning all of that reasoning into a clear training plan.\n\nWhat should lead the cycle. What should support it. What needs technique work. What can stay in the background.\n\nHere, pressing leads with dedicated volume on bench and strict press. Olympic technical work comes next — snatch-focused, plus jerk work to close the gap on the clean. The squat runs second behind pressing while deadlift volume stays moderate — the hinge is already his strongest pattern — and conditioning biases toward longer, sustained-pace work.\n\nIf you move forward with AI Programming, these recommendations become the starting point for the program — alongside your goals, schedule, equipment, and preferences.\n\nThe Evaluation doesn’t just tell you what needs work. It tells the AI what to build next.',
+          'The Evaluation finishes by turning all of that reasoning into a clear training roadmap — what should lead, what should support it, and what can stay in the background.\n\nContinue to AI Programming, and those recommendations become the starting point for your program, alongside your goals, schedule, equipment, and preferences.\n\nOr keep the Evaluation and show it to your coach. It’s yours.',
       },
     ],
   },
