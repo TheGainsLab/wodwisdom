@@ -276,14 +276,14 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
           </div>
         )}
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
           {rows.map((r) => (
             <Link
               key={r.slug}
               to={`/knowledge/${r.slug}`}
               style={{
                 display: 'block', padding: '14px 16px', borderRadius: 12,
-                border: '1px solid var(--border)', background: 'var(--surface)',
+                border: '1px solid rgba(255,255,255,0.85)', background: 'var(--surface)',
                 color: 'var(--text)', textDecoration: 'none',
               }}
             >
