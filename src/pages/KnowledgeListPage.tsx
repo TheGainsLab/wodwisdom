@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { fetchKnowledgeIndex, topicLabel, type KnowledgeIndexRow } from '../lib/knowledgeLibrary';
 import { QAHeader } from '../components/QAShared';
@@ -52,6 +52,8 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
   const [finding, setFinding] = useState(false);
   const [findError, setFindError] = useState('');
   const [askQuestion, setAskQuestion] = useState<string | undefined>(undefined);
+  // Chip row: tap a topic to filter the list (search starter, not metadata).
+  const [activeTopic, setActiveTopic] = useState<string | null>(null);
 
   // Can this member ask a LIBRARY question right now? Entitled/admin:
   // always. Free: while the library's own lifetime pool lasts (the
@@ -105,13 +107,26 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
     };
   }, []);
 
-  // No chip row: with search matching topics and Ask-the-library answering
-  // open questions, the chips had become 50+ pieces of wallpaper (removed
-  // at the founder's call). Topic tags stay in the data — they feed search
-  // here and the Ask-the-library router server-side.
+  // Chips returned (founder's call, 2026-10-20) — but as SEARCH STARTERS,
+  // not card metadata: one curated row of the ten most common topics under
+  // the box, each a tap-to-filter. They answer "what would I even type?"
+  // and disappear the moment a query is typed. Cards and paper pages stay
+  // chip-free.
+  const topTopics = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const r of index ?? []) {
+      for (const t of r.topics) counts.set(t, (counts.get(t) ?? 0) + 1);
+    }
+    return [...counts.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .slice(0, 10)
+      .map(([t]) => t);
+  }, [index]);
+
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
     return (index ?? []).filter((r) => {
+      if (activeTopic && !r.topics.includes(activeTopic)) return false;
       if (!q) return true;
       return (
         r.title.toLowerCase().includes(q) ||
@@ -120,41 +135,53 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
         r.topics.some((t) => topicLabel(t).includes(q))
       );
     });
-  }, [index, query]);
+  }, [index, query, activeTopic]);
 
   // The library grows fast; the landing page shouldn't. By default show
   // the DEFAULT_VISIBLE_PAPERS most relevant entries (the index arrives
   // sorted by practical relevance) — searching always searches everything
   // and shows every match. An active Find replaces the list with the
   // router's picks, in the router's order.
-  const searching = query.trim() !== '';
+  const searching = query.trim() !== '' || activeTopic !== null;
   const capped = !searching && !foundSlugs && !showAllPapers && matches.length > DEFAULT_VISIBLE_PAPERS;
   const rows = foundSlugs
     ? foundSlugs.map((s) => (index ?? []).find((r) => r.slug === s)).filter((r): r is KnowledgeIndexRow => !!r)
     : capped ? matches.slice(0, DEFAULT_VISIBLE_PAPERS) : matches;
 
-  // Find: the router alone — Haiku reads the catalog and picks papers that
-  // answer the question. Free for any account; no coached answer.
-  const runFind = async () => {
+  // Find — the Haiku router picking papers that ANSWER the question — is
+  // now INVISIBLE (founder's call, 2026-10-20: "the one box, two rows is
+  // confusing"). No row, no choice: when the word-filter comes up empty
+  // for a typed query, the semantic find runs by itself after a short
+  // pause and the matches appear as "Papers for your question". The user
+  // experiences one smart search; the free/metered split stays real
+  // server-side (find is unmetered, ~$0.001).
+  const lastFindQuery = useRef('');
+  useEffect(() => {
     const q = query.trim();
-    if (!q || finding) return;
-    setFindError('');
-    setFinding(true);
-    try {
-      const resp = await fetch(DISCUSS_PAPER_ENDPOINT, {
-        method: 'POST',
-        headers: await getAuthHeaders(),
-        body: JSON.stringify({ action: 'find', question: q }),
-      });
-      if (!resp.ok) throw new Error('find failed');
-      const data = await resp.json();
-      setFoundSlugs(Array.isArray(data.slugs) ? data.slugs : []);
-    } catch {
-      setFindError("Couldn't search just now — try again.");
-    } finally {
-      setFinding(false);
-    }
-  };
+    if (!signedIn || !q || index === null) return;
+    if (matches.length > 0 || foundSlugs !== null) return;
+    if (lastFindQuery.current === q) return;
+    const t = setTimeout(async () => {
+      lastFindQuery.current = q;
+      setFindError('');
+      setFinding(true);
+      try {
+        const resp = await fetch(DISCUSS_PAPER_ENDPOINT, {
+          method: 'POST',
+          headers: await getAuthHeaders(),
+          body: JSON.stringify({ action: 'find', question: q }),
+        });
+        if (!resp.ok) throw new Error('find failed');
+        const data = await resp.json();
+        setFoundSlugs(Array.isArray(data.slugs) ? data.slugs : []);
+      } catch {
+        setFindError("Couldn't search just now — try again.");
+      } finally {
+        setFinding(false);
+      }
+    }, 700);
+    return () => clearTimeout(t);
+  }, [signedIn, query, index, matches.length, foundSlugs]);
 
   // Ask: hand the typed question to the conversation panel below the box.
   const runAsk = () => {
@@ -177,16 +204,17 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
 
         {/* THE ONE BOX (founder's final design): for account holders, a
             single input that is search (free, instant word-match as you
-            type), Find (free Haiku router — picks papers that ANSWER the
-            question) and Ask (coached answer — 3 lifetime free, then paid)
-            in one place. Visitors with no account get no box: the library
-            is look-only, with one pitch row where the box would be. */}
+            type, with semantic find running invisibly when the words
+            miss) and Ask (coached answer — 3 lifetime free, then paid).
+            At most ONE row ever shows under it: Ask, or the upgrade row.
+            Visitors with no account get no box: the library is look-only,
+            with one pitch row where the box would be. */}
         {signedIn ? (
           <div style={{ marginBottom: 20 }}>
             <input
               type="search"
               value={query}
-              onChange={(e) => { setQuery(e.target.value); setFoundSlugs(null); setFindError(''); }}
+              onChange={(e) => { setQuery(e.target.value); setFoundSlugs(null); setFindError(''); setActiveTopic(null); }}
               onKeyDown={(e) => { if (e.key === 'Enter' && query.trim() && canAsk) { e.preventDefault(); runAsk(); } }}
               placeholder="Search the library — or ask a question…"
               aria-label="Search the research library or ask a question"
@@ -196,25 +224,33 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
                 border: '1px solid var(--border)', borderRadius: 10, boxSizing: 'border-box',
               }}
             />
+            {/* Search starters: the ten most common topics, one tappable
+                row. Visible only at rest — a typed query takes over. */}
+            {query.trim() === '' && topTopics.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                {topTopics.map((t) => {
+                  const active = activeTopic === t;
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => { setActiveTopic(active ? null : t); setFoundSlugs(null); setFindError(''); }}
+                      style={{
+                        fontSize: 11.5, fontWeight: 600, letterSpacing: 0.3, cursor: 'pointer',
+                        fontFamily: 'inherit', borderRadius: 999, padding: '4px 12px',
+                        border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+                        background: active ? 'var(--accent)' : 'var(--surface)',
+                        color: active ? '#fff' : 'var(--text-dim)',
+                      }}
+                    >
+                      {topicLabel(t)}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
             {query.trim() !== '' && (
               <>
-                <button
-                  type="button"
-                  onClick={runFind}
-                  disabled={finding}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 10, width: '100%', boxSizing: 'border-box',
-                    marginTop: 8, padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 10,
-                    background: 'var(--surface)', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
-                  }}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style={{ color: 'var(--accent)', flexShrink: 0 }}>
-                    <circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-                  </svg>
-                  <span style={{ fontSize: 13.5, color: 'var(--text-dim)' }}>
-                    {finding ? 'Finding papers…' : <>Find papers for: <span style={{ color: 'var(--text)' }}>“{query.trim()}”</span></>}
-                  </span>
-                </button>
                 {canAsk ? (
                   <button
                     type="button"
@@ -419,7 +455,7 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
           )}
           {rows.length === 0 && foundSlugs === null && (
             <div style={{ color: 'var(--text-dim)', fontSize: 14, padding: '20px 0' }}>
-              {index === null ? 'Loading the library…' : 'Nothing matches — try a broader term.'}
+              {index === null ? 'Loading the library…' : finding ? 'Searching the library…' : 'Nothing matches — try a broader term.'}
             </div>
           )}
         </div>
