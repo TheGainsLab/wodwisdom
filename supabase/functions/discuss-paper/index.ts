@@ -16,23 +16,27 @@
  * cited must name its paper; disagreements between papers are presented as
  * disagreement, never blended.
  *
- * Both modes inject the member's athlete profile (same fields the main
- * coach uses) so "how does this apply to ME" gets a real answer — with a
- * hard labeling rule: application to the member is coaching inference,
- * opened "For your training:", never presented as the paper's finding.
+ * PURE RESEARCH (founder's call, 2026-10-21): no athlete profile is
+ * injected in either mode. The product is access to the research — the
+ * same answer for every reader, like the paper itself. Application to a
+ * specific athlete is the programming product's job, not the library's.
+ * (A per-question opt-in toggle may come later; the injection helper
+ * lived here through 2026-10-20 — see git history if it returns.)
  *
  * Find mode (action "find"): the ROUTER ALONE — Haiku reads the catalog,
  * returns matching slugs, no answer, nothing persisted. Free for any
  * signed-in account (a tenth of a cent per call): semantic paper-finding,
  * the step between word-search and the paid coached answer.
  *
- * Access (founder's final matrix, 2026-10-19): any signed-in account may
- * search and find. COACHED ANSWERS are free for FREE_LIMIT questions
- * lifetime PER SURFACE — two separate pools: FREE_LIMIT in-paper Discuss
- * questions (summed across every paper thread) and FREE_LIMIT library
- * Ask questions (the _library thread) — so each hook gets its own taste.
- * Then 402 FREE_LIMIT. The research_chat entitlement (or admin — no
- * limit ever applies to an admin) is unlimited.
+ * Access (founder's matrix, 2026-10-21): any signed-in account may find.
+ * ANSWERS are free for FREE_LIMIT questions lifetime PER SURFACE — two
+ * separate pools: FREE_LIMIT in-paper Discuss questions (summed across
+ * every paper thread) and FREE_LIMIT library questions (the _library
+ * thread) — so each hook gets its own taste. Then 402 FREE_LIMIT.
+ * PAID (the AI Research sub's research_chat entitlement, or All Access =
+ * programming + engine together): DAILY_LIMIT questions per surface per
+ * UTC day (fair use — generous for any human), then 429 DAILY_LIMIT.
+ * Admin: unlimited — no limit ever applies to an admin, anywhere.
  *
  * Conversations persist server-side: one thread per (user, slug); library-
  * mode threads persist under the reserved slug "_library" (paper slugs are
@@ -44,13 +48,14 @@ import { MODELS } from "../_shared/model-profiles.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { fetchWithTimeout } from "../_shared/fetch-with-timeout.ts";
 
-export const FUNCTION_VERSION = "2026-10-19.3";
+export const FUNCTION_VERSION = "2026-10-21.1";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 
 const FREE_LIMIT = 3;
+const DAILY_LIMIT = 20;
 const MAX_TOKENS = 1024;
 const MAX_HISTORY_TURNS = 10;
 const MAX_QUESTION_CHARS = 2000;
@@ -67,31 +72,6 @@ const LIBRARY_SLUG = "_library";
 type Json = any;
 
 type CatalogRow = { slug: string; title: string; topics: string[] };
-
-/**
- * The member's athlete profile as a compact prompt block — the same fields
- * the main coach injects (chat's buildAthleteContext), trimmed to what a
- * research answer needs. Empty string when the profile has nothing.
- */
-function buildMemberContext(p: Json): string {
-  if (!p) return "";
-  const u = p.units === "kg" ? "kg" : "lbs";
-  const parts: string[] = [];
-  if (p.age != null && p.age > 0) parts.push(`Age: ${p.age}`);
-  if (p.gender) parts.push(`Gender: ${p.gender}`);
-  if (p.bodyweight != null && p.bodyweight > 0) parts.push(`Bodyweight: ${p.bodyweight} ${u}`);
-  const lifts = Object.entries(p.lifts ?? {}).filter(([, v]) => typeof v === "number" && v > 0)
-    .map(([k, v]) => `${k.replace(/_/g, " ")}: ${v} ${u}`).join(", ");
-  if (lifts) parts.push("1RM lifts — " + lifts);
-  const skills = Object.entries(p.skills ?? {}).filter(([, v]) => v !== "" && v != null)
-    .map(([k, v]) => `${k.replace(/_/g, " ")}: ${v}`).join(", ");
-  if (skills) parts.push("Skills — " + skills);
-  const cond = Object.entries(p.conditioning ?? {}).filter(([, v]) => v !== "" && v != null)
-    .map(([k, v]) => `${k.replace(/_/g, " ")}: ${v}`).join(", ");
-  if (cond) parts.push("Conditioning — " + cond);
-  if (parts.length === 0) return "";
-  return "\n\nTHE MEMBER'S ATHLETE PROFILE (for applying research to them — see the application rule):\n" + parts.join("\n");
-}
 
 /**
  * Library-mode routing pass: a small model reads the ENTIRE catalog (titles
@@ -142,7 +122,6 @@ async function routeLibraryQuestion(question: string, catalog: CatalogRow[]): Pr
 function buildSystemPrompt(
   papers: Array<{ slug: string; title: string; entry: Json }>,
   index: CatalogRow[],
-  memberContext: string,
   libraryMode: boolean,
 ): string {
   const indexLines = index
@@ -166,12 +145,10 @@ function buildSystemPrompt(
       "When the papers disagree, present the disagreement and name each side — the library deliberately holds both " +
       "sides of live debates. Link each paper you draw on: [Paper title](/knowledge/slug).\n"
     : "";
-  const applyRule = memberContext
-    ? (libraryMode ? "7" : "6") + ". APPLYING RESEARCH TO THIS MEMBER. Their athlete profile is below. When they ask how " +
-      "research applies to them, use it — but application to the member is YOUR coaching inference, never a paper's " +
-      "finding. Open those passages with \"For your training:\" and keep them visibly separate from what the research " +
-      "showed. Never imply a paper studied people like this member unless its record says so.\n"
-    : "";
+  // PURE RESEARCH: no athlete profile, no personalized application. The
+  // answer is the same for every reader. Practical COACHING interpretation
+  // of the findings (what this argues for in programming terms, generally)
+  // is welcome — personal prescription is the programming product's job.
   const papersBlock = papers.length > 0
     ? (libraryMode ? "THE PAPERS (verified structured records — your primary sources):\n" : "THE PAPER (verified structured record — your primary source):\n") +
       papers.map((p) => `=== ${p.title} (/knowledge/${p.slug}) ===\n${JSON.stringify(p.entry)}`).join("\n\n")
@@ -199,12 +176,10 @@ function buildSystemPrompt(
     "asks for personal programming beyond what the research supports, suggest asking their AI Coach in the main " +
     "chat, which knows their full training.\n" +
     multiPaperRule +
-    applyRule +
     "\n" +
     papersBlock +
     "\n\nTHE LIBRARY INDEX (the only other papers you may reference or link):\n" +
-    indexLines +
-    memberContext
+    indexLines
   );
 }
 
@@ -267,29 +242,33 @@ Deno.serve(async (req) => {
       }));
       const slugs = await routeLibraryQuestion(question, catalog);
       await supa.from("knowledge_events").insert({
-        event_type: "library_find", slug: null, meta: { chars: question.length, found: slugs },
+        event_type: "library_find", slug: null, user_id: user.id, meta: { chars: question.length, found: slugs },
       }).then(() => {}, () => {});
       return json({ slugs });
     }
 
     // ── Access: entitlement, or the lifetime free meter ─────────────────
     const nowIso = new Date().toISOString();
-    const [{ data: profile }, { data: entitlements }, { data: athleteProfile }] = await Promise.all([
+    const [{ data: profile }, { data: entitlements }] = await Promise.all([
       supa.from("profiles").select("role").eq("id", user.id).maybeSingle(),
       supa.from("user_entitlements").select("feature")
         .eq("user_id", user.id)
-        .eq("feature", "research_chat")
+        .in("feature", ["research_chat", "programming", "engine"])
         .or("expires_at.is.null,expires_at.gt." + nowIso),
-      supa.from("athlete_profiles")
-        .select("lifts, skills, conditioning, bodyweight, units, gender, age")
-        .eq("user_id", user.id).maybeSingle(),
     ]);
-    const entitled = profile?.role === "admin" || (entitlements ?? []).length > 0;
+    const isAdmin = profile?.role === "admin";
+    // Paid research access: the AI Research sub (research_chat), or All
+    // Access — checked at runtime as programming + engine together, so
+    // existing All Access subscribers need no entitlement backfill.
+    const features = new Set((entitlements ?? []).map((e: { feature: string }) => e.feature));
+    const entitled = isAdmin || features.has("research_chat") ||
+      (features.has("programming") && features.has("engine"));
     // Free accounts: FREE_LIMIT lifetime per SURFACE — the library thread
     // meters library mode, the paper threads (summed) meter paper mode.
     // Each hook keeps its own taste. INVARIANT: no limit ever applies to
     // an admin (entitled covers it — admins are always entitled).
     let totalQuestions = 0;
+    let dailyQuestions = 0;
     if (!entitled) {
       const { data: rows } = await supa
         .from("knowledge_conversations").select("slug, question_count").eq("user_id", user.id);
@@ -300,6 +279,27 @@ Deno.serve(async (req) => {
         return json(
           { error: "Free limit reached", code: "FREE_LIMIT", usage: { tier: "free", total_questions: totalQuestions, free_limit: FREE_LIMIT } },
           402,
+        );
+      }
+    } else if (!isAdmin) {
+      // Paid fair use: DAILY_LIMIT per surface per UTC day, counted from
+      // discuss_question events (user_id set explicitly — service-role
+      // inserts don't get auth.uid()). meta.library marks the surface.
+      const dayStart = new Date();
+      dayStart.setUTCHours(0, 0, 0, 0);
+      const { data: todays } = await supa
+        .from("knowledge_events")
+        .select("meta")
+        .eq("event_type", "discuss_question")
+        .eq("user_id", user.id)
+        .gte("created_at", dayStart.toISOString());
+      dailyQuestions = (todays ?? [])
+        .filter((e: { meta: Json }) => libraryMode ? e.meta?.library === true : e.meta?.library !== true)
+        .length;
+      if (dailyQuestions >= DAILY_LIMIT) {
+        return json(
+          { error: "Daily limit reached — resets at midnight UTC", code: "DAILY_LIMIT", usage: { tier: "paid", daily_questions: dailyQuestions, daily_limit: DAILY_LIMIT } },
+          429,
         );
       }
     }
@@ -351,7 +351,7 @@ Deno.serve(async (req) => {
         max_tokens: MAX_TOKENS,
         temperature: 0.3,
         stream: true,
-        system: buildSystemPrompt(papers, index, buildMemberContext(athleteProfile), libraryMode),
+        system: buildSystemPrompt(papers, index, libraryMode),
         messages: [...history, { role: "user", content: question }],
       }),
     });
@@ -367,7 +367,7 @@ Deno.serve(async (req) => {
     const dec = new TextDecoder();
     let fullAnswer = "";
     const usagePayload = entitled
-      ? { tier: "paid" }
+      ? { tier: "paid", daily_questions: dailyQuestions + 1, daily_limit: DAILY_LIMIT, unlimited: isAdmin }
       : { tier: "free", total_questions: totalQuestions + 1, free_limit: FREE_LIMIT };
 
     const threadSlug = libraryMode ? LIBRARY_SLUG : slug;
@@ -395,6 +395,9 @@ Deno.serve(async (req) => {
         await supa.from("knowledge_events").insert({
           event_type: "discuss_question",
           slug: libraryMode ? null : slug,
+          // Explicit: service-role inserts don't get auth.uid(), and the
+          // paid daily meter counts these rows by user.
+          user_id: user.id,
           meta: { chars: question.length, entitled, ...(libraryMode ? { library: true, routed: routedSlugs } : {}) },
         });
       } catch (e) {

@@ -70,7 +70,10 @@ export default function KnowledgeDiscuss({ slug, signedIn, noHistory = false, do
   const [used, setUsed] = useState<number | null>(null);
   const [freeLimit, setFreeLimit] = useState(3);
   const { hasFeature, loading: entitlementsLoading } = useEntitlements();
-  const entitled = hasFeature('research_chat');
+  // Paid research access: the AI Research sub, or All Access (checked as
+  // programming + engine together — no backfill rows for existing subs).
+  // hasFeature covers admin. Mirrors the server's check in discuss-paper.
+  const entitled = hasFeature('research_chat') || (hasFeature('programming') && hasFeature('engine'));
   const endRef = useRef<HTMLDivElement>(null);
   const clickLogged = useRef(false);
 
@@ -235,7 +238,7 @@ export default function KnowledgeDiscuss({ slug, signedIn, noHistory = false, do
             <rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
           </svg>
           <span style={{ fontSize: 13.5, color: 'var(--text-dim)', lineHeight: 1.45, flex: 1, minWidth: 170 }}>
-            Answers from the research, applied to your training.
+            Answers from the research, in plain coaching terms.
           </span>
           <button
             className="paywall-btn-sm"

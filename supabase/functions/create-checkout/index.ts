@@ -19,6 +19,8 @@ const PRICE_ENGINE = Deno.env.get("STRIPE_PRICE_ENGINE");
 const PRICE_ENGINE_QUARTERLY = Deno.env.get("STRIPE_PRICE_ENGINE_QUARTERLY");
 const PRICE_ALL_ACCESS = Deno.env.get("STRIPE_PRICE_ALL_ACCESS");
 const PRICE_ALL_ACCESS_QUARTERLY = Deno.env.get("STRIPE_PRICE_ALL_ACCESS_QUARTERLY");
+const PRICE_AI_RESEARCH = Deno.env.get("STRIPE_PRICE_AI_RESEARCH");
+const PRICE_AI_RESEARCH_QUARTERLY = Deno.env.get("STRIPE_PRICE_AI_RESEARCH_QUARTERLY");
 
 const PRICES: Record<string, { monthly: string | undefined; quarterly: string | undefined }> = {
   coach: { monthly: PRICE_COACH, quarterly: PRICE_COACH_QUARTERLY },
@@ -27,6 +29,7 @@ const PRICES: Record<string, { monthly: string | undefined; quarterly: string | 
   programming: { monthly: PRICE_PROGRAMMING, quarterly: PRICE_PROGRAMMING_QUARTERLY },
   engine: { monthly: PRICE_ENGINE, quarterly: PRICE_ENGINE_QUARTERLY },
   all_access: { monthly: PRICE_ALL_ACCESS, quarterly: PRICE_ALL_ACCESS_QUARTERLY },
+  ai_research: { monthly: PRICE_AI_RESEARCH, quarterly: PRICE_AI_RESEARCH_QUARTERLY },
 };
 
 serve(async (req) => {
