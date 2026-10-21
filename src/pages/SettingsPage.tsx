@@ -151,7 +151,7 @@ export default function SettingsPage({ session }: { session: Session }) {
               <>
                 {/* Subscription Section */}
                 {(() => {
-                  const featureLabels: Record<string, string> = { ai_chat: 'AI Coach', nutrition: 'Nutrition', programming: 'AI Programming', engine: 'Engine' };
+                  const featureLabels: Record<string, string> = { ai_chat: 'AI Coach', nutrition: 'Nutrition', programming: 'AI Programming', engine: 'Engine', research_chat: 'AI Research' };
                   const hasAllAccess = userFeatures.includes('ai_chat') && userFeatures.includes('programming') && userFeatures.includes('engine') && userFeatures.includes('nutrition');
 
                   // Determine plan name from features
@@ -160,6 +160,7 @@ export default function SettingsPage({ session }: { session: Session }) {
                   else if (hasAllAccess) planName = 'All Access';
                   else if (userFeatures.includes('programming')) planName = 'AI Programming';
                   else if (userFeatures.includes('engine')) planName = 'Year of the Engine';
+                  else if (userFeatures.includes('research_chat')) planName = 'AI Research';
                   else if (userFeatures.includes('ai_chat') && userFeatures.includes('nutrition')) planName = 'AI Coach + AI Nutrition';
                   else if (userFeatures.includes('nutrition')) planName = 'AI Nutrition';
                   else if (userFeatures.includes('ai_chat')) planName = 'AI Coach';

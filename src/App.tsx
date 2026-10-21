@@ -110,6 +110,7 @@ const PricingPage = lazy(() => import('./pages/PricingPage'));
 // Feature landing pages
 const FeaturesHubPage = lazy(() => import('./pages/features/FeaturesHubPage'));
 const AICoachingFeaturePage = lazy(() => import('./pages/features/AICoachingFeaturePage'));
+const ResearchFeaturePage = lazy(() => import('./pages/features/ResearchFeaturePage'));
 const ProgramsFeaturePage = lazy(() => import('./pages/features/ProgramsFeaturePage'));
 const EngineFeaturePage = lazy(() => import('./pages/features/EngineFeaturePage'));
 const NutritionFeaturePage = lazy(() => import('./pages/features/NutritionFeaturePage'));
@@ -198,6 +199,7 @@ export default function App() {
             <Route path="/stay" element={<StayPage />} />
             <Route path="/features" element={<FeaturesHubPage />} />
             <Route path="/features/coaching" element={<AICoachingFeaturePage />} />
+            <Route path="/features/research" element={<ResearchFeaturePage />} />
             <Route path="/features/programs" element={<ProgramsFeaturePage />} />
             <Route path="/features/engine" element={<EngineFeaturePage />} />
             <Route path="/features/nutrition" element={<NutritionFeaturePage />} />
@@ -354,6 +356,7 @@ function AuthenticatedApp({ session }: { session: Session }) {
             <Route path="/ailog/:id" element={<AILogProgramPage session={session} />} />
             <Route path="/features" element={<FeaturesHubPage />} />
             <Route path="/features/coaching" element={<AICoachingFeaturePage />} />
+            <Route path="/features/research" element={<ResearchFeaturePage />} />
             <Route path="/features/programs" element={<ProgramsFeaturePage signedIn />} />
             <Route path="/features/engine" element={<EngineFeaturePage signedIn />} />
             <Route path="/features/nutrition" element={<NutritionFeaturePage />} />

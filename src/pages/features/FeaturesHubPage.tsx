@@ -31,6 +31,17 @@ const PRODUCTS = [
       </svg>
     ),
   },
+  {
+    title: 'AI Research',
+    description: 'A research library built for coaches and athletes. Every paper translated into plain coaching terms, and an AI that answers your questions from the papers — with citations, never inventions. Reading is free; unlimited is $9.99/month.',
+    path: '/features/research',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+      </svg>
+    ),
+  },
 ];
 
 const INCLUDED = [
