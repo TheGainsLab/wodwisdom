@@ -908,7 +908,7 @@ export function KnowledgeEntryView({ entry, signedIn = false }: { entry: Knowled
 function DiscussBlock({ slug, signedIn }: { slug: string; signedIn: boolean }) {
   return (
     <div style={{ marginTop: 8 }}>
-      <SectionTitle>Discuss with the AI Coach</SectionTitle>
+      <SectionTitle>Talk to the Research</SectionTitle>
       <KnowledgeDiscuss slug={slug} signedIn={signedIn} />
     </div>
   );
