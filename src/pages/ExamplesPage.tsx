@@ -130,7 +130,7 @@ export default function ExamplesPage({ signedIn = false }: { signedIn?: boolean 
       <section className="feature-hero" style={{ paddingBottom: 36 }}>
         <h1 className="feature-hero-title">See it for real.</h1>
         <p className="feature-hero-sub">
-          Real evaluations, real programming, real Engine analytics — actual outputs, not marketing mockups.
+          Real evaluations, real programming, real training data, all from actual programs.
         </p>
       </section>
 
