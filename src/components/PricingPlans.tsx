@@ -48,20 +48,15 @@ export default function PricingPlans({ onBuy, busyPlan = null }: {
           </div>
         ))}
       </div>
-      {/* AI Research — the knowledge sub, a compact row under the training
-          ladder (the grid is a fixed 3-up with All Access featured; a 4th
-          equal card would wrap and dilute it). Included with All Access. */}
-      <div className="lp-plan" style={{ marginTop: 18, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', textAlign: 'left', gap: 16, padding: '18px 24px' }}>
-        <div style={{ flex: 1, minWidth: 220 }}>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase', color: 'var(--accent)', marginBottom: 6 }}>For Coaches</div>
-          <h3 style={{ fontSize: 18, fontWeight: 800, margin: '0 0 4px' }}>AI Research</h3>
-          <p style={{ color: 'var(--text-dim)', fontSize: 14, margin: 0 }}>Talk to the Research — AI answers from the research library, with citations — plus the AI Coach. Included with All Access.</p>
-        </div>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 24, fontWeight: 800 }}>{interval === 'monthly' ? '$9.99' : '$24.99'}</div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{interval === 'monthly' ? 'per month' : 'per quarter'}</div>
-        </div>
-        <button className="landing-cta" onClick={() => onBuy('ai_research', interval)} disabled={busyPlan !== null}>
+      {/* AI Research — the knowledge sub, styled exactly like the plan cards
+          above (same centered layout, full-width CTA), rendered under the
+          training ladder's 3-up grid. Included with All Access. */}
+      <div className="lp-plan" style={{ marginTop: 18 }}>
+        <h3 style={{ fontSize: 20, fontWeight: 800, margin: '0 0 6px' }}>AI Research</h3>
+        <div style={{ fontSize: 30, fontWeight: 800, margin: '8px 0 2px' }}>{interval === 'monthly' ? '$9.99' : '$24.99'}</div>
+        <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 14 }}>{interval === 'monthly' ? 'per month' : 'per quarter'}</div>
+        <p style={{ color: 'var(--text-dim)', fontSize: 15, margin: '0 0 20px' }}>Talk to the Research — AI answers from the research library, with citations — plus the AI Coach. Included with All Access.</p>
+        <button className="landing-cta" style={{ marginTop: 'auto' }} onClick={() => onBuy('ai_research', interval)} disabled={busyPlan !== null}>
           {busyPlan === 'ai_research' ? 'Redirecting…' : 'Choose AI Research'}
         </button>
       </div>
