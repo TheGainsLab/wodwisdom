@@ -1599,10 +1599,17 @@ export default function AthletePage({ session }: { session: Session }) {
   // as the data they describe, so the closed-over tierStatus is exactly the
   // persisted state. Live tierStatus still drives the pre-run gap checks.
   const [savedTier, setSavedTier] = useState<TierStatus | null>(null);
+  // athleticReviewedAt is a dep because the Step-2 stamp is the one
+  // tier-relevant value that changes OUTSIDE the dirty cycle: a review save
+  // on an already-clean form (plain-save first, then Save My Numbers —
+  // founder repro, 2026-10-11) stamps the DB without flipping isDirty, and
+  // without this dep the snapshot kept rendering the pre-stamp world until
+  // the next login. Every other tier input only changes via edits that
+  // flip isDirty.
   useEffect(() => {
     if (!loading && !loadError && !isDirty) setSavedTier(tierStatus);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDirty, loading, loadError]);
+  }, [isDirty, loading, loadError, athleticReviewedAt]);
   const savedStatus = savedTier ?? tierStatus;
 
   // Sections always arrive COLLAPSED (founder, 2026-10-08): the user gets
