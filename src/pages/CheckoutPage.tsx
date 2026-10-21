@@ -67,7 +67,7 @@ const PLANS: { key: PlanKey; name: string; monthly: string; quarterly: string; f
     quarterly: '$119.99',
     badge: 'Best value',
     featured: true,
-    features: ['Everything in AI Programming', 'Plus Year of the Engine — save $120/year vs buying both', 'AI Coach & full Nutrition tracking', 'All future features included'],
+    features: ['Everything in AI Programming', 'Plus Year of the Engine — save $120/year vs buying both', 'Plus AI Research — the research library, included', 'AI Coach & full Nutrition tracking', 'All future features included'],
   },
   {
     key: 'engine',
@@ -124,7 +124,7 @@ export default function CheckoutPage({ session }: CheckoutPageProps) {
   const { hasFeature, isAdmin, loading: entLoading } = useEntitlements(session.user.id);
   const autoTriggered = useRef(false);
 
-  const userFeatures = ['ai_chat', 'programming', 'engine', 'nutrition'].filter(f => hasFeature(f));
+  const userFeatures = ['ai_chat', 'programming', 'engine', 'nutrition', 'research_chat'].filter(f => hasFeature(f));
   const hasSubscription = !entLoading && !isAdmin && userFeatures.length > 0;
 
   /** Check if a plan is a valid upgrade: keeps all current features AND adds at least one new one */
@@ -144,7 +144,7 @@ export default function CheckoutPage({ session }: CheckoutPageProps) {
     return PLAN_FEATURES[planKey].filter(f => !hasFeature(f));
   };
 
-  const featureLabels: Record<string, string> = { ai_chat: 'AI Coach', nutrition: 'Nutrition', programming: 'AI Programming', engine: 'Engine' };
+  const featureLabels: Record<string, string> = { ai_chat: 'AI Coach', nutrition: 'Nutrition', programming: 'AI Programming', engine: 'Engine', research_chat: 'AI Research' };
 
   // Auto-trigger plan selection from URL params (e.g. /checkout?plan=engine&interval=monthly)
   useEffect(() => {
