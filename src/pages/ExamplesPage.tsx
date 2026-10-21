@@ -130,7 +130,7 @@ export default function ExamplesPage({ signedIn = false }: { signedIn?: boolean 
       <section className="feature-hero" style={{ paddingBottom: 36 }}>
         <h1 className="feature-hero-title">See it for real.</h1>
         <p className="feature-hero-sub">
-          Real evaluations, real programming, real Engine analytics — actual outputs, not marketing mockups.
+          Real evaluations, real programming, real training data, all from actual programs.
         </p>
       </section>
 
@@ -170,9 +170,12 @@ export default function ExamplesPage({ signedIn = false }: { signedIn?: boolean 
                     {s.title}
                   </h3>
                   <figcaption style={{ color: 'var(--text-dim)', fontSize: 14.5, lineHeight: 1.55, margin: '0 0 14px' }}>
-                    {/* Captions carry \n\n paragraph breaks (founder copy). */}
+                    {/* Captions carry \n\n paragraph breaks and **bold** —
+                        the only markup in founder copy. */}
                     {s.caption.split('\n\n').map((para, j) => (
-                      <p key={j} style={{ margin: j === 0 ? 0 : '10px 0 0' }}>{para}</p>
+                      <p key={j} style={{ margin: j === 0 ? 0 : '10px 0 0' }}>
+                        {para.split('**').map((seg, k) => (k % 2 === 1 ? <b key={k} style={{ color: 'var(--text)' }}>{seg}</b> : seg))}
+                      </p>
                     ))}
                   </figcaption>
                   <img src={s.image} alt={s.alt} loading="lazy" className="feature-img" style={{ maxWidth: 420 }} />
