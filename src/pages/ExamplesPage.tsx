@@ -158,18 +158,18 @@ export default function ExamplesPage({ signedIn = false }: { signedIn?: boolean 
               <h2 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 8px', color: 'var(--text)' }}>
                 {walkthrough.title}
               </h2>
-              <p style={{ color: 'var(--text-dim)', fontSize: 15, lineHeight: 1.55, margin: '0 0 28px', whiteSpace: 'pre-line' }}>
+              <p style={{ color: 'var(--text-dim)', fontSize: 16, lineHeight: 1.6, margin: '0 0 28px', whiteSpace: 'pre-line' }}>
                 {walkthrough.intro}
               </p>
               {walkthrough.steps.map((s, i) => (
                 <figure key={s.image} style={{ margin: '0 0 40px' }}>
-                  <h3 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 6px', color: 'var(--text)' }}>
+                  <h3 style={{ fontSize: 17, fontWeight: 700, margin: '0 0 6px', color: 'var(--text)' }}>
                     <span style={{ color: 'var(--accent)', fontFamily: "'JetBrains Mono', monospace", fontSize: 13, marginRight: 8 }}>
                       {String(i + 1).padStart(2, '0')}
                     </span>
                     {s.title}
                   </h3>
-                  <figcaption style={{ color: 'var(--text-dim)', fontSize: 14.5, lineHeight: 1.55, margin: '0 0 14px' }}>
+                  <figcaption style={{ color: 'var(--text-dim)', fontSize: 15.5, lineHeight: 1.6, margin: '0 0 14px' }}>
                     {/* Captions carry \n\n paragraph breaks and **bold** —
                         the only markup in founder copy. */}
                     {s.caption.split('\n\n').map((para, j) => (
@@ -189,7 +189,7 @@ export default function ExamplesPage({ signedIn = false }: { signedIn?: boolean 
               <h3 style={{ fontSize: 17, fontWeight: 700, margin: '0 0 6px', color: 'var(--text)' }}>
                 {e.title}
               </h3>
-              <figcaption style={{ color: 'var(--text-dim)', fontSize: 14.5, lineHeight: 1.55, margin: '0 0 14px' }}>
+              <figcaption style={{ color: 'var(--text-dim)', fontSize: 15.5, lineHeight: 1.6, margin: '0 0 14px' }}>
                 {e.caption}
               </figcaption>
               <img src={e.image} alt={e.alt} loading="lazy" className="feature-img" />
