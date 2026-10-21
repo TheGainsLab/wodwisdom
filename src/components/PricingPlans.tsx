@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-export type PricingPlan = 'programming' | 'engine' | 'all_access';
+export type PricingPlan = 'programming' | 'engine' | 'all_access' | 'ai_research';
 export type PricingInterval = 'monthly' | 'quarterly';
 
 /** The single source of truth for public plan copy and prices — rendered on
@@ -12,7 +12,7 @@ const PLANS: {
   blurb: string; cta: string; feat: boolean; badge: string;
 }[] = [
   { plan: 'programming', name: 'AI Programming', monthly: '$29.99', quarterly: '$74.99', blurb: 'Individualized training built around your evaluation, goals, and progress.', cta: 'Choose Programming', feat: false, badge: '' },
-  { plan: 'all_access', name: 'All Access', monthly: '$49.99', quarterly: '$119.99', blurb: 'AI Programming + AI Year of the Engine.', cta: 'Get All Access', feat: true, badge: 'Best Value' },
+  { plan: 'all_access', name: 'All Access', monthly: '$49.99', quarterly: '$119.99', blurb: 'AI Programming + AI Year of the Engine + AI Research.', cta: 'Get All Access', feat: true, badge: 'Best Value' },
   { plan: 'engine', name: 'AI Year of the Engine', monthly: '$29.99', quarterly: '$74.99', blurb: 'Our conditioning system, personalized to your fitness and goals.', cta: 'Choose Engine', feat: false, badge: '' },
 ];
 
@@ -47,6 +47,23 @@ export default function PricingPlans({ onBuy, busyPlan = null }: {
             </button>
           </div>
         ))}
+      </div>
+      {/* AI Research — the knowledge sub, a compact row under the training
+          ladder (the grid is a fixed 3-up with All Access featured; a 4th
+          equal card would wrap and dilute it). Included with All Access. */}
+      <div className="lp-plan" style={{ marginTop: 18, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', textAlign: 'left', gap: 16, padding: '18px 24px' }}>
+        <div style={{ flex: 1, minWidth: 220 }}>
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase', color: 'var(--accent)', marginBottom: 6 }}>For Coaches</div>
+          <h3 style={{ fontSize: 18, fontWeight: 800, margin: '0 0 4px' }}>AI Research</h3>
+          <p style={{ color: 'var(--text-dim)', fontSize: 14, margin: 0 }}>Talk to the Research — AI answers from the research library, with citations — plus the AI Coach. Included with All Access.</p>
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 24, fontWeight: 800 }}>{interval === 'monthly' ? '$9.99' : '$24.99'}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{interval === 'monthly' ? 'per month' : 'per quarter'}</div>
+        </div>
+        <button className="landing-cta" onClick={() => onBuy('ai_research', interval)} disabled={busyPlan !== null}>
+          {busyPlan === 'ai_research' ? 'Redirecting…' : 'Choose AI Research'}
+        </button>
       </div>
     </>
   );
