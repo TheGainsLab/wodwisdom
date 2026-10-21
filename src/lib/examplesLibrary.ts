@@ -168,21 +168,21 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
   engine: {
     title: 'A training day, start to finish',
     intro:
-      'This is Day 8 of a real athlete\u2019s Year of the Engine program \u2014 a Max Aerobic Power session, captured directly from their account.\n\nFollow along as the athlete opens the workout, sees their personalized targets, gets pacing guidance from AI Coach, and tracks their performance.\n\nSee how every interval is calibrated to the athlete\u2019s abilities, how the coaching helps them get the intended stimulus, and how their results inform future training.\n\nNot just conditioning workouts. Personalized training that evolves as you improve.',
+      'Follow along. Open the workout, see your personalized targets, get pacing guidance from AI Coach, and track your performance.\n\nSee how every interval is calibrated, how the coaching supports the intended stimulus, and how your results inform future training.\n\nNot just conditioning workouts. Personalized training that evolves as you improve.',
     steps: [
       {
         image: '/images/engine-day-overview.webp',
         alt: 'Engine Day 8 — Max Aerobic Power day page with spectrum strip, session structure, and AI tools',
         title: 'Know what you’re training',
         caption:
-          'Every Engine session starts by telling you what you’re training and how the day is structured.\n\nThe spectrum shows where the session sits between endurance and power. Here, the work is 8 rounds of 1:30 on / 1:30 off, with 12 total minutes of work.\n\nFrom there, everything you need is one tap away: workout details, your history and past targets, pacing guidance, warm-up, and AI Coach.\n\nYou know the purpose of the session before you start — and you have the tools to execute it well.',
+          'Every Engine session starts by telling you what you’re training and how the day is structured.\n\nThe spectrum shows where the session sits between endurance and power.\n\nEverything you need is one tap away: workout details, your history and past targets, pacing guidance, warm-up, and AI Coach.\n\nYou know the purpose of the session before you start — and you have the tools to execute it well.',
       },
       {
         image: '/images/engine-day-details.webp',
         alt: 'Workout details — every round with a personal calorie target, cal/min rate, and RPM',
         title: 'Every interval has your number',
         caption:
-          'Open the workout details and every round has a target built from your own performance.\n\nHere, each 90-second interval is set at about 24 calories, with the pace and RPM shown alongside it so you know exactly what to hold.\n\nThat same idea carries across the program — calories, meters, pace, RPM, or split time, depending on the machine.\n\nYou’re not guessing at intensity. Every interval is calibrated to give you the stimulus you need.',
+          'Every round has a target built from your own performance.\n\nHere, each 90-second interval is set at about 24 calories, with the pace and RPM shown alongside it so you know exactly what to hold.\n\nThat same idea carries across the program — calories, meters, pace, RPM, or split time, depending on the machine.\n\nYou’re not guessing at intensity. Every interval is calibrated to give you the stimulus you need.',
       },
       {
         image: '/images/engine-day-timer.webp',
@@ -196,14 +196,14 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
         alt: 'AI Coach pacing answer citing the athlete’s previous session, RPE, and heart rate',
         title: 'Pacing built from your data',
         caption:
-          'Tap Pace this and AI Coach builds the plan around you.\n\nIt sees your profile, Evaluation, training history, previous sessions, targets, RPE, and the workout in front of you. Then it turns that context into specific pacing guidance for this session — how hard to start, what to hold, where fatigue is likely to show up, and how to approach each interval.\n\nHere, the Coach knows the athlete’s previous Max Aerobic Power session came in at 106% of target at RPE 8, so the advice starts from what this athlete has actually done — not from generic pacing rules.\n\nThe question may be simple. The answer is built from your data.',
+          'Tap **Pace this** and AI Coach turns your history and evaluation into specific pacing guidance for this session: how hard to start, what to hold, where fatigue is likely to show up, and how to approach each interval.\n\nHere, the Coach knows the athlete’s previous Max Aerobic Power session came in at 106% of target at RPE 8, so the advice starts from what this athlete has actually done — not from generic pacing rules.\n\nThe question may be simple. The answer is built from your data.',
       },
       {
         image: '/images/engine-day-history.webp',
         alt: 'Workout history — two Max Aerobic Power sessions a week apart, output rising from 16.3 to 18.4 cal/min',
         title: 'See your progress, session by session',
         caption:
-          'Every session is stored, so you can see exactly how your performance is changing over time.\n\nHere, the same Max Aerobic Power work moves from 16.3 cal/min to 18.4 one week later — with RPE recorded alongside it.\n\nThat history gives you a clearer picture of your progress, and it gives the AI better information for what comes next.\n\nYou can see how far you’ve come. The system uses that history to decide where to push next.',
+          'Track your performance over time, across each stimulus, to see exactly where you’re improving.\n\nHere, the same Max Aerobic Power work moves from 16.3 cal/min to 18.4 one week later — with RPE recorded alongside it.\n\nThat history gives you a clearer picture of your progress, and it gives the AI better information for what comes next.\n\nYou can see how far you’ve come. The system uses that history to decide where to push next.',
       },
       {
         image: '/images/engine-day-equipment.webp',
@@ -217,7 +217,7 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
         alt: 'Analytics overview — 12 sessions at 108% average performance, five day types from anaerobic to threshold, and energy system paces with the 2.56× ratio',
         title: 'See your complete conditioning picture',
         caption:
-          'This is the rollup.\n\nSessions completed. Average performance against target. RPE. Equipment used. Training split across day types. Time-trial baselines. Aerobic and anaerobic pace. Glycolytic reserve.\n\nInstead of a list of workouts, you get a living picture of how your conditioning is developing.\n\nYou can see what you’ve trained, how you’re responding, where you’re improving, and what still needs work — and the AI sees the same picture when it decides what comes next.',
+          'Sessions completed. Average performance against target. RPE. Equipment used. Training split across day types. Time-trial baselines. Aerobic and anaerobic pace. Glycolytic reserve.\n\nInstead of a list of workouts, you get a living picture of how your conditioning is developing.\n\nYou can see what you’ve trained, how you’re responding, where you’re improving, and what still needs work — and the AI sees the same picture when it decides what comes next.',
       },
     ],
   },
