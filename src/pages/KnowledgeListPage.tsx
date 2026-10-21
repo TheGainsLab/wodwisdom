@@ -156,7 +156,7 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
               <rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
             </svg>
             <span style={{ fontSize: 13.5, color: 'var(--text-dim)', lineHeight: 1.45, flex: 1, minWidth: 150 }}>
-              Answers from the research, applied to your training.
+              Answers from the research, in plain coaching terms.
             </span>
             <button className="paywall-btn-sm" onClick={() => navigate('/auth?signup=1&next=/knowledge')}>Create Free Account</button>
           </div>

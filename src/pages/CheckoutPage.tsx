@@ -6,7 +6,7 @@ import { useEntitlements } from '../hooks/useEntitlements';
 import Nav from '../components/Nav';
 import { CheckCircle } from 'lucide-react';
 
-type PlanKey = 'coach' | 'nutrition' | 'coach_nutrition' | 'programming' | 'engine' | 'all_access';
+type PlanKey = 'coach' | 'nutrition' | 'coach_nutrition' | 'programming' | 'engine' | 'all_access' | 'ai_research';
 type Interval = 'monthly' | 'quarterly';
 type Stage = 'browse' | 'loading' | 'confirm' | 'success';
 
@@ -17,7 +17,8 @@ const PLAN_FEATURES: Record<PlanKey, string[]> = {
   coach_nutrition: ['ai_chat', 'nutrition'],
   programming: ['programming', 'ai_chat', 'nutrition'],
   engine: ['engine', 'ai_chat', 'nutrition'],
-  all_access: ['ai_chat', 'programming', 'engine', 'nutrition'],
+  all_access: ['ai_chat', 'programming', 'engine', 'nutrition', 'research_chat'],
+  ai_research: ['research_chat', 'ai_chat'],
 };
 
 const PLAN_NAMES: Record<PlanKey, string> = {
@@ -27,6 +28,7 @@ const PLAN_NAMES: Record<PlanKey, string> = {
   programming: 'AI Programming',
   engine: 'Year of the Engine',
   all_access: 'All Access',
+  ai_research: 'AI Research',
 };
 
 /** Where to send users after upgrading, based on the new features they gained */
@@ -35,6 +37,7 @@ const FEATURE_NEXT_STEPS: { feature: string; label: string; path: string; descri
   { feature: 'engine', label: 'Go to Engine Dashboard', path: '/engine', description: 'Start your conditioning program with personalized pacing targets' },
   { feature: 'nutrition', label: 'Start Nutrition Tracking', path: '/nutrition', description: 'Log your first meal with food search, barcode scanning, or photo recognition' },
   { feature: 'ai_chat', label: 'Talk to Your AI Coach', path: '/chat', description: 'Ask your first coaching question — training, recovery, programming, anything' },
+  { feature: 'research_chat', label: 'Talk to the Research', path: '/knowledge', description: 'Open the research library and ask your first question — answers cite their papers' },
 ];
 
 // July '26 repositioning: the ladder is the three TRAINING plans (each with
@@ -73,6 +76,14 @@ const PLANS: { key: PlanKey; name: string; monthly: string; quarterly: string; f
     quarterly: '$74.99',
     badge: 'Includes AI Coach & Nutrition',
     features: ['20 distinct training frameworks', 'Machine-learning calibrated targets', 'Real-time pacing coach', 'An AI coach that knows your training data'],
+  },
+  {
+    key: 'ai_research',
+    name: 'AI Research',
+    monthly: '$9.99',
+    quarterly: '$24.99',
+    badge: 'For coaches',
+    features: ['Talk to the Research — AI answers from the research library, with citations', 'AI Coach chat grounded in the training methodology', 'Every paper, translated into plain coaching language', 'Included with All Access'],
   },
   {
     key: 'coach',

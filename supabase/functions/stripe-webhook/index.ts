@@ -141,7 +141,11 @@ const PLAN_ENTITLEMENTS: Record<string, string[]> = {
   coach_nutrition: ["ai_chat", "nutrition"],
   engine: ["engine", "ai_chat", "nutrition"],
   programming: ["programming", "ai_chat", "nutrition"],
-  all_access: ["ai_chat", "programming", "engine", "nutrition"],
+  all_access: ["ai_chat", "programming", "engine", "nutrition", "research_chat"],
+  // AI Research ($9.99): the knowledge sub — Talk to the Research plus the
+  // methodology AI Coach chat. ai_chat rides along so chat treats these
+  // subscribers as coach_standalone (20/day), matching the research cap.
+  ai_research: ["research_chat", "ai_chat"],
 };
 
 const cryptoKey = await crypto.subtle.importKey(
