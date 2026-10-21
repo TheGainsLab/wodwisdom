@@ -256,7 +256,7 @@ export default function KnowledgeDiscuss({ slug, signedIn, noHistory = false, do
             onChange={(e) => setInput(e.target.value)}
             onFocus={logOnce}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
-            placeholder={slug ? 'Ask this paper a question…' : 'Ask the library anything…'}
+            placeholder={slug ? 'Ask this paper a question…' : 'Ask the research anything…'}
             disabled={sending}
           />
           <button className="send-btn" onClick={() => send()} disabled={sending || !input.trim()}>
