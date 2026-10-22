@@ -252,6 +252,11 @@ async function priceFeatures(price: any): Promise<string[]> {
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { status: 200 });
 
+  // Claim released in the catch below if processing fails mid-way, so
+  // Stripe's retry of a genuinely failed delivery still goes through.
+  let claimedEventId: string | null = null;
+  let claimSupa: ReturnType<typeof createClient> | null = null;
+
   try {
     const body = await req.text();
     const sig = req.headers.get("stripe-signature");
@@ -261,6 +266,31 @@ serve(async (req) => {
 
     const event = JSON.parse(body);
     const supa = createClient(SUPABASE_URL!, SUPABASE_SERVICE_KEY!);
+
+    // ── Idempotency claim (2026-10-22): Stripe retries deliveries that
+    // don't 2xx fast enough, and this handler does slow work inline — a
+    // retried invoice.payment_succeeded used to re-run the +1 engine
+    // unlock (the sweep's phantom over_entitled months). First delivery
+    // claims event.id; duplicates no-op with a 200. Fail OPEN if the
+    // ledger itself errors: a duplicate grant is visible and recoverable,
+    // a dropped event is a paid entitlement that never lands.
+    if (typeof event.id === "string" && event.id) {
+      const { error: claimErr } = await supa
+        .from("stripe_webhook_events")
+        .insert({ event_id: event.id, event_type: String(event.type ?? "unknown") });
+      if (!claimErr) {
+        claimedEventId = event.id;
+        claimSupa = supa;
+      } else if ((claimErr as { code?: string }).code === "23505") {
+        console.log(`[webhook] duplicate delivery ${event.id} (${event.type}) — already processed, no-op`);
+        return new Response(JSON.stringify({ received: true, duplicate: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      } else {
+        console.error("[webhook] idempotency claim failed (processing anyway):", claimErr.message);
+      }
+    }
 
     switch (event.type) {
       case "checkout.session.completed": {
@@ -1123,6 +1153,15 @@ serve(async (req) => {
     });
   } catch (e) {
     console.error("Webhook error:", (e as Error).message);
+    // Release the idempotency claim so Stripe's retry of this failed
+    // delivery isn't swallowed as a "duplicate".
+    if (claimedEventId && claimSupa) {
+      try {
+        await claimSupa.from("stripe_webhook_events").delete().eq("event_id", claimedEventId);
+      } catch (relErr) {
+        console.error("[webhook] claim release failed:", (relErr as Error).message);
+      }
+    }
     return new Response(JSON.stringify({ error: (e as Error).message }), { status: 400 });
   }
 });
