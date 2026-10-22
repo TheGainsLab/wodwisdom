@@ -107,7 +107,19 @@ Deno.serve(async (_req) => {
         );
         if (invResp.ok) {
           const invData = await invResp.json();
-          paidInvoiceCount = (invData.data ?? []).length;
+          // LOCKSTEP with stripe-webhook and reconcile-engine-months
+          // (2026-10-22): only invoices that billed a NEW period count —
+          // create, cycle, and updates that charged real money. Counting a
+          // $0 plan-flip invoice here over-raised quarterly users by a full
+          // quarter, which the sweep then flagged over_entitled forever.
+          paidInvoiceCount =
+            ((invData.data ?? []) as Array<{ billing_reason?: string; amount_paid?: number }>)
+              .filter((inv) =>
+                inv.billing_reason === "subscription_create" ||
+                inv.billing_reason === "subscription_cycle" ||
+                (inv.billing_reason === "subscription_update" && (inv.amount_paid ?? 0) > 0)
+              )
+              .length;
         }
       } catch {
         continue; // skip on error

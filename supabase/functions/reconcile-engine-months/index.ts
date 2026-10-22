@@ -122,34 +122,53 @@ Deno.serve(async (_req) => {
     );
     const healthy = report.filter((r) => r.reason.startsWith("already_correct")).length;
 
-    // Flag-spike alert (2026-10-09 lesson: a deploy regression flagged 44 of
-    // 49 subscribers for four straight mornings and nobody reads the journal
-    // — mars-maker found out at his month wall). Normal mornings run 0–5
-    // flags; double digits means something structural changed, usually a
-    // billing-logic deploy. Best-effort, never fails the sweep, and silent
-    // on dry runs (those are operator-driven).
-    if (!dryRun && flaggedRows.length >= 10) {
+    // Delta alert (2026-10-22, replacing the raw spike threshold): the
+    // flagged set carries a permanent grandfathered tail (pre-Oct-9
+    // double-grants, comps at the cap) that the sweep deliberately never
+    // lowers — re-announcing it nightly buried the real signal. Alert on
+    // NEW flags only: users flagged today who weren't in the previous
+    // run's flagged set. The spike threshold stays as a backstop for a
+    // first-run or mass regression. Best-effort, never fails the sweep,
+    // silent on dry runs.
+    if (!dryRun) {
       try {
-        const counts = new Map<string, number>();
-        for (const r of flaggedRows) {
-          const key = String(r.reason).split(":")[0];
-          counts.set(key, (counts.get(key) ?? 0) + 1);
-        }
-        const breakdown = [...counts.entries()]
-          .sort((a, b) => b[1] - a[1])
-          .map(([k, n]) => `${escapeHtml(k)}: ${n}`)
-          .join(", ");
-        await sendViaResend(
-          ALERT_EMAIL,
-          `Engine sweep flagged ${flaggedRows.length} of ${entitlements.length} subscribers`,
-          emailWrap(
-            `<p>The nightly Engine reconciliation flagged <strong>${flaggedRows.length}</strong> of ${entitlements.length} checked subscribers (healthy ${healthy}, healed ${healed.length}).</p>` +
-            `<p>Reasons: ${breakdown}.</p>` +
-            `<p>Per-user list: <code>programming_reconciliations</code> where kind='engine', today's row. A jump like this usually means a deploy changed billing logic — check what shipped yesterday.</p>`,
-          ),
+        const { data: prevRow } = await supa
+          .from("programming_reconciliations")
+          .select("flagged")
+          .eq("kind", "engine")
+          .eq("dry_run", false)
+          .order("ran_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        const prevFlagged = new Set(
+          ((prevRow?.flagged ?? []) as Array<{ user_id?: string }>)
+            .map((r) => r.user_id)
+            .filter(Boolean),
         );
+        const newFlags = flaggedRows.filter((r) => !prevFlagged.has(r.user_id));
+
+        if (newFlags.length > 0 || flaggedRows.length >= 20) {
+          const newList = newFlags
+            .map((r) => `<li><strong>${escapeHtml(r.email ?? r.user_id)}</strong> — <code>${escapeHtml(String(r.reason))}</code></li>`)
+            .join("");
+          const knownCount = flaggedRows.length - newFlags.length;
+          await sendViaResend(
+            ALERT_EMAIL,
+            newFlags.length > 0
+              ? `Engine sweep: ${newFlags.length} NEW flag${newFlags.length === 1 ? "" : "s"} (${flaggedRows.length} total)`
+              : `Engine sweep flagged ${flaggedRows.length} of ${entitlements.length} subscribers`,
+            emailWrap(
+              `<p>The nightly Engine reconciliation checked ${entitlements.length} subscribers (healthy ${healthy}, healed ${healed.length}, flagged ${flaggedRows.length}).</p>` +
+              (newFlags.length > 0
+                ? `<p><strong>New since the previous run:</strong></p><ul>${newList}</ul>`
+                : "") +
+              `<p>${knownCount} previously-known flag${knownCount === 1 ? "" : "s"} unchanged (grandfathered over-entitlements and comps — full list in <code>programming_reconciliations</code>, kind='engine', today's row).</p>` +
+              `<p>A new <code>over_entitled</code> usually means a double-grant: check the Stripe delivery log for retried invoice events on that customer, and what deployed recently.</p>`,
+            ),
+          );
+        }
       } catch (e) {
-        console.error("[reconcile-engine-months] flag-spike alert failed:", e);
+        console.error("[reconcile-engine-months] delta alert failed:", e);
       }
     }
 
