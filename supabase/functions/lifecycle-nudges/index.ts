@@ -87,40 +87,38 @@ function renderFreeLimit(firstName: string | null, unsubUrl: string | null): str
 const EVAL_FOLLOWUP_SUBJECT = "Your evaluation, and what to do with it";
 
 /**
- * Shared bottom half of both eval follow-up variants (founder copy, Sep '26).
- * One committed frame — your info + your goals → the program — instead of the
- * old three-symmetric-doors pitch; each product name deep-links to its
- * pre-selected checkout (/checkout?plan=... auto-opens the purchase flow for
- * the signed-in account these recipients all have); the button stays neutral
- * for the undecided.
+ * Shared bottom half of both eval follow-up variants (founder rewrite,
+ * Oct '26): proof-first funnel. Products pitched as one committed frame,
+ * then the two prominent CTAs are EVIDENCE (/examples) and the FREE door
+ * (/knowledge) — the undecided want to see outputs and use something
+ * today more than they want a fourth paragraph of pitch. Product names
+ * still deep-link to their pre-selected checkouts.
  */
 function evalFollowupWaysForward(): string {
+  const cta = (path: string, label: string) =>
+    `<p style="margin:18px 0"><strong>${emailLink(path, label, "eval_followup")}</strong></p>`;
   return (
-    `<p>An assessment you don't act on is just interesting reading. The real value comes when we combine what we know about you with what you want to accomplish.</p>` +
-    `<p>There are a few ways forward:</p>` +
-    `<p><strong>${emailLink("/checkout?plan=programming", "AI Programming", "eval_followup")}</strong> builds your full program around your evaluation and your goals — strength, skills, accessories and MetCons, plus personalized warmups, cooldowns and mobility. AI Coach is there throughout to guide your training.</p>` +
-    `<p><strong>${emailLink("/checkout?plan=engine", "Year of the Engine", "eval_followup")}</strong> is for athletes who want to focus on conditioning. Choose from 8 different programs based on your goals and schedule, then the AI personalizes the path within that program based on your strengths and weaknesses. Your targets are calibrated to you and recalibrated as you improve.</p>` +
-    `<p><strong>${emailLink("/checkout?plan=all_access", "All Access", "eval_followup")}</strong> combines both — complete programming plus Year of the Engine — our most comprehensive personalized training, at around the same price as most group programs.</p>` +
-    `<p>The evaluation tells us where you are. You tell us where you want to go. We build the training between the two.</p>` +
-    // Proof + free door (founder, Oct '26): the undecided want evidence
-    // more than another pitch — real outputs, and something free to use
-    // today. Both links are quiet paragraphs so the three product CTAs
-    // above stay the primary clicks.
-    `<p>Want to see what this actually produces? ${emailLink("/examples", "See real examples", "eval_followup")} — real evaluations, real programming, real training data, all from actual programs.</p>` +
-    `<p>And whatever you decide, the ${emailLink("/knowledge", "Research Library", "eval_followup")} is free: exercise science translated into plain coaching terms, with an AI that answers your questions straight from the papers.</p>` +
-    // Deliberately NOT a button: the product links above are the primary
-    // CTAs (straight into pre-selected checkout), and a button here would
-    // out-click them. This is the fallback for the undecided — quiet, and
-    // it funnels back to a page whose whole job is CTAs.
-    `<p style="font-size:13px;color:#5a584f">Still deciding? ${emailLink("/features", "Learn more about each program", "eval_followup")}.</p>` +
-    `<p>-Matt</p>`
+    `<p>But an evaluation you don't act on is just interesting reading.</p>` +
+    `<p>The real value comes when we combine what we've learned about you with your goals and build training specifically for you.</p>` +
+    `<p><strong>${emailLink("/checkout?plan=programming", "AI Programming", "eval_followup")}</strong> builds your training around your strengths, weaknesses, and goals. Every session is individualized — even the warmups and cooldowns. And as you improve, your training evolves with you.</p>` +
+    `<p><strong>${emailLink("/checkout?plan=engine", "Year of the Engine", "eval_followup")}</strong> is for athletes who want to focus on conditioning. Every session is personalized, with targets calibrated to your abilities and adjusted as you improve.</p>` +
+    `<p>Both include unlimited <strong>AI Coach</strong>, which knows your evaluation, goals, and training history. It's like having a coach by your side every time you train.</p>` +
+    `<p>Rather than just tell you what that looks like, we've put together real examples from actual athletes and programs.</p>` +
+    cta("/examples", "SEE REAL TRAINING EXAMPLES") +
+    `<p>We've also added a free <strong>Research Library</strong>. We break down scientific studies into useful, actionable information for athletes and coaches. You can even talk to the research with our AI Research Assistant — your first three questions are free.</p>` +
+    cta("/knowledge", "EXPLORE THE RESEARCH LIBRARY") +
+    `<p><strong>${emailLink("/checkout?plan=all_access", "All Access", "eval_followup")}</strong> combines AI Programming and Year of the Engine, along with the Research Library, for less than most group training programs.</p>` +
+    `<p><strong>The evaluation tells us where you are. You tell us where you want to go. We build the training between the two.</strong></p>` +
+    `<p>&mdash; Matt</p>` +
+    `<p style="font-size:13px;color:#5a584f">P.S. Questions? Just reply. I read every response.</p>`
   );
 }
 
 function renderEvalFollowup(firstName: string | null, unsubUrl: string | null): string {
   return emailWrap(
     `<p>${hi(firstName)}</p>` +
-    `<p>A few days ago our AI took an honest look at your fitness — your lifting, your skills, and your engine. ${emailLink("/profile", "It's still there in your account", "eval_followup")} whenever you want to re-read it.</p>` +
+    `<p>Coach Matt here &mdash; really me, not the AI.</p>` +
+    `<p>A few days ago, our AI took an honest look at your fitness &mdash; your lifting, your skills, and your engine. ${emailLink("/profile", "You can revisit your evaluation here", "eval_followup")}.</p>` +
     evalFollowupWaysForward(),
     { unsubUrl },
   );
@@ -142,7 +140,8 @@ function renderEvalFollowupAware(
     : "";
   return emailWrap(
     `<p>${hi(firstName)}</p>` +
-    `<p>A few days ago our AI took an honest look at your fitness — your lifting, your skills, and your engine. Here's the one-line verdict it reached:</p>` +
+    `<p>Coach Matt here &mdash; really me, not the AI.</p>` +
+    `<p>A few days ago, our AI took an honest look at your fitness &mdash; your lifting, your skills, and your engine. Here's the one-line verdict it reached:</p>` +
     `<p style="border-left:3px solid #ccc;padding-left:12px;color:#5a584f"><strong>${escapeHtml(headline)}</strong></p>` +
     priorityBlock +
     evalFollowupWaysForward(),
