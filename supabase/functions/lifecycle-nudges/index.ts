@@ -124,42 +124,24 @@ function renderEvalFollowup(firstName: string | null, unsubUrl: string | null): 
   );
 }
 
-// Eval-aware variant: quotes the athlete's own evaluation back at them —
-// the headline verdict and the top priority — so the email reads as a coach
-// following up on a real assessment, not a template. Falls back to the
-// generic render when the structured evaluation isn't available.
+// Eval-aware variant: quotes the athlete's own one-line verdict back at
+// them — the single strongest personalization the email has (founder call,
+// Oct '26: verdict only; the old second quote block, the top priority,
+// delayed the pitch without adding hook). Falls back to the generic render
+// when the structured evaluation isn't available.
 function renderEvalFollowupAware(
   firstName: string | null,
   unsubUrl: string | null,
   headline: string,
-  topPriority: string | null,
 ): string {
-  const priorityBlock = topPriority
-    ? `<p>And the highest-return work it found:</p>` +
-      `<p style="border-left:3px solid #ccc;padding-left:12px;color:#5a584f">${escapeHtml(topPriority)}</p>`
-    : "";
   return emailWrap(
     `<p>${hi(firstName)}</p>` +
     `<p>Coach Matt here &mdash; really me, not the AI.</p>` +
     `<p>A few days ago, our AI took an honest look at your fitness &mdash; your lifting, your skills, and your engine. Here's the one-line verdict it reached:</p>` +
     `<p style="border-left:3px solid #ccc;padding-left:12px;color:#5a584f"><strong>${escapeHtml(headline)}</strong></p>` +
-    priorityBlock +
     evalFollowupWaysForward(),
     { unsubUrl },
   );
-}
-
-/** First 1–2 sentences of a coach-prose bullet, capped so the email quote
- *  stays a quote and not a reprint. */
-function excerptSentences(text: string, maxChars = 240): string {
-  const sentences = text.split(/(?<=[.!?])\s+/);
-  let out = "";
-  for (const s of sentences) {
-    if (out && (out + " " + s).length > maxChars) break;
-    out = out ? out + " " + s : s;
-    if (out.length > maxChars) break;
-  }
-  return out || text.slice(0, maxChars);
 }
 
 /** Eval follow-up sweep: same candidates RPC + guards as the other sweeps,
@@ -183,16 +165,13 @@ async function runEvalFollowupSweep(supa: SupabaseClient): Promise<SweepResult> 
       .limit(1)
       .maybeSingle();
     const se = (evalRow?.structured_evaluation ?? null) as
-      | { headline_takeaway?: string; weaknesses_and_priorities?: string[] }
+      | { headline_takeaway?: string }
       | null;
     const headline = se?.headline_takeaway?.trim() || null;
-    const topPriority = se?.weaknesses_and_priorities?.[0]
-      ? excerptSentences(se.weaknesses_and_priorities[0])
-      : null;
 
     const unsubUrl = await unsubscribeUrl(c.user_id);
     const html = headline
-      ? renderEvalFollowupAware(firstNameOf(c.full_name), unsubUrl, headline, topPriority)
+      ? renderEvalFollowupAware(firstNameOf(c.full_name), unsubUrl, headline)
       : renderEvalFollowup(firstNameOf(c.full_name), unsubUrl);
     const messageId = await sendViaResend(c.email, EVAL_FOLLOWUP_SUBJECT, html);
     await logEmailSend(supa, c.user_id, "eval_followup", EVAL_FOLLOWUP_SUBJECT, messageId);
