@@ -102,6 +102,12 @@ function evalFollowupWaysForward(): string {
     `<p><strong>${emailLink("/checkout?plan=engine", "Year of the Engine", "eval_followup")}</strong> is for athletes who want to focus on conditioning. Choose from 8 different programs based on your goals and schedule, then the AI personalizes the path within that program based on your strengths and weaknesses. Your targets are calibrated to you and recalibrated as you improve.</p>` +
     `<p><strong>${emailLink("/checkout?plan=all_access", "All Access", "eval_followup")}</strong> combines both — complete programming plus Year of the Engine — our most comprehensive personalized training, at around the same price as most group programs.</p>` +
     `<p>The evaluation tells us where you are. You tell us where you want to go. We build the training between the two.</p>` +
+    // Proof + free door (founder, Oct '26): the undecided want evidence
+    // more than another pitch — real outputs, and something free to use
+    // today. Both links are quiet paragraphs so the three product CTAs
+    // above stay the primary clicks.
+    `<p>Want to see what this actually produces? ${emailLink("/examples", "See real examples", "eval_followup")} — real evaluations, real programming, real training data, all from actual programs.</p>` +
+    `<p>And whatever you decide, the ${emailLink("/knowledge", "Research Library", "eval_followup")} is free: exercise science translated into plain coaching terms, with an AI that answers your questions straight from the papers.</p>` +
     // Deliberately NOT a button: the product links above are the primary
     // CTAs (straight into pre-selected checkout), and a button here would
     // out-click them. This is the fallback for the undecided — quiet, and
