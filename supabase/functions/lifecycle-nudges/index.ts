@@ -87,74 +87,61 @@ function renderFreeLimit(firstName: string | null, unsubUrl: string | null): str
 const EVAL_FOLLOWUP_SUBJECT = "Your evaluation, and what to do with it";
 
 /**
- * Shared bottom half of both eval follow-up variants (founder copy, Sep '26).
- * One committed frame — your info + your goals → the program — instead of the
- * old three-symmetric-doors pitch; each product name deep-links to its
- * pre-selected checkout (/checkout?plan=... auto-opens the purchase flow for
- * the signed-in account these recipients all have); the button stays neutral
- * for the undecided.
+ * Shared bottom half of both eval follow-up variants (founder rewrite,
+ * Oct '26): proof-first funnel. Products pitched as one committed frame,
+ * then the two prominent CTAs are EVIDENCE (/examples) and the FREE door
+ * (/knowledge) — the undecided want to see outputs and use something
+ * today more than they want a fourth paragraph of pitch. Product names
+ * still deep-link to their pre-selected checkouts.
  */
 function evalFollowupWaysForward(): string {
+  const cta = (path: string, label: string) =>
+    `<p style="margin:18px 0"><strong>${emailLink(path, label, "eval_followup")}</strong></p>`;
   return (
-    `<p>An assessment you don't act on is just interesting reading. The real value comes when we combine what we know about you with what you want to accomplish.</p>` +
-    `<p>There are a few ways forward:</p>` +
-    `<p><strong>${emailLink("/checkout?plan=programming", "AI Programming", "eval_followup")}</strong> builds your full program around your evaluation and your goals — strength, skills, accessories and MetCons, plus personalized warmups, cooldowns and mobility. AI Coach is there throughout to guide your training.</p>` +
-    `<p><strong>${emailLink("/checkout?plan=engine", "Year of the Engine", "eval_followup")}</strong> is for athletes who want to focus on conditioning. Choose from 8 different programs based on your goals and schedule, then the AI personalizes the path within that program based on your strengths and weaknesses. Your targets are calibrated to you and recalibrated as you improve.</p>` +
-    `<p><strong>${emailLink("/checkout?plan=all_access", "All Access", "eval_followup")}</strong> combines both — complete programming plus Year of the Engine — our most comprehensive personalized training, at around the same price as most group programs.</p>` +
-    `<p>The evaluation tells us where you are. You tell us where you want to go. We build the training between the two.</p>` +
-    // Deliberately NOT a button: the product links above are the primary
-    // CTAs (straight into pre-selected checkout), and a button here would
-    // out-click them. This is the fallback for the undecided — quiet, and
-    // it funnels back to a page whose whole job is CTAs.
-    `<p style="font-size:13px;color:#5a584f">Still deciding? ${emailLink("/features", "Learn more about each program", "eval_followup")}.</p>` +
-    `<p>-Matt</p>`
+    `<p>But an evaluation you don't act on is just interesting reading.</p>` +
+    `<p>The real value comes when we combine what we've learned about you with your goals and build training specifically for you.</p>` +
+    `<p><strong>${emailLink("/checkout?plan=programming", "AI Programming", "eval_followup")}</strong> builds your training around your strengths, weaknesses, and goals. Every session is individualized — even the warmups and cooldowns. And as you improve, your training evolves with you.</p>` +
+    `<p><strong>${emailLink("/checkout?plan=engine", "Year of the Engine", "eval_followup")}</strong> is for athletes who want to focus on conditioning. Every session is personalized, with targets calibrated to your abilities and adjusted as you improve.</p>` +
+    `<p>Both include unlimited <strong>AI Coach</strong>, which knows your evaluation, goals, and training history. It's like having a coach by your side every time you train.</p>` +
+    `<p>Rather than just tell you what that looks like, we've put together real examples from actual athletes and programs.</p>` +
+    cta("/examples", "SEE REAL TRAINING EXAMPLES") +
+    `<p>We've also added a free <strong>Research Library</strong>. We break down scientific studies into useful, actionable information for athletes and coaches. You can even talk to the research with our AI Research Assistant — your first three questions are free.</p>` +
+    cta("/knowledge", "EXPLORE THE RESEARCH LIBRARY") +
+    `<p><strong>${emailLink("/checkout?plan=all_access", "All Access", "eval_followup")}</strong> combines AI Programming and Year of the Engine, along with the Research Library, for less than most group training programs.</p>` +
+    `<p><strong>The evaluation tells us where you are. You tell us where you want to go. We build the training between the two.</strong></p>` +
+    `<p>&mdash; Matt</p>` +
+    `<p style="font-size:13px;color:#5a584f">P.S. Questions? Just reply. I read every response.</p>`
   );
 }
 
 function renderEvalFollowup(firstName: string | null, unsubUrl: string | null): string {
   return emailWrap(
     `<p>${hi(firstName)}</p>` +
-    `<p>A few days ago our AI took an honest look at your fitness — your lifting, your skills, and your engine. ${emailLink("/profile", "It's still there in your account", "eval_followup")} whenever you want to re-read it.</p>` +
+    `<p>Coach Matt here &mdash; really me, not the AI.</p>` +
+    `<p>A few days ago, our AI took an honest look at your fitness &mdash; your lifting, your skills, and your engine. ${emailLink("/profile", "You can revisit your evaluation here", "eval_followup")}.</p>` +
     evalFollowupWaysForward(),
     { unsubUrl },
   );
 }
 
-// Eval-aware variant: quotes the athlete's own evaluation back at them —
-// the headline verdict and the top priority — so the email reads as a coach
-// following up on a real assessment, not a template. Falls back to the
-// generic render when the structured evaluation isn't available.
+// Eval-aware variant: quotes the athlete's own one-line verdict back at
+// them — the single strongest personalization the email has (founder call,
+// Oct '26: verdict only; the old second quote block, the top priority,
+// delayed the pitch without adding hook). Falls back to the generic render
+// when the structured evaluation isn't available.
 function renderEvalFollowupAware(
   firstName: string | null,
   unsubUrl: string | null,
   headline: string,
-  topPriority: string | null,
 ): string {
-  const priorityBlock = topPriority
-    ? `<p>And the highest-return work it found:</p>` +
-      `<p style="border-left:3px solid #ccc;padding-left:12px;color:#5a584f">${escapeHtml(topPriority)}</p>`
-    : "";
   return emailWrap(
     `<p>${hi(firstName)}</p>` +
-    `<p>A few days ago our AI took an honest look at your fitness — your lifting, your skills, and your engine. Here's the one-line verdict it reached:</p>` +
+    `<p>Coach Matt here &mdash; really me, not the AI.</p>` +
+    `<p>A few days ago, our AI took an honest look at your fitness &mdash; your lifting, your skills, and your engine. Here's the one-line verdict it reached:</p>` +
     `<p style="border-left:3px solid #ccc;padding-left:12px;color:#5a584f"><strong>${escapeHtml(headline)}</strong></p>` +
-    priorityBlock +
     evalFollowupWaysForward(),
     { unsubUrl },
   );
-}
-
-/** First 1–2 sentences of a coach-prose bullet, capped so the email quote
- *  stays a quote and not a reprint. */
-function excerptSentences(text: string, maxChars = 240): string {
-  const sentences = text.split(/(?<=[.!?])\s+/);
-  let out = "";
-  for (const s of sentences) {
-    if (out && (out + " " + s).length > maxChars) break;
-    out = out ? out + " " + s : s;
-    if (out.length > maxChars) break;
-  }
-  return out || text.slice(0, maxChars);
 }
 
 /** Eval follow-up sweep: same candidates RPC + guards as the other sweeps,
@@ -178,16 +165,13 @@ async function runEvalFollowupSweep(supa: SupabaseClient): Promise<SweepResult> 
       .limit(1)
       .maybeSingle();
     const se = (evalRow?.structured_evaluation ?? null) as
-      | { headline_takeaway?: string; weaknesses_and_priorities?: string[] }
+      | { headline_takeaway?: string }
       | null;
     const headline = se?.headline_takeaway?.trim() || null;
-    const topPriority = se?.weaknesses_and_priorities?.[0]
-      ? excerptSentences(se.weaknesses_and_priorities[0])
-      : null;
 
     const unsubUrl = await unsubscribeUrl(c.user_id);
     const html = headline
-      ? renderEvalFollowupAware(firstNameOf(c.full_name), unsubUrl, headline, topPriority)
+      ? renderEvalFollowupAware(firstNameOf(c.full_name), unsubUrl, headline)
       : renderEvalFollowup(firstNameOf(c.full_name), unsubUrl);
     const messageId = await sendViaResend(c.email, EVAL_FOLLOWUP_SUBJECT, html);
     await logEmailSend(supa, c.user_id, "eval_followup", EVAL_FOLLOWUP_SUBJECT, messageId);
