@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import { supabase, CHAT_ENDPOINT, APPLY_BLOCK_EDIT_ENDPOINT, getAuthHeaders } from '../lib/supabase';
+import { supabase, CHAT_ENDPOINT, APPLY_BLOCK_EDIT_ENDPOINT, APPLY_PROFILE_UPDATE_ENDPOINT, getAuthHeaders } from '../lib/supabase';
 import { movementToLine, type BlockProposal } from '../pages/ProgramDetailPage';
+import ProfileUpdateCard, { type ProfileProposalData, type ProfileCardStatus } from './ProfileUpdateCard';
 
 interface ProposalData {
   ai_edit_log_id: string;
@@ -14,7 +15,8 @@ interface ProposalData {
 
 type CoachMessage =
   | { kind: 'text'; role: 'user' | 'assistant'; content: string; streaming?: boolean }
-  | { kind: 'proposal'; data: ProposalData; status: 'pending' | 'applying' | 'applied' | 'kept' | 'error' };
+  | { kind: 'proposal'; data: ProposalData; status: 'pending' | 'applying' | 'applied' | 'kept' | 'error' }
+  | { kind: 'profile_proposal'; data: ProfileProposalData; status: ProfileCardStatus };
 
 function formatMarkdown(text: string): string {
   return text
@@ -125,6 +127,32 @@ export default function CoachChat({ session, workoutId, onDayChanged }: {
     }
   }, [onDayChanged]);
 
+  const resolveProfileProposal = useCallback(async (proposalId: string, action: 'apply' | 'decline') => {
+    setMessages(prev => prev.map(m =>
+      m.kind === 'profile_proposal' && m.data.proposal_id === proposalId
+        ? { ...m, status: action === 'apply' ? 'applying' as const : m.status }
+        : m
+    ));
+    try {
+      const resp = await fetch(APPLY_PROFILE_UPDATE_ENDPOINT, {
+        method: 'POST',
+        headers: await getAuthHeaders(),
+        body: JSON.stringify({ proposal_id: proposalId, action }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data?.error || `Failed (${resp.status})`);
+      setMessages(prev => prev.map(m =>
+        m.kind === 'profile_proposal' && m.data.proposal_id === proposalId
+          ? { ...m, status: action === 'apply' ? 'applied' as const : 'declined' as const }
+          : m
+      ));
+    } catch {
+      setMessages(prev => prev.map(m =>
+        m.kind === 'profile_proposal' && m.data.proposal_id === proposalId ? { ...m, status: 'error' as const } : m
+      ));
+    }
+  }, []);
+
   const sendMessage = useCallback(async () => {
     const question = input.trim();
     if (!question || isLoading) return;
@@ -199,6 +227,33 @@ export default function CoachChat({ session, workoutId, onDayChanged }: {
               fullText += event.text;
               updateStreamingText(fullText);
             }
+            if (event.type === 'profile_proposal' && event.proposal_id) {
+              const card: CoachMessage = {
+                kind: 'profile_proposal',
+                status: 'pending',
+                data: {
+                  proposal_id: event.proposal_id,
+                  rationale: event.rationale || '',
+                  current: event.current,
+                  proposal: event.proposal,
+                },
+              };
+              fullText = '';
+              setMessages(prev => {
+                const updated = [...prev];
+                for (let i = updated.length - 1; i >= 0; i--) {
+                  const m = updated[i];
+                  if (m.kind === 'text' && m.role === 'assistant' && m.streaming) {
+                    if (m.content.trim()) updated[i] = { ...m, streaming: false };
+                    else updated.splice(i, 1);
+                    break;
+                  }
+                }
+                updated.push(card);
+                updated.push({ kind: 'text', role: 'assistant', content: '', streaming: true });
+                return updated;
+              });
+            }
             if (event.type === 'proposal' && event.ai_edit_log_id) {
               // Card lands after the current text; the coach's wrap-up keeps
               // streaming into a fresh bubble beneath it.
@@ -263,7 +318,14 @@ export default function CoachChat({ session, workoutId, onDayChanged }: {
       {/* Messages */}
       {messages.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16, maxHeight: 400, overflowY: 'auto' }}>
-          {messages.map((m, i) => m.kind === 'text' ? (
+          {messages.map((m, i) => m.kind === 'profile_proposal' ? (
+            <ProfileUpdateCard
+              key={i}
+              data={m.data}
+              status={m.status}
+              onResolve={(action) => resolveProfileProposal(m.data.proposal_id, action)}
+            />
+          ) : m.kind === 'text' ? (
             <div key={i} style={{
               alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
               maxWidth: '85%',
