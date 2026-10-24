@@ -125,6 +125,8 @@ export default function AdminProgramsPage({ session }: { session: Session }) {
   const navigate = useNavigate();
 
   const [loadingList, setLoadingList] = useState(true);
+  const [rebuilding, setRebuilding] = useState(false);
+  const [rebuildNote, setRebuildNote] = useState('');
   const [programs, setPrograms] = useState<ProgramSummary[]>([]);
   const [listError, setListError] = useState('');
 
@@ -193,6 +195,39 @@ export default function AdminProgramsPage({ session }: { session: Session }) {
     <AdminSubPageLayout session={session} userId={id!} title="Programs">
       {loadingList && <div className="page-loading"><div className="loading-pulse" /></div>}
       {listError && <div className="auth-error" style={{ display: 'block', marginBottom: 16 }}>{listError}</div>}
+
+      {/* Rebuild current month — the cheap human gate (founder keeps full
+          regeneration human-gated; this makes operating the gate one click).
+          Deletes the latest generated program's current month and regenerates
+          it from the athlete's CURRENT profile via admin-rebuild-month. */}
+      {!loadingList && programs.some(p => p.source === 'generated') && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+          <button
+            className="auth-btn"
+            disabled={rebuilding}
+            style={{ width: 'auto', padding: '8px 16px', marginTop: 0 }}
+            onClick={async () => {
+              const gen = programs.find(p => p.source === 'generated');
+              if (!gen) return;
+              if (!window.confirm(
+                `Rebuild month ${gen.generated_months} of "${gen.name}" from the athlete's CURRENT profile?\n\n` +
+                'The month\'s workouts are deleted and regenerated. Logged training is kept. This cannot be undone.'
+              )) return;
+              setRebuilding(true);
+              setRebuildNote('');
+              const { data, error } = await supabase.functions.invoke('admin-rebuild-month', {
+                body: { user_id: id },
+              });
+              setRebuilding(false);
+              if (error || data?.error) setRebuildNote(`Failed: ${data?.error || error?.message}`);
+              else setRebuildNote(`Month ${data.month_rebuilt} rebuilt — generation ${data.generation}. Refresh in a minute to see the new month.`);
+            }}
+          >
+            {rebuilding ? 'Rebuilding…' : 'Rebuild current month from profile'}
+          </button>
+          {rebuildNote && <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>{rebuildNote}</span>}
+        </div>
+      )}
 
       {!loadingList && programs.length === 0 && (
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
-import { CHAT_ENDPOINT, getAuthHeaders, supabase } from '../lib/supabase';
+import { APPLY_PROFILE_UPDATE_ENDPOINT, CHAT_ENDPOINT, getAuthHeaders, supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
 import GainsLogo from '../components/GainsLogo';
 import ProfileBanner from '../components/ProfileBanner';
@@ -12,10 +12,14 @@ import { Clock, Bookmark, ThumbsUp, ThumbsDown, UserRound } from 'lucide-react';
 import { cacheGet, cacheSet, chatHistoryKey } from '../lib/offlineCache';
 import { pickNudgeTemplate, type ProfileSection } from '../lib/chatNudgeTemplates';
 import CoachContactModal from '../components/CoachContactModal';
+import ProfileUpdateCard, { type ProfileProposalData, type ProfileCardStatus } from '../components/ProfileUpdateCard';
 
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+  /** When set, this message renders as a profile-update card, not a bubble. */
+  profileProposal?: ProfileProposalData;
+  proposalStatus?: ProfileCardStatus;
   sources?: { title: string; author: string; source: string }[];
   message_id?: string;
   bookmarked?: boolean;
@@ -197,6 +201,11 @@ export default function ChatPage({ session }: { session: Session }) {
         let accumulatedContent = '';
         let sources: { title: string; author: string; source: string }[] = [];
 
+        // The coach may split the turn around a proposal card: text so far is
+        // finalized, the card lands, and the wrap-up streams into a FRESH
+        // bubble — so the index the deltas write to can move mid-stream.
+        let currentIdx = assistantIdx;
+
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
@@ -220,13 +229,38 @@ export default function ChatPage({ session }: { session: Session }) {
               if (event.type === 'delta') {
                 accumulatedContent += event.text;
                 setMessages(prev => prev.map((m, i) =>
-                  i === assistantIdx ? { ...m, content: accumulatedContent } : m
+                  i === currentIdx ? { ...m, content: accumulatedContent } : m
                 ));
+              }
+
+              if (event.type === 'profile_proposal' && event.proposal_id) {
+                const card: Message = {
+                  role: 'assistant',
+                  content: '',
+                  profileProposal: {
+                    proposal_id: event.proposal_id,
+                    rationale: event.rationale || '',
+                    current: event.current,
+                    proposal: event.proposal,
+                  },
+                  proposalStatus: 'pending',
+                };
+                const closedContent = accumulatedContent;
+                accumulatedContent = '';
+                setMessages(prev => {
+                  const updated = prev.map((m, i) =>
+                    i === currentIdx ? { ...m, content: closedContent, streaming: false } : m
+                  ).filter((_m, i) => !(i === currentIdx && !closedContent.trim()));
+                  updated.push(card);
+                  updated.push({ role: 'assistant', content: '', streaming: true });
+                  currentIdx = updated.length - 1;
+                  return updated;
+                });
               }
 
               if (event.type === 'done') {
                 setMessages(prev => prev.map((m, i) =>
-                  i === assistantIdx
+                  i === currentIdx
                     ? { ...m, content: accumulatedContent, sources, message_id: event.message_id, bookmarked: false, rating: null, streaming: false }
                     : m
                 ));
@@ -254,7 +288,7 @@ export default function ChatPage({ session }: { session: Session }) {
 
         // Ensure streaming flag is cleared even if no 'done' event arrived
         setMessages(prev => prev.map((m, i) =>
-          i === assistantIdx && m.streaming ? { ...m, sources, streaming: false } : m
+          i === currentIdx && m.streaming ? { ...m, sources, streaming: false } : m
         ));
 
         maybeAppendNudge(assistantIdx, question, accumulatedContent);
@@ -377,7 +411,39 @@ export default function ChatPage({ session }: { session: Session }) {
           </div>
         ) : (
           <div className="messages" ref={messagesRef}>
-            {messages.map((m, i) => (
+            {messages.map((m, i) => m.profileProposal ? (
+              <ProfileUpdateCard
+                key={i}
+                data={m.profileProposal}
+                status={m.proposalStatus ?? 'pending'}
+                onResolve={async (action) => {
+                  const pid = m.profileProposal!.proposal_id;
+                  setMessages(prev => prev.map(msg =>
+                    msg.profileProposal?.proposal_id === pid
+                      ? { ...msg, proposalStatus: action === 'apply' ? 'applying' : msg.proposalStatus }
+                      : msg
+                  ));
+                  try {
+                    const resp = await fetch(APPLY_PROFILE_UPDATE_ENDPOINT, {
+                      method: 'POST',
+                      headers: await getAuthHeaders(),
+                      body: JSON.stringify({ proposal_id: pid, action }),
+                    });
+                    const data = await resp.json();
+                    if (!resp.ok) throw new Error(data?.error || 'failed');
+                    setMessages(prev => prev.map(msg =>
+                      msg.profileProposal?.proposal_id === pid
+                        ? { ...msg, proposalStatus: action === 'apply' ? 'applied' : 'declined' }
+                        : msg
+                    ));
+                  } catch {
+                    setMessages(prev => prev.map(msg =>
+                      msg.profileProposal?.proposal_id === pid ? { ...msg, proposalStatus: 'error' } : msg
+                    ));
+                  }
+                }}
+              />
+            ) : (
               <div key={i} className={"msg " + m.role}>
                 {m.role === 'assistant' && (
                   <div className="msg-header">

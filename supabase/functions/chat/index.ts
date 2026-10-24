@@ -17,6 +17,13 @@ import { buildActivityChatContext, fetchOutsideTraining } from "../_shared/athle
 import { fetchAndFormatProgramContext } from "../_shared/training-program.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { fetchWithTimeout } from "../_shared/fetch-with-timeout.ts";
+import {
+  buildProposeProfileUpdateTool,
+  PROFILE_UPDATE_PROMPT,
+  validateProfileProposal,
+  type ProfileCurrent,
+  type ProfileProposal,
+} from "../_shared/profile-update.ts";
 import { reassembleV3WorkoutText } from "../_shared/v3-workout-prose.ts";
 import { fetchTier4Bundle, type Tier4Bundle } from "../_shared/fetch-tier4-bundle.ts";
 
@@ -132,7 +139,7 @@ const PRODUCT_KNOWLEDGE =
   "- Mobile app: long-term plans, no timeline. Don't promise dates.\n" +
   "- Pricing: don't quote numbers — plans and pricing live on the website.\n" +
   "- Support: for anything that needs a human (bad/duplicate logged data, billing, bugs), email coach@thegainslab.com — a real person reads every message. Answer what you can yourself FIRST; deflect to support only when the fix genuinely needs us.\n" +
-  "- YOUR abilities: you can see the athlete context provided to you and coach. In day-scoped AI Programming chat (the athlete has a program day open and you see TODAY'S BLOCKS) you can PROPOSE a structured edit to one of that day's blocks; the athlete taps Apply to accept — nothing changes unless they do, and proposals are unlimited. Outside that surface you CANNOT edit programs, logs, settings, or accounts — never claim you made a change or promise to make one; to adjust a program day, tell the athlete to open that day and ask you there.\n" +
+  "- YOUR abilities: you can see the athlete context provided to you and coach. In day-scoped AI Programming chat (the athlete has a program day open and you see TODAY'S BLOCKS) you can PROPOSE a structured edit to one of that day's blocks; the athlete taps Apply to accept — nothing changes unless they do, and proposals are unlimited. In ANY chat you can PROPOSE a profile update (propose_profile_update: days per week, a goal addition, injuries/constraints) when the athlete states a durable change — it renders as an Apply / Not now card and nothing changes unless they tap Apply. Beyond those two proposal cards you CANNOT edit programs, logs, settings, or accounts — never claim you made a change or promise to make one; to adjust a program day, tell the athlete to open that day and ask you there.\n" +
   "- Engine navigation: the Engine dashboard shows each month as a grid of days; 'Start' opens the athlete's current day; any unlocked day is tappable, past or future (browsing ahead is fine — a banner shows when viewing a non-current day). A training day: pick equipment, run the guided timer, log the result. Day numbers are program positions (Day 1..N).\n" +
   "- Engine pacing: target = time-trial baseline × the day's intended intensity × a rolling recent-performance multiplier. Scheduled monthly time trials recalibrate. To RE-DO a time trial anytime: open any completed time-trial day from the dashboard and train it again — the new result automatically becomes the current baseline.\n" +
   "- Engine equipment & modalities: every Engine day starts with an equipment pick, and the program is NOT tied to one machine. Available: rowing ergs, bikes (Echo/Assault/AirDyne/C2, including Outdoor Ride), C2 ski erg, treadmills, and RUNNING — Outdoor Run, Road Run, Track Run, Trail Run, and Assault Runner. Time-trial baselines and pace targets are PER MODALITY: to train a modality with calibrated targets, pick it on the day screen and complete a time trial on that equipment — from then on the athlete's targets are calibrated to it. An athlete who prefers running can do their Engine days running (outside included) with real targets; never tell them their numbers only work on one machine or steer them back to a machine for calibration reasons.\n" +
@@ -777,7 +784,7 @@ Deno.serve(async (req) => {
     // Fetch athlete profile for prompt personalization (including Engine state)
     const { data: athleteProfile } = await supa
       .from("athlete_profiles")
-      .select("lifts, skills, conditioning, bodyweight, units, gender, age, engine_program_version, engine_current_day, engine_months_unlocked, engine_goal, competition_athlete_id")
+      .select("lifts, skills, conditioning, bodyweight, units, gender, age, engine_program_version, engine_current_day, engine_months_unlocked, engine_goal, competition_athlete_id, days_per_week, goal, injuries_constraints")
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -1357,15 +1364,25 @@ Deno.serve(async (req) => {
         "- After a card is shown, conclude in one or two sentences; never restate the block's contents in text."
       : "";
 
+    // Chat → profile Apply (2026-10-24, the Mackenzie case): mounted in EVERY
+    // signed-in chat, so a durable change stated in conversation can become
+    // profile state with one tap instead of homework on the profile page.
+    const profileCurrent: ProfileCurrent = {
+      days_per_week: (athleteProfile?.days_per_week as number | null) ?? null,
+      goal: (athleteProfile?.goal as string | null) ?? null,
+      injuries_constraints: (athleteProfile?.injuries_constraints as string | null) ?? null,
+    };
+    const profileTool = buildProposeProfileUpdateTool(profileCurrent);
+
     // Request body shared by every leg of the turn; `messages` grows when the
     // coach proposes an edit (tool_use → tool_result → continuation leg).
     const claudeBody: Record<string, unknown> = {
       model: MODELS.sonnet,
       // Proposals carry a full block as tool JSON — give the turn room.
-      max_tokens: editTool ? 2048 : 1024,
+      max_tokens: editTool ? 2048 : 1536,
       temperature: 0.3,
       stream: true,
-      ...(editTool ? { tools: [editTool] } : {}),
+      tools: [...(editTool ? [editTool] : []), profileTool],
       system:
           // Base prompt (persona + mode focus)
           (workoutContext || engineCoachingMode
@@ -1417,6 +1434,8 @@ Deno.serve(async (req) => {
           workoutContext +
           // Edit-proposal behavior (day-scoped programming chat only)
           editPromptAddendum +
+          // Profile-update behavior — mounted in every signed-in chat
+          PROFILE_UPDATE_PROMPT +
           // RAG-retrieved articles
           context,
       messages,
@@ -1556,7 +1575,9 @@ Deno.serve(async (req) => {
 
             const toolUses = result.content
               .filter((c): c is Extract<LegBlock, { type: "tool_use" }> => c.type === "tool_use");
-            if (result.stopReason !== "tool_use" || toolUses.length === 0 || !editTool || !editContext || leg === MAX_LEGS) {
+            // profileTool is always mounted, so tool handling runs in every
+            // chat surface; block edits additionally need the day context.
+            if (result.stopReason !== "tool_use" || toolUses.length === 0 || leg === MAX_LEGS) {
               break;
             }
 
@@ -1570,8 +1591,69 @@ Deno.serve(async (req) => {
                   content,
                   ...(isError ? { is_error: true } : {}),
                 });
+              // ── Profile-update proposal (any chat surface) ──────────────
+              if (tu.name === "propose_profile_update" && !tu.parse_failed) {
+                if (proposalsEmitted > 0) {
+                  answer("One proposal card per message — the athlete already has one. Wrap up in text.", true);
+                  continue;
+                }
+                const pInput = tu.input as ProfileProposal & { rationale?: string };
+                const pProblems = validateProfileProposal(pInput);
+                if (pProblems.length > 0) {
+                  invalidBounces++;
+                  answer(
+                    invalidBounces > 1
+                      ? `Still invalid: ${pProblems.join(" ")} Do NOT propose again this turn — explain in text instead.`
+                      : `Proposal rejected: ${pProblems.join(" ")} Fix and re-propose, or explain instead.`,
+                    true,
+                  );
+                  continue;
+                }
+                const pProposal: ProfileProposal = {
+                  ...(pInput.days_per_week !== undefined ? { days_per_week: pInput.days_per_week } : {}),
+                  ...(pInput.goal_append?.trim() ? { goal_append: pInput.goal_append.trim() } : {}),
+                  ...(pInput.injuries_replace?.trim() ? { injuries_replace: pInput.injuries_replace.trim() } : {}),
+                };
+                const { data: pRow, error: pErr } = await supa
+                  .from("profile_update_proposals")
+                  .insert({
+                    user_id: userId,
+                    request: question.slice(0, 2000),
+                    rationale: pInput.rationale ?? "",
+                    current: profileCurrent,
+                    proposal: pProposal,
+                  })
+                  .select("id")
+                  .single();
+                if (pErr || !pRow) {
+                  console.error("[chat] profile_update_proposals insert failed:", pErr?.message);
+                  answer("Could not record the proposal — explain the change in text instead.", true);
+                  continue;
+                }
+                proposalsEmitted++;
+                controller.enqueue(
+                  encoder.encode(`data: ${JSON.stringify({
+                    type: "profile_proposal",
+                    proposal_id: pRow.id,
+                    rationale: pInput.rationale ?? "",
+                    current: profileCurrent,
+                    proposal: pProposal,
+                  })}\n\n`)
+                );
+                answer(
+                  "The profile-update card is on the athlete's screen with Apply / Not now. Conclude in one or two " +
+                  "sentences: if they apply, their NEXT generated month is built from the updated profile; a rebuild " +
+                  "of the CURRENT month goes through a human (Message a human coach / coach@thegainslab.com).",
+                );
+                continue;
+              }
+
               if (tu.name !== "propose_block_edit" || tu.parse_failed) {
                 answer("Unrecognized or malformed tool call.", true);
+                continue;
+              }
+              if (!editTool || !editContext) {
+                answer("Block edits are only available in day-scoped programming chat — tell the athlete to open the day and ask there.", true);
                 continue;
               }
               if (proposalsEmitted > 0) {
