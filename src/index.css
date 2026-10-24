@@ -53,8 +53,13 @@ body.landing-body{overflow:auto;height:auto}
 .loading-screen{height:100vh;height:100dvh;display:flex;align-items:center;justify-content:center;background:var(--bg)}
 .loading-pulse{width:40px;height:40px;border-radius:50%;background:var(--accent);animation:pulse 1s ease infinite}
 @keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.3);opacity:.4}}
-.auth-screen{height:100vh;height:100dvh;display:flex;align-items:center;justify-content:center;padding:20px;background:var(--bg);background-image:radial-gradient(ellipse at 20% 50%,rgba(255,58,58,.04) 0%,transparent 70%),radial-gradient(ellipse at 80% 50%,rgba(255,58,58,.03) 0%,transparent 70%)}
-.auth-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:44px 40px;width:100%;max-width:400px;animation:fadeUp .4s ease}
+/* overflow-y + margin:auto (not align-items:center): body is overflow:hidden
+   app-wide, and a flex-CENTERED card taller than a short phone viewport
+   (keyboard open shrinks 100dvh) clips at BOTH ends with no way to scroll —
+   the signup submit button became unreachable (jonnylocal, 2026-10-24).
+   margin:auto centers when there's room and scrolls when there isn't. */
+.auth-screen{height:100vh;height:100dvh;display:flex;justify-content:center;overflow-y:auto;padding:20px;background:var(--bg);background-image:radial-gradient(ellipse at 20% 50%,rgba(255,58,58,.04) 0%,transparent 70%),radial-gradient(ellipse at 80% 50%,rgba(255,58,58,.03) 0%,transparent 70%)}
+.auth-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:44px 40px;width:100%;max-width:400px;margin:auto;animation:fadeUp .4s ease}
 .auth-logo{width:48px;height:48px;background:var(--accent);border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:24px;color:white;margin-bottom:24px}
 .auth-card h1{font-size:26px;font-weight:700;letter-spacing:-.5px;margin-bottom:6px}
 .auth-subtitle{color:var(--text-dim);font-size:14px;margin-bottom:28px}
