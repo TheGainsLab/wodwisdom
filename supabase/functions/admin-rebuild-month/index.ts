@@ -62,6 +62,36 @@ Deno.serve(async (req) => {
       ? body.month
       : (program.generated_months || 1);
 
+    // Retrigger-only: finish a PARTIAL rebuild (month already deleted, the
+    // generation trigger failed). Skips the deletes — a plain re-click after
+    // a partial failure would compute month from the rolled-back
+    // generated_months and delete the PREVIOUS month. The client's "Retry
+    // generation" button passes the original month explicitly.
+    if (body.retrigger_only === true) {
+      await supa.from("programs")
+        .update({ generated_months: Math.max(month - 1, 1) })
+        .eq("id", program.id);
+      let generation = "triggered";
+      try {
+        const genResp = await fetchWithTimeout(`${SUPABASE_URL}/functions/v1/generate-next-month`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${SERVICE_KEY}`,
+            "x-webhook-user-id": targetUserId,
+          },
+          body: JSON.stringify({ program_id: program.id, user_id: targetUserId }),
+        }, 60_000);
+        if (!genResp.ok) {
+          const errBody = await genResp.text().catch(() => "");
+          generation = `trigger failed: HTTP ${genResp.status} ${errBody.slice(0, 160)}`;
+        }
+      } catch (e) {
+        generation = `trigger failed: ${(e as Error).message}`;
+      }
+      return json({ ok: true, program_id: program.id, month_rebuilt: month, retriggered: true, generation });
+    }
+
     // Same three steps as admin_delete_program_month (service-role here;
     // the RPC's own gate is auth.uid-based and this fn verified admin above).
     const { error: delW } = await supa
@@ -70,6 +100,14 @@ Deno.serve(async (req) => {
     if (delW) return json({ error: `workout delete failed: ${delW.message}` }, 500);
     await supa.from("program_months").delete()
       .eq("program_id", program.id).eq("month_number", month);
+    // The month's own evaluation must go too: generate-next-month's
+    // double-fire guard 429s when a complete, visible eval exists for the
+    // target month ("Evaluation already generated for this month" — the
+    // Mackenzie rebuild, 2026-10-24). A rebuild WANTS a fresh eval from the
+    // athlete's current profile; keeping the stale one both blocks the
+    // trigger and would misrepresent the rebuilt month.
+    await supa.from("profile_evaluations").delete()
+      .eq("user_id", targetUserId).eq("month_number", month);
     await supa.from("programs")
       .update({ generated_months: Math.max(month - 1, 1) })
       .eq("id", program.id);
@@ -86,7 +124,10 @@ Deno.serve(async (req) => {
         },
         body: JSON.stringify({ program_id: program.id, user_id: targetUserId }),
       }, 60_000);
-      if (!genResp.ok) generation = `trigger failed: HTTP ${genResp.status}`;
+      if (!genResp.ok) {
+        const errBody = await genResp.text().catch(() => "");
+        generation = `trigger failed: HTTP ${genResp.status} ${errBody.slice(0, 160)}`;
+      }
     } catch (e) {
       generation = `trigger failed: ${(e as Error).message}`;
     }

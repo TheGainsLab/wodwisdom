@@ -127,6 +127,10 @@ export default function AdminProgramsPage({ session }: { session: Session }) {
   const [loadingList, setLoadingList] = useState(true);
   const [rebuilding, setRebuilding] = useState(false);
   const [rebuildNote, setRebuildNote] = useState('');
+  // Set when the delete half succeeded but the generation trigger failed —
+  // a plain re-click would target the wrong (previous) month, so the retry
+  // path re-invokes with this month explicitly and skips the deletes.
+  const [retryMonth, setRetryMonth] = useState<number | null>(null);
   const [programs, setPrograms] = useState<ProgramSummary[]>([]);
   const [listError, setListError] = useState('');
 
@@ -215,16 +219,41 @@ export default function AdminProgramsPage({ session }: { session: Session }) {
               )) return;
               setRebuilding(true);
               setRebuildNote('');
+              setRetryMonth(null);
               const { data, error } = await supabase.functions.invoke('admin-rebuild-month', {
                 body: { user_id: id },
               });
               setRebuilding(false);
               if (error || data?.error) setRebuildNote(`Failed: ${data?.error || error?.message}`);
-              else setRebuildNote(`Month ${data.month_rebuilt} rebuilt — generation ${data.generation}. Refresh in a minute to see the new month.`);
+              else if (String(data.generation).startsWith('trigger failed')) {
+                setRebuildNote(`Month ${data.month_rebuilt} cleared, but generation ${data.generation}. Use Retry generation — do NOT click Rebuild again.`);
+                setRetryMonth(data.month_rebuilt);
+              } else {
+                setRebuildNote(`Month ${data.month_rebuilt} rebuilt — generation ${data.generation}. Refresh in a minute to see the new month.`);
+              }
             }}
           >
             {rebuilding ? 'Rebuilding…' : 'Rebuild current month from profile'}
           </button>
+          {retryMonth !== null && (
+            <button
+              className="auth-btn"
+              disabled={rebuilding}
+              style={{ width: 'auto', padding: '8px 16px', marginTop: 0, background: 'var(--surface2)', color: 'var(--text)' }}
+              onClick={async () => {
+                setRebuilding(true);
+                const { data, error } = await supabase.functions.invoke('admin-rebuild-month', {
+                  body: { user_id: id, month: retryMonth, retrigger_only: true },
+                });
+                setRebuilding(false);
+                if (error || data?.error) setRebuildNote(`Retry failed: ${data?.error || error?.message}`);
+                else if (String(data.generation).startsWith('trigger failed')) setRebuildNote(`Still failing: ${data.generation}`);
+                else { setRebuildNote(`Month ${retryMonth} generation re-triggered. Refresh in a minute.`); setRetryMonth(null); }
+              }}
+            >
+              Retry generation (month {retryMonth})
+            </button>
+          )}
           {rebuildNote && <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>{rebuildNote}</span>}
         </div>
       )}
