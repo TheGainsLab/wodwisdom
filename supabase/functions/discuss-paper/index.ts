@@ -52,7 +52,8 @@ export const FUNCTION_VERSION = "2026-10-21.1";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+// Research-family key for spend attribution; falls back to the shared key.
+const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY_RESEARCH") ?? Deno.env.get("ANTHROPIC_API_KEY");
 
 const FREE_LIMIT = 3;
 const DAILY_LIMIT = 20;

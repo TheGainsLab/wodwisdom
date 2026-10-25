@@ -29,7 +29,10 @@ import { fetchTier4Bundle, type Tier4Bundle } from "../_shared/fetch-tier4-bundl
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+// Per-family API key for spend attribution in the Anthropic console
+// (2026-10-25: one key carried the whole product, so cost couldn't be broken
+// down). Falls back to the shared key so a missing secret never breaks chat.
+const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY_CHAT") ?? Deno.env.get("ANTHROPIC_API_KEY");
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 
 const FREE_LIMIT = 3;

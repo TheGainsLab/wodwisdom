@@ -398,7 +398,8 @@ export async function callMetconComposer(
   inputs: MetconComposerInputs,
   opts: { model?: string; apiKey?: string; retryViolations?: string } = {},
 ): Promise<MetconComposerOutput> {
-  const apiKey = opts.apiKey ?? Deno.env.get("ANTHROPIC_API_KEY");
+  // Pipeline-family key for spend attribution; falls back to the shared key.
+  const apiKey = opts.apiKey ?? Deno.env.get("ANTHROPIC_API_KEY_PIPELINE") ?? Deno.env.get("ANTHROPIC_API_KEY");
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not configured");
   const model = opts.model ?? MODELS.sonnet;
 

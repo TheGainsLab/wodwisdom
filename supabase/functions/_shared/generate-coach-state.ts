@@ -42,7 +42,8 @@ import {
 import { persistCoachState } from "./persist-coach-state.ts";
 import { MODELS } from "./model-profiles.ts";
 
-const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+// Pipeline-family key for spend attribution; falls back to the shared key.
+const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY_PIPELINE") ?? Deno.env.get("ANTHROPIC_API_KEY");
 // Frontier eval (2026-08 side-by-side: Fable > Opus > Sonnet on fidelity,
 // calibration, and causal reasoning; ~25¢/eval). The free eval is the
 // conversion artifact — pay for judgment here. Skeleton/week-fill unaffected.
