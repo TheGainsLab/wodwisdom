@@ -553,7 +553,7 @@ async function buildEngineAthleteCard(
   currentDay: number | null,
   engineGoal: string | null = null,
 ): Promise<string> {
-  const [{ data: mapping }, { data: timeTrials }, { data: pref }, { data: recentModalities }] = await Promise.all([
+  const [{ data: mapping }, { data: timeTrials }, { data: pref }, { data: recentModalities }, { data: programRow }] = await Promise.all([
     // engine_current_day is a SEQUENCE position (post sequence-identity) —
     // unique per program. Fetch the current row PLUS the upcoming window so
     // the card can also answer "when is my next time trial?" (a repeatedly
@@ -588,6 +588,17 @@ async function buildEngineAthleteCard(
       .eq("completed", true)
       .gte("created_at", new Date(Date.now() - 90 * 864e5).toISOString())
       .limit(200),
+    // The SELECTED catalog program's display name. Without it the card's
+    // header named only the product ("Year of the Engine subscriber"), so the
+    // coach told specialty-track athletes they were "on Year of the Engine"
+    // when they had selected e.g. the VO2 Max program (mrsashleydrake,
+    // 2026-10-25). The day-scoped dossier already resolves this; general chat
+    // must too.
+    supa
+      .from("engine_programs")
+      .select("name")
+      .eq("id", programVersion)
+      .maybeSingle(),
   ]);
 
   // Resolve day types for the upcoming window in one query: the current
@@ -642,7 +653,15 @@ async function buildEngineAthleteCard(
     if (tt) nextTTSeq = tt.program_sequence_order;
   }
 
-  const parts: string[] = ["\n\nENGINE ATHLETE CONTEXT (Year of the Engine subscriber):"];
+  const programName = (programRow?.name as string | undefined) ?? "Year of the Engine";
+  const parts: string[] = [
+    `\n\nENGINE ATHLETE CONTEXT (Engine subscriber — selected program: ${programName}):`,
+  ];
+  if (programName !== "Year of the Engine") {
+    parts.push(
+      `"Year of the Engine" is the PRODUCT they subscribe to; "${programName}" is the catalog program they selected inside it. When they ask which program they're on, the answer is "${programName}" — never tell them they're "on Year of the Engine".`,
+    );
+  }
   if (engineGoal) {
     parts.push(`Stated goal: "${engineGoal}" — connect your coaching to what they're chasing where it's relevant.`);
   }
