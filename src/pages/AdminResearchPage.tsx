@@ -27,7 +27,7 @@ interface Row {
 
 // Must match FUNCTION_VERSION in supabase/functions/ingest-paper/index.ts.
 // The System Check flags a mismatch, which means "redeploy the function".
-const EXPECTED_FUNCTION_VERSION = '2026-10-18.1';
+const EXPECTED_FUNCTION_VERSION = '2026-10-25.1';
 
 /** Invoke ingest-paper surfacing the function's real error body. */
 async function invokeIngest(body: Record<string, unknown>): Promise<Record<string, unknown>> {
@@ -199,6 +199,27 @@ export default function AdminResearchPage({ session }: { session: Session }) {
     setSelected(null);
     setDraft(null);
     await refresh();
+  };
+
+  // Sonnet-vs-Opus comparison (2026-10-25): re-ingest this entry's stored PDF
+  // on the cheaper default profile as a NEW draft. The published/selected
+  // entry is untouched; the fresh draft lands in the queue labeled with its
+  // model (validator_report.model) for a side-by-side read.
+  const redraftSonnet = async () => {
+    if (!selected) return;
+    setSaving(true);
+    setError('');
+    try {
+      const { data: row } = await supabase.from('knowledge_entries').select('source_pdf_path').eq('slug', selected.slug).maybeSingle();
+      if (!row?.source_pdf_path) throw new Error('No source PDF stored for this entry — re-upload the PDF instead.');
+      await invokeIngest({ storage_path: row.source_pdf_path, model_profile: 'default' });
+      setSelected(null);
+      setDraft(null);
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 're-draft failed');
+    }
+    setSaving(false);
   };
 
   const saveEntry = async (status?: 'published' | 'rejected') => {
@@ -385,6 +406,12 @@ export default function AdminResearchPage({ session }: { session: Session }) {
                   <button disabled={saving} onClick={() => saveEntry('rejected')} style={{ ...field, width: 'auto', cursor: 'pointer', color: 'var(--text-muted)' }}>Reject</button>
                 )}
                 <button disabled={saving} onClick={deleteEntry} style={{ ...field, width: 'auto', cursor: 'pointer', borderColor: 'var(--accent)', color: 'var(--accent)' }}>Delete</button>
+                <button
+                  disabled={saving}
+                  onClick={redraftSonnet}
+                  title="Re-ingest this paper's PDF on the cheaper model as a NEW draft — this entry is untouched; compare the two and keep whichever reads better."
+                  style={{ ...field, width: 'auto', cursor: 'pointer', color: 'var(--text-muted)' }}
+                >Re-draft (Sonnet test)</button>
               </div>
 
               {report && (report.errors.length > 0 || report.warnings.length > 0) && (
