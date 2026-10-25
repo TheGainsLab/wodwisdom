@@ -32,7 +32,9 @@ import { MODELS } from "../model-profiles.ts";
 /** Failure list shape from a hard-audit run (type-only; erased at runtime). */
 type AuditFailures = ReturnType<typeof runAudits>["failures"];
 
-const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+// Pipeline-family key (program generation / evals) for spend attribution;
+// falls back to the shared key so a missing secret never breaks generation.
+const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY_PIPELINE") ?? Deno.env.get("ANTHROPIC_API_KEY");
 const MODEL = MODELS.sonnet;
 // 2026-08 adoption: the skeleton is the judgment-translation layer — it reads
 // the full CoachState document and structures the cycle. Frontier model per the

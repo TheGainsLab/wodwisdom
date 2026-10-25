@@ -166,7 +166,8 @@ interface ClaudeResponse {
 }
 
 const MODEL = MODELS.sonnet;
-const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+// Pipeline-family key for spend attribution; falls back to the shared key.
+const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY_PIPELINE") ?? Deno.env.get("ANTHROPIC_API_KEY");
 
 /** LLM extraction: raw answers → typed CoachingIntake (version-stamped). */
 export async function extractCoachingIntake(raw: CoachingIntakeRaw): Promise<CoachingIntake> {
