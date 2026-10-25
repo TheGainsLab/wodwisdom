@@ -1396,16 +1396,14 @@ Deno.serve(async (req) => {
     };
     const profileTool = buildProposeProfileUpdateTool(profileCurrent);
 
-    // Request body shared by every leg of the turn; `messages` grows when the
-    // coach proposes an edit (tool_use → tool_result → continuation leg).
-    const claudeBody: Record<string, unknown> = {
-      model: MODELS.sonnet,
-      // Proposals carry a full block as tool JSON — give the turn room.
-      max_tokens: editTool ? 2048 : 1536,
-      temperature: 0.3,
-      stream: true,
-      tools: [...(editTool ? [editTool] : []), profileTool],
-      system:
+    // Prompt caching (2026-10-25): the system prompt is split into blocks so
+    // Anthropic can cache the repeated prefix. One TURN spans multiple legs
+    // (tool_use → continuation) and one CONVERSATION spans many turns, all
+    // re-sending the same preamble — cached input reads bill at ~10% of list.
+    // Block 1 = instructions stable across a conversation; Block 2 = the
+    // athlete's context, stable within a conversation; Block 3 = RAG passages,
+    // which change per question and must stay OUTSIDE the cached prefix.
+    const systemShared =
           // Base prompt (persona + mode focus)
           (workoutContext || engineCoachingMode
             ? WORKOUT_COACHING_PROMPT
@@ -1428,7 +1426,9 @@ Deno.serve(async (req) => {
           // Verified product facts — every mode, meta included (product
           // questions overwhelmingly route meta). See the const's doc.
           PRODUCT_KNOWLEDGE +
-          engineProgramCatalog +
+          engineProgramCatalog;
+
+    const systemAthlete =
           // Athlete profile — ALWAYS injected, meta included. It's ~200
           // tokens of insurance: when the router misroutes a real personal
           // question as meta, the answer still knows who the athlete is.
@@ -1457,9 +1457,25 @@ Deno.serve(async (req) => {
           // Edit-proposal behavior (day-scoped programming chat only)
           editPromptAddendum +
           // Profile-update behavior — mounted in every signed-in chat
-          PROFILE_UPDATE_PROMPT +
-          // RAG-retrieved articles
-          context,
+          PROFILE_UPDATE_PROMPT;
+
+    // Request body shared by every leg of the turn; `messages` grows when the
+    // coach proposes an edit (tool_use → tool_result → continuation leg).
+    // A cache breakpoint covers the whole prefix before it (tools included),
+    // so legs and follow-up messages re-read the preamble at the cached rate.
+    const claudeBody: Record<string, unknown> = {
+      model: MODELS.sonnet,
+      // Proposals carry a full block as tool JSON — give the turn room.
+      max_tokens: editTool ? 2048 : 1536,
+      temperature: 0.3,
+      stream: true,
+      tools: [...(editTool ? [editTool] : []), profileTool],
+      system: [
+        { type: "text", text: systemShared, cache_control: { type: "ephemeral" } },
+        { type: "text", text: systemAthlete, cache_control: { type: "ephemeral" } },
+        // RAG passages vary per question — never inside the cached prefix.
+        ...(context ? [{ type: "text", text: context }] : []),
+      ],
       messages,
     };
 
