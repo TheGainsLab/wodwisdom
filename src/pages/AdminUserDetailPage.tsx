@@ -1046,7 +1046,9 @@ export default function AdminUserDetailPage({ session: _session }: { session: Se
           <div style={{ maxWidth: 700, margin: '0 auto' }}>
             {/* Back button */}
             <button
-              onClick={() => navigate('/admin')}
+              // Real back when we got here from the users list (restores its
+              // tab + filters via the URL); users-tab fallback on a deep link.
+              onClick={() => { if ((window.history.state?.idx ?? 0) > 0) navigate(-1); else navigate('/admin?tab=users'); }}
               style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 14, fontFamily: "'Outfit', sans-serif", padding: '4px 0', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6 }}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6" /></svg>
