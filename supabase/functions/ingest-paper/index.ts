@@ -14,7 +14,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { fetchWithTimeout } from "../_shared/fetch-with-timeout.ts";
-import { resolveModelProfile } from "../_shared/model-profiles.ts";
+import { resolveModelProfile, type ResolvedProfile } from "../_shared/model-profiles.ts";
 import { validateKnowledgeEntry } from "../_shared/knowledge-validate.ts";
 
 /**
@@ -56,7 +56,7 @@ const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY_RESEARCH") ?? Deno.env
 // Bumped with every change to this function. The admin System Check compares
 // it against the version the app expects, so "did the deploy happen?" is a
 // question the system answers about itself.
-export const FUNCTION_VERSION = "2026-10-18.1";
+export const FUNCTION_VERSION = "2026-10-25.1";
 
 // The hardest extraction + judgment in the app: quality profile (Opus
 // primary, Sonnet fallback). One attempt each — a PDF pass is slow, and the
@@ -73,8 +73,9 @@ const SYSTEM = KNOWLEDGE_INGESTION_PROMPT +
 async function draftFromPdf(
   pdfBase64: string,
   feedback: string | null,
-  opts?: { timeoutMs?: number; primaryOnly?: boolean },
+  opts?: { timeoutMs?: number; primaryOnly?: boolean; profile?: ResolvedProfile },
 ): Promise<{ text: string; model: string }> {
+  const profile = opts?.profile ?? PROFILE;
   const content: unknown[] = [
     { type: "document", source: { type: "base64", media_type: "application/pdf", data: pdfBase64 } },
     {
@@ -85,8 +86,8 @@ async function draftFromPdf(
     },
   ];
   const models = opts?.primaryOnly
-    ? [PROFILE.primary]
-    : [PROFILE.primary, ...(PROFILE.fallback ? [PROFILE.fallback] : [])];
+    ? [profile.primary]
+    : [profile.primary, ...(profile.fallback ? [profile.fallback] : [])];
   const timeoutMs = opts?.timeoutMs ?? ATTEMPT_TIMEOUT_MS;
   let lastErr = "";
   for (const model of models) {
@@ -298,10 +299,19 @@ Deno.serve(async (req) => {
     });
     if (stubErr) return json({ error: `Could not start draft: ${stubErr.message}` }, 500);
 
+    // Model toggle for the Sonnet-vs-Opus comparison (2026-10-25): the admin
+    // console can request `model_profile: "default"` (Sonnet) to re-draft an
+    // already-ingested paper cheaply and compare entries side by side. The
+    // quality profile (Opus) stays the default; validator_report.model labels
+    // every draft with what actually wrote it.
+    const requestProfile: ResolvedProfile = body.model_profile === "default"
+      ? resolveModelProfile("default")
+      : PROFILE;
+
     const work = (async () => {
       const t0 = Date.now();
       try {
-        let { text, model } = await draftFromPdf(pdfBase64, null);
+        let { text, model } = await draftFromPdf(pdfBase64, null, { profile: requestProfile });
         let entry = extractJson(text);
         let stripped = stripForeignLayer1(entry);
         let report = validateKnowledgeEntry(entry);
@@ -309,7 +319,7 @@ Deno.serve(async (req) => {
         if (report.errors.length > 0 && Date.now() - t0 < 180_000) {
           try {
             // Capped so worst-case total stays inside the background wall clock.
-            const retry = await draftFromPdf(pdfBase64, report.errors.join("\n"), { timeoutMs: 120_000, primaryOnly: true });
+            const retry = await draftFromPdf(pdfBase64, report.errors.join("\n"), { timeoutMs: 120_000, primaryOnly: true, profile: requestProfile });
             const retryEntry = extractJson(retry.text);
             const retryStripped = stripForeignLayer1(retryEntry);
             const retryReport = validateKnowledgeEntry(retryEntry);

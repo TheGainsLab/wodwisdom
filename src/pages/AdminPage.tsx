@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
@@ -129,10 +129,18 @@ function StageBadge({ stage }: { stage: string | null }) {
 
 export default function AdminPage({ session }: { session: Session }) {
   const navigate = useNavigate();
+  // The users view lives in the URL (tab + filters) so browser-back from a
+  // user detail page restores the same category instead of resetting to the
+  // overview (2026-10-26). States initialize from the URL; a sync effect
+  // below writes them back with history replacement.
+  const [searchParams, setSearchParams] = useSearchParams();
   const [navOpen, setNavOpen] = useState(false);
   const [role, setRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<Tab>('overview');
+  const [activeTab, setActiveTab] = useState<Tab>(() => {
+    const t = searchParams.get('tab');
+    return t === 'users' || t === 'engagement' ? t : 'overview';
+  });
   const [error, setError] = useState('');
 
   // Overview data
@@ -157,20 +165,35 @@ export default function AdminPage({ session }: { session: Session }) {
 
   // Users data
   const [users, setUsers] = useState<any[]>([]);
-  const [viewFilter, setViewFilter] = useState<string | null>(null);
-  const [userSearch, setUserSearch] = useState('');
-  const [userSort, setUserSort] = useState<UserSort>('last_active');
-  const [subscriberFilter, setSubscriberFilter] = useState<SubscriberFilter>('all');
-  const [competitionFilter, setCompetitionFilter] = useState<CompetitionFilter>('all');
-  const [stageFilter, setStageFilter] = useState<string>('all');
-  const [dupNamesOnly, setDupNamesOnly] = useState(false);
+  const [viewFilter, setViewFilter] = useState<string | null>(() => searchParams.get('view'));
+  const [userSearch, setUserSearch] = useState(() => searchParams.get('q') ?? '');
+  const [userSort, setUserSort] = useState<UserSort>(() => (searchParams.get('sort') as UserSort) || 'last_active');
+  const [subscriberFilter, setSubscriberFilter] = useState<SubscriberFilter>(() => (searchParams.get('subs') as SubscriberFilter) || 'all');
+  const [competitionFilter, setCompetitionFilter] = useState<CompetitionFilter>(() => (searchParams.get('comp') as CompetitionFilter) || 'all');
+  const [stageFilter, setStageFilter] = useState<string>(() => searchParams.get('stage') ?? 'all');
+  const [dupNamesOnly, setDupNamesOnly] = useState(() => searchParams.get('dup') === '1');
+
+  // Mirror the users view into the URL. replace (not push) so filter clicks
+  // never stack history entries — back always leaves the admin page.
+  useEffect(() => {
+    const p = new URLSearchParams();
+    if (activeTab !== 'overview') p.set('tab', activeTab);
+    if (viewFilter) p.set('view', viewFilter);
+    if (userSearch) p.set('q', userSearch);
+    if (userSort !== 'last_active') p.set('sort', userSort);
+    if (subscriberFilter !== 'all') p.set('subs', subscriberFilter);
+    if (competitionFilter !== 'all') p.set('comp', competitionFilter);
+    if (stageFilter !== 'all') p.set('stage', stageFilter);
+    if (dupNamesOnly) p.set('dup', '1');
+    setSearchParams(p, { replace: true });
+  }, [activeTab, viewFilter, userSearch, userSort, subscriberFilter, competitionFilter, stageFilter, dupNamesOnly, setSearchParams]);
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     supabase.from('profiles').select('role').eq('id', session.user.id).single()
       .then(({ data }) => {
         setRole(data?.role || 'user');
-        if (data?.role === 'admin') loadTab('overview');
+        if (data?.role === 'admin') loadTab(activeTab);
         else setLoading(false);
       });
   }, []);
