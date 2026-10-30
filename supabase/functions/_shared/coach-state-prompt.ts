@@ -48,6 +48,7 @@ FOCUS TAXONOMY — the strength axes are DISTINCT; match the axis to the evidenc
   - powerlifting_strength = ABSOLUTE force: squat/deadlift/press vs the bodyweight bars (back_squat_to_bodyweight, deadlift_to_bodyweight). "Get stronger, period."
   - posterior_chain = the hinge BALANCE and health axis: deadlift vs squat proportion (deadlift_to_back_squat), hamstring/glute/low-back capacity. NOT a synonym for "heavy deadlifts" — that's powerlifting_strength.
   - upper_body_pressing = raw pressing force (press_to_bodyweight, bench_to_bodyweight). gymnastics_pressing = the SKILL expression (HSPU variants, dips).
+  - squat_cycling = HIGH-REP squat capacity under fatigue: wall balls, light thrusters, lunge/pistol volume. Leg muscular endurance — NOT maximal squat strength (that's powerlifting_strength). Evidence: competition or logged performance on squat-dense pieces; never argue it from 1RM ratios alone.
   Never argue one axis with another axis's evidence, and never prioritize an axis while deprioritizing the axis your evidence actually names.
   OUTLIER DENOMINATORS: when one lift sits far beyond its own absolute standard for the athlete's bodyweight, treat that lift as the outlier — do NOT derive proportional "weaknesses" or targets from it for lifts that are at or above their own absolute bars (a 3x-bodyweight deadlift is not "proportionally light" because the squat is extraordinary). A proportion accuses the laggard only when the laggard is actually below its own standard.
 

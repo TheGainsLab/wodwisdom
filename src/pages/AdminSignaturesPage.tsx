@@ -24,17 +24,18 @@ import '../qa.css';
 const FOCUS_AREAS = [
   'olympic_lifting', 'powerlifting_strength', 'posterior_chain', 'upper_body_pressing',
   'gymnastics_pulling', 'gymnastics_pressing', 'midline', 'skill_coordination',
-  'aerobic_capacity', 'anaerobic_capacity', 'mixed_modal_conditioning',
+  'squat_cycling', 'aerobic_capacity', 'anaerobic_capacity', 'mixed_modal_conditioning',
 ] as const;
 const FOCUS_LABELS: Record<string, string> = {
   olympic_lifting: 'Olympic lifting', powerlifting_strength: 'Max strength',
   posterior_chain: 'Posterior chain', upper_body_pressing: 'UB pressing',
   gymnastics_pulling: 'Gym pulling', gymnastics_pressing: 'Gym pressing',
   midline: 'Midline', skill_coordination: 'Skill / coordination',
+  squat_cycling: 'Squat cycling',
   aerobic_capacity: 'Aerobic', anaerobic_capacity: 'Anaerobic',
   mixed_modal_conditioning: 'Mixed-modal',
 };
-const EXPECTED_FUNCTION_VERSION = '2026-10-30.1';
+const EXPECTED_FUNCTION_VERSION = '2026-10-30.2';
 
 type Weights = Record<string, number>;
 interface Gate { movement: string; kind: 'skill' | 'load' | 'capacity'; detail?: string }
