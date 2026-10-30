@@ -53,7 +53,7 @@ import {
 import type { BlockPrescription } from "../_shared/v2-output-schema.ts";
 import type { Gender } from "../_shared/compute-benchmarks.ts";
 
-const FUNCTION_VERSION = "2026-10-30.1";
+const FUNCTION_VERSION = "2026-10-30.2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -156,7 +156,8 @@ const AXES_GLOSSARY = `The ONLY allowed weight keys (the fixed training axes):
 - gymnastics_pulling — pull-ups, chest-to-bar, muscle-ups, toes-to-bar, rope climbs
 - gymnastics_pressing — HSPU, dips, wall walks, handstand holds (inverted work)
 - midline — trunk under load/fatigue: GHD, L-sits, heavy carries
-- skill_coordination — double-unders, pistols, handstand walk, jump-rope-class rhythm skills
+- skill_coordination — double-unders, handstand walk, jump-rope-class rhythm skills
+- squat_cycling — HIGH-REP squat capacity under fatigue: wall balls, light thrusters, lunge/step-up/pistol volume; leg muscular endurance, NOT maximal squat strength
 - aerobic_capacity — sustained-output engine, pacing over long continuous work
 - anaerobic_capacity — repeated high-power bursts, sprint tolerance
 - mixed_modal_conditioning — holding output while switching movements/modalities under fatigue`;
@@ -170,6 +171,11 @@ A signature has THREE weight vectors over those axes (each: integer percents, mu
 1. "demand" — what the workout REQUIRES of anyone who does it, cohort-independent. Draft this FIRST from time share (where a mid-pack athlete's minutes actually go) adjusted for what the structure makes matter. Duration is an input to your judgment, never a fixed allocation.
 2. "discrimination" — what decides RANK among RX competitive athletes. Derive it from demand by cohort adjustment: light loads nearly everyone moves fast separate little; high-skill gymnastics and fatigued inverted work separate enormously; pacing separates on long pieces.
 3. "stimulus" — what adaptation PERFORMING it produces (wall walks under fatigue test inverted capacity without building maximal pressing).
+
+ADJUDICATED MAPPING RULES (founder rulings — follow them over your own instinct):
+- Dumbbell/kettlebell variants of the Olympic lifts carry REDUCED olympic_lifting weight (the overhead receive only, ~5–10, scaled by load); the pull is posterior_chain. Full olympic_lifting weight is reserved for barbell snatch/clean work at loads where positions and technique decide the outcome.
+- Wall balls, light thrusters, lunges, step-ups and pistol volume are squat_cycling, not powerlifting_strength (unless the load is genuinely heavy for the cohort), not midline, and not merely conditioning — name the leg endurance explicitly, then weight the engine axes for the pacing on top.
+- A movement near-universally possessed by the RX competitive cohort (wall walks, box jump-overs) is NEVER a skill gate — its difficulty is capacity, which lives in the weights.
 
 "gates" — binary walls only, kept OUTSIDE the weights: [{"movement": "...", "kind": "skill"|"load"|"capacity", "detail": "what it blocks"}]. skill = cannot do the movement at all; load = cannot move the prescribed weight; capacity = can do the work but slows dramatically (use sparingly — capacity usually belongs in the weights). Most workouts have NO gates; an empty array is the common, correct answer.
 

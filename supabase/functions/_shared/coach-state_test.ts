@@ -139,7 +139,7 @@ Deno.test("no duplicate enum members", () => {
 });
 
 Deno.test("locked vocabulary counts (guards accidental edits)", () => {
-  assertEquals(FOCUS_AREAS.length, 11);
+  assertEquals(FOCUS_AREAS.length, 12); // v1.19: squat_cycling joined (Workout Signatures pilot evidence)
   assertEquals(REASON_CODES.length, 21); // v1.8: observed_progress/observed_plateau retired with the inference layer
   assertEquals(NORMATIVE_KEYS.length, 12);
 });

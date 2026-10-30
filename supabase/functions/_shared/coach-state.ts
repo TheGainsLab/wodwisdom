@@ -95,7 +95,15 @@ export type EvidenceKey = AthleteModelKey | (string & {});
 // an unchanged (athlete_model, builder) pair the cached state can lag the
 // athlete's latest Engine month — the composer's per-generation engine
 // context (uncached) carries the fresh picture regardless.
-export const COACH_STATE_BUILDER_VERSION = "v1.18";
+// v1.19 (squat_cycling axis, 2026-10-30): FOCUS_AREAS gains squat_cycling —
+// high-rep squat capacity under fatigue (wall balls, light thrusters,
+// lunge/pistol volume). Added on Workout Signatures pilot evidence: squat-
+// dense tests (19.1) had no truthful axis, so their demand smeared into
+// conditioning/midline and squat-endurance-limited athletes were invisible.
+// Distinct from powerlifting_strength (maximal) the same way
+// gymnastics_pressing is distinct from upper_body_pressing. The bump
+// regenerates cached states so the coach's judgment can cite it.
+export const COACH_STATE_BUILDER_VERSION = "v1.19";
 
 // ============================================================
 // Controlled vocabularies — LOCKED v1 (DATA, versioned with the schema;
@@ -123,6 +131,10 @@ export const FOCUS_AREAS = [
   "gymnastics_pressing",
   "midline",
   "skill_coordination",
+  // squat endurance (v1.19): HIGH-REP squat capacity under fatigue — wall
+  // balls, light thrusters, lunge/pistol volume. Leg muscular endurance,
+  // NOT maximal squat strength (that's powerlifting_strength).
+  "squat_cycling",
   // conditioning (energy systems; modality/time-domain carried by ReasonCode)
   "aerobic_capacity",
   "anaerobic_capacity",
