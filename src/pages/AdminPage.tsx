@@ -441,6 +441,17 @@ export default function AdminPage({ session }: { session: Session }) {
                     Research Library →
                   </button>
                   <button
+                    onClick={() => navigate('/admin/signatures')}
+                    style={{
+                      background: 'var(--accent-glow)', color: 'var(--accent)',
+                      border: '1px solid var(--border)', borderRadius: 8,
+                      padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                      fontFamily: "'Outfit', sans-serif",
+                    }}
+                  >
+                    Signatures →
+                  </button>
+                  <button
                     onClick={() => navigate('/admin/program-score')}
                     style={{
                       background: 'var(--accent-glow)', color: 'var(--accent)',
