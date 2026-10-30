@@ -53,7 +53,7 @@ import {
 import type { BlockPrescription } from "../_shared/v2-output-schema.ts";
 import type { Gender } from "../_shared/compute-benchmarks.ts";
 
-const FUNCTION_VERSION = "2026-10-30.2";
+const FUNCTION_VERSION = "2026-10-30.3";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -302,6 +302,63 @@ async function measure(
 }
 
 // ============================================================
+// Provenance + workout identity (server-managed)
+// ============================================================
+
+/** Default v1 provenance: every vector is editorial judgment; discrimination
+ *  is derived from demand by cohort adjustment. 'empirical' provenance
+ *  (cohort, n, fitted_at, fit_quality) arrives only when the regression
+ *  layer exists — never from this function's clients. */
+const DEFAULT_PROVENANCE = {
+  demand: { kind: "editorial" },
+  discrimination: { kind: "derived_from_demand" },
+  stimulus: { kind: "editorial" },
+};
+
+function canonicalJson(v: unknown): string {
+  if (Array.isArray(v)) return "[" + v.map(canonicalJson).join(",") + "]";
+  if (v && typeof v === "object") {
+    const o = v as Record<string, unknown>;
+    return "{" +
+      Object.keys(o).sort().map((k) => JSON.stringify(k) + ":" + canonicalJson(o[k])).join(",") +
+      "}";
+  }
+  return JSON.stringify(v) ?? "null";
+}
+
+/** The workout's identity: a hash of its canonical structure, distinct from
+ *  the signature's version. Empirical provenance is pinned to this hash. */
+async function hashWorkout(workout: unknown): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(canonicalJson(workout)),
+  );
+  return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/** Stale-mark any empirical vector when the workout structure changed —
+ *  a regression fitted on one structure must not describe another. */
+function staleMarkProvenance(
+  prov: Record<string, { kind?: string } & Record<string, unknown>>,
+  hashChanged: boolean,
+): Record<string, unknown> {
+  if (!hashChanged) return prov;
+  const out: Record<string, unknown> = { ...prov };
+  for (const key of ["demand", "discrimination", "stimulus"]) {
+    const p = prov[key];
+    if (p?.kind === "empirical") {
+      out[key] = {
+        ...p,
+        kind: "stale_empirical",
+        invalidated_at: new Date().toISOString(),
+        invalidated_by: "workout_edit",
+      };
+    }
+  }
+  return out;
+}
+
+// ============================================================
 // Row shaping
 // ============================================================
 
@@ -393,8 +450,18 @@ Deno.serve(async (req) => {
       const fields = pickRowFields(body);
       const sigErrors = validateSignature(fields as Partial<SignatureDraft>, false);
       if (sigErrors.length > 0) return json({ error: sigErrors.join("; ") }, 422);
+      if (fields.workout) fields.workout_hash = await hashWorkout(fields.workout);
       const id = typeof body.id === "string" ? body.id : null;
       if (id) {
+        const { data: existing } = await supa
+          .from("workout_signatures").select("workout_hash, provenance").eq("id", id).maybeSingle();
+        if (!existing) return json({ error: "NOT_FOUND" }, 404);
+        const hashChanged = !!fields.workout_hash && !!existing.workout_hash &&
+          fields.workout_hash !== existing.workout_hash;
+        fields.provenance = staleMarkProvenance(
+          (existing.provenance ?? DEFAULT_PROVENANCE) as Record<string, { kind?: string }>,
+          hashChanged,
+        );
         const { data, error } = await supa
           .from("workout_signatures")
           .update({ ...fields, updated_at: new Date().toISOString() })
@@ -407,7 +474,7 @@ Deno.serve(async (req) => {
       }
       const { data, error } = await supa
         .from("workout_signatures")
-        .insert({ ...fields, status: "draft" })
+        .insert({ ...fields, status: "draft", provenance: DEFAULT_PROVENANCE })
         .select().single();
       if (error) return json({ error: error.message }, 500);
       return json({ row: data });
@@ -430,6 +497,13 @@ Deno.serve(async (req) => {
         const merged = { ...existing, ...fields };
         const sigErrors = validateSignature(merged as Partial<SignatureDraft>, true);
         if (sigErrors.length > 0) return json({ error: sigErrors.join("; ") }, 422);
+        if (fields.workout) {
+          fields.workout_hash = await hashWorkout(fields.workout);
+          fields.provenance = staleMarkProvenance(
+            (existing.provenance ?? DEFAULT_PROVENANCE) as Record<string, { kind?: string }>,
+            !!existing.workout_hash && fields.workout_hash !== existing.workout_hash,
+          );
+        }
         Object.assign(update, fields, { approved_at: new Date().toISOString() });
       }
       const { data, error } = await supa
