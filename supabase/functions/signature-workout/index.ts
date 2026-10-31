@@ -168,11 +168,11 @@ ${AXES_GLOSSARY}
 
 A signature has THREE weight vectors over those axes (each: integer percents, multiples of 5, SUM EXACTLY 100, omit zero-weight axes):
 
-1. "demand" — what the workout REQUIRES of anyone who does it, cohort-independent. Draft this FIRST from time share (where a mid-pack athlete's minutes actually go) adjusted for what the structure makes matter. Duration is an input to your judgment, never a fixed allocation.
+1. "demand" — what the workout REQUIRES of anyone who does it, cohort-independent. Draft this FIRST from where a mid-pack athlete's time AND effort actually go, adjusted for what the structure makes matter (a heavy single is seconds of time and a large share of demand; sustained output is demand that no single movement owns).
 2. "discrimination" — what decides RANK in the GENERAL OPEN POPULATION (everyone on the leaderboard, NOT elite competitors — mid-pack reality: walls you would call universal stop 20–70% of real fields). Derive it from demand by cohort adjustment: light loads nearly everyone moves fast separate little; high-skill gymnastics and fatigued inverted work separate enormously; pacing separates on long pieces. DEGRADATION DISCRIMINATES: when lacking a capacity does not stop a movement but forces a slower pattern — jump→step-over, unbroken→singles, kip→strict grind — that capacity discriminates even though no wall appears in the distribution (the continuous cousin of a gate: no pile, a steady pace tax on part of the field).
-3. "stimulus" — what adaptation PERFORMING it produces (wall walks under fatigue test inverted capacity without building maximal pressing).
+3. "stimulus" — what adaptation PERFORMING it produces. Derive it from demand by reducing the axes the workout tests without developing (skill under fatigue, max-effort expressions) and leaving the rest (wall walks under fatigue test inverted capacity without building maximal pressing).
 
-ADJUDICATED MAPPING RULES (founder rulings — follow them over your own instinct):
+FOUNDER RULINGS (case law, not statute — precedents to extend by analogy; where a workout genuinely falls outside a precedent's reasoning, your judgment governs):
 - Dumbbell/kettlebell variants of the Olympic lifts carry REDUCED olympic_lifting weight (the overhead receive only, ~5–10, scaled by load); the pull is posterior_chain. Full olympic_lifting weight is reserved for barbell snatch/clean work at loads where positions and technique decide the outcome.
 - Wall balls, light thrusters, lunges, step-ups and pistol volume are squat_cycling, not powerlifting_strength, not midline, and not merely conditioning — name the leg endurance explicitly, then weight the engine axes for the pacing on top.
 - LOAD TRUMPS REPS, JUDGED AGAINST THE GENERAL FIELD: high-rep squatting is squat_cycling only while the load is light enough that leg endurance, not force production, is what fails — and judge "light" against the general Open population, not competitors. Volume at 95/65 is already a meaningful strength test for mid-pack athletes (degradation to slow singles discriminates); wall balls and empty-bar work are cycling; genuinely heavy bars are powerlifting_strength expression regardless of rep count.
@@ -186,12 +186,12 @@ ADJUDICATED MAPPING RULES (founder rulings — follow them over your own instinc
 "gates" — GATE DOCTRINE (founder ruling): a gate is a wall that ONE ACQUISITION unlocks — land your first bar muscle-up and the round opens. Strength is NEVER a gate: no single fix unlocks a heavy bar, so load difficulty lives in the weights and may dominate discrimination instead (a climbing ladder can carry 40+ strength discrimination, zero gates). A cliff is evidence, a gate is a mechanism: only unlock-mechanism walls get the gate label. A gate sequenced behind a stricter gate in the same workout is NOT recorded — the binding wall screens first. A hedge ("may be immovable") is never a gate — "may" means weights. A movement near-universally POSSESSED by the general Open field (wall walks, box jump-overs — possession, not speed) is never a gate; slow performance of it is capacity/degradation and lives in the weights. Format: [{"movement": "...", "kind": "skill", "detail": "what it blocks"}]. Most workouts have NO gates; an empty array is the common, correct answer.
 
 Also emit:
-- "time_domain": "short" (<8 min) | "medium" (8–15) | "long" (>15), judged from the structure for a mid-pack athlete.
+- "time_domain": "short" (<8 min) | "medium" (8–15) | "long" (>15). When MEASURED CONTEXT gives an expected duration, CONFIRM against it rather than concluding from the movement list; otherwise judge from structure for a mid-pack athlete.
 - "format": one of ${SIG_FORMATS.join("/")}.
 - "archetype": a 2–5 word label for the recurring test design this matches (e.g. "couplet sprint", "gymnastics ladder with cap", "long grind triplet").
 - "rationale": 2–4 sentences on the judgment calls — why the dominant buckets dominate, what separates, why any gate.
 
-Output STRICT JSON only — one object with keys demand, discrimination, stimulus, gates, time_domain, format, archetype, rationale. No markdown fences, no commentary.
+Output STRICT JSON only — one object with keys IN THIS ORDER: archetype, rationale, time_domain, format, demand, discrimination, stimulus, gates. Commit to the structural reading (archetype, rationale) first; the numbers follow from it. No markdown fences, no commentary.
 Never use the word "CrossFit" anywhere in your output.`;
 
 const PARSE_SYSTEM = `You parse ONE workout from raw text into a strict JSON structure. Output JSON only — no fences, no commentary.
@@ -237,13 +237,28 @@ function extractJson(text: string): unknown {
 async function draftSignature(
   workout: BlockPrescription,
   library: MeasuredLibrary | null,
+  measured: ExpectedBenchmark | null,
 ): Promise<SignatureDraft> {
   if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY not configured");
   const workoutJson = JSON.stringify(workout, null, 2);
-  const measuredBlock = library
-    ? `\n\nMEASURED LEADERBOARD FACTS (general Open population — condition discrimination and gate judgments on these, they outrank your priors):\n${
+  // MEASURED CONTEXT rides EVERY draft that has it, library workout or not —
+  // the judge confirms duration/pacing against computation instead of
+  // inferring them from the movement list.
+  const parts: string[] = [];
+  if (measured) {
+    parts.push(`Computed for this exact prescription (cohort power model): expected median ${
+      measured.median_score
+    }${measured.median_seconds ? ` (~${Math.round(measured.median_seconds)}s)` : ""}, time_domain ${
+      measured.time_domain
+    }, median cohort power ${measured.median_watts}W.`);
+  }
+  if (library) {
+    parts.push(`Leaderboard facts (general Open population): ${
       JSON.stringify(library)
-    }\nReading: capped_frac = share of the field that never finished (ranked by reps where the clock bit). pile_at_score / pile_share = the score where the field piled up — a measured wall; whether it is a gate is the mechanism call (unlock wall vs load cliff). expected_rel_iqr = typical relative spread for this duration and scoring class.`
+    } — capped_frac = share that never finished (ranked by reps where the clock bit); pile_at_score/pile_share = the measured wall (whether it is a gate is the mechanism call); expected_rel_iqr = typical relative spread for this duration and scoring class.`);
+  }
+  const measuredBlock = parts.length
+    ? `\n\nMEASURED CONTEXT (condition your judgments on these — they outrank your priors):\n${parts.join("\n")}`
     : "";
   const ask = `Tag this workout:\n\n${workoutJson}${measuredBlock}`;
 
@@ -521,7 +536,7 @@ Deno.serve(async (req) => {
       if (action === "measure") {
         return json({ measured, measured_library: library });
       }
-      const signature = await draftSignature(workout, library);
+      const signature = await draftSignature(workout, library, measured);
       return json({ signature, measured, measured_library: library, drafted_model: "sonnet" });
     }
 
