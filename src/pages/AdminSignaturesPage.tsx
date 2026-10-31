@@ -35,7 +35,7 @@ const FOCUS_LABELS: Record<string, string> = {
   aerobic_capacity: 'Aerobic', anaerobic_capacity: 'Anaerobic',
   mixed_modal_conditioning: 'Mixed-modal',
 };
-const EXPECTED_FUNCTION_VERSION = '2026-10-31.1';
+const EXPECTED_FUNCTION_VERSION = '2026-10-31.2';
 
 type Weights = Record<string, number>;
 interface Gate { movement: string; kind: 'skill' | 'load' | 'capacity'; detail?: string }
@@ -60,6 +60,11 @@ interface SigRow {
   status?: string; created_at?: string;
 }
 interface Baseline { demand: Weights; discrimination: Weights; stimulus: Weights; measured: Measured | null }
+interface MeasuredLib {
+  censoring?: { year: number; capped_frac: number; time_cap_seconds: number | null; n: number };
+  pile?: { year: number; pile_at_score: number; pile_share: number; n_total: number };
+  expected_rel_iqr?: number;
+}
 
 async function invokeSig(body: Record<string, unknown>): Promise<Record<string, unknown>> {
   const { data, error: err } = await supabase.functions.invoke('signature-workout', { body });
@@ -118,6 +123,7 @@ export default function AdminSignaturesPage({ session }: { session: Session }) {
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [sel, setSel] = useState<SigRow | null>(null);        // editable working copy
   const [baseline, setBaseline] = useState<Baseline | null>(null);
+  const [lib, setLib] = useState<MeasuredLib | null>(null);   // measured-layer facts
   const [pasteText, setPasteText] = useState('');
   const [gender, setGender] = useState<'men' | 'women'>('men');
   const [busy, setBusy] = useState<string | null>(null);
@@ -144,7 +150,7 @@ export default function AdminSignaturesPage({ session }: { session: Session }) {
     measured: r.measured ?? null,
   });
 
-  const open = (r: SigRow) => { setSel(structuredClone(r)); setBaseline(snapshot(r)); setError(''); };
+  const open = (r: SigRow) => { setSel(structuredClone(r)); setBaseline(snapshot(r)); setLib(null); setError(''); };
 
   const run = async (name: string, fn: () => Promise<void>) => {
     setBusy(name); setError('');
@@ -166,11 +172,12 @@ export default function AdminSignaturesPage({ session }: { session: Session }) {
     const out = await invokeSig({ action: 'parse', text: pasteText });
     const workout = out.workout as Workout;
     const fresh: SigRow = { name: '', source: 'adhoc', workout, demand: {}, gates: [] };
-    setSel(fresh); setBaseline(null); setPasteText('');
+    setSel(fresh); setBaseline(null); setLib(null); setPasteText('');
   });
 
   const doDraft = () => sel && run('draft', async () => {
-    const out = await invokeSig({ action: 'draft', workout: sel.workout, gender });
+    const out = await invokeSig({ action: 'draft', workout: sel.workout, gender, name: sel.name });
+    setLib((out.measured_library as MeasuredLib | null) ?? null);
     const sig = out.signature as Partial<SigRow>;
     const next = {
       ...sel,
@@ -189,7 +196,8 @@ export default function AdminSignaturesPage({ session }: { session: Session }) {
   });
 
   const doMeasure = () => sel && run('measure', async () => {
-    const out = await invokeSig({ action: 'measure', workout: sel.workout, gender });
+    const out = await invokeSig({ action: 'measure', workout: sel.workout, gender, name: sel.name });
+    setLib((out.measured_library as MeasuredLib | null) ?? null);
     setSel({ ...sel, measured: (out.measured as Measured | null) });
   });
 
@@ -380,6 +388,34 @@ export default function AdminSignaturesPage({ session }: { session: Session }) {
                   </span>
                   {baseline?.measured?.median_seconds != null && sel.measured.median_seconds != null && baseline.measured.median_seconds !== sel.measured.median_seconds && (
                     <span style={{ color: 'var(--text-muted)' }}>was {fmtSecs(baseline.measured.median_seconds)} → now {fmtSecs(sel.measured.median_seconds)}</span>
+                  )}
+                </div>
+              )}
+
+              {/* ---- measured library layer ---- */}
+              {lib && (
+                <div style={{ marginTop: 10 }}>
+                  <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', padding: '10px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, fontSize: 12.5, ...mono }}>
+                    <span style={{ fontWeight: 700, color: 'var(--text-muted)', fontFamily: 'inherit' }}>LEADERBOARD</span>
+                    {lib.censoring && (
+                      <span>capped <strong>{Math.round(lib.censoring.capped_frac * 100)}%</strong> ({lib.censoring.year}, n {lib.censoring.n.toLocaleString()})</span>
+                    )}
+                    {lib.pile && (
+                      <span>pile at <strong>{lib.pile.pile_at_score}</strong> ({Math.round(lib.pile.pile_share * 100)}% of field)</span>
+                    )}
+                    {lib.expected_rel_iqr != null && (
+                      <span>expected spread <strong>{lib.expected_rel_iqr}</strong></span>
+                    )}
+                  </div>
+                  {lib.pile && lib.pile.pile_share >= 0.1 && sel.gates.length === 0 && (
+                    <div style={{ fontSize: 12, color: 'var(--accent)', marginTop: 6 }}>
+                      ⚠ Measured wall at {lib.pile.pile_at_score} ({Math.round(lib.pile.pile_share * 100)}%) with no editorial gate — unlock wall missed, or a load cliff (then it belongs in discrimination)?
+                    </div>
+                  )}
+                  {sel.gates.length > 0 && !lib.pile && (
+                    <div style={{ fontSize: 12, color: 'var(--accent)', marginTop: 6 }}>
+                      ⚠ Editorial gate claimed but no measured pile ≥3% — verify the wall is real for this cohort.
+                    </div>
                   )}
                 </div>
               )}
