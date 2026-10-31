@@ -176,7 +176,21 @@ export default function AdminSignaturesPage({ session }: { session: Session }) {
    *  measured facts) → save as DRAFT rows for queue adjudication. Sequential
    *  on purpose — one failure never kills the run. */
   const doBulk = async () => {
-    const blocks = bulkText.split(/^###\s+/m).map((b) => b.trim()).filter(Boolean)
+    // Accept the raw text OR a pasted SQL-result JSON wrapper
+    // ([{"bulk_payload":"### 11.1\n..."}]) — unwrap and unescape automatically.
+    let raw = bulkText.trim();
+    if (raw.startsWith('[') || raw.startsWith('{')) {
+      try {
+        const j = JSON.parse(raw);
+        const v = Array.isArray(j) ? j[0] : j;
+        const s = v && typeof v === 'object'
+          ? Object.values(v as Record<string, unknown>).find((x): x is string => typeof x === 'string' && x.includes('###'))
+          : null;
+        if (s) raw = s;
+      } catch { /* not JSON — treat as plain text */ }
+    }
+    if (!raw.includes('\n') && raw.includes('\\n')) raw = raw.replace(/\\n/g, '\n');
+    const blocks = raw.split(/^###\s+/m).map((b) => b.trim()).filter(Boolean)
       .map((b) => {
         const nl = b.indexOf('\n');
         return nl === -1 ? null : { name: b.slice(0, nl).trim(), text: b.slice(nl + 1).trim() };
