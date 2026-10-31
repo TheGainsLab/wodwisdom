@@ -53,7 +53,7 @@ import {
 import type { BlockPrescription } from "../_shared/v2-output-schema.ts";
 import type { Gender } from "../_shared/compute-benchmarks.ts";
 
-const FUNCTION_VERSION = "2026-10-31.1";
+const FUNCTION_VERSION = "2026-10-31.2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -231,10 +231,18 @@ function extractJson(text: string): unknown {
 }
 
 /** One drafting call with one validation-driven repair attempt. */
-async function draftSignature(workout: BlockPrescription): Promise<SignatureDraft> {
+async function draftSignature(
+  workout: BlockPrescription,
+  library: MeasuredLibrary | null,
+): Promise<SignatureDraft> {
   if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY not configured");
   const workoutJson = JSON.stringify(workout, null, 2);
-  const ask = `Tag this workout:\n\n${workoutJson}`;
+  const measuredBlock = library
+    ? `\n\nMEASURED LEADERBOARD FACTS (general Open population — condition discrimination and gate judgments on these, they outrank your priors):\n${
+      JSON.stringify(library)
+    }\nReading: capped_frac = share of the field that never finished (ranked by reps where the clock bit). pile_at_score / pile_share = the score where the field piled up — a measured wall; whether it is a gate is the mechanism call (unlock wall vs load cliff). expected_rel_iqr = typical relative spread for this duration and scoring class.`
+    : "";
+  const ask = `Tag this workout:\n\n${workoutJson}${measuredBlock}`;
 
   let raw = await callClaude({
     apiKey: ANTHROPIC_API_KEY,
@@ -302,6 +310,69 @@ async function measure(
     console.warn(`[signature-workout] measure failed: ${e instanceof Error ? e.message : e}`);
     return null;
   }
+}
+
+// ============================================================
+// The measured layer (phase-1 sweep outputs, seeded by migration)
+// ============================================================
+
+interface MeasuredLibrary {
+  /** Fraction of the field that never finished; absent = <15% censored. */
+  censoring?: {
+    year: number;
+    capped_frac: number;
+    time_cap_seconds: number | null;
+    n: number;
+  };
+  /** The score where the largest share of the field piled up (the wall). */
+  pile?: { year: number; pile_at_score: number; pile_share: number; n_total: number };
+  /** Typical relative spread (p75−p25)/p50 for this duration/scoring class. */
+  expected_rel_iqr?: number;
+}
+
+/** Look up what the leaderboards measured for a named workout + duration
+ *  class. Judgment-free context for drafting and adjudication. */
+async function fetchMeasuredLibrary(
+  supa: ReturnType<typeof createClient>,
+  name: string,
+  gender: Gender,
+  workout: BlockPrescription,
+  medianSeconds: number | null,
+): Promise<MeasuredLibrary | null> {
+  const g = gender === "women" ? "F" : "M";
+  const lib: MeasuredLibrary = {};
+
+  if (name) {
+    const [{ data: cens }, { data: pile }] = await Promise.all([
+      supa.from("signature_censoring")
+        .select("year, capped_frac, time_cap_seconds, n")
+        .eq("workout_name", name).eq("gender", g)
+        .order("year", { ascending: false }).limit(1).maybeSingle(),
+      supa.from("signature_gate_catalog")
+        .select("year, pile_at_score, pile_share, n_total")
+        .eq("workout_name", name).eq("gender", g)
+        .order("year", { ascending: false }).limit(1).maybeSingle(),
+    ]);
+    if (cens) lib.censoring = cens as MeasuredLibrary["censoring"];
+    if (pile) lib.pile = pile as MeasuredLibrary["pile"];
+  }
+
+  // Expected spread by duration class: nearest bin midpoint, matching scoring type.
+  const basisSeconds = medianSeconds ?? workout.time_cap_seconds ?? null;
+  if (basisSeconds && basisSeconds > 0) {
+    const repScored = /\bamrap\b|\bemom\b/i.test(workout.block_scheme ?? "");
+    const { data: bins } = await supa.from("signature_duration_curve")
+      .select("bin_min_s, bin_max_s, median_rel_iqr")
+      .eq("competition_type", "open").eq("rep_scored", repScored);
+    if (bins && bins.length > 0) {
+      const nearest = (bins as Array<{ bin_min_s: number; bin_max_s: number; median_rel_iqr: number }>)
+        .map((b) => ({ b, d: Math.abs((b.bin_min_s + b.bin_max_s) / 2 - basisSeconds) }))
+        .sort((a, z) => a.d - z.d)[0];
+      lib.expected_rel_iqr = Number(nearest.b.median_rel_iqr);
+    }
+  }
+
+  return (lib.censoring || lib.pile || lib.expected_rel_iqr != null) ? lib : null;
 }
 
 // ============================================================
@@ -439,14 +510,16 @@ Deno.serve(async (req) => {
       if (!workout || !Array.isArray(workout.movements) || workout.movements.length === 0) {
         return json({ error: "MISSING_WORKOUT" }, 400);
       }
+      const name = typeof body.name === "string" ? body.name.trim() : "";
+      const measured = await measure(workout, gender);
+      const library = await fetchMeasuredLibrary(
+        supa, name, gender, workout, measured?.median_seconds ?? null,
+      );
       if (action === "measure") {
-        return json({ measured: await measure(workout, gender) });
+        return json({ measured, measured_library: library });
       }
-      const [signature, measured] = await Promise.all([
-        draftSignature(workout),
-        measure(workout, gender),
-      ]);
-      return json({ signature, measured, drafted_model: "sonnet" });
+      const signature = await draftSignature(workout, library);
+      return json({ signature, measured, measured_library: library, drafted_model: "sonnet" });
     }
 
     if (action === "save") {
