@@ -53,7 +53,7 @@ import {
 import type { BlockPrescription } from "../_shared/v2-output-schema.ts";
 import type { Gender } from "../_shared/compute-benchmarks.ts";
 
-const FUNCTION_VERSION = "2026-10-31.5";
+const FUNCTION_VERSION = "2026-10-31.7";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -148,43 +148,49 @@ function validateSignature(sig: Partial<SignatureDraft>, requireAll: boolean): s
 // Prompts
 // ============================================================
 
-const AXES_GLOSSARY = `The ONLY allowed weight keys (the fixed training axes):
-- olympic_lifting — snatch/clean & jerk technique and positions
-- powerlifting_strength — maximal squat/press/deadlift strength
-- posterior_chain — hinge pattern: deadlifts, swings, hip extension (incl. endurance at submax load)
-- upper_body_pressing — horizontal/overhead barbell+DB pressing strength
-- gymnastics_pulling — pull-ups, chest-to-bar, muscle-ups, toes-to-bar, rope climbs
-- gymnastics_pressing — HSPU, dips, wall walks, handstand holds (inverted work)
-- midline — trunk under load/fatigue: GHD, L-sits, heavy carries
-- skill_coordination — double-unders, handstand walk, jump-rope-class rhythm skills
-- squat_cycling — HIGH-REP squat capacity under fatigue: wall balls, light thrusters, lunge/step-up/pistol volume; leg muscular endurance, NOT maximal squat strength
-- aerobic_capacity — sustained-output engine, pacing over long continuous work
-- anaerobic_capacity — repeated high-power bursts, sprint tolerance
-- mixed_modal_conditioning — holding output while switching movements/modalities under fatigue`;
+const AXES_GLOSSARY = `The ONLY allowed weight keys (the fixed training axes), with their boundaries — these are definitions of what the words mean:
+- olympic_lifting — barbell snatch / clean & jerk technique at loads where positions and speed under the bar decide. Dumbbell/kettlebell variants are mostly hinge (posterior_chain) plus a small overhead-receive share (~5–10, scaled by load).
+- powerlifting_strength — maximal force: heavy squat/press/deadlift, and any loaded work heavy enough that force production, not endurance, is what fails for the general field.
+- posterior_chain — hinge pattern: deadlifts, swings, hip extension, incl. endurance at submax load; the pull of DB/KB ballistics lives here.
+- upper_body_pressing — horizontal/overhead barbell+DB pressing strength.
+- gymnastics_pulling — pull-ups, chest-to-bar, muscle-ups, toes-to-bar, rope climbs.
+- gymnastics_pressing — HSPU, dips, wall walks, handstand holds (inverted work).
+- midline — trunk under load/fatigue: GHD, L-sits, heavy carries.
+- skill_coordination — double-unders, handstand walk, rhythm and precision skills.
+- squat_cycling — high-rep squat capacity under fatigue: wall balls, lunges, step-ups, pistol volume, and squatting at loads the mid-pack athlete cycles unbroken ("light" means exactly that). Leg endurance, not force.
+- aerobic_capacity — sustained-output engine, pacing over long continuous work. No machine required: mixed work at sustained pace IS aerobic.
+- anaerobic_capacity — repeated high-power / ballistic output and surge tolerance.
+- mixed_modal_conditioning — the transition/interference tax of switching implements under fatigue; never a mixed piece's whole engine.`;
 
-const DRAFT_SYSTEM = `You are an expert strength & conditioning coach tagging scoreable workouts with a SIGNATURE for a training-analysis system. Judge each workout on its own merits with your full coaching knowledge — there is no formula to apply. The definitions below are vocabulary, not procedure.
+const DRAFT_SYSTEM = `You are an expert strength & conditioning coach tagging scoreable workouts with a SIGNATURE for a training-analysis system.
+
+THE REFERENCE POPULATION — read everything below through this: the GENERAL Open field, everyone on the leaderboard, NOT competitive athletes. Mid-pack reality: skills you might assume universal stop 20–70% of real fields; moderate loads force many athletes into slow singles.
 
 ${AXES_GLOSSARY}
 
-Axis boundary notes (definitions, not rules): dumbbell/kettlebell variants of the Olympic lifts are mostly hinge (posterior_chain) plus an overhead receive — full olympic_lifting weight belongs to barbell snatch/clean work where technique at load decides the outcome. squat_cycling covers high-rep squatting only while the load is light enough that endurance, not force, is what fails; judge heaviness for the general field. mixed_modal_conditioning is the transition/interference tax of switching implements under fatigue, not the whole engine of a mixed piece. Loaded and ballistic efforts are glycolytic — anaerobic demand is rarely zero outside pure low-intensity monostructural work.
+A signature has THREE weight vectors over those axes (each: integer percents, multiples of 5, SUM EXACTLY 100, omit zero-weight axes):
 
-THE REFERENCE POPULATION is the GENERAL Open field — everyone on the leaderboard, not competitive athletes. Mid-pack reality: skills you might assume universal stop 20–70% of real fields; moderate loads force many athletes into slow singles; degradation to a slower movement pattern (jump→step, unbroken→singles) separates athletes even when nothing stops them outright.
+1. "demand" — what the workout REQUIRES of anyone who does it, cohort-independent. Draft this FIRST from where a mid-pack athlete's time AND effort actually go (a heavy single is seconds of time and a large share of demand; sustained output is demand that no single movement owns).
+2. "discrimination" — what decides RANK in the reference population, conditional on the scoring structure: the cap, the score type, and where the field actually gets ranked shape what separates. A quality can be demanded yet decide nothing (everyone has it), or separate strongly with no visible wall.
+3. "stimulus" — what adaptation PERFORMING it produces. Derive it from demand by reducing the axes the workout tests without developing (skill under fatigue, max-effort expressions) and leaving the rest.
 
-A signature has THREE weight vectors over the axes (each: integer percents, multiples of 5, SUM EXACTLY 100, omit zero-weight axes):
+"gates" — a gate is a wall that ONE ACQUISITION unlocks: land your first bar muscle-up and the round opens. Strength is never a gate — no single fix unlocks a heavy bar; load difficulty lives in the weights and may dominate discrimination instead. A cliff in the data is evidence; a gate is a mechanism. Record only the binding wall, only for movements a meaningful share of the general field cannot do AT ALL (possession, not speed). Format: [{"movement": "...", "kind": "skill", "detail": "what it blocks"}]. Most workouts have NO gates; an empty array is the common, correct answer.
 
-1. "demand" — what the workout REQUIRES of anyone who does it: where the work and the minutes actually go, cohort-independent.
-2. "discrimination" — what decides RANK in the reference population. Conditional on the scoring structure: the cap, the score type, and where the field actually gets ranked all shape what separates. A quality can be demanded yet decide nothing (everyone has it), or separate strongly through pace degradation with no visible wall.
-3. "stimulus" — what adaptation PERFORMING it produces (a workout can test a quality without building it).
-
-"gates" — a gate is a wall that ONE ACQUISITION unlocks (land your first bar muscle-up and the round opens). Strength is never a gate — no single fix unlocks a heavy bar; load difficulty lives in the weights and may dominate discrimination instead. Only record the binding wall, and only for movements a meaningful share of the general field cannot do at all. Format: [{"movement": "...", "kind": "skill", "detail": "what it blocks"}]. Most workouts have NO gates; an empty array is the common, correct answer.
+FOUNDER RULINGS (case law, not statute — extend each by analogy; where a workout falls outside a precedent's reasoning, your judgment governs):
+- 22.1: the 50 lb DB snatch decided nothing — real demand, universally cycled, near-zero discrimination. A demanded quality everyone possesses does not separate.
+- 22.1: box jump-overs carry anaerobic demand (~10) — much of the field downshifts to slow step-overs, an anaerobic deficit expressing itself. Extend to other ballistic movements by analogy.
+- 22.1: wall walks govern the pace, so the engine cannot be cashed in — when a movement bottleneck sets cycle speed, aerobic discrimination sits BELOW its demand and the bottleneck's axis takes the difference.
+- 22.3: a 12:00 cap with the field median at 11:16 ranked half the field by reps inside round 3 — discrimination concentrates where the clock bites.
+- 22.3: 15 thrusters at 135, deep in fatigue, is strength expression for the general field even at reps — load trumps reps, and volume at 95/65 is already a meaningful strength test mid-pack.
+- Degradation discriminates: jump→step, unbroken→singles, kip→strict grind — a steady pace tax on part of the field, with no wall in the distribution.
 
 Also emit:
-- "time_domain": "short" (<8 min) | "medium" (8–15) | "long" (>15), judged from the structure for a mid-pack athlete.
+- "time_domain": "short" (<8 min) | "medium" (8–15) | "long" (>15). When MEASURED CONTEXT gives an expected duration, CONFIRM against it rather than concluding from the movement list; otherwise judge from structure for a mid-pack athlete.
 - "format": one of ${SIG_FORMATS.join("/")}.
 - "archetype": a 2–5 word label for the recurring test design this matches (e.g. "couplet sprint", "gymnastics ladder with cap", "long grind triplet").
-- "rationale": 2–4 sentences on the judgment calls — why the dominant buckets dominate, what separates, why any gate.
+- "rationale": 2–4 sentences — the structural reading, what separates and why, which degradation modes you relied on, why any gate.
 
-Output STRICT JSON only — one object with keys demand, discrimination, stimulus, gates, time_domain, format, archetype, rationale. No markdown fences, no commentary.
+Output STRICT JSON only — one object with keys IN THIS ORDER: archetype, rationale, time_domain, format, demand, discrimination, stimulus, gates. Commit to the structural reading (archetype, rationale) first; the numbers follow from it. No markdown fences, no commentary.
 Never use the word "CrossFit" anywhere in your output.`;
 
 const PARSE_SYSTEM = `You parse ONE workout from raw text into a strict JSON structure. Output JSON only — no fences, no commentary.
@@ -230,13 +236,28 @@ function extractJson(text: string): unknown {
 async function draftSignature(
   workout: BlockPrescription,
   library: MeasuredLibrary | null,
+  measured: ExpectedBenchmark | null,
 ): Promise<SignatureDraft> {
   if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY not configured");
   const workoutJson = JSON.stringify(workout, null, 2);
-  const measuredBlock = library
-    ? `\n\nMEASURED LEADERBOARD FACTS (general Open population — condition discrimination and gate judgments on these, they outrank your priors):\n${
+  // MEASURED CONTEXT rides EVERY draft that has it, library workout or not —
+  // the judge confirms duration/pacing against computation instead of
+  // inferring them from the movement list.
+  const parts: string[] = [];
+  if (measured) {
+    parts.push(`Computed for this exact prescription (cohort power model): expected median ${
+      measured.median_score
+    }${measured.median_seconds ? ` (~${Math.round(measured.median_seconds)}s)` : ""}, time_domain ${
+      measured.time_domain
+    }, median cohort power ${measured.median_watts}W.`);
+  }
+  if (library) {
+    parts.push(`Leaderboard facts (general Open population): ${
       JSON.stringify(library)
-    }\nReading: capped_frac = share of the field that never finished (ranked by reps where the clock bit). pile_at_score / pile_share = the score where the field piled up — a measured wall; whether it is a gate is the mechanism call (unlock wall vs load cliff). expected_rel_iqr = typical relative spread for this duration and scoring class.`
+    } — capped_frac = share that never finished (ranked by reps where the clock bit); pile_at_score/pile_share = the measured wall (whether it is a gate is the mechanism call); expected_rel_iqr = typical relative spread for this duration and scoring class.`);
+  }
+  const measuredBlock = parts.length
+    ? `\n\nMEASURED CONTEXT (condition your judgments on these — they outrank your priors):\n${parts.join("\n")}`
     : "";
   const ask = `Tag this workout:\n\n${workoutJson}${measuredBlock}`;
 
@@ -514,7 +535,7 @@ Deno.serve(async (req) => {
       if (action === "measure") {
         return json({ measured, measured_library: library });
       }
-      const signature = await draftSignature(workout, library);
+      const signature = await draftSignature(workout, library, measured);
       return json({ signature, measured, measured_library: library, drafted_model: "sonnet" });
     }
 
