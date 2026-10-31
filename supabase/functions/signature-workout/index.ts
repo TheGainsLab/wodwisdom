@@ -53,7 +53,7 @@ import {
 import type { BlockPrescription } from "../_shared/v2-output-schema.ts";
 import type { Gender } from "../_shared/compute-benchmarks.ts";
 
-const FUNCTION_VERSION = "2026-10-30.3";
+const FUNCTION_VERSION = "2026-10-31.1";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -174,10 +174,13 @@ A signature has THREE weight vectors over those axes (each: integer percents, mu
 
 ADJUDICATED MAPPING RULES (founder rulings — follow them over your own instinct):
 - Dumbbell/kettlebell variants of the Olympic lifts carry REDUCED olympic_lifting weight (the overhead receive only, ~5–10, scaled by load); the pull is posterior_chain. Full olympic_lifting weight is reserved for barbell snatch/clean work at loads where positions and technique decide the outcome.
-- Wall balls, light thrusters, lunges, step-ups and pistol volume are squat_cycling, not powerlifting_strength (unless the load is genuinely heavy for the cohort), not midline, and not merely conditioning — name the leg endurance explicitly, then weight the engine axes for the pacing on top.
-- A movement near-universally possessed by the RX competitive cohort (wall walks, box jump-overs) is NEVER a skill gate — its difficulty is capacity, which lives in the weights.
+- Wall balls, light thrusters, lunges, step-ups and pistol volume are squat_cycling, not powerlifting_strength, not midline, and not merely conditioning — name the leg endurance explicitly, then weight the engine axes for the pacing on top.
+- LOAD TRUMPS REPS: high-rep squatting is squat_cycling only while the bar is light enough that leg endurance, not force production, fails. Men's RX thruster calibration: ~95 lbs = cycling, ~115 = transitional, 135+ = powerlifting_strength expression regardless of rep count. Generalize proportionally to other loaded squat patterns.
+- AEROBIC FOLLOWS DURATION AND CONTINUITY, NEVER MODALITY. Mixed-modal work at sustained pace IS aerobic training in this sport — a machine or run is not required for aerobic weight. Any continuous piece beyond ~10–12 minutes carries real aerobic demand. anaerobic_capacity requires burst-and-recover structure or a short clock. mixed_modal_conditioning is ONLY the transition/interference tax — the cost of switching implements under fatigue — never the whole engine of a mixed piece.
+- Three or more alternating modalities ⇒ mixed_modal_conditioning carries real weight (≥10) unless the rest structure removes the transition cost.
+- DISCRIMINATION IS CONDITIONAL ON SCORING STRUCTURE. Take the time cap and score type as inputs: when the cohort median sits near the cap, roughly half the field is ranked by reps completed where the clock bites — weight discrimination toward what sorts athletes in THAT section, not the whole workout evenly.
 
-"gates" — binary walls only, kept OUTSIDE the weights: [{"movement": "...", "kind": "skill"|"load"|"capacity", "detail": "what it blocks"}]. skill = cannot do the movement at all; load = cannot move the prescribed weight; capacity = can do the work but slows dramatically (use sparingly — capacity usually belongs in the weights). Most workouts have NO gates; an empty array is the common, correct answer.
+"gates" — GATE DOCTRINE (founder ruling): a gate is a wall that ONE ACQUISITION unlocks — land your first bar muscle-up and the round opens. Strength is NEVER a gate: no single fix unlocks a heavy bar, so load difficulty lives in the weights and may dominate discrimination instead (a climbing ladder can carry 40+ strength discrimination, zero gates). A cliff is evidence, a gate is a mechanism: only unlock-mechanism walls get the gate label. A gate sequenced behind a stricter gate in the same workout is NOT recorded — the binding wall screens first. A hedge ("may be immovable") is never a gate — "may" means weights. A movement near-universally possessed by the RX competitive cohort (wall walks, box jump-overs) is never a gate. Format: [{"movement": "...", "kind": "skill", "detail": "what it blocks"}]. Most workouts have NO gates; an empty array is the common, correct answer.
 
 Also emit:
 - "time_domain": "short" (<8 min) | "medium" (8–15) | "long" (>15), judged from the structure for a mid-pack athlete.
