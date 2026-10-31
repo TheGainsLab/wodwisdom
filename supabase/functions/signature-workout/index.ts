@@ -53,7 +53,7 @@ import {
 import type { BlockPrescription } from "../_shared/v2-output-schema.ts";
 import type { Gender } from "../_shared/compute-benchmarks.ts";
 
-const FUNCTION_VERSION = "2026-10-31.4";
+const FUNCTION_VERSION = "2026-10-31.5";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -162,28 +162,21 @@ const AXES_GLOSSARY = `The ONLY allowed weight keys (the fixed training axes):
 - anaerobic_capacity — repeated high-power bursts, sprint tolerance
 - mixed_modal_conditioning — holding output while switching movements/modalities under fatigue`;
 
-const DRAFT_SYSTEM = `You tag scoreable workouts with a SIGNATURE for a training-analysis system.
+const DRAFT_SYSTEM = `You are an expert strength & conditioning coach tagging scoreable workouts with a SIGNATURE for a training-analysis system. Judge each workout on its own merits with your full coaching knowledge — there is no formula to apply. The definitions below are vocabulary, not procedure.
 
 ${AXES_GLOSSARY}
 
-A signature has THREE weight vectors over those axes (each: integer percents, multiples of 5, SUM EXACTLY 100, omit zero-weight axes):
+Axis boundary notes (definitions, not rules): dumbbell/kettlebell variants of the Olympic lifts are mostly hinge (posterior_chain) plus an overhead receive — full olympic_lifting weight belongs to barbell snatch/clean work where technique at load decides the outcome. squat_cycling covers high-rep squatting only while the load is light enough that endurance, not force, is what fails; judge heaviness for the general field. mixed_modal_conditioning is the transition/interference tax of switching implements under fatigue, not the whole engine of a mixed piece. Loaded and ballistic efforts are glycolytic — anaerobic demand is rarely zero outside pure low-intensity monostructural work.
 
-1. "demand" — what the workout REQUIRES of anyone who does it, cohort-independent. Draft this FIRST from time share (where a mid-pack athlete's minutes actually go) adjusted for what the structure makes matter. Duration is an input to your judgment, never a fixed allocation.
-2. "discrimination" — what decides RANK in the GENERAL OPEN POPULATION (everyone on the leaderboard, NOT elite competitors — mid-pack reality: walls you would call universal stop 20–70% of real fields). Derive it from demand by cohort adjustment: light loads nearly everyone moves fast separate little; high-skill gymnastics and fatigued inverted work separate enormously; pacing separates on long pieces. DEGRADATION DISCRIMINATES: when lacking a capacity does not stop a movement but forces a slower pattern — jump→step-over, unbroken→singles, kip→strict grind — that capacity discriminates even though no wall appears in the distribution (the continuous cousin of a gate: no pile, a steady pace tax on part of the field).
-3. "stimulus" — what adaptation PERFORMING it produces (wall walks under fatigue test inverted capacity without building maximal pressing).
+THE REFERENCE POPULATION is the GENERAL Open field — everyone on the leaderboard, not competitive athletes. Mid-pack reality: skills you might assume universal stop 20–70% of real fields; moderate loads force many athletes into slow singles; degradation to a slower movement pattern (jump→step, unbroken→singles) separates athletes even when nothing stops them outright.
 
-ADJUDICATED MAPPING RULES (founder rulings — follow them over your own instinct):
-- Dumbbell/kettlebell variants of the Olympic lifts carry REDUCED olympic_lifting weight (the overhead receive only, ~5–10, scaled by load); the pull is posterior_chain. Full olympic_lifting weight is reserved for barbell snatch/clean work at loads where positions and technique decide the outcome.
-- Wall balls, light thrusters, lunges, step-ups and pistol volume are squat_cycling, not powerlifting_strength, not midline, and not merely conditioning — name the leg endurance explicitly, then weight the engine axes for the pacing on top.
-- LOAD TRUMPS REPS, JUDGED AGAINST THE GENERAL FIELD: high-rep squatting is squat_cycling only while the load is light enough that leg endurance, not force production, is what fails — and judge "light" against the general Open population, not competitors. Volume at 95/65 is already a meaningful strength test for mid-pack athletes (degradation to slow singles discriminates); wall balls and empty-bar work are cycling; genuinely heavy bars are powerlifting_strength expression regardless of rep count.
-- AEROBIC FOLLOWS DURATION AND CONTINUITY, NEVER MODALITY. Mixed-modal work at sustained pace IS aerobic training in this sport — a machine or run is not required for aerobic weight. Any continuous piece beyond ~10–12 minutes carries real aerobic demand. anaerobic_capacity requires burst-and-recover structure or a short clock. mixed_modal_conditioning is ONLY the transition/interference tax — the cost of switching implements under fatigue — never the whole engine of a mixed piece.
-- Three or more alternating modalities ⇒ mixed_modal_conditioning carries real weight (≥10) unless the rest structure removes the transition cost.
-- DISCRIMINATION IS CONDITIONAL ON SCORING STRUCTURE. Take the time cap and score type as inputs: when the cohort median sits near the cap, roughly half the field is ranked by reps completed where the clock bites — weight discrimination toward what sorts athletes in THAT section, not the whole workout evenly.
-- STRUCTURE SETS THE ENGINE ENVELOPE; MOVEMENTS COMPOSE WITHIN IT. Duration and work:rest put BOUNDS on the engine axes (long continuous ⇒ aerobic floor and an anaerobic ceiling around 15; short clocks and burst-and-recover ⇒ the reverse), set before reading the movement list — but the movements then allocate WITHIN and INTO that envelope, never just out of it. ANAEROBIC FLOOR (founder ruling): every effort moving an external object or jumping is glycolytic — any workout with loaded or ballistic movements carries anaerobic demand of at least 5–10, whatever its duration. Zero anaerobic is reserved for pure low-intensity monostructural work. Loads and skill interruptions may still take weight from the sustained-output share toward strength/skill axes. The envelope is bounds, never a quota.
-- ENGINE DISCRIMINATES ONLY WHERE THE ENGINE SETS THE PACE. Aerobic demand on a long piece is real, but its discrimination survives only if pace is engine-limited (throughput movements: wall balls, erg, burpees). When a movement bottleneck governs cycle speed (wall walks, heavy bars, low-cycle skills), the engine's discrimination share flows to that movement's axis.
-- ANAEROBIC: demand = repeated ballistic/power output (jumping, throwing) or surge structure (burst-and-recover, sprintable segments, short clocks); discrimination additionally requires the power to be LIMITING for the general field — forced jump→step degradation is an anaerobic deficit expressing itself, and it discriminates.
+A signature has THREE weight vectors over the axes (each: integer percents, multiples of 5, SUM EXACTLY 100, omit zero-weight axes):
 
-"gates" — GATE DOCTRINE (founder ruling): a gate is a wall that ONE ACQUISITION unlocks — land your first bar muscle-up and the round opens. Strength is NEVER a gate: no single fix unlocks a heavy bar, so load difficulty lives in the weights and may dominate discrimination instead (a climbing ladder can carry 40+ strength discrimination, zero gates). A cliff is evidence, a gate is a mechanism: only unlock-mechanism walls get the gate label. A gate sequenced behind a stricter gate in the same workout is NOT recorded — the binding wall screens first. A hedge ("may be immovable") is never a gate — "may" means weights. A movement near-universally POSSESSED by the general Open field (wall walks, box jump-overs — possession, not speed) is never a gate; slow performance of it is capacity/degradation and lives in the weights. Format: [{"movement": "...", "kind": "skill", "detail": "what it blocks"}]. Most workouts have NO gates; an empty array is the common, correct answer.
+1. "demand" — what the workout REQUIRES of anyone who does it: where the work and the minutes actually go, cohort-independent.
+2. "discrimination" — what decides RANK in the reference population. Conditional on the scoring structure: the cap, the score type, and where the field actually gets ranked all shape what separates. A quality can be demanded yet decide nothing (everyone has it), or separate strongly through pace degradation with no visible wall.
+3. "stimulus" — what adaptation PERFORMING it produces (a workout can test a quality without building it).
+
+"gates" — a gate is a wall that ONE ACQUISITION unlocks (land your first bar muscle-up and the round opens). Strength is never a gate — no single fix unlocks a heavy bar; load difficulty lives in the weights and may dominate discrimination instead. Only record the binding wall, and only for movements a meaningful share of the general field cannot do at all. Format: [{"movement": "...", "kind": "skill", "detail": "what it blocks"}]. Most workouts have NO gates; an empty array is the common, correct answer.
 
 Also emit:
 - "time_domain": "short" (<8 min) | "medium" (8–15) | "long" (>15), judged from the structure for a mid-pack athlete.
