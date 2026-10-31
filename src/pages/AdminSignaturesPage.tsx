@@ -35,7 +35,7 @@ const FOCUS_LABELS: Record<string, string> = {
   aerobic_capacity: 'Aerobic', anaerobic_capacity: 'Anaerobic',
   mixed_modal_conditioning: 'Mixed-modal',
 };
-const EXPECTED_FUNCTION_VERSION = '2026-10-31.3';
+const EXPECTED_FUNCTION_VERSION = '2026-10-31.5';
 
 type Weights = Record<string, number>;
 interface Gate { movement: string; kind: 'skill' | 'load' | 'capacity'; detail?: string }
