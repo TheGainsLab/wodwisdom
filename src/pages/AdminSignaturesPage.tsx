@@ -12,7 +12,7 @@
  *
  * Approve persists the editorial artifact every downstream consumer reads.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
@@ -125,6 +125,10 @@ export default function AdminSignaturesPage({ session }: { session: Session }) {
   const [baseline, setBaseline] = useState<Baseline | null>(null);
   const [lib, setLib] = useState<MeasuredLib | null>(null);   // measured-layer facts
   const [pasteText, setPasteText] = useState('');
+  const [bulkText, setBulkText] = useState('');
+  const [bulkLog, setBulkLog] = useState<string[]>([]);
+  const [bulkRunning, setBulkRunning] = useState(false);
+  const bulkStop = useRef(false);
   const [gender, setGender] = useState<'men' | 'women'>('men');
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState('');
@@ -167,6 +171,42 @@ export default function AdminSignaturesPage({ session }: { session: Session }) {
       `${out.anthropic_key ? '' : ' · ✗ no API key'}${axesOk ? '' : ' · ✗ focus axes drifted from coach-state'}`,
     );
   });
+
+  /** Bulk load: "### <name>\n<prescription>" blocks → parse → draft (with
+   *  measured facts) → save as DRAFT rows for queue adjudication. Sequential
+   *  on purpose — one failure never kills the run. */
+  const doBulk = async () => {
+    const blocks = bulkText.split(/^###\s+/m).map((b) => b.trim()).filter(Boolean)
+      .map((b) => {
+        const nl = b.indexOf('\n');
+        return nl === -1 ? null : { name: b.slice(0, nl).trim(), text: b.slice(nl + 1).trim() };
+      })
+      .filter((x): x is { name: string; text: string } => !!x && !!x.name && !!x.text);
+    if (blocks.length === 0) { setError('No "### name" blocks found.'); return; }
+    setBulkRunning(true); bulkStop.current = false; setBulkLog([]); setError('');
+    for (const [i, b] of blocks.entries()) {
+      if (bulkStop.current) { setBulkLog((l) => [...l, '⏹ stopped']); break; }
+      try {
+        setBulkLog((l) => [...l, `… ${b.name} (${i + 1}/${blocks.length})`]);
+        const p = await invokeSig({ action: 'parse', text: b.text });
+        const d = await invokeSig({ action: 'draft', workout: p.workout, gender, name: b.name });
+        const sig = d.signature as Record<string, unknown>;
+        await invokeSig({
+          action: 'save', source: 'open', name: b.name, workout: p.workout,
+          demand: sig.demand, discrimination: sig.discrimination, stimulus: sig.stimulus,
+          gates: sig.gates ?? [], time_domain: sig.time_domain ?? null,
+          format: sig.format ?? null, archetype: sig.archetype ?? null,
+          rationale: sig.rationale ?? null, measured: d.measured ?? null,
+          drafted_model: 'sonnet',
+        });
+        setBulkLog((l) => [...l.slice(0, -1), `✓ ${b.name}`]);
+      } catch (e) {
+        setBulkLog((l) => [...l.slice(0, -1), `✗ ${b.name}: ${e instanceof Error ? e.message : e}`]);
+      }
+    }
+    setBulkRunning(false);
+    await refresh();
+  };
 
   const doParse = () => run('parse', async () => {
     const out = await invokeSig({ action: 'parse', text: pasteText });
@@ -287,6 +327,24 @@ export default function AdminSignaturesPage({ session }: { session: Session }) {
               <button disabled={!pasteText.trim() || busy === 'parse'} onClick={doParse} style={{ ...btn, marginTop: 8 }}>
                 {busy === 'parse' ? 'Parsing…' : 'Parse → structured workout'}
               </button>
+
+              <span style={label}>Bulk load — "### name" header per workout, prescription below it</span>
+              <textarea value={bulkText} onChange={(e) => setBulkText(e.target.value)} rows={6}
+                placeholder={'### 21.1\nAMRAP 15:\n1 wall walk\n10 double-unders\n...\n\n### 21.2\nFor time: ...'}
+                style={{ ...field, resize: 'vertical', fontFamily: 'ui-monospace, monospace', fontSize: 12 }} />
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
+                <button disabled={bulkRunning || !bulkText.trim()} onClick={doBulk} style={btn}>
+                  {bulkRunning ? 'Loading…' : 'Bulk load → drafts'}
+                </button>
+                {bulkRunning && (
+                  <button onClick={() => { bulkStop.current = true; }} style={{ ...btn, color: 'var(--accent)' }}>Stop</button>
+                )}
+              </div>
+              {bulkLog.length > 0 && (
+                <div style={{ ...mono, fontSize: 12, margin: '8px 0', maxHeight: 160, overflowY: 'auto', lineHeight: 1.6 }}>
+                  {bulkLog.map((l, i) => <div key={i} style={{ color: l.startsWith('✗') ? 'var(--accent)' : undefined }}>{l}</div>)}
+                </div>
+              )}
 
               <span style={label}>Review queue</span>
               <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
