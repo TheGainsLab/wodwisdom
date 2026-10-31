@@ -53,7 +53,7 @@ import {
 import type { BlockPrescription } from "../_shared/v2-output-schema.ts";
 import type { Gender } from "../_shared/compute-benchmarks.ts";
 
-const FUNCTION_VERSION = "2026-10-31.3";
+const FUNCTION_VERSION = "2026-10-31.4";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -179,7 +179,7 @@ ADJUDICATED MAPPING RULES (founder rulings — follow them over your own instinc
 - AEROBIC FOLLOWS DURATION AND CONTINUITY, NEVER MODALITY. Mixed-modal work at sustained pace IS aerobic training in this sport — a machine or run is not required for aerobic weight. Any continuous piece beyond ~10–12 minutes carries real aerobic demand. anaerobic_capacity requires burst-and-recover structure or a short clock. mixed_modal_conditioning is ONLY the transition/interference tax — the cost of switching implements under fatigue — never the whole engine of a mixed piece.
 - Three or more alternating modalities ⇒ mixed_modal_conditioning carries real weight (≥10) unless the rest structure removes the transition cost.
 - DISCRIMINATION IS CONDITIONAL ON SCORING STRUCTURE. Take the time cap and score type as inputs: when the cohort median sits near the cap, roughly half the field is ranked by reps completed where the clock bites — weight discrimination toward what sorts athletes in THAT section, not the whole workout evenly.
-- ENGINE FIRST, FROM STRUCTURE (drafting order): set the engine axes (aerobic / anaerobic / mixed-modal) from format, duration and work:rest BEFORE reading the movement list; then set the nine movement axes from movements × loads; then let loads and skill interruptions take weight FROM the engine share (output that keeps stopping shrinks sustained-output demand toward strength/skill axes). The engine allocation is a prior, not a quota — a 10-minute 1RM ladder still ends nearly engine-free.
+- STRUCTURE SETS THE ENGINE ENVELOPE; MOVEMENTS COMPOSE WITHIN IT. Duration and work:rest put BOUNDS on the engine axes (long continuous ⇒ aerobic floor and an anaerobic ceiling around 15; short clocks and burst-and-recover ⇒ the reverse), set before reading the movement list — but the movements then allocate WITHIN and INTO that envelope, never just out of it. ANAEROBIC FLOOR (founder ruling): every effort moving an external object or jumping is glycolytic — any workout with loaded or ballistic movements carries anaerobic demand of at least 5–10, whatever its duration. Zero anaerobic is reserved for pure low-intensity monostructural work. Loads and skill interruptions may still take weight from the sustained-output share toward strength/skill axes. The envelope is bounds, never a quota.
 - ENGINE DISCRIMINATES ONLY WHERE THE ENGINE SETS THE PACE. Aerobic demand on a long piece is real, but its discrimination survives only if pace is engine-limited (throughput movements: wall balls, erg, burpees). When a movement bottleneck governs cycle speed (wall walks, heavy bars, low-cycle skills), the engine's discrimination share flows to that movement's axis.
 - ANAEROBIC: demand = repeated ballistic/power output (jumping, throwing) or surge structure (burst-and-recover, sprintable segments, short clocks); discrimination additionally requires the power to be LIMITING for the general field — forced jump→step degradation is an anaerobic deficit expressing itself, and it discriminates.
 
