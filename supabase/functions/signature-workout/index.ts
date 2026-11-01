@@ -53,7 +53,7 @@ import {
 import type { BlockPrescription } from "../_shared/v2-output-schema.ts";
 import type { Gender } from "../_shared/compute-benchmarks.ts";
 
-const FUNCTION_VERSION = "2026-10-31.7";
+const FUNCTION_VERSION = "2026-11-01.1";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -149,12 +149,12 @@ function validateSignature(sig: Partial<SignatureDraft>, requireAll: boolean): s
 // ============================================================
 
 const AXES_GLOSSARY = `The ONLY allowed weight keys (the fixed training axes), with their boundaries — these are definitions of what the words mean:
-- olympic_lifting — barbell snatch / clean & jerk technique at loads where positions and speed under the bar decide. Dumbbell/kettlebell variants are mostly hinge (posterior_chain) plus a small overhead-receive share (~5–10, scaled by load).
+- olympic_lifting — barbell snatch / clean & jerk technique: positions, timing, speed under the bar. OLY DEMAND FOLLOWS THE MOVEMENT FAMILY: any barbell snatch or clean variant carries a nonzero olympic_lifting DEMAND at any load — a power clean asks for the pull-and-catch whatever the bar weighs (a gym programming 145-lb power cleans weekly does NOT do 0% Olympic lifting). Whether technique DECIDES RANK is a separate, discrimination-side question — oly discrimination may be low when the field cycles the load on strength. Only dumbbell/kettlebell variants are reduced to a small overhead-receive residual (~5–10, scaled by load), with their pull in posterior_chain.
 - powerlifting_strength — maximal force: heavy squat/press/deadlift, and any loaded work heavy enough that force production, not endurance, is what fails for the general field.
 - posterior_chain — hinge pattern: deadlifts, swings, hip extension, incl. endurance at submax load; the pull of DB/KB ballistics lives here.
 - upper_body_pressing — horizontal/overhead barbell+DB pressing strength.
-- gymnastics_pulling — pull-ups, chest-to-bar, muscle-ups, toes-to-bar, rope climbs.
-- gymnastics_pressing — HSPU, dips, wall walks, handstand holds (inverted work).
+- gymnastics_pulling — pull-ups, chest-to-bar, muscle-ups, toes-to-bar, rope climbs. MUSCLE-UP DECOMPOSITION: a ring muscle-up is a pull AND a press — count roughly two-thirds here, one-third gymnastics_pressing, a small skill_coordination share for the transition. A bar muscle-up is mostly pull and hip drive — count it here with a skill share for the turnover, no pressing unless the standard demands a locked-out dip. Under fatigue the ring version fails at the dip and the bar version at the turnover: put discrimination where the cohort's failure actually sits.
+- gymnastics_pressing — HSPU, dips, wall walks, handstand holds (inverted work); the dip third of ring muscle-ups.
 - midline — trunk under load/fatigue: GHD, L-sits, heavy carries.
 - skill_coordination — double-unders, handstand walk, rhythm and precision skills.
 - squat_cycling — high-rep squat capacity under fatigue: wall balls, lunges, step-ups, pistol volume, and squatting at loads the mid-pack athlete cycles unbroken ("light" means exactly that). Leg endurance, not force.
@@ -214,7 +214,7 @@ Shape:
   }]
 }
 
-Rules: movements in performed order. Every movement needs at least one volume field. Use the men's RX load when two are given ("50/35" → 50). Do arithmetic for schemes ("5 rounds: 12 snatches" → rep_scheme [12,12,12,12,12]). Default block_type "metcon" for scored mixed work. Never use the word "CrossFit" in output.`;
+Rules: movements in performed order. Every movement needs at least one volume field. Use the men's RX load when two are given ("50/35" → 50, "♀ 85 lb / ♂ 135 lb" → 135). VARYING LOADS SPLIT THE MOVEMENT: when the same movement appears at different loads across a ladder or sections, emit ONE ENTRY PER LOAD with its own reps (15 squat cleans at 135, then 13 at 185 → two entries) — never a single collapsed entry with the load dropped; the loads are the workout's defining feature. Do arithmetic for schemes ("5 rounds: 12 snatches" → rep_scheme [12,12,12,12,12]). Default block_type "metcon" for scored mixed work. Never use the word "CrossFit" in output.`;
 
 // ============================================================
 // Model call helpers
@@ -564,6 +564,24 @@ Deno.serve(async (req) => {
       }
       if (!fields.name || !fields.workout || !fields.demand) {
         return json({ error: "MISSING_FIELDS (name, workout, demand required)" }, 400);
+      }
+      // A nameless save re-run (bulk re-paste after a parse fix) overwrites an
+      // existing DRAFT of the same name — never an approved/rejected row, which
+      // is ratified editorial work.
+      const { data: existing } = await supa
+        .from("workout_signatures").select("id, status")
+        .eq("source", fields.source ?? "adhoc").ilike("name", fields.name as string)
+        .maybeSingle();
+      if (existing) {
+        if (existing.status !== "draft") {
+          return json({ error: `"${fields.name}" is already ${existing.status} — not overwritten` }, 409);
+        }
+        const { data, error } = await supa
+          .from("workout_signatures")
+          .update({ ...fields, provenance: DEFAULT_PROVENANCE, updated_at: new Date().toISOString() })
+          .eq("id", existing.id).select().single();
+        if (error) return json({ error: error.message }, 500);
+        return json({ row: data });
       }
       const { data, error } = await supa
         .from("workout_signatures")
