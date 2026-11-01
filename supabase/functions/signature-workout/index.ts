@@ -214,7 +214,7 @@ Shape:
   }]
 }
 
-Rules: movements in performed order. Every movement needs at least one volume field. Use the men's RX load when two are given ("50/35" → 50). Do arithmetic for schemes ("5 rounds: 12 snatches" → rep_scheme [12,12,12,12,12]). Default block_type "metcon" for scored mixed work. Never use the word "CrossFit" in output.`;
+Rules: movements in performed order. Every movement needs at least one volume field. Use the men's RX load when two are given ("50/35" → 50, "♀ 85 lb / ♂ 135 lb" → 135). VARYING LOADS SPLIT THE MOVEMENT: when the same movement appears at different loads across a ladder or sections, emit ONE ENTRY PER LOAD with its own reps (15 squat cleans at 135, then 13 at 185 → two entries) — never a single collapsed entry with the load dropped; the loads are the workout's defining feature. Do arithmetic for schemes ("5 rounds: 12 snatches" → rep_scheme [12,12,12,12,12]). Default block_type "metcon" for scored mixed work. Never use the word "CrossFit" in output.`;
 
 // ============================================================
 // Model call helpers
