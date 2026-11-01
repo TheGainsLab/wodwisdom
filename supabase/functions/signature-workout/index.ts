@@ -565,6 +565,24 @@ Deno.serve(async (req) => {
       if (!fields.name || !fields.workout || !fields.demand) {
         return json({ error: "MISSING_FIELDS (name, workout, demand required)" }, 400);
       }
+      // A nameless save re-run (bulk re-paste after a parse fix) overwrites an
+      // existing DRAFT of the same name — never an approved/rejected row, which
+      // is ratified editorial work.
+      const { data: existing } = await supa
+        .from("workout_signatures").select("id, status")
+        .eq("source", fields.source ?? "adhoc").ilike("name", fields.name as string)
+        .maybeSingle();
+      if (existing) {
+        if (existing.status !== "draft") {
+          return json({ error: `"${fields.name}" is already ${existing.status} — not overwritten` }, 409);
+        }
+        const { data, error } = await supa
+          .from("workout_signatures")
+          .update({ ...fields, provenance: DEFAULT_PROVENANCE, updated_at: new Date().toISOString() })
+          .eq("id", existing.id).select().single();
+        if (error) return json({ error: error.message }, 500);
+        return json({ row: data });
+      }
       const { data, error } = await supa
         .from("workout_signatures")
         .insert({ ...fields, status: "draft", provenance: DEFAULT_PROVENANCE })
