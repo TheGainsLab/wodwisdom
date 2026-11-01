@@ -53,7 +53,7 @@ import {
 import type { BlockPrescription } from "../_shared/v2-output-schema.ts";
 import type { Gender } from "../_shared/compute-benchmarks.ts";
 
-const FUNCTION_VERSION = "2026-10-31.7";
+const FUNCTION_VERSION = "2026-11-01.1";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -149,7 +149,7 @@ function validateSignature(sig: Partial<SignatureDraft>, requireAll: boolean): s
 // ============================================================
 
 const AXES_GLOSSARY = `The ONLY allowed weight keys (the fixed training axes), with their boundaries — these are definitions of what the words mean:
-- olympic_lifting — barbell snatch / clean & jerk technique at loads where positions and speed under the bar decide. Dumbbell/kettlebell variants are mostly hinge (posterior_chain) plus a small overhead-receive share (~5–10, scaled by load).
+- olympic_lifting — barbell snatch / clean & jerk technique: positions, timing, speed under the bar. OLY DEMAND FOLLOWS THE MOVEMENT FAMILY: any barbell snatch or clean variant carries a nonzero olympic_lifting DEMAND at any load — a power clean asks for the pull-and-catch whatever the bar weighs (a gym programming 145-lb power cleans weekly does NOT do 0% Olympic lifting). Whether technique DECIDES RANK is a separate, discrimination-side question — oly discrimination may be low when the field cycles the load on strength. Only dumbbell/kettlebell variants are reduced to a small overhead-receive residual (~5–10, scaled by load), with their pull in posterior_chain.
 - powerlifting_strength — maximal force: heavy squat/press/deadlift, and any loaded work heavy enough that force production, not endurance, is what fails for the general field.
 - posterior_chain — hinge pattern: deadlifts, swings, hip extension, incl. endurance at submax load; the pull of DB/KB ballistics lives here.
 - upper_body_pressing — horizontal/overhead barbell+DB pressing strength.
