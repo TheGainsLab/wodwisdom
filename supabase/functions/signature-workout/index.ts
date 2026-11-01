@@ -153,8 +153,8 @@ const AXES_GLOSSARY = `The ONLY allowed weight keys (the fixed training axes), w
 - powerlifting_strength — maximal force: heavy squat/press/deadlift, and any loaded work heavy enough that force production, not endurance, is what fails for the general field.
 - posterior_chain — hinge pattern: deadlifts, swings, hip extension, incl. endurance at submax load; the pull of DB/KB ballistics lives here.
 - upper_body_pressing — horizontal/overhead barbell+DB pressing strength.
-- gymnastics_pulling — pull-ups, chest-to-bar, muscle-ups, toes-to-bar, rope climbs.
-- gymnastics_pressing — HSPU, dips, wall walks, handstand holds (inverted work).
+- gymnastics_pulling — pull-ups, chest-to-bar, muscle-ups, toes-to-bar, rope climbs. MUSCLE-UP DECOMPOSITION: a ring muscle-up is a pull AND a press — count roughly two-thirds here, one-third gymnastics_pressing, a small skill_coordination share for the transition. A bar muscle-up is mostly pull and hip drive — count it here with a skill share for the turnover, no pressing unless the standard demands a locked-out dip. Under fatigue the ring version fails at the dip and the bar version at the turnover: put discrimination where the cohort's failure actually sits.
+- gymnastics_pressing — HSPU, dips, wall walks, handstand holds (inverted work); the dip third of ring muscle-ups.
 - midline — trunk under load/fatigue: GHD, L-sits, heavy carries.
 - skill_coordination — double-unders, handstand walk, rhythm and precision skills.
 - squat_cycling — high-rep squat capacity under fatigue: wall balls, lunges, step-ups, pistol volume, and squatting at loads the mid-pack athlete cycles unbroken ("light" means exactly that). Leg endurance, not force.
