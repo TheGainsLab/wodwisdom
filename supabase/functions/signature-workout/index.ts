@@ -441,8 +441,13 @@ async function hashWorkout(workout: unknown): Promise<string> {
 async function evidenceHashesFor(
   workout: BlockPrescription,
   sourceText?: string,
+  openName?: string,
 ): Promise<string[]> {
   const hashes: string[] = [];
+  // Open signatures also claim the deterministic name key, so Open-history
+  // ingestion rows written before (or without) a structure hash stay
+  // claimable (review item 2, 2026-11-02).
+  if (openName?.trim()) hashes.push(`open_name_${openName.trim().toLowerCase()}`);
   try {
     const movements = (workout.movements ?? []).map((m) => ({
       movement: m.movement ?? "",
@@ -602,17 +607,27 @@ Deno.serve(async (req) => {
       const fields = pickRowFields(body);
       const sigErrors = validateSignature(fields as Partial<SignatureDraft>, false);
       if (sigErrors.length > 0) return json({ error: sigErrors.join("; ") }, 422);
+      const id = typeof body.id === "string" ? body.id : null;
+      let existingRow: { workout_hash: string | null; provenance: unknown; source: string; name: string } | null = null;
+      if (id) {
+        const { data } = await supa
+          .from("workout_signatures")
+          .select("workout_hash, provenance, source, name")
+          .eq("id", id).maybeSingle();
+        existingRow = data as typeof existingRow;
+      }
       if (fields.workout) {
         fields.workout_hash = await hashWorkout(fields.workout);
+        const source = (fields.source ?? existingRow?.source) as string | undefined;
+        const name = (fields.name ?? existingRow?.name) as string | undefined;
         fields.evidence_hashes = await evidenceHashesFor(
           fields.workout as BlockPrescription,
           typeof body.source_text === "string" ? body.source_text : undefined,
+          source === "open" ? name : undefined,
         );
       }
-      const id = typeof body.id === "string" ? body.id : null;
       if (id) {
-        const { data: existing } = await supa
-          .from("workout_signatures").select("workout_hash, provenance").eq("id", id).maybeSingle();
+        const existing = existingRow;
         if (!existing) return json({ error: "NOT_FOUND" }, 404);
         const hashChanged = !!fields.workout_hash && !!existing.workout_hash &&
           fields.workout_hash !== existing.workout_hash;
@@ -678,6 +693,13 @@ Deno.serve(async (req) => {
         if (sigErrors.length > 0) return json({ error: sigErrors.join("; ") }, 422);
         if (fields.workout) {
           fields.workout_hash = await hashWorkout(fields.workout);
+          const src = (fields.source ?? existing.source) as string | undefined;
+          const nm = (fields.name ?? existing.name) as string | undefined;
+          fields.evidence_hashes = await evidenceHashesFor(
+            fields.workout as BlockPrescription,
+            typeof body.source_text === "string" ? body.source_text : undefined,
+            src === "open" ? nm : undefined,
+          );
           fields.provenance = staleMarkProvenance(
             (existing.provenance ?? DEFAULT_PROVENANCE) as Record<string, { kind?: string }>,
             !!existing.workout_hash && fields.workout_hash !== existing.workout_hash,

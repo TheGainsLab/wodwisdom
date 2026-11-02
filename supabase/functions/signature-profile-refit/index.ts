@@ -62,6 +62,8 @@ interface LedgerRow {
 async function loadEvidence(
   supa: SupabaseClient,
   userId: string,
+  params_draft_inflation: number | undefined,
+  DEFAULT_NOISE_VAR: number,
 ): Promise<{ observations: EvidenceObservation[]; skipped: number; sourceMix: Record<string, number> }> {
   const { data: rows, error } = await supa
     .from("signature_evidence")
@@ -73,7 +75,7 @@ async function loadEvidence(
 
   const ledger = (rows ?? []) as LedgerRow[];
   const sigIds = [...new Set(ledger.map((r) => r.workout_signature_id).filter(Boolean))] as string[];
-  const discById = new Map<string, Record<string, number>>();
+  const discById = new Map<string, { disc: Record<string, number>; approved: boolean }>();
   if (sigIds.length > 0) {
     const { data: sigs, error: sigErr } = await supa
       .from("workout_signatures")
@@ -82,9 +84,9 @@ async function loadEvidence(
     if (sigErr) throw new Error(`signatures read failed: ${sigErr.message}`);
     for (const s of sigs ?? []) {
       const row = s as { id: string; discrimination: Record<string, number> | null; status: string };
-      // drafts are usable evidence but only approved rows at full weight is a
-      // judge-hardening concern; v1: any signature with a discrimination vector
-      if (row.discrimination) discById.set(row.id, row.discrimination);
+      if (row.discrimination) {
+        discById.set(row.id, { disc: row.discrimination, approved: row.status === "approved" });
+      }
     }
   }
 
@@ -93,8 +95,8 @@ async function loadEvidence(
   const sourceMix: Record<string, number> = {};
   let skipped = 0;
   for (const r of ledger) {
-    const disc = r.workout_signature_id ? discById.get(r.workout_signature_id) : undefined;
-    if (!disc || r.percentile === null) {
+    const sig = r.workout_signature_id ? discById.get(r.workout_signature_id) : undefined;
+    if (!sig || r.percentile === null) {
       skipped++;
       continue;
     }
@@ -102,11 +104,23 @@ async function loadEvidence(
       0,
       Math.floor((now - new Date(r.performed_at).getTime()) / (365.25 * 24 * 3600 * 1000)),
     );
+    // Per-row noise: structure-scored rows (logged_solo) arrive pre-widened
+    // from ingest (log-workout writes the deliberate obs_noise_var=400
+    // placeholder, sd ~20, until scorescale_acceptance measures the real
+    // error); leaderboard-grade rows carry null and get the params default.
+    // On top of that, a DRAFT signature's weighting is an unreviewed
+    // instrument (judge-hardening rule): inflate its rows' noise so drafts
+    // inform but cannot dominate a profile.
+    const draftInflation = (params_draft_inflation ?? 3.0);
+    const baseNoise = r.obs_noise_var !== null ? Number(r.obs_noise_var) : undefined;
+    const obsNoiseVar = sig.approved
+      ? baseNoise
+      : (baseNoise ?? DEFAULT_NOISE_VAR) * draftInflation;
     observations.push({
       percentile: Number(r.percentile),
-      discrimination: disc,
+      discrimination: sig.disc,
       yearsAgo,
-      obsNoiseVar: r.obs_noise_var !== null ? Number(r.obs_noise_var) : undefined,
+      obsNoiseVar,
     });
     sourceMix[r.source] = (sourceMix[r.source] ?? 0) + 1;
   }
@@ -138,17 +152,23 @@ async function ingestOpenHistory(
   const results = (bundle?.all_results ?? []) as Tier4AllResultsEntry[];
   if (results.length === 0) return { upserted: 0, skipped: 0 };
 
-  // Library signatures by lowercased name ('open' source only).
+  // Library signatures: join by competition_workout_id when the signature
+  // carries it (exact), name as fallback (naming drift risk, hence second).
   const { data: sigs } = await supa
     .from("workout_signatures")
-    .select("id, name, evidence_hashes")
+    .select("id, name, competition_workout_id, evidence_hashes")
     .eq("source", "open");
+  type SigRow = { id: string; name: string; competition_workout_id: string | null; evidence_hashes: string[] | null };
+  const keyOf = (s: SigRow) => ({
+    id: s.id,
+    hash: s.evidence_hashes?.find((h) => h.startsWith("open_name_")) ??
+      s.evidence_hashes?.[0] ?? `open_name_${s.name.toLowerCase()}`,
+  });
+  const sigByCompId = new Map<string, { id: string; hash: string }>();
   const sigByName = new Map<string, { id: string; hash: string }>();
-  for (const s of (sigs ?? []) as Array<{ id: string; name: string; evidence_hashes: string[] | null }>) {
-    sigByName.set(s.name.toLowerCase(), {
-      id: s.id,
-      hash: s.evidence_hashes?.[0] ?? `open_name_${s.name.toLowerCase()}`,
-    });
+  for (const s of (sigs ?? []) as SigRow[]) {
+    if (s.competition_workout_id) sigByCompId.set(s.competition_workout_id, keyOf(s));
+    sigByName.set(s.name.toLowerCase(), keyOf(s));
   }
 
   const rows: Record<string, unknown>[] = [];
@@ -160,16 +180,24 @@ async function ingestOpenHistory(
       skipped++;
       continue;
     }
+    // Scale check (review item 3, 2026-11-02): worldwide_percentile is
+    // computed within workout_id, and competition workout_ids are
+    // division-specific (one id per gender/division/year) — verified during
+    // the research phase: the 222k-score extraction joined on these ids and
+    // produced within-gender scales (mean ~48 per gender; gate-wall
+    // percentiles differ by gender on the same workout, impossible under a
+    // pooled scale). With scaled_tier filtered to 'rx' above, this matches
+    // the open_rx_general cohort the model params were fitted on.
     const pct = r.result.worldwide_percentile;
     if (typeof pct !== "number" || !Number.isFinite(pct)) {
       skipped++;
       continue;
     }
-    const sig = sigByName.get(r.workout_name.toLowerCase());
-    rows.push({
+    const sig = sigByCompId.get(r.competition_workout_id) ??
+      sigByName.get(r.workout_name.toLowerCase());
+    const row: Record<string, unknown> = {
       user_id: userId,
       workout_hash: sig?.hash ?? `open_name_${r.workout_name.toLowerCase()}`,
-      workout_signature_id: sig?.id ?? null,
       score_raw: {
         raw_score: r.result.raw_score,
         raw_score_text: r.result.raw_score_text,
@@ -184,13 +212,24 @@ async function ingestOpenHistory(
       // The Open runs Feb-Mar; month precision is all the aging curve needs.
       performed_at: `${r.year}-03-01`,
       source_ref: `open:${r.competition_workout_id}`,
-    });
+    };
+    // Only set the signature link when resolved: an unresolved re-ingest
+    // must never null out a link the retroactive claim pass established.
+    if (sig) row.workout_signature_id = sig.id;
+    rows.push(row);
   }
   if (rows.length === 0) return { upserted: 0, skipped };
-  const { error } = await supa
-    .from("signature_evidence")
-    .upsert(rows, { onConflict: "user_id,source_ref" });
-  if (error) return { error: error.message };
+  // Two batches with homogeneous keys: PostgREST applies the union of
+  // payload columns, so a mixed batch would write nulls into the linked rows.
+  const withSig = rows.filter((r) => "workout_signature_id" in r);
+  const withoutSig = rows.filter((r) => !("workout_signature_id" in r));
+  for (const batch of [withSig, withoutSig]) {
+    if (batch.length === 0) continue;
+    const { error } = await supa
+      .from("signature_evidence")
+      .upsert(batch, { onConflict: "user_id,source_ref" });
+    if (error) return { error: error.message };
+  }
   return { upserted: rows.length, skipped };
 }
 
@@ -243,7 +282,12 @@ Deno.serve(async (req) => {
     }
 
     // ── Evidence → fit ───────────────────────────────────────────────────
-    const { observations, skipped, sourceMix } = await loadEvidence(supa, targetUserId);
+    const { observations, skipped, sourceMix } = await loadEvidence(
+      supa,
+      targetUserId,
+      (params as SignatureModelParams & { draft_noise_inflation?: number }).draft_noise_inflation,
+      params.noise_var_pct,
+    );
     const profile = fitProfile(observations, params);
 
     const limiterTop2 = profile.limiterRanked.slice(0, 2).map((axis) => ({
@@ -270,6 +314,23 @@ Deno.serve(async (req) => {
         .from("athlete_capability_vectors")
         .upsert(vectorRows, { onConflict: "user_id,axis" });
       if (upsertErr) return json({ error: "PERSIST_FAILED", detail: upsertErr.message }, 500);
+      // The profile header: level + full ranked limiter posterior, so the
+      // dial display reads storage, never a live refit.
+      const { error: headerErr } = await supa
+        .from("athlete_signature_profiles")
+        .upsert({
+          user_id: targetUserId,
+          level_mean: profile.level.mean,
+          level_sd: profile.level.sd,
+          limiter: profile.limiterRanked.map((axis) => ({
+            axis,
+            p: profile.limiterPosterior[axis],
+          })),
+          n_evidence: observations.length,
+          model_params_key: paramsKey,
+          fitted_at: fittedAt,
+        }, { onConflict: "user_id" });
+      if (headerErr) return json({ error: "PERSIST_FAILED", detail: headerErr.message }, 500);
       persisted = true;
     }
 
