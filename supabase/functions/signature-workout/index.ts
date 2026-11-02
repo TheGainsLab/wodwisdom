@@ -56,6 +56,10 @@ import {
   OPEN_OBSERVED_MEDIANS,
   type ObservedMedianRow,
 } from "../_shared/fixtures/open-observed-medians.ts";
+import {
+  hashWorkoutStructure,
+  hashWorkoutText,
+} from "../_shared/signature-hash.ts";
 
 const FUNCTION_VERSION = "2026-11-02.1";
 
@@ -431,6 +435,57 @@ async function hashWorkout(workout: unknown): Promise<string> {
   return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+/** The lenient join keys this signature claims in the wsh1_ address space
+ *  (identity stays strict via workout_hash; JOINING is lenient by design).
+ *  Structure hash always; text hash too when the admin pasted source text. */
+async function evidenceHashesFor(
+  workout: BlockPrescription,
+  sourceText?: string,
+): Promise<string[]> {
+  const hashes: string[] = [];
+  try {
+    const movements = (workout.movements ?? []).map((m) => ({
+      movement: m.movement ?? "",
+      reps: (m as { rep_scheme?: number[] }).rep_scheme ?? m.reps ?? null,
+      load: m.weight != null ? `${m.weight}${m.weight_unit ?? "lbs"}` : null,
+    }));
+    hashes.push(await hashWorkoutStructure({
+      block_scheme: workout.block_scheme ?? null,
+      time_cap_seconds: workout.time_cap_seconds ?? null,
+      movements,
+    }));
+  } catch (_) { /* a structure the hasher can't read claims nothing */ }
+  if (sourceText?.trim()) {
+    hashes.push(await hashWorkoutText(
+      sourceText,
+      workout.block_scheme ?? null,
+      workout.time_cap_seconds ?? null,
+    ));
+  }
+  return hashes;
+}
+
+/** Retroactive join: point waiting unsigned ledger rows at this signature.
+ *  Best-effort — a failed claim never fails the save. */
+async function claimEvidence(
+  supa: ReturnType<typeof createClient>,
+  signatureId: string,
+  hashes: string[],
+): Promise<number> {
+  if (hashes.length === 0) return 0;
+  const { data, error } = await supa
+    .from("signature_evidence")
+    .update({ workout_signature_id: signatureId })
+    .in("workout_hash", hashes)
+    .is("workout_signature_id", null)
+    .select("id");
+  if (error) {
+    console.warn("[signature-workout] evidence claim failed:", error.message);
+    return 0;
+  }
+  return (data ?? []).length;
+}
+
 /** Stale-mark any empirical vector when the workout structure changed —
  *  a regression fitted on one structure must not describe another. */
 function staleMarkProvenance(
@@ -547,7 +602,13 @@ Deno.serve(async (req) => {
       const fields = pickRowFields(body);
       const sigErrors = validateSignature(fields as Partial<SignatureDraft>, false);
       if (sigErrors.length > 0) return json({ error: sigErrors.join("; ") }, 422);
-      if (fields.workout) fields.workout_hash = await hashWorkout(fields.workout);
+      if (fields.workout) {
+        fields.workout_hash = await hashWorkout(fields.workout);
+        fields.evidence_hashes = await evidenceHashesFor(
+          fields.workout as BlockPrescription,
+          typeof body.source_text === "string" ? body.source_text : undefined,
+        );
+      }
       const id = typeof body.id === "string" ? body.id : null;
       if (id) {
         const { data: existing } = await supa
@@ -564,7 +625,8 @@ Deno.serve(async (req) => {
           .update({ ...fields, updated_at: new Date().toISOString() })
           .eq("id", id).select().single();
         if (error) return json({ error: error.message }, 500);
-        return json({ row: data });
+        const claimed = await claimEvidence(supa, data.id, (data.evidence_hashes ?? []) as string[]);
+        return json({ row: data, evidence_claimed: claimed });
       }
       if (!fields.name || !fields.workout || !fields.demand) {
         return json({ error: "MISSING_FIELDS (name, workout, demand required)" }, 400);
@@ -585,14 +647,16 @@ Deno.serve(async (req) => {
           .update({ ...fields, provenance: DEFAULT_PROVENANCE, updated_at: new Date().toISOString() })
           .eq("id", existing.id).select().single();
         if (error) return json({ error: error.message }, 500);
-        return json({ row: data });
+        const claimed = await claimEvidence(supa, data.id, (data.evidence_hashes ?? []) as string[]);
+        return json({ row: data, evidence_claimed: claimed });
       }
       const { data, error } = await supa
         .from("workout_signatures")
         .insert({ ...fields, status: "draft", provenance: DEFAULT_PROVENANCE })
         .select().single();
       if (error) return json({ error: error.message }, 500);
-      return json({ row: data });
+      const claimed = await claimEvidence(supa, data.id, (data.evidence_hashes ?? []) as string[]);
+      return json({ row: data, evidence_claimed: claimed });
     }
 
     if (action === "approve" || action === "reject") {
@@ -624,7 +688,10 @@ Deno.serve(async (req) => {
       const { data, error } = await supa
         .from("workout_signatures").update(update).eq("id", id).select().single();
       if (error) return json({ error: error.message }, 500);
-      return json({ row: data });
+      const claimed = action === "approve"
+        ? await claimEvidence(supa, data.id, (data.evidence_hashes ?? []) as string[])
+        : 0;
+      return json({ row: data, evidence_claimed: claimed });
     }
 
     if (action === "scorescale_acceptance") {

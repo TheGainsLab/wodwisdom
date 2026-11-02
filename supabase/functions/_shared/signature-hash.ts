@@ -65,6 +65,9 @@ export interface HashableMovement {
   reps?: number | number[] | null;
   load_lbs_men?: number | null;
   load_lbs_women?: number | null;
+  /** generic single-load form ("95lbs", "50lb db") for structures that
+   *  carry one prescribed weight rather than gendered pairs */
+  load?: string | null;
   distance?: string | null;
 }
 
@@ -88,6 +91,7 @@ export async function hashWorkoutStructure(s: HashableStructure): Promise<string
         reps,
         m.load_lbs_men != null ? String(m.load_lbs_men) : "",
         m.load_lbs_women != null ? String(m.load_lbs_women) : "",
+        m.load ? normalizeWorkoutText(m.load) : "",
         m.distance ? normalizeWorkoutText(m.distance) : "",
       ].join("~"),
     );

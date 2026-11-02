@@ -169,3 +169,14 @@ alter table public.signature_evidence
 -- distinct under a unique index).
 create unique index if not exists signature_evidence_user_source_ref_key
   on public.signature_evidence (user_id, source_ref);
+
+-- evidence_hashes: the lenient join keys (wsh1_ address space) this
+-- signature claims — structure hash always, plus the text hash when the
+-- signature was created from pasted text. Distinct from workout_hash
+-- (the strict canonical-JSON identity that governs provenance staleness):
+-- identity is strict, joining is lenient, by design.
+alter table public.workout_signatures
+  add column if not exists evidence_hashes text[] not null default '{}';
+
+create index if not exists workout_signatures_evidence_hashes_idx
+  on public.workout_signatures using gin (evidence_hashes);
