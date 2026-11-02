@@ -41,9 +41,31 @@ export function normalizeWorkoutText(text: string): string {
   return text
     .toLowerCase()
     .replace(/[“”"'`]/g, "")
+    // unit tokens: #, lb, lbs, pound(s) -> lb; kg, kgs, kilo(s) -> kg —
+    // "95#", "95 lb", "95lbs" must land on one spelling or the
+    // class-leaderboard collision works 70% of the time instead of 95%
+    .replace(/(\d)\s*#/g, "$1lb")
+    .replace(/\b(lbs|lb|pounds?)\b/g, "lb")
+    .replace(/\b(kgs|kg|kilos?)\b/g, "kg")
     .replace(/[^\p{L}\p{N}:@./-]+/gu, " ")
+    // join a number to its unit: "95 lb" == "95lb"
+    .replace(/(\d)\s+(lb|kg)\b/g, "$1$2")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+/** Collapse free-text scheme descriptions onto a small enum before
+ *  hashing — "AMRAP", "amrap 12", "AMRAP 12 min" are one scheme (the
+ *  duration already rides the cap field), and parser drift must not
+ *  defeat the class-leaderboard collision. */
+export function canonicalScheme(scheme: string | null | undefined): string {
+  const t = (scheme ?? "").toLowerCase();
+  if (/\bamrap\b/.test(t)) return "amrap";
+  if (/\bemom\b|every\s+\d+\s*min/.test(t)) return "emom";
+  if (/interval/.test(t)) return "intervals";
+  if (/ladder|ascending|descending/.test(t)) return "ladder";
+  if (/for\s*time|\brft\b|rounds\s+for\s+time/.test(t)) return "for_time";
+  return t ? "other" : "";
 }
 
 export async function hashWorkoutText(
@@ -54,7 +76,7 @@ export async function hashWorkoutText(
   const canonical = [
     "text",
     normalizeWorkoutText(text),
-    normalizeWorkoutText(scheme ?? ""),
+    canonicalScheme(scheme),
     capSeconds && capSeconds > 0 ? String(capSeconds) : "",
   ].join("|");
   return PREFIX + (await sha256Hex(canonical)).slice(0, 32);
@@ -80,7 +102,7 @@ export interface HashableStructure {
 export async function hashWorkoutStructure(s: HashableStructure): Promise<string> {
   const parts: string[] = [
     "struct",
-    normalizeWorkoutText(s.block_scheme ?? ""),
+    canonicalScheme(s.block_scheme),
     s.time_cap_seconds && s.time_cap_seconds > 0 ? String(s.time_cap_seconds) : "",
   ];
   for (const m of s.movements) {

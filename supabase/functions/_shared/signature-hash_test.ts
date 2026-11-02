@@ -84,3 +84,25 @@ Deno.test("loads and reps survive normalization: RX and scaled never collide", a
   const rx2 = await hashWorkoutText("21-15-9:  Thrusters  (95/65) +  Pull-ups!", "FOR_TIME", 600);
   assertEquals(rx, rx2);
 });
+
+Deno.test("unit tokens collapse: #, lb, lbs, pounds are one spelling", async () => {
+  const a = await hashWorkoutText("5 rounds: 12 deadlifts 185#, 15 box jumps", "for_time", null);
+  const b = await hashWorkoutText("5 rounds: 12 deadlifts 185 lbs, 15 box jumps", "for_time", null);
+  const c = await hashWorkoutText("5 rounds: 12 deadlifts 185lb, 15 box jumps", "for_time", null);
+  assertEquals(a, b);
+  assertEquals(b, c);
+  // but a different load never collides
+  const d = await hashWorkoutText("5 rounds: 12 deadlifts 225 lbs, 15 box jumps", "for_time", null);
+  assertNotEquals(a, d);
+});
+
+Deno.test("scheme drift collapses to the enum; rx flag never enters the hash", async () => {
+  const a = await hashWorkoutText("10 thrusters, 10 pull-ups", "AMRAP", 720);
+  const b = await hashWorkoutText("10 thrusters, 10 pull-ups", "amrap 12 min", 720);
+  assertEquals(a, b);
+  // hash is structural by decision (review 2026-11-02 item 1): the SAME
+  // whiteboard text hashes identically whether performed RX or scaled —
+  // cohort handling lives on the percentile, not the identity.
+  const sameTextAgain = await hashWorkoutText("10 thrusters, 10 pull-ups", "amrap", 720);
+  assertEquals(a, sameTextAgain);
+});

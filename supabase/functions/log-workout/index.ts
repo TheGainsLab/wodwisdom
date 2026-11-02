@@ -419,7 +419,16 @@ Deno.serve(async (req) => {
             time_cap_seconds: b.time_cap_seconds ?? null,
             rx: b.rx ?? null,
           },
-          percentile: !b.capped && b.percentile != null && b.percentile >= 1 && b.percentile <= 99
+          // Percentile enters the fit ONLY for RX performances: the client
+          // computes it against RX cohort anchors, and the model params are
+          // fitted on the RX general field — a scaled score on the RX scale
+          // is the same cohort mismatch Open ingestion filters out. Scaled
+          // (and unknown-rx) rows keep their hash and score_raw; their
+          // percentile joins when scaled cohorts exist. A capped result is
+          // interval information ("below the cap's percentile") — the
+          // interval-censored observation lands with the gate-aware model.
+          percentile: b.rx === true && !b.capped && b.percentile != null &&
+              b.percentile >= 1 && b.percentile <= 99
             ? b.percentile
             : null,
           // Structure-derived percentile → provisional noise sd ≈ 20
@@ -431,6 +440,15 @@ Deno.serve(async (req) => {
           source_ref: `log:${log.id}:${bi}`,
         });
       }
+      // Replace, don't merge: a re-log with fewer or reordered blocks must
+      // not leave stale log:<id>:<bi> rows behind (the same-id destructive
+      // rewrite keeps source_refs aligned only for surviving positions).
+      const { error: delErr } = await supa
+        .from("signature_evidence")
+        .delete()
+        .eq("user_id", user.id)
+        .like("source_ref", `log:${log.id}:%`);
+      if (delErr) console.warn("log-workout evidence cleanup failed:", delErr.message);
       if (evidenceRows.length > 0) {
         const { error: evErr } = await supa
           .from("signature_evidence")

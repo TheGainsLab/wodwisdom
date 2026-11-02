@@ -158,7 +158,7 @@ insert into public.signature_model_params (key, params, notes) values (
 on conflict (key) do nothing;
 
 -- source_ref: stable identity of the observation's origin
--- ('log:<log_id>:<sort_order>', 'open:<year>:<workout>', 'benchmark:<id>')
+-- ('log:<log_id>:<sort_order>', 'open:<competition_workout_id>', 'benchmark:<id>')
 -- so destructive re-logging (log-workout wipes and re-inserts blocks) and
 -- backfills stay idempotent: ingest paths upsert on (user_id, source_ref).
 alter table public.signature_evidence
