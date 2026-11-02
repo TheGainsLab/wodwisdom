@@ -9,6 +9,7 @@ import { inferTimeDomain } from "../_shared/time-domain.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { computeMetconPower, type MetconBlockInput } from "../_shared/metcon-workcalc.ts";
 import { computeCardioPower } from "../_shared/cardio-power.ts";
+import { hashWorkoutText } from "../_shared/signature-hash.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -387,6 +388,78 @@ Deno.serve(async (req) => {
       if (entriesErr) {
         console.error("log-workout entries insert error:", entriesErr);
       }
+    }
+
+    // 3b. Evidence ingestion (Workout Signatures athlete layer): every scored
+    // metcon block becomes a signature_evidence row keyed by the workout's
+    // text-hash — the universal join key. Unsigned today; when the judge signs
+    // the same structure these rows join its signature retroactively, and the
+    // next profile refit consumes them. Idempotent across the destructive
+    // re-log path via (user_id, source_ref). Best-effort: never blocks logging.
+    try {
+      const evidenceRows: Record<string, unknown>[] = [];
+      for (let bi = 0; bi < blocks.length; bi++) {
+        const b = blocks[bi];
+        if (b.type !== "metcon") continue;
+        const scored = Boolean(b.score?.trim()) || b.capped === true;
+        if (!scored || !b.text?.trim()) continue;
+        const hash = await hashWorkoutText(
+          b.text,
+          b.block_scheme ?? null,
+          b.time_cap_seconds ?? null,
+        );
+        evidenceRows.push({
+          user_id: user.id,
+          workout_hash: hash,
+          score_raw: {
+            score: b.score ?? null,
+            capped: b.capped ?? null,
+            capped_reps: b.capped_reps ?? null,
+            block_scheme: b.block_scheme ?? null,
+            time_cap_seconds: b.time_cap_seconds ?? null,
+            rx: b.rx ?? null,
+          },
+          // Percentile enters the fit ONLY for RX performances: the client
+          // computes it against RX cohort anchors, and the model params are
+          // fitted on the RX general field — a scaled score on the RX scale
+          // is the same cohort mismatch Open ingestion filters out. Scaled
+          // (and unknown-rx) rows keep their hash and score_raw; their
+          // percentile joins when scaled cohorts exist. A capped result is
+          // interval information ("below the cap's percentile") — the
+          // interval-censored observation lands with the gate-aware model.
+          percentile: b.rx === true && !b.capped && b.percentile != null &&
+              b.percentile >= 1 && b.percentile <= 99
+            ? b.percentile
+            : null,
+          // Structure-derived percentile → provisional noise sd ≈ 20
+          // (var 400) until the scorescale_acceptance protocol measures the
+          // real error (design doc 2026-11-02: that error feeds calibration).
+          obs_noise_var: 400,
+          source: "logged_solo",
+          performed_at: priorPerformedBySort.get(bi) ?? dateStr,
+          source_ref: `log:${log.id}:${bi}`,
+        });
+      }
+      // Replace, don't merge: a re-log with fewer or reordered blocks must
+      // not leave stale log:<id>:<bi> rows behind (the same-id destructive
+      // rewrite keeps source_refs aligned only for surviving positions).
+      const { error: delErr } = await supa
+        .from("signature_evidence")
+        .delete()
+        .eq("user_id", user.id)
+        .like("source_ref", `log:${log.id}:%`);
+      if (delErr) console.warn("log-workout evidence cleanup failed:", delErr.message);
+      if (evidenceRows.length > 0) {
+        const { error: evErr } = await supa
+          .from("signature_evidence")
+          .upsert(evidenceRows, { onConflict: "user_id,source_ref" });
+        if (evErr) console.warn("log-workout evidence upsert failed:", evErr.message);
+      }
+    } catch (e) {
+      console.warn(
+        "log-workout evidence ingestion skipped:",
+        e instanceof Error ? e.message : e,
+      );
     }
 
     // Background: compute metcon power (joules/watts) per metcon block and

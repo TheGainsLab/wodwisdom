@@ -52,8 +52,16 @@ import {
 } from "../_shared/compute-block-benchmark.ts";
 import type { BlockPrescription } from "../_shared/v2-output-schema.ts";
 import type { Gender } from "../_shared/compute-benchmarks.ts";
+import {
+  OPEN_OBSERVED_MEDIANS,
+  type ObservedMedianRow,
+} from "../_shared/fixtures/open-observed-medians.ts";
+import {
+  hashWorkoutStructure,
+  hashWorkoutText,
+} from "../_shared/signature-hash.ts";
 
-const FUNCTION_VERSION = "2026-11-01.1";
+const FUNCTION_VERSION = "2026-11-02.1";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -427,6 +435,105 @@ async function hashWorkout(workout: unknown): Promise<string> {
   return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+/** The lenient join keys this signature claims in the wsh1_ address space
+ *  (identity stays strict via workout_hash; JOINING is lenient by design).
+ *  Structure hash always; text hash too when the admin pasted source text. */
+async function evidenceHashesFor(
+  workout: BlockPrescription,
+  sourceText?: string,
+  openName?: string,
+): Promise<string[]> {
+  const hashes: string[] = [];
+  // Open signatures also claim the deterministic name key, so Open-history
+  // ingestion rows written before (or without) a structure hash stay
+  // claimable (review item 2, 2026-11-02).
+  if (openName?.trim()) hashes.push(`open_name_${openName.trim().toLowerCase()}`);
+  try {
+    const movements = (workout.movements ?? []).map((m) => ({
+      movement: m.movement ?? "",
+      reps: (m as { rep_scheme?: number[] }).rep_scheme ?? m.reps ?? null,
+      load: m.weight != null ? `${m.weight}${m.weight_unit ?? "lbs"}` : null,
+    }));
+    hashes.push(await hashWorkoutStructure({
+      block_scheme: workout.block_scheme ?? null,
+      time_cap_seconds: workout.time_cap_seconds ?? null,
+      movements,
+    }));
+  } catch (_) { /* a structure the hasher can't read claims nothing */ }
+  if (sourceText?.trim()) {
+    hashes.push(await hashWorkoutText(
+      sourceText,
+      workout.block_scheme ?? null,
+      workout.time_cap_seconds ?? null,
+    ));
+  }
+  return hashes;
+}
+
+/** Release rows this signature claimed under hashes it no longer carries —
+ *  the evidence-level mirror of staleMarkProvenance: a profile's training
+ *  rows must not follow a signature whose structure changed from under
+ *  them. Released rows return to waiting and the right signature (or a
+ *  reclaim pass) picks them up. Best-effort like the claim. */
+async function releaseStaleEvidence(
+  supa: ReturnType<typeof createClient>,
+  signatureId: string,
+  keepHashes: string[],
+): Promise<number> {
+  let q = supa
+    .from("signature_evidence")
+    .update({ workout_signature_id: null })
+    .eq("workout_signature_id", signatureId);
+  if (keepHashes.length > 0) {
+    q = q.not("workout_hash", "in", `(${keepHashes.map((h) => `"${h}"`).join(",")})`);
+  }
+  const { data, error } = await q.select("id");
+  if (error) {
+    console.warn("[signature-workout] evidence release failed:", error.message);
+    return 0;
+  }
+  return (data ?? []).length;
+}
+
+/** Signatures other than this one that list any of the same join keys —
+ *  duplicate-structure detection, surfaced so the admin sees which
+ *  signature owns the evidence (first claim wins until merged). */
+async function findHashConflicts(
+  supa: ReturnType<typeof createClient>,
+  signatureId: string,
+  hashes: string[],
+): Promise<Array<{ id: string; name: string; status: string }>> {
+  if (hashes.length === 0) return [];
+  const { data, error } = await supa
+    .from("workout_signatures")
+    .select("id, name, status")
+    .neq("id", signatureId)
+    .overlaps("evidence_hashes", hashes);
+  if (error) return [];
+  return (data ?? []) as Array<{ id: string; name: string; status: string }>;
+}
+
+/** Retroactive join: point waiting unsigned ledger rows at this signature.
+ *  Best-effort — a failed claim never fails the save. */
+async function claimEvidence(
+  supa: ReturnType<typeof createClient>,
+  signatureId: string,
+  hashes: string[],
+): Promise<number> {
+  if (hashes.length === 0) return 0;
+  const { data, error } = await supa
+    .from("signature_evidence")
+    .update({ workout_signature_id: signatureId })
+    .in("workout_hash", hashes)
+    .is("workout_signature_id", null)
+    .select("id");
+  if (error) {
+    console.warn("[signature-workout] evidence claim failed:", error.message);
+    return 0;
+  }
+  return (data ?? []).length;
+}
+
 /** Stale-mark any empirical vector when the workout structure changed —
  *  a regression fitted on one structure must not describe another. */
 function staleMarkProvenance(
@@ -543,11 +650,27 @@ Deno.serve(async (req) => {
       const fields = pickRowFields(body);
       const sigErrors = validateSignature(fields as Partial<SignatureDraft>, false);
       if (sigErrors.length > 0) return json({ error: sigErrors.join("; ") }, 422);
-      if (fields.workout) fields.workout_hash = await hashWorkout(fields.workout);
       const id = typeof body.id === "string" ? body.id : null;
+      let existingRow: { workout_hash: string | null; provenance: unknown; source: string; name: string } | null = null;
       if (id) {
-        const { data: existing } = await supa
-          .from("workout_signatures").select("workout_hash, provenance").eq("id", id).maybeSingle();
+        const { data } = await supa
+          .from("workout_signatures")
+          .select("workout_hash, provenance, source, name")
+          .eq("id", id).maybeSingle();
+        existingRow = data as typeof existingRow;
+      }
+      if (fields.workout) {
+        fields.workout_hash = await hashWorkout(fields.workout);
+        const source = (fields.source ?? existingRow?.source) as string | undefined;
+        const name = (fields.name ?? existingRow?.name) as string | undefined;
+        fields.evidence_hashes = await evidenceHashesFor(
+          fields.workout as BlockPrescription,
+          typeof body.source_text === "string" ? body.source_text : undefined,
+          source === "open" ? name : undefined,
+        );
+      }
+      if (id) {
+        const existing = existingRow;
         if (!existing) return json({ error: "NOT_FOUND" }, 404);
         const hashChanged = !!fields.workout_hash && !!existing.workout_hash &&
           fields.workout_hash !== existing.workout_hash;
@@ -560,7 +683,16 @@ Deno.serve(async (req) => {
           .update({ ...fields, updated_at: new Date().toISOString() })
           .eq("id", id).select().single();
         if (error) return json({ error: error.message }, 500);
-        return json({ row: data });
+        const hashes = (data.evidence_hashes ?? []) as string[];
+        const released = await releaseStaleEvidence(supa, data.id, hashes);
+        const claimed = await claimEvidence(supa, data.id, hashes);
+        const conflicts = await findHashConflicts(supa, data.id, hashes);
+        return json({
+          row: data,
+          evidence_claimed: claimed,
+          evidence_released: released,
+          hash_conflicts: conflicts,
+        });
       }
       if (!fields.name || !fields.workout || !fields.demand) {
         return json({ error: "MISSING_FIELDS (name, workout, demand required)" }, 400);
@@ -581,14 +713,26 @@ Deno.serve(async (req) => {
           .update({ ...fields, provenance: DEFAULT_PROVENANCE, updated_at: new Date().toISOString() })
           .eq("id", existing.id).select().single();
         if (error) return json({ error: error.message }, 500);
-        return json({ row: data });
+        const hashes = (data.evidence_hashes ?? []) as string[];
+        const released = await releaseStaleEvidence(supa, data.id, hashes);
+        const claimed = await claimEvidence(supa, data.id, hashes);
+        const conflicts = await findHashConflicts(supa, data.id, hashes);
+        return json({
+          row: data,
+          evidence_claimed: claimed,
+          evidence_released: released,
+          hash_conflicts: conflicts,
+        });
       }
       const { data, error } = await supa
         .from("workout_signatures")
         .insert({ ...fields, status: "draft", provenance: DEFAULT_PROVENANCE })
         .select().single();
       if (error) return json({ error: error.message }, 500);
-      return json({ row: data });
+      const newHashes = (data.evidence_hashes ?? []) as string[];
+      const claimed = await claimEvidence(supa, data.id, newHashes);
+      const conflicts = await findHashConflicts(supa, data.id, newHashes);
+      return json({ row: data, evidence_claimed: claimed, hash_conflicts: conflicts });
     }
 
     if (action === "approve" || action === "reject") {
@@ -610,6 +754,13 @@ Deno.serve(async (req) => {
         if (sigErrors.length > 0) return json({ error: sigErrors.join("; ") }, 422);
         if (fields.workout) {
           fields.workout_hash = await hashWorkout(fields.workout);
+          const src = (fields.source ?? existing.source) as string | undefined;
+          const nm = (fields.name ?? existing.name) as string | undefined;
+          fields.evidence_hashes = await evidenceHashesFor(
+            fields.workout as BlockPrescription,
+            typeof body.source_text === "string" ? body.source_text : undefined,
+            src === "open" ? nm : undefined,
+          );
           fields.provenance = staleMarkProvenance(
             (existing.provenance ?? DEFAULT_PROVENANCE) as Record<string, { kind?: string }>,
             !!existing.workout_hash && fields.workout_hash !== existing.workout_hash,
@@ -620,7 +771,220 @@ Deno.serve(async (req) => {
       const { data, error } = await supa
         .from("workout_signatures").update(update).eq("id", id).select().single();
       if (error) return json({ error: error.message }, 500);
-      return json({ row: data });
+      let claimed = 0;
+      if (action === "approve") {
+        const hashes = (data.evidence_hashes ?? []) as string[];
+        await releaseStaleEvidence(supa, data.id, hashes);
+        claimed = await claimEvidence(supa, data.id, hashes);
+      }
+      return json({ row: data, evidence_claimed: claimed });
+    }
+
+    if (action === "scorescale_acceptance") {
+      // The score-scale acceptance protocol (design doc, 2026-11-02):
+      // predict every ratified Open workout's median from STRUCTURE ALONE
+      // (the deterministic measure() path — zero tokens, zero judgment) and
+      // score it against the leaderboard's observed medians. The
+      // percentile_error summary is the number that seeds obs_noise_var for
+      // structure-scored evidence (percentile units, no hand conversion).
+      //
+      // IN-SAMPLE CAVEAT (review item 3, 2026-11-02): the fixture is
+      // independent of the predictor, but the predictor is not independent
+      // of the fixture — the stage power curve and cohort anchors were fit
+      // on leaderboards that include these workouts. This error is a FLOOR,
+      // not an estimate; the honest leave-one-out version needs per-workout
+      // curve refits upstream (competition-service job, queued). When this
+      // number seeds params, apply a conservative multiplier and say so.
+      if (OPEN_OBSERVED_MEDIANS.length === 0) {
+        return json({
+          error: "NEEDS_FIXTURE",
+          detail: "Seed _shared/fixtures/open-observed-medians.ts from the SQL in its header, then redeploy.",
+        }, 400);
+      }
+      const { data: sigRows, error: sigErr } = await supa
+        .from("workout_signatures")
+        .select("name, workout")
+        .eq("source", "open").eq("status", "approved");
+      if (sigErr) return json({ error: sigErr.message }, 500);
+
+      const observed = new Map<string, ObservedMedianRow>();
+      for (const r of OPEN_OBSERVED_MEDIANS) {
+        observed.set(`${r.workout_name.toLowerCase()}|${r.gender}`, r);
+      }
+
+      // Where the predicted median falls in the observed distribution,
+      // via piecewise-linear interpolation through the score-space
+      // quartiles (direction auto-detected: seconds descend with
+      // percentile, reps ascend). Clamped to [2, 98] outside the range.
+      const interpPercentile = (
+        pred: number,
+        p25: number,
+        p50: number,
+        p75: number,
+      ): number | null => {
+        const ascending = p75 > p25;
+        if (!ascending && !(p25 > p75)) return null; // degenerate quartiles
+        const pts = ascending
+          ? [[p25, 25], [p50, 50], [p75, 75]]
+          : [[p75, 75], [p50, 50], [p25, 25]]; // sort by score ascending
+        if (pts[0][0] >= pts[1][0] || pts[1][0] >= pts[2][0]) return null; // non-monotone
+        const seg = pred <= pts[1][0] ? [pts[0], pts[1]] : [pts[1], pts[2]];
+        const t = (pred - seg[0][0]) / (seg[1][0] - seg[0][0]);
+        return Math.min(98, Math.max(2, seg[0][1] + t * (seg[1][1] - seg[0][1])));
+      };
+
+      // "9+14" → total reps, using the structure's reps-per-round.
+      const amrapTotalReps = (scoreText: string, workout: BlockPrescription): number | null => {
+        const perRound = (workout.movements ?? []).reduce((acc, m) => {
+          const scheme = (m as { rep_scheme?: number[] }).rep_scheme;
+          if (Array.isArray(scheme) && scheme.length > 0) {
+            return acc + scheme.reduce((a, b) => a + b, 0);
+          }
+          return acc + (typeof m.reps === "number" ? m.reps : 0);
+        }, 0);
+        const rr = String(scoreText).match(/(\d+)\s*\+\s*(\d+)/);
+        if (rr) {
+          if (perRound <= 0) return null; // can't convert rounds without a round length
+          return Number(rr[1]) * perRound + Number(rr[2]);
+        }
+        const plain = String(scoreText).match(/^\s*(\d+)\s*(reps?)?\s*$/i);
+        return plain ? Number(plain[1]) : null;
+      };
+
+      const perWorkout: Array<Record<string, unknown>> = [];
+      const relErrsTime: number[] = [];
+      const relErrsReps: number[] = [];
+      const pctErrs: number[] = [];
+      for (const s of (sigRows ?? []) as Array<{ name: string; workout: BlockPrescription }>) {
+        for (const g of ["men", "women"] as Gender[]) {
+          const key = `${s.name.toLowerCase()}|${g === "women" ? "F" : "M"}`;
+          const truth = observed.get(key);
+          if (!truth) continue;
+          const bench = await measure(s.workout, g);
+          if (!bench) {
+            perWorkout.push({ name: s.name, gender: g, status: "no_prediction" });
+            continue;
+          }
+          // measure() knows which scoring it produced — key on that alone.
+          const isRepScored = bench.median_seconds === null;
+          // Capped-median guard: when the observed median sits at the cap,
+          // half the field never finished and a seconds comparison is
+          // invalid (22.3, 19.2) — rep-space or nothing.
+          const observedAtCap = truth.time_cap_seconds != null &&
+            truth.observed_median_s != null &&
+            truth.observed_median_s >= truth.time_cap_seconds * 0.98;
+
+          let pred: number | null = null;
+          let obs: number | null = null;
+          let kind = "";
+          if (!isRepScored && !observedAtCap && truth.observed_median_s && s.name !== "17.3") {
+            pred = bench.median_seconds;
+            obs = truth.observed_median_s;
+            kind = "time";
+          } else if ((isRepScored || observedAtCap) && truth.p50_score) {
+            pred = isRepScored
+              ? amrapTotalReps(String(bench.median_score), s.workout)
+              : null; // capped for_time: measure() has no rep-space median yet
+            obs = Number(truth.p50_score);
+            kind = "reps";
+            if (pred === null) {
+              perWorkout.push({
+                name: s.name, gender: g,
+                status: observedAtCap ? "skipped_capped_median" : "unparseable_prediction",
+              });
+              continue;
+            }
+          } else {
+            perWorkout.push({ name: s.name, gender: g, status: "skipped_no_basis" });
+            continue;
+          }
+
+          const rel = (pred! - obs!) / obs!;
+          (kind === "time" ? relErrsTime : relErrsReps).push(Math.abs(rel));
+          const pctAt = (truth.p25_score != null && truth.p50_score != null && truth.p75_score != null)
+            ? interpPercentile(pred!, Number(truth.p25_score), Number(truth.p50_score), Number(truth.p75_score))
+            : null;
+          // quartiles must live in the same score space as the comparison:
+          // for time rows require descending seconds through the quartiles.
+          const pctErr = pctAt !== null &&
+              (kind === "reps" || Number(truth.p25_score) > Number(truth.p75_score))
+            ? pctAt - 50
+            : null;
+          if (pctErr !== null) pctErrs.push(pctErr);
+          perWorkout.push({
+            name: s.name, gender: g, kind,
+            predicted: Math.round(pred!),
+            observed: Math.round(obs!),
+            rel_error: Number(rel.toFixed(3)),
+            percentile_error: pctErr !== null ? Number(pctErr.toFixed(1)) : null,
+          });
+        }
+      }
+      const summarize = (xs: number[]) =>
+        xs.length === 0 ? null : {
+          n: xs.length,
+          median_abs_rel_error: Number(
+            xs.slice().sort((a, b) => a - b)[Math.floor(xs.length / 2)].toFixed(3),
+          ),
+          mean_abs_rel_error: Number((xs.reduce((a, b) => a + b, 0) / xs.length).toFixed(3)),
+        };
+      const pctMean = pctErrs.length ? pctErrs.reduce((a, b) => a + b, 0) / pctErrs.length : null;
+      const pctVar = pctErrs.length > 1 && pctMean !== null
+        ? pctErrs.reduce((a, b) => a + (b - pctMean) ** 2, 0) / (pctErrs.length - 1)
+        : null;
+      return json({
+        in_sample: true,
+        time_scored: summarize(relErrsTime),
+        rep_scored: summarize(relErrsReps),
+        // THE number for params: variance of where predicted medians land
+        // in the observed distributions, percentile² — plus the bias,
+        // which should be ~0 if the watts layer is honest.
+        percentile_error: pctErrs.length
+          ? {
+            n: pctErrs.length,
+            bias: Number(pctMean!.toFixed(2)),
+            sd: Number(Math.sqrt(pctVar ?? 0).toFixed(2)),
+            var_for_obs_noise: Number((pctVar ?? 0).toFixed(1)),
+          }
+          : null,
+        per_workout: perWorkout.sort((a, b) =>
+          Math.abs((b.rel_error as number) ?? 0) - Math.abs((a.rel_error as number) ?? 0)
+        ),
+      });
+    }
+
+    if (action === "reclaim_evidence") {
+      // Reconciliation: the per-save claim is best-effort, so a transient
+      // failure can orphan unsigned rows. This re-runs the claim for every
+      // signature. Ownership priority when hashes collide (duplicate
+      // structures): approved before draft, then oldest — deterministic,
+      // and the same signature wins every run.
+      const { data: sigRows, error: sigErr } = await supa
+        .from("workout_signatures")
+        .select("id, status, created_at, evidence_hashes")
+        .neq("evidence_hashes", "{}");
+      if (sigErr) return json({ error: sigErr.message }, 500);
+      const sorted = ((sigRows ?? []) as Array<
+        { id: string; status: string; created_at: string; evidence_hashes: string[] | null }
+      >).sort((a, b) =>
+        (a.status === "approved" ? 0 : 1) - (b.status === "approved" ? 0 : 1) ||
+        a.created_at.localeCompare(b.created_at)
+      );
+      const owner = new Map<string, string>();
+      for (const sig of sorted) {
+        for (const h of sig.evidence_hashes ?? []) {
+          if (!owner.has(h)) owner.set(h, sig.id);
+        }
+      }
+      const byOwner = new Map<string, string[]>();
+      for (const [h, sigId] of owner) {
+        byOwner.set(sigId, [...(byOwner.get(sigId) ?? []), h]);
+      }
+      let totalClaimed = 0;
+      for (const [sigId, hashes] of byOwner) {
+        totalClaimed += await claimEvidence(supa, sigId, hashes);
+      }
+      return json({ claimed: totalClaimed, signatures_checked: byOwner.size });
     }
 
     if (action === "list") {
