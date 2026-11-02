@@ -784,10 +784,17 @@ Deno.serve(async (req) => {
       // The score-scale acceptance protocol (design doc, 2026-11-02):
       // predict every ratified Open workout's median from STRUCTURE ALONE
       // (the deterministic measure() path — zero tokens, zero judgment) and
-      // score it against the leaderboard's observed medians. The resulting
-      // error is the candidate obs_noise_var for structure-scored evidence;
-      // large error = structure scoring is a fallback behind class-leaderboard
-      // and own-history references, small = solo logging is first-class.
+      // score it against the leaderboard's observed medians. The
+      // percentile_error summary is the number that seeds obs_noise_var for
+      // structure-scored evidence (percentile units, no hand conversion).
+      //
+      // IN-SAMPLE CAVEAT (review item 3, 2026-11-02): the fixture is
+      // independent of the predictor, but the predictor is not independent
+      // of the fixture — the stage power curve and cohort anchors were fit
+      // on leaderboards that include these workouts. This error is a FLOOR,
+      // not an estimate; the honest leave-one-out version needs per-workout
+      // curve refits upstream (competition-service job, queued). When this
+      // number seeds params, apply a conservative multiplier and say so.
       if (OPEN_OBSERVED_MEDIANS.length === 0) {
         return json({
           error: "NEEDS_FIXTURE",
@@ -805,9 +812,49 @@ Deno.serve(async (req) => {
         observed.set(`${r.workout_name.toLowerCase()}|${r.gender}`, r);
       }
 
+      // Where the predicted median falls in the observed distribution,
+      // via piecewise-linear interpolation through the score-space
+      // quartiles (direction auto-detected: seconds descend with
+      // percentile, reps ascend). Clamped to [2, 98] outside the range.
+      const interpPercentile = (
+        pred: number,
+        p25: number,
+        p50: number,
+        p75: number,
+      ): number | null => {
+        const ascending = p75 > p25;
+        if (!ascending && !(p25 > p75)) return null; // degenerate quartiles
+        const pts = ascending
+          ? [[p25, 25], [p50, 50], [p75, 75]]
+          : [[p75, 75], [p50, 50], [p25, 25]]; // sort by score ascending
+        if (pts[0][0] >= pts[1][0] || pts[1][0] >= pts[2][0]) return null; // non-monotone
+        const seg = pred <= pts[1][0] ? [pts[0], pts[1]] : [pts[1], pts[2]];
+        const t = (pred - seg[0][0]) / (seg[1][0] - seg[0][0]);
+        return Math.min(98, Math.max(2, seg[0][1] + t * (seg[1][1] - seg[0][1])));
+      };
+
+      // "9+14" → total reps, using the structure's reps-per-round.
+      const amrapTotalReps = (scoreText: string, workout: BlockPrescription): number | null => {
+        const perRound = (workout.movements ?? []).reduce((acc, m) => {
+          const scheme = (m as { rep_scheme?: number[] }).rep_scheme;
+          if (Array.isArray(scheme) && scheme.length > 0) {
+            return acc + scheme.reduce((a, b) => a + b, 0);
+          }
+          return acc + (typeof m.reps === "number" ? m.reps : 0);
+        }, 0);
+        const rr = String(scoreText).match(/(\d+)\s*\+\s*(\d+)/);
+        if (rr) {
+          if (perRound <= 0) return null; // can't convert rounds without a round length
+          return Number(rr[1]) * perRound + Number(rr[2]);
+        }
+        const plain = String(scoreText).match(/^\s*(\d+)\s*(reps?)?\s*$/i);
+        return plain ? Number(plain[1]) : null;
+      };
+
       const perWorkout: Array<Record<string, unknown>> = [];
       const relErrsTime: number[] = [];
       const relErrsReps: number[] = [];
+      const pctErrs: number[] = [];
       for (const s of (sigRows ?? []) as Array<{ name: string; workout: BlockPrescription }>) {
         for (const g of ["men", "women"] as Gender[]) {
           const key = `${s.name.toLowerCase()}|${g === "women" ? "F" : "M"}`;
@@ -818,33 +865,59 @@ Deno.serve(async (req) => {
             perWorkout.push({ name: s.name, gender: g, status: "no_prediction" });
             continue;
           }
-          const isAmrap = bench.median_seconds === null ||
-            /\bamrap\b|\bemom\b/i.test(s.workout.block_scheme ?? "");
-          if (!isAmrap && truth.observed_median_s && s.name !== "17.3") {
-            const rel = (bench.median_seconds! - truth.observed_median_s) /
-              truth.observed_median_s;
-            relErrsTime.push(Math.abs(rel));
-            perWorkout.push({
-              name: s.name, gender: g, kind: "time",
-              predicted_s: Math.round(bench.median_seconds!),
-              observed_s: truth.observed_median_s,
-              rel_error: Number(rel.toFixed(3)),
-            });
-          } else if (isAmrap && truth.p50_score) {
-            const predReps = Number(String(bench.median_score).replace(/[^0-9.]/g, ""));
-            if (!Number.isFinite(predReps) || predReps <= 0) {
-              perWorkout.push({ name: s.name, gender: g, status: "unparseable_prediction" });
+          // measure() knows which scoring it produced — key on that alone.
+          const isRepScored = bench.median_seconds === null;
+          // Capped-median guard: when the observed median sits at the cap,
+          // half the field never finished and a seconds comparison is
+          // invalid (22.3, 19.2) — rep-space or nothing.
+          const observedAtCap = truth.time_cap_seconds != null &&
+            truth.observed_median_s != null &&
+            truth.observed_median_s >= truth.time_cap_seconds * 0.98;
+
+          let pred: number | null = null;
+          let obs: number | null = null;
+          let kind = "";
+          if (!isRepScored && !observedAtCap && truth.observed_median_s && s.name !== "17.3") {
+            pred = bench.median_seconds;
+            obs = truth.observed_median_s;
+            kind = "time";
+          } else if ((isRepScored || observedAtCap) && truth.p50_score) {
+            pred = isRepScored
+              ? amrapTotalReps(String(bench.median_score), s.workout)
+              : null; // capped for_time: measure() has no rep-space median yet
+            obs = Number(truth.p50_score);
+            kind = "reps";
+            if (pred === null) {
+              perWorkout.push({
+                name: s.name, gender: g,
+                status: observedAtCap ? "skipped_capped_median" : "unparseable_prediction",
+              });
               continue;
             }
-            const rel = (predReps - Number(truth.p50_score)) / Number(truth.p50_score);
-            relErrsReps.push(Math.abs(rel));
-            perWorkout.push({
-              name: s.name, gender: g, kind: "reps",
-              predicted_reps: predReps,
-              observed_reps: Number(truth.p50_score),
-              rel_error: Number(rel.toFixed(3)),
-            });
+          } else {
+            perWorkout.push({ name: s.name, gender: g, status: "skipped_no_basis" });
+            continue;
           }
+
+          const rel = (pred! - obs!) / obs!;
+          (kind === "time" ? relErrsTime : relErrsReps).push(Math.abs(rel));
+          const pctAt = (truth.p25_score != null && truth.p50_score != null && truth.p75_score != null)
+            ? interpPercentile(pred!, Number(truth.p25_score), Number(truth.p50_score), Number(truth.p75_score))
+            : null;
+          // quartiles must live in the same score space as the comparison:
+          // for time rows require descending seconds through the quartiles.
+          const pctErr = pctAt !== null &&
+              (kind === "reps" || Number(truth.p25_score) > Number(truth.p75_score))
+            ? pctAt - 50
+            : null;
+          if (pctErr !== null) pctErrs.push(pctErr);
+          perWorkout.push({
+            name: s.name, gender: g, kind,
+            predicted: Math.round(pred!),
+            observed: Math.round(obs!),
+            rel_error: Number(rel.toFixed(3)),
+            percentile_error: pctErr !== null ? Number(pctErr.toFixed(1)) : null,
+          });
         }
       }
       const summarize = (xs: number[]) =>
@@ -855,9 +928,25 @@ Deno.serve(async (req) => {
           ),
           mean_abs_rel_error: Number((xs.reduce((a, b) => a + b, 0) / xs.length).toFixed(3)),
         };
+      const pctMean = pctErrs.length ? pctErrs.reduce((a, b) => a + b, 0) / pctErrs.length : null;
+      const pctVar = pctErrs.length > 1 && pctMean !== null
+        ? pctErrs.reduce((a, b) => a + (b - pctMean) ** 2, 0) / (pctErrs.length - 1)
+        : null;
       return json({
+        in_sample: true,
         time_scored: summarize(relErrsTime),
         rep_scored: summarize(relErrsReps),
+        // THE number for params: variance of where predicted medians land
+        // in the observed distributions, percentile² — plus the bias,
+        // which should be ~0 if the watts layer is honest.
+        percentile_error: pctErrs.length
+          ? {
+            n: pctErrs.length,
+            bias: Number(pctMean!.toFixed(2)),
+            sd: Number(Math.sqrt(pctVar ?? 0).toFixed(2)),
+            var_for_obs_noise: Number((pctVar ?? 0).toFixed(1)),
+          }
+          : null,
         per_workout: perWorkout.sort((a, b) =>
           Math.abs((b.rel_error as number) ?? 0) - Math.abs((a.rel_error as number) ?? 0)
         ),
