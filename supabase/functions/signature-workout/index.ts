@@ -52,8 +52,12 @@ import {
 } from "../_shared/compute-block-benchmark.ts";
 import type { BlockPrescription } from "../_shared/v2-output-schema.ts";
 import type { Gender } from "../_shared/compute-benchmarks.ts";
+import {
+  OPEN_OBSERVED_MEDIANS,
+  type ObservedMedianRow,
+} from "../_shared/fixtures/open-observed-medians.ts";
 
-const FUNCTION_VERSION = "2026-11-01.1";
+const FUNCTION_VERSION = "2026-11-02.1";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -621,6 +625,90 @@ Deno.serve(async (req) => {
         .from("workout_signatures").update(update).eq("id", id).select().single();
       if (error) return json({ error: error.message }, 500);
       return json({ row: data });
+    }
+
+    if (action === "scorescale_acceptance") {
+      // The score-scale acceptance protocol (design doc, 2026-11-02):
+      // predict every ratified Open workout's median from STRUCTURE ALONE
+      // (the deterministic measure() path — zero tokens, zero judgment) and
+      // score it against the leaderboard's observed medians. The resulting
+      // error is the candidate obs_noise_var for structure-scored evidence;
+      // large error = structure scoring is a fallback behind class-leaderboard
+      // and own-history references, small = solo logging is first-class.
+      if (OPEN_OBSERVED_MEDIANS.length === 0) {
+        return json({
+          error: "NEEDS_FIXTURE",
+          detail: "Seed _shared/fixtures/open-observed-medians.ts from the SQL in its header, then redeploy.",
+        }, 400);
+      }
+      const { data: sigRows, error: sigErr } = await supa
+        .from("workout_signatures")
+        .select("name, workout")
+        .eq("source", "open").eq("status", "approved");
+      if (sigErr) return json({ error: sigErr.message }, 500);
+
+      const observed = new Map<string, ObservedMedianRow>();
+      for (const r of OPEN_OBSERVED_MEDIANS) {
+        observed.set(`${r.workout_name.toLowerCase()}|${r.gender}`, r);
+      }
+
+      const perWorkout: Array<Record<string, unknown>> = [];
+      const relErrsTime: number[] = [];
+      const relErrsReps: number[] = [];
+      for (const s of (sigRows ?? []) as Array<{ name: string; workout: BlockPrescription }>) {
+        for (const g of ["men", "women"] as Gender[]) {
+          const key = `${s.name.toLowerCase()}|${g === "women" ? "F" : "M"}`;
+          const truth = observed.get(key);
+          if (!truth) continue;
+          const bench = await measure(s.workout, g);
+          if (!bench) {
+            perWorkout.push({ name: s.name, gender: g, status: "no_prediction" });
+            continue;
+          }
+          const isAmrap = bench.median_seconds === null ||
+            /\bamrap\b|\bemom\b/i.test(s.workout.block_scheme ?? "");
+          if (!isAmrap && truth.observed_median_s && s.name !== "17.3") {
+            const rel = (bench.median_seconds! - truth.observed_median_s) /
+              truth.observed_median_s;
+            relErrsTime.push(Math.abs(rel));
+            perWorkout.push({
+              name: s.name, gender: g, kind: "time",
+              predicted_s: Math.round(bench.median_seconds!),
+              observed_s: truth.observed_median_s,
+              rel_error: Number(rel.toFixed(3)),
+            });
+          } else if (isAmrap && truth.p50_score) {
+            const predReps = Number(String(bench.median_score).replace(/[^0-9.]/g, ""));
+            if (!Number.isFinite(predReps) || predReps <= 0) {
+              perWorkout.push({ name: s.name, gender: g, status: "unparseable_prediction" });
+              continue;
+            }
+            const rel = (predReps - Number(truth.p50_score)) / Number(truth.p50_score);
+            relErrsReps.push(Math.abs(rel));
+            perWorkout.push({
+              name: s.name, gender: g, kind: "reps",
+              predicted_reps: predReps,
+              observed_reps: Number(truth.p50_score),
+              rel_error: Number(rel.toFixed(3)),
+            });
+          }
+        }
+      }
+      const summarize = (xs: number[]) =>
+        xs.length === 0 ? null : {
+          n: xs.length,
+          median_abs_rel_error: Number(
+            xs.slice().sort((a, b) => a - b)[Math.floor(xs.length / 2)].toFixed(3),
+          ),
+          mean_abs_rel_error: Number((xs.reduce((a, b) => a + b, 0) / xs.length).toFixed(3)),
+        };
+      return json({
+        time_scored: summarize(relErrsTime),
+        rep_scored: summarize(relErrsReps),
+        per_workout: perWorkout.sort((a, b) =>
+          Math.abs((b.rel_error as number) ?? 0) - Math.abs((a.rel_error as number) ?? 0)
+        ),
+      });
     }
 
     if (action === "list") {
