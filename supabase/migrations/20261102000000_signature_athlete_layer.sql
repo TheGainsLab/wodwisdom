@@ -156,3 +156,16 @@ insert into public.signature_model_params (key, params, notes) values (
   'Fitted 2026-11-02 on 30k Open RX athletes (two independent 15k samples; all headline numbers replicated on the second). prior_cov_pct: covariance of ridge axis-deltas, deep athletes, percentile units. signal_cov_pct: split-half cross-covariance (noise-cancelled). loading_matrix_pct: four varimax factors (puller_grinder 53%, strength_engine 24%, inversion_skill 15%, coordination 4%). noise_var_pct: per-score noise from verbatim-repeat test-retest (sd ~10). calibration_sd_inflation: predictive sd multiplier (raw posterior overconfident; after x1.349, 80% intervals cover 80.2-83.6% in every depth band). evidence_age_weight: forward-prediction retention by years of gap (year-holdout aging curve).'
 )
 on conflict (key) do nothing;
+
+-- source_ref: stable identity of the observation's origin
+-- ('log:<log_id>:<sort_order>', 'open:<year>:<workout>', 'benchmark:<id>')
+-- so destructive re-logging (log-workout wipes and re-inserts blocks) and
+-- backfills stay idempotent: ingest paths upsert on (user_id, source_ref).
+alter table public.signature_evidence
+  add column if not exists source_ref text;
+
+-- Full (not partial) unique index: upsert's ON CONFLICT (user_id, source_ref)
+-- must infer it, and NULL source_refs stay freely insertable (nulls are
+-- distinct under a unique index).
+create unique index if not exists signature_evidence_user_source_ref_key
+  on public.signature_evidence (user_id, source_ref);
