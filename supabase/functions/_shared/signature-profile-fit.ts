@@ -33,10 +33,20 @@
 
 export interface SignatureModelParams {
   axes: string[]; // canonical axis order for every matrix/vector below
-  prior_cov_pct: number[][]; // Sigma, percentile units
+  /** Sigma: prior covariance of TRUE deltas, percentile units. Must be the
+   *  noise-cancelled (deconvolved) signal covariance plus slack, NEVER the
+   *  raw covariance of estimated deltas — that one is estimation-noise
+   *  inflated and under-shrinks (review 2026-11-02; the shallow-band
+   *  limiter failure was this matrix). */
+  prior_cov_pct: number[][];
   noise_var_pct: number; // per-score noise variance (repeat-measured)
   calibration_sd_inflation: number; // multiply predictive sd by this
   evidence_age_weight: Record<string, number>; // years-of-gap -> weight
+  /** Level prior — PER STRATUM (committed ~p50, onboarding ~p35); params
+   *  rows carry these, code holds only last-resort defaults. */
+  level_prior_mean?: number;
+  level_prior_var?: number;
+  draft_noise_inflation?: number;
 }
 
 export interface EvidenceObservation {
@@ -59,7 +69,12 @@ export interface AxisPosterior {
 export interface FittedProfile {
   level: { mean: number; sd: number };
   axes: Record<string, AxisPosterior>;
-  /** P(axis is the limiter), summing to ~1 across axes */
+  /** P(axis is the limiter), summing to ~1 across axes.
+   *  v1 limiter = most negative delta (unpriced). The Goal-1 target is a
+   *  PRICED limiter — P(axis costs the most percentile across a target
+   *  basket), i.e. the posterior over basketLoad[axis]*delta — so this
+   *  surface will grow an optional basket argument; callers should not
+   *  assume raw-delta semantics are permanent. */
   limiterPosterior: Record<string, number>;
   /** axes ranked by limiter probability, most likely first */
   limiterRanked: string[];
@@ -71,7 +86,12 @@ export interface GateContext {
   possessed: boolean | null; // null = unknown
   /** probability of possession when unknown (population rate for the gate) */
   possessionProb?: number;
-  /** the wall's percentile for this workout/cohort (pile location) */
+  /** The wall's percentile for this workout/cohort. NOTE: the gate catalog
+   *  reports the pile's assigned percentile (the tie group shares one
+   *  value — effectively the pile's upper edge). Athletes lacking the
+   *  movement are distributed AT that tie value by ranking construction,
+   *  so clamping to it is correct for tie-scored leaderboards; if a future
+   *  catalog reports an interval instead, the clamp should move inside it. */
   wallPercentile: number;
 }
 
@@ -85,24 +105,12 @@ export interface ScorePrediction {
 // ---------------------------------------------------------------- linalg
 // 12x12 is small; plain arrays beat pulling in a dependency.
 
-function matAdd(a: number[][], b: number[][]): number[][] {
-  return a.map((row, i) => row.map((v, j) => v + b[i][j]));
-}
-
-function matScale(a: number[][], s: number): number[][] {
-  return a.map((row) => row.map((v) => v * s));
-}
-
 function matVec(a: number[][], v: number[]): number[] {
   return a.map((row) => row.reduce((acc, x, j) => acc + x * v[j], 0));
 }
 
 function dot(a: number[], b: number[]): number {
   return a.reduce((acc, x, i) => acc + x * b[i], 0);
-}
-
-function outer(a: number[], b: number[]): number[][] {
-  return a.map((x) => b.map((y) => x * y));
 }
 
 /** Cholesky decomposition of a symmetric positive-definite matrix. */
@@ -189,13 +197,17 @@ function ageWeight(params: SignatureModelParams, yearsAgo: number): number {
 const LIMITER_DRAWS = 512;
 
 /**
- * Fit an athlete profile from evidence.
+ * Fit an athlete profile from evidence — ONE joint solve for level and the
+ * twelve deltas (review 2026-11-02 item 1: the two-stage fit let the level
+ * absorb an unbalanced menu's tilt — a weak puller logging pulling-heavy
+ * class workouts read as "balanced, just unfit." Jointly, the constant
+ * column competes with the signature rows and the prior allocates honestly).
  *
- * Level is the precision-weighted mean of the observations (age-weighted);
- * the axis posterior is the Gaussian-process update of the correlated prior
- * on the residuals. With zero or thin evidence the posterior IS the prior:
- * wide sds, limiter posterior = the population's (the Bayesian-naming
- * behavior the limiter validation required).
+ * Model: percentile = level_prior_mean + [x | 1] · [delta; levelOffset] + e,
+ * prior diag(Sigma, level_prior_var). With zero evidence the posterior IS
+ * the prior: level at the stratum mean, wide sds, limiter posterior = the
+ * population's (the Bayesian-naming behavior the limiter validation
+ * requires).
  */
 export function fitProfile(
   evidence: EvidenceObservation[],
@@ -204,55 +216,46 @@ export function fitProfile(
 ): FittedProfile {
   const axes = params.axes;
   const A = axes.length;
-  const Sigma = params.prior_cov_pct;
+  const D = A + 1; // + the level-offset dimension
+  const LPM = params.level_prior_mean ?? 50;
+  const LPV = params.level_prior_var ?? 625;
 
-  // ---- level: precision-weighted mean under per-obs noise + age weight
-  let wSum = 0;
-  let wy = 0;
+  // information form: info = blockdiag(Sigma^-1, 1/LPV) + X' N^-1 X
+  const SigmaInv = invSPD(params.prior_cov_pct);
+  const info: number[][] = Array.from({ length: D }, (_, i) =>
+    Array.from({ length: D }, (_, j) =>
+      i < A && j < A ? SigmaInv[i][j] : i === A && j === A ? 1 / LPV : 0));
+  const b = new Array(D).fill(0);
   for (const e of evidence) {
+    const x = [...signatureRow(e.discrimination, axes), 1];
     const noise = (e.obsNoiseVar ?? params.noise_var_pct) /
       ageWeight(params, e.yearsAgo ?? 0);
-    const w = 1 / noise;
-    wSum += w;
-    wy += w * e.percentile;
-  }
-  // diffuse prior on level centered at the field median
-  const LEVEL_PRIOR_MEAN = 50;
-  const LEVEL_PRIOR_VAR = 625; // sd 25: covers the field, dominated quickly
-  const levelPrec = wSum + 1 / LEVEL_PRIOR_VAR;
-  const levelMean = (wy + LEVEL_PRIOR_MEAN / LEVEL_PRIOR_VAR) / levelPrec;
-  const levelVar = 1 / levelPrec;
-
-  // ---- axis posterior on residuals r = percentile - level
-  // posterior: M = Sigma X' (X Sigma X' + N)^-1 r ; C = Sigma - Sigma X' K^-1 X Sigma
-  // computed in information form to stay at A x A:
-  //   C = (Sigma^-1 + X' N^-1 X)^-1 ; M = C X' N^-1 r
-  const SigmaInv = invSPD(Sigma);
-  let info = SigmaInv;
-  const xtNr = new Array(A).fill(0);
-  for (const e of evidence) {
-    const x = signatureRow(e.discrimination, axes);
-    const noise = (e.obsNoiseVar ?? params.noise_var_pct) /
-      ageWeight(params, e.yearsAgo ?? 0);
-    info = matAdd(info, matScale(outer(x, x), 1 / noise));
-    const r = e.percentile - levelMean;
-    for (let j = 0; j < A; j++) xtNr[j] += (x[j] * r) / noise;
+    for (let i = 0; i < D; i++) {
+      if (x[i] === 0) continue;
+      b[i] += (x[i] * (e.percentile - LPM)) / noise;
+      for (let j = 0; j < D; j++) {
+        if (x[j] !== 0) info[i][j] += (x[i] * x[j]) / noise;
+      }
+    }
   }
   const C = invSPD(info);
-  const M = matVec(C, xtNr);
+  const M = matVec(C, b);
 
   const axisOut: Record<string, AxisPosterior> = {};
   for (let j = 0; j < A; j++) {
     axisOut[axes[j]] = { mean: M[j], sd: Math.sqrt(Math.max(C[j][j], 0)) };
   }
+  const level = { mean: LPM + M[A], sd: Math.sqrt(Math.max(C[A][A], 0)) };
 
   // ---- limiter posterior: P(axis j has the most negative delta), by draws
+  // over the joint posterior's delta block (the level dimension rides the
+  // cholesky but never competes for "limiter").
   const rng = mulberry32(opts.seed ?? 42);
   const L = cholesky(C);
   const counts = new Array(A).fill(0);
   for (let d = 0; d < LIMITER_DRAWS; d++) {
     const zRaw: number[] = [];
-    while (zRaw.length < A) {
+    while (zRaw.length < D) {
       const [g1, g2] = gaussPair(rng);
       zRaw.push(g1, g2);
     }
@@ -271,11 +274,11 @@ export function fitProfile(
   const limiterPosterior: Record<string, number> = {};
   for (let j = 0; j < A; j++) limiterPosterior[axes[j]] = counts[j] / LIMITER_DRAWS;
   const limiterRanked = [...axes].sort(
-    (a, b) => limiterPosterior[b] - limiterPosterior[a],
+    (a, b2) => limiterPosterior[b2] - limiterPosterior[a],
   );
 
   return {
-    level: { mean: levelMean, sd: Math.sqrt(levelVar) },
+    level,
     axes: axisOut,
     limiterPosterior,
     limiterRanked,
