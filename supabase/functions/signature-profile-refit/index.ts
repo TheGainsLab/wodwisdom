@@ -40,6 +40,10 @@ import {
   fitProfile,
   type SignatureModelParams,
 } from "../_shared/signature-profile-fit.ts";
+import {
+  fetchTier4Bundle,
+  type Tier4AllResultsEntry,
+} from "../_shared/fetch-tier4-bundle.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -109,6 +113,87 @@ async function loadEvidence(
   return { observations, skipped, sourceMix };
 }
 
+/**
+ * Open-history ingestion: pull the linked athlete's career results from the
+ * competition service and land each RX Open score as an open_linked ledger
+ * row joined to its library signature by name. Idempotent via
+ * (user_id, source_ref='open:<competition_workout_id>'); leaderboard-grade
+ * percentiles carry no obs_noise_var override (the params default — the
+ * repeat-measured per-score noise — applies). Returns rows upserted.
+ */
+async function ingestOpenHistory(
+  supa: SupabaseClient,
+  userId: string,
+): Promise<{ upserted: number; skipped: number } | { error: string }> {
+  const { data: ap } = await supa
+    .from("athlete_profiles")
+    .select("competition_athlete_id")
+    .eq("user_id", userId)
+    .maybeSingle();
+  const competitorId = (ap as { competition_athlete_id: string | null } | null)
+    ?.competition_athlete_id;
+  if (!competitorId) return { error: "NOT_LINKED" };
+
+  const bundle = await fetchTier4Bundle(competitorId, { include: ["all_results"] });
+  const results = (bundle?.all_results ?? []) as Tier4AllResultsEntry[];
+  if (results.length === 0) return { upserted: 0, skipped: 0 };
+
+  // Library signatures by lowercased name ('open' source only).
+  const { data: sigs } = await supa
+    .from("workout_signatures")
+    .select("id, name, evidence_hashes")
+    .eq("source", "open");
+  const sigByName = new Map<string, { id: string; hash: string }>();
+  for (const s of (sigs ?? []) as Array<{ id: string; name: string; evidence_hashes: string[] | null }>) {
+    sigByName.set(s.name.toLowerCase(), {
+      id: s.id,
+      hash: s.evidence_hashes?.[0] ?? `open_name_${s.name.toLowerCase()}`,
+    });
+  }
+
+  const rows: Record<string, unknown>[] = [];
+  let skipped = 0;
+  for (const r of results) {
+    // v1 cohort match: the model params are fitted on the RX Open general
+    // field; scaled divisions join when cohort-specific discrimination ships.
+    if (r.stage !== "open" || r.scaled_tier !== "rx" || !r.result?.valid) {
+      skipped++;
+      continue;
+    }
+    const pct = r.result.worldwide_percentile;
+    if (typeof pct !== "number" || !Number.isFinite(pct)) {
+      skipped++;
+      continue;
+    }
+    const sig = sigByName.get(r.workout_name.toLowerCase());
+    rows.push({
+      user_id: userId,
+      workout_hash: sig?.hash ?? `open_name_${r.workout_name.toLowerCase()}`,
+      workout_signature_id: sig?.id ?? null,
+      score_raw: {
+        raw_score: r.result.raw_score,
+        raw_score_text: r.result.raw_score_text,
+        scoring_unit: r.result.scoring_unit,
+        year: r.year,
+        workout_name: r.workout_name,
+      },
+      percentile: Math.min(Math.max(pct, 0), 100),
+      source: "open_linked",
+      signature_version: null,
+      cohort: "open_rx_general",
+      // The Open runs Feb-Mar; month precision is all the aging curve needs.
+      performed_at: `${r.year}-03-01`,
+      source_ref: `open:${r.competition_workout_id}`,
+    });
+  }
+  if (rows.length === 0) return { upserted: 0, skipped };
+  const { error } = await supa
+    .from("signature_evidence")
+    .upsert(rows, { onConflict: "user_id,source_ref" });
+  if (error) return { error: error.message };
+  return { upserted: rows.length, skipped };
+}
+
 Deno.serve(async (req) => {
   const cors = getCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -149,6 +234,14 @@ Deno.serve(async (req) => {
     if (paramsErr || !paramsRow) return json({ error: "PARAMS_NOT_FOUND", key: paramsKey }, 400);
     const params = paramsRow.params as SignatureModelParams;
 
+    // ── Optional: sync Open history into the ledger first ───────────────
+    // Explicit opt-in (link/refresh flows pass it); the bundle fetch is a
+    // cross-service call and the ledger is the durable copy.
+    let openIngest: { upserted: number; skipped: number } | { error: string } | null = null;
+    if (body.ingest_open === true) {
+      openIngest = await ingestOpenHistory(supa, targetUserId);
+    }
+
     // ── Evidence → fit ───────────────────────────────────────────────────
     const { observations, skipped, sourceMix } = await loadEvidence(supa, targetUserId);
     const profile = fitProfile(observations, params);
@@ -188,6 +281,7 @@ Deno.serve(async (req) => {
       n_skipped_unsigned: skipped,
       params_key: paramsKey,
       persisted,
+      open_ingest: openIngest,
     });
   } catch (e) {
     console.error("signature-profile-refit error:", e);
