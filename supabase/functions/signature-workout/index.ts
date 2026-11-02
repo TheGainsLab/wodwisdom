@@ -470,6 +470,49 @@ async function evidenceHashesFor(
   return hashes;
 }
 
+/** Release rows this signature claimed under hashes it no longer carries —
+ *  the evidence-level mirror of staleMarkProvenance: a profile's training
+ *  rows must not follow a signature whose structure changed from under
+ *  them. Released rows return to waiting and the right signature (or a
+ *  reclaim pass) picks them up. Best-effort like the claim. */
+async function releaseStaleEvidence(
+  supa: ReturnType<typeof createClient>,
+  signatureId: string,
+  keepHashes: string[],
+): Promise<number> {
+  let q = supa
+    .from("signature_evidence")
+    .update({ workout_signature_id: null })
+    .eq("workout_signature_id", signatureId);
+  if (keepHashes.length > 0) {
+    q = q.not("workout_hash", "in", `(${keepHashes.map((h) => `"${h}"`).join(",")})`);
+  }
+  const { data, error } = await q.select("id");
+  if (error) {
+    console.warn("[signature-workout] evidence release failed:", error.message);
+    return 0;
+  }
+  return (data ?? []).length;
+}
+
+/** Signatures other than this one that list any of the same join keys —
+ *  duplicate-structure detection, surfaced so the admin sees which
+ *  signature owns the evidence (first claim wins until merged). */
+async function findHashConflicts(
+  supa: ReturnType<typeof createClient>,
+  signatureId: string,
+  hashes: string[],
+): Promise<Array<{ id: string; name: string; status: string }>> {
+  if (hashes.length === 0) return [];
+  const { data, error } = await supa
+    .from("workout_signatures")
+    .select("id, name, status")
+    .neq("id", signatureId)
+    .overlaps("evidence_hashes", hashes);
+  if (error) return [];
+  return (data ?? []) as Array<{ id: string; name: string; status: string }>;
+}
+
 /** Retroactive join: point waiting unsigned ledger rows at this signature.
  *  Best-effort — a failed claim never fails the save. */
 async function claimEvidence(
@@ -640,8 +683,16 @@ Deno.serve(async (req) => {
           .update({ ...fields, updated_at: new Date().toISOString() })
           .eq("id", id).select().single();
         if (error) return json({ error: error.message }, 500);
-        const claimed = await claimEvidence(supa, data.id, (data.evidence_hashes ?? []) as string[]);
-        return json({ row: data, evidence_claimed: claimed });
+        const hashes = (data.evidence_hashes ?? []) as string[];
+        const released = await releaseStaleEvidence(supa, data.id, hashes);
+        const claimed = await claimEvidence(supa, data.id, hashes);
+        const conflicts = await findHashConflicts(supa, data.id, hashes);
+        return json({
+          row: data,
+          evidence_claimed: claimed,
+          evidence_released: released,
+          hash_conflicts: conflicts,
+        });
       }
       if (!fields.name || !fields.workout || !fields.demand) {
         return json({ error: "MISSING_FIELDS (name, workout, demand required)" }, 400);
@@ -662,16 +713,26 @@ Deno.serve(async (req) => {
           .update({ ...fields, provenance: DEFAULT_PROVENANCE, updated_at: new Date().toISOString() })
           .eq("id", existing.id).select().single();
         if (error) return json({ error: error.message }, 500);
-        const claimed = await claimEvidence(supa, data.id, (data.evidence_hashes ?? []) as string[]);
-        return json({ row: data, evidence_claimed: claimed });
+        const hashes = (data.evidence_hashes ?? []) as string[];
+        const released = await releaseStaleEvidence(supa, data.id, hashes);
+        const claimed = await claimEvidence(supa, data.id, hashes);
+        const conflicts = await findHashConflicts(supa, data.id, hashes);
+        return json({
+          row: data,
+          evidence_claimed: claimed,
+          evidence_released: released,
+          hash_conflicts: conflicts,
+        });
       }
       const { data, error } = await supa
         .from("workout_signatures")
         .insert({ ...fields, status: "draft", provenance: DEFAULT_PROVENANCE })
         .select().single();
       if (error) return json({ error: error.message }, 500);
-      const claimed = await claimEvidence(supa, data.id, (data.evidence_hashes ?? []) as string[]);
-      return json({ row: data, evidence_claimed: claimed });
+      const newHashes = (data.evidence_hashes ?? []) as string[];
+      const claimed = await claimEvidence(supa, data.id, newHashes);
+      const conflicts = await findHashConflicts(supa, data.id, newHashes);
+      return json({ row: data, evidence_claimed: claimed, hash_conflicts: conflicts });
     }
 
     if (action === "approve" || action === "reject") {
@@ -710,9 +771,12 @@ Deno.serve(async (req) => {
       const { data, error } = await supa
         .from("workout_signatures").update(update).eq("id", id).select().single();
       if (error) return json({ error: error.message }, 500);
-      const claimed = action === "approve"
-        ? await claimEvidence(supa, data.id, (data.evidence_hashes ?? []) as string[])
-        : 0;
+      let claimed = 0;
+      if (action === "approve") {
+        const hashes = (data.evidence_hashes ?? []) as string[];
+        await releaseStaleEvidence(supa, data.id, hashes);
+        claimed = await claimEvidence(supa, data.id, hashes);
+      }
       return json({ row: data, evidence_claimed: claimed });
     }
 
@@ -798,6 +862,40 @@ Deno.serve(async (req) => {
           Math.abs((b.rel_error as number) ?? 0) - Math.abs((a.rel_error as number) ?? 0)
         ),
       });
+    }
+
+    if (action === "reclaim_evidence") {
+      // Reconciliation: the per-save claim is best-effort, so a transient
+      // failure can orphan unsigned rows. This re-runs the claim for every
+      // signature. Ownership priority when hashes collide (duplicate
+      // structures): approved before draft, then oldest — deterministic,
+      // and the same signature wins every run.
+      const { data: sigRows, error: sigErr } = await supa
+        .from("workout_signatures")
+        .select("id, status, created_at, evidence_hashes")
+        .neq("evidence_hashes", "{}");
+      if (sigErr) return json({ error: sigErr.message }, 500);
+      const sorted = ((sigRows ?? []) as Array<
+        { id: string; status: string; created_at: string; evidence_hashes: string[] | null }
+      >).sort((a, b) =>
+        (a.status === "approved" ? 0 : 1) - (b.status === "approved" ? 0 : 1) ||
+        a.created_at.localeCompare(b.created_at)
+      );
+      const owner = new Map<string, string>();
+      for (const sig of sorted) {
+        for (const h of sig.evidence_hashes ?? []) {
+          if (!owner.has(h)) owner.set(h, sig.id);
+        }
+      }
+      const byOwner = new Map<string, string[]>();
+      for (const [h, sigId] of owner) {
+        byOwner.set(sigId, [...(byOwner.get(sigId) ?? []), h]);
+      }
+      let totalClaimed = 0;
+      for (const [sigId, hashes] of byOwner) {
+        totalClaimed += await claimEvidence(supa, sigId, hashes);
+      }
+      return json({ claimed: totalClaimed, signatures_checked: byOwner.size });
     }
 
     if (action === "list") {

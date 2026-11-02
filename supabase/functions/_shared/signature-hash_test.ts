@@ -71,3 +71,16 @@ Deno.test("structure hash is order-sensitive and edit-sensitive", async () => {
   });
   assertNotEquals(reversed, same);
 });
+
+Deno.test("loads and reps survive normalization: RX and scaled never collide", async () => {
+  const rx = await hashWorkoutText("21-15-9: thrusters (95/65), pull-ups", "for_time", 600);
+  const scaled = await hashWorkoutText("21-15-9: thrusters (65/45), pull-ups", "for_time", 600);
+  const fewerReps = await hashWorkoutText("15-12-9: thrusters (95/65), pull-ups", "for_time", 600);
+  assertNotEquals(rx, scaled);
+  assertNotEquals(rx, fewerReps);
+  // and punctuation-only variance still collides (the intended leniency;
+  // note ":" is NOT stripped — times like "5:00" must survive — so the
+  // colon stays on both sides here)
+  const rx2 = await hashWorkoutText("21-15-9:  Thrusters  (95/65) +  Pull-ups!", "FOR_TIME", 600);
+  assertEquals(rx, rx2);
+});
