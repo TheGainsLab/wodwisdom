@@ -57,6 +57,8 @@ interface LedgerRow {
   obs_noise_var: number | null;
   source: string;
   performed_at: string;
+  /** row-level vector (intake/benchmark rows); null = resolve via signature */
+  discrimination: Record<string, number> | null;
 }
 
 async function loadEvidence(
@@ -67,7 +69,7 @@ async function loadEvidence(
 ): Promise<{ observations: EvidenceObservation[]; skipped: number; sourceMix: Record<string, number> }> {
   const { data: rows, error } = await supa
     .from("signature_evidence")
-    .select("id, workout_signature_id, percentile, obs_noise_var, source, performed_at")
+    .select("id, workout_signature_id, percentile, obs_noise_var, source, performed_at, discrimination")
     .eq("user_id", userId)
     .order("performed_at", { ascending: false })
     .limit(500);
@@ -96,7 +98,12 @@ async function loadEvidence(
   let skipped = 0;
   for (const r of ledger) {
     const sig = r.workout_signature_id ? discById.get(r.workout_signature_id) : undefined;
-    if (!sig || r.percentile === null) {
+    // a row-level vector (intake/benchmark evidence) needs no signature and
+    // no draft inflation — its noise is already set by the standards config
+    const rowDisc = r.discrimination && Object.keys(r.discrimination).length > 0
+      ? r.discrimination
+      : undefined;
+    if ((!sig && !rowDisc) || r.percentile === null) {
       skipped++;
       continue;
     }
@@ -113,12 +120,13 @@ async function loadEvidence(
     // inform but cannot dominate a profile.
     const draftInflation = (params_draft_inflation ?? 3.0);
     const baseNoise = r.obs_noise_var !== null ? Number(r.obs_noise_var) : undefined;
-    const obsNoiseVar = sig.approved
+    const approved = rowDisc ? true : sig!.approved;
+    const obsNoiseVar = approved
       ? baseNoise
       : (baseNoise ?? DEFAULT_NOISE_VAR) * draftInflation;
     observations.push({
       percentile: Number(r.percentile),
-      discrimination: sig.disc,
+      discrimination: rowDisc ?? sig!.disc,
       yearsAgo,
       obsNoiseVar,
     });
@@ -233,6 +241,194 @@ async function ingestOpenHistory(
   return { upserted: rows.length, skipped };
 }
 
+// ---------------------------------------------------------------- intake
+
+interface IntakeStandard {
+  axes: Record<string, number>;
+  noise_var: number;
+  lower_is_better?: boolean;
+  men: { p50: number; p95: number };
+  women: { p50: number; p95: number };
+}
+
+interface IntakeStandards {
+  lifts: Record<string, IntakeStandard>;
+  conditioning: Record<string, IntakeStandard>;
+  skill_gates: Record<string, string>;
+  pct_clamp: [number, number];
+}
+
+/** "7:45" | "7.45"? no — mm:ss or raw seconds (number|string) → seconds */
+function parseTimeSeconds(v: unknown): number | null {
+  if (typeof v === "number" && Number.isFinite(v) && v > 0) return v;
+  if (typeof v !== "string") return null;
+  const t = v.trim();
+  const mmss = t.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (mmss) {
+    const [, a, b, c] = mmss;
+    return c !== undefined
+      ? Number(a) * 3600 + Number(b) * 60 + Number(c)
+      : Number(a) * 60 + Number(b);
+  }
+  const n = Number(t);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function anchorsPct(
+  value: number,
+  std: IntakeStandard,
+  gender: "men" | "women",
+  clamp: [number, number],
+): number {
+  const { p50, p95 } = std[gender];
+  const span = p95 - p50;
+  if (span === 0) return 50;
+  const pct = 50 + 45 * ((value - p50) / span);
+  return Math.min(clamp[1], Math.max(clamp[0], pct));
+}
+
+/**
+ * Declared intake → ledger evidence + gate possession (build item 2,
+ * 2026-11-03). Lifts enter as bodyweight-ratio percentiles against the
+ * editorial anchors (near-pure strength/oly vectors — the per-athlete
+ * oly-vs-powerlifting split the Open provably cannot make); conditioning
+ * times enter with the transference discount as widened noise; the skills
+ * checklist sets gate switches (none → lacks, any level → has).
+ * Idempotent via source_ref='intake:<key>'. Editorial standards are a
+ * params row, replaced per-metric as platform regressions gain power.
+ */
+async function ingestIntake(
+  supa: SupabaseClient,
+  userId: string,
+): Promise<{ upserted: number; gates_set: number; skipped: number } | { error: string }> {
+  const { data: stdRow } = await supa
+    .from("signature_model_params")
+    .select("params")
+    .eq("key", "intake_standards_v1")
+    .maybeSingle();
+  if (!stdRow) return { error: "NO_STANDARDS" };
+  const std = stdRow.params as IntakeStandards;
+
+  const { data: prof } = await supa
+    .from("athlete_profiles")
+    .select("lifts, conditioning, skills, bodyweight, gender, units")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (!prof) return { error: "NO_PROFILE" };
+  const row = prof as {
+    lifts: Record<string, unknown> | null;
+    conditioning: Record<string, unknown> | null;
+    skills: Record<string, unknown> | null;
+    bodyweight: number | null;
+    gender: string | null;
+    units: string | null;
+  };
+  const g = row.gender?.toLowerCase();
+  const gender: "men" | "women" | null = g === "men" || g === "male"
+    ? "men"
+    : g === "women" || g === "female"
+    ? "women"
+    : null;
+  if (!gender) return { error: "NO_GENDER" }; // anchors are gendered; no guessing
+
+  const today = new Date().toISOString().slice(0, 10);
+  const rows: Record<string, unknown>[] = [];
+  let skipped = 0;
+
+  // --- lifts: bodyweight ratios (units cancel: lift and bw share units)
+  const bw = typeof row.bodyweight === "number" && row.bodyweight > 0 ? row.bodyweight : null;
+  for (const [key, cfg] of Object.entries(std.lifts)) {
+    const raw = (row.lifts ?? {})[key];
+    const lift = typeof raw === "number" && Number.isFinite(raw) && raw > 0 ? raw : null;
+    if (lift === null || bw === null) {
+      skipped++;
+      continue;
+    }
+    const pct = anchorsPct(lift / bw, cfg, gender, std.pct_clamp);
+    rows.push({
+      user_id: userId,
+      workout_hash: `intake_${key}`,
+      score_raw: { metric: key, value: lift, bodyweight: bw, units: row.units ?? null },
+      percentile: pct,
+      discrimination: cfg.axes,
+      obs_noise_var: cfg.noise_var,
+      source: "intake_declaration",
+      cohort: "open_rx_general",
+      performed_at: today,
+      source_ref: `intake:${key}`,
+    });
+  }
+
+  // --- conditioning: times vs anchors, faster = higher
+  for (const [key, cfg] of Object.entries(std.conditioning)) {
+    const secs = parseTimeSeconds((row.conditioning ?? {})[key]);
+    if (secs === null) {
+      skipped++;
+      continue;
+    }
+    const value = cfg.lower_is_better ? -secs : secs;
+    const anchors = {
+      ...cfg,
+      men: cfg.lower_is_better ? { p50: -cfg.men.p50, p95: -cfg.men.p95 } : cfg.men,
+      women: cfg.lower_is_better ? { p50: -cfg.women.p50, p95: -cfg.women.p95 } : cfg.women,
+    };
+    const pct = anchorsPct(value, anchors as IntakeStandard, gender, std.pct_clamp);
+    rows.push({
+      user_id: userId,
+      workout_hash: `intake_${key}`,
+      score_raw: { metric: key, seconds: secs },
+      percentile: pct,
+      discrimination: cfg.axes,
+      obs_noise_var: cfg.noise_var,
+      source: "intake_declaration",
+      cohort: "open_rx_general",
+      performed_at: today,
+      source_ref: `intake:${key}`,
+    });
+  }
+
+  if (rows.length > 0) {
+    const { error } = await supa
+      .from("signature_evidence")
+      .upsert(rows, { onConflict: "user_id,source_ref" });
+    if (error) return { error: error.message };
+  }
+
+  // --- skills checklist → gate switches (declared facts, full weight)
+  const skills = (row.skills ?? {}) as Record<string, unknown>;
+  const level = (k: string): string | null => {
+    const v = skills[k];
+    return typeof v === "string" ? v : null;
+  };
+  const gateRows: Record<string, unknown>[] = [];
+  for (const [skillKey, movement] of Object.entries(std.skill_gates)) {
+    let lvl: string | null;
+    if (skillKey === "pull_ups_any") {
+      const ls = ["strict_pull_ups", "kipping_pull_ups", "butterfly_pull_ups"].map(level);
+      lvl = ls.some((l) => l && l !== "none") ? "intermediate" : ls.every((l) => l === null) ? null : "none";
+    } else {
+      lvl = level(skillKey);
+    }
+    if (lvl === null) continue; // unanswered = unknown, write nothing
+    gateRows.push({
+      user_id: userId,
+      movement,
+      status: lvl === "none" ? "lacks" : "has",
+      source: "intake_declaration",
+      observed_at: today,
+      updated_at: new Date().toISOString(),
+    });
+  }
+  if (gateRows.length > 0) {
+    const { error } = await supa
+      .from("athlete_gate_possession")
+      .upsert(gateRows, { onConflict: "user_id,movement" });
+    if (error) return { error: error.message };
+  }
+
+  return { upserted: rows.length, gates_set: gateRows.length, skipped };
+}
+
 Deno.serve(async (req) => {
   const cors = getCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -279,6 +475,13 @@ Deno.serve(async (req) => {
     let openIngest: { upserted: number; skipped: number } | { error: string } | null = null;
     if (body.ingest_open === true) {
       openIngest = await ingestOpenHistory(supa, targetUserId);
+    }
+
+    // Intake ingestion runs on every refit unless opted out: local reads,
+    // idempotent upserts, and declared numbers should never lag the fit.
+    let intakeIngest: { upserted: number; gates_set: number; skipped: number } | { error: string } | null = null;
+    if (body.ingest_intake !== false) {
+      intakeIngest = await ingestIntake(supa, targetUserId);
     }
 
     // ── Evidence → fit ───────────────────────────────────────────────────
@@ -368,6 +571,7 @@ Deno.serve(async (req) => {
       persisted,
       fit_log_id: fitLogId,
       open_ingest: openIngest,
+      intake_ingest: intakeIngest,
     });
   } catch (e) {
     console.error("signature-profile-refit error:", e);
