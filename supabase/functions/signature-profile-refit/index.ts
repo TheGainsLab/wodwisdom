@@ -331,6 +331,24 @@ Deno.serve(async (req) => {
           fitted_at: fittedAt,
         }, { onConflict: "user_id" });
       if (headerErr) return json({ error: "PERSIST_FAILED", detail: headerErr.message }, 500);
+      // Append-only research record (story-layer spec item 5): the fit log
+      // accumulates every production fit for concordance capture and
+      // params-version drift monitoring. Best-effort — never fails the fit.
+      const { error: logErr } = await supa.from("signature_fit_log").insert({
+        user_id: targetUserId,
+        fitted_at: fittedAt,
+        params_key: paramsKey,
+        n_evidence: observations.length,
+        level_mean: profile.level.mean,
+        level_sd: profile.level.sd,
+        axes: profile.axes,
+        limiter: profile.limiterRanked.map((axis) => ({
+          axis,
+          p: profile.limiterPosterior[axis],
+        })),
+        source_mix: sourceMix,
+      });
+      if (logErr) console.warn("fit-log append failed:", logErr.message);
       persisted = true;
     }
 
