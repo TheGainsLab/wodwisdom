@@ -187,9 +187,16 @@ export function evidenceLimiters(p: FittedProfileView, max = 2): LimiterItem[] {
     }));
 }
 
-/** Width-driven unknowns: dials still mostly at the prior. */
+/** Width-driven unknowns: dials still mostly at the prior. An axis that
+ *  already earned "limiter" is excluded — the two-card rule is DISJOINT by
+ *  spec (unknowns are width ALONE), and a shallow dial can genuinely pass
+ *  both gates: evidence-backed negative mean AND mostly-prior width (the
+ *  z-space copy-checker profiles surfaced this, review 2026-11-03; it is
+ *  reachable in pct space too). The limiter claim is the stronger one. */
 export function unknownDials(p: FittedProfileView, max = 3): UnknownItem[] {
+  const limiterAxes = new Set(evidenceLimiters(p).map((l) => l.axis));
   return Object.entries(p.axes)
+    .filter(([axis]) => !limiterAxes.has(axis))
     .map(([axis, ax]) => {
       const ps = priorSdOf(ax);
       return { axis, resolution: ps ? 1 - ax.sd / ps : null };

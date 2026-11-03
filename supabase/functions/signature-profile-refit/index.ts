@@ -43,6 +43,7 @@ import {
   pctFromZ,
   type SignatureModelParams,
 } from "../_shared/signature-profile-fit.ts";
+import { selectEliteCohort } from "../_shared/signature-cohort-select.ts";
 import {
   fetchTier4Bundle,
   type Tier4AllResultsEntry,
@@ -513,13 +514,9 @@ Deno.serve(async (req) => {
     let activeKey = paramsKey;
 
     // ── Two-pass cohort selection: elite athletes refit in z ────────────
-    // Only from the default path (an explicit params_key is an operator
-    // asking for exactly that row), and only when the elite row exists.
-    // HYSTERESIS (review 2026-11-03): enter at elite_level_min_pct, but an
-    // athlete already in the elite cohort stays until the general fit drops
-    // below elite_level_exit_pct — which side they were on is read from the
-    // persisted header, never recomputed from the (noisy) level alone, so
-    // near-threshold athletes don't flip rulers between refits.
+    // The decision itself (threshold-from-params, elite row absent,
+    // explicit params_key bypass, hysteresis via the PERSISTED cohort) is
+    // the pure selectEliteCohort(), pinned by its own test file.
     if (paramsKey === DEFAULT_PARAMS_KEY && observations.length > 0) {
       const [{ data: eliteRow }, { data: prevHeader }] = await Promise.all([
         supa.from("signature_model_params")
@@ -528,13 +525,15 @@ Deno.serve(async (req) => {
           .select("cohort").eq("user_id", targetUserId).maybeSingle(),
       ]);
       const eliteParams = (eliteRow?.params ?? null) as SignatureModelParams | null;
-      const wasElite = (prevHeader as { cohort?: string } | null)?.cohort === "open_rx_elite";
-      const enterAt = eliteParams?.elite_level_min_pct ?? 85;
-      const exitAt = eliteParams?.elite_level_exit_pct ?? enterAt - 5;
-      const eliteNow = wasElite
-        ? profile.level.mean >= exitAt
-        : profile.level.mean >= enterAt;
-      if (eliteParams?.space === "z" && eliteNow) {
+      const eliteNow = selectEliteCohort({
+        requestedKey: paramsKey,
+        defaultKey: DEFAULT_PARAMS_KEY,
+        nEvidence: observations.length,
+        eliteParams,
+        previousCohort: (prevHeader as { cohort?: string } | null)?.cohort ?? null,
+        generalLevelMean: profile.level.mean,
+      });
+      if (eliteParams && eliteNow) {
         const zObs = convertEvidenceToZ(
           observations,
           params.noise_var_pct,
@@ -596,9 +595,16 @@ Deno.serve(async (req) => {
           sd_pct: displayAxes[axis].sd,
           // the prior sd THIS fit shrank from — the display computes
           // resolution against it (never against client-side constants).
-          // For a z fit, converted at the athlete's level so sd/priorSd
-          // stays the same resolution ratio the fit actually achieved.
-          prior_sd_pct: isZ ? 100 * normPdf(Lz) * priorSd : priorSd,
+          // For a z fit, converted at the SAME evaluation point as the
+          // dial's own sd (level + delta), so sd/priorSd is exactly the
+          // z-space resolution ratio. Converting the prior at the bare
+          // level instead inflates the ratio on negative dials (phi grows
+          // toward the mean) and a well-measured limiter would also
+          // classify as an unknown — the two-card violation the z-space
+          // copy-checker profiles caught (review 2026-11-03).
+          prior_sd_pct: isZ
+            ? 100 * normPdf(Lz + profile.axes[axis].mean) * priorSd
+            : priorSd,
           // z natives — explicitly null on pct fits so an athlete who
           // drops below the elite threshold doesn't keep stale z columns
           mean_z: isZ ? profile.axes[axis].mean : null,
