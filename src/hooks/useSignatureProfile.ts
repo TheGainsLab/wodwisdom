@@ -22,6 +22,10 @@ export interface SignatureProfileState {
   refresh: () => Promise<void>;
   sendConcordance: (verdict: 'match' | 'partial' | 'miss', note?: string) => Promise<boolean>;
   concordanceSent: boolean;
+  /** false until a fit-log row exists to attach a reaction to (profiles
+   *  persisted before the log shipped render fine but can't record
+   *  concordance until one refresh) */
+  canConcord: boolean;
 }
 
 interface VectorRow {
@@ -81,6 +85,16 @@ export function useSignatureProfile(userId: string | undefined): SignatureProfil
     }
     const limiterPosterior: Record<string, number> = {};
     for (const l of h.limiter ?? []) limiterPosterior[l.axis] = l.p;
+    // resolve the fit-log row this persisted profile corresponds to, so
+    // concordance has an address (and the buttons know whether to arm)
+    const { data: latestFit } = await supabase
+      .from('signature_fit_log')
+      .select('id')
+      .eq('user_id', userId)
+      .order('fitted_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    setPinnedFitId((latestFit as { id: string } | null)?.id ?? null);
     const gateMap: Record<string, 'has' | 'lacks' | 'unknown'> = {};
     for (const g of (gates ?? []) as Array<{ movement: string; status: 'has' | 'lacks' | 'unknown' }>) {
       gateMap[g.movement] = g.status;
@@ -129,8 +143,9 @@ export function useSignatureProfile(userId: string | undefined): SignatureProfil
       }
       // pin concordance to THIS fit's log row (the log insert is
       // best-effort server-side; "latest row" could be a previous fit)
-      setPinnedFitId((body as { fit_log_id?: string | null }).fit_log_id ?? null);
-      await load();
+      const freshId = (body as { fit_log_id?: string | null }).fit_log_id ?? null;
+      await load(); // load() re-pins to the latest row...
+      if (freshId) setPinnedFitId(freshId); // ...the refit's own id wins when present
       setConcordanceSent(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Refresh failed');
@@ -142,19 +157,10 @@ export function useSignatureProfile(userId: string | undefined): SignatureProfil
   const sendConcordance = useCallback(
     async (verdict: 'match' | 'partial' | 'miss', note?: string): Promise<boolean> => {
       if (!userId) return false;
-      // attach to the pinned fit when we have one (set by refresh());
-      // otherwise the latest row — the fit the athlete is looking at.
-      let targetId = pinnedFitId;
-      if (!targetId) {
-        const { data: latest } = await supabase
-          .from('signature_fit_log')
-          .select('id')
-          .eq('user_id', userId)
-          .order('fitted_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        targetId = (latest as { id: string } | null)?.id ?? null;
-      }
+      // the pin is resolved by load() (latest row) and sharpened by
+      // refresh() (the exact row that fit wrote); no pin = nothing to
+      // attach to, and the UI keeps the buttons disabled.
+      const targetId = pinnedFitId;
       if (!targetId) return false;
       const { error: upErr } = await supabase
         .from('signature_fit_log')
@@ -170,5 +176,8 @@ export function useSignatureProfile(userId: string | undefined): SignatureProfil
     [userId, pinnedFitId],
   );
 
-  return { profile, loading, refreshing, error, refresh, sendConcordance, concordanceSent };
+  return {
+    profile, loading, refreshing, error, refresh, sendConcordance, concordanceSent,
+    canConcord: pinnedFitId !== null,
+  };
 }
