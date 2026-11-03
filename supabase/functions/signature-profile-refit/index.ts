@@ -288,8 +288,20 @@ function anchorsPct(
 }
 
 /**
- * Declared intake → ledger evidence + gate possession (build item 2,
- * 2026-11-03). Lifts enter as bodyweight-ratio percentiles against the
+ * DORMANT — NO CALL PATH (founder ruling, 2026-11-03): the Signature is
+ * built from performance data (Open, future metcon results); the Profile
+ * is the athlete's self-reported intake. They stay COMPLETELY DISCONNECTED
+ * until the integration is designed properly. This function and the
+ * intake_standards_v1 params row are kept as the starting point for that
+ * work. Open design questions recorded in the design doc: anchor-scale
+ * calibration against the real RX Open field (linked-user regression);
+ * correlated anchor error (shared per-source bias term, not independent
+ * rows); the arbitration rule between direct-but-scale-uncertain
+ * declarations and blended-but-validated performance inference; and the
+ * reference-population framing of self-reported numbers.
+ *
+ * Original design: declared intake → ledger evidence + gate possession
+ * (build item 2, 2026-11-03). Lifts enter as bodyweight-ratio percentiles against the
  * editorial anchors (near-pure strength/oly vectors — the per-athlete
  * oly-vs-powerlifting split the Open provably cannot make); conditioning
  * times enter with the transference discount as widened noise; the skills
@@ -477,12 +489,6 @@ Deno.serve(async (req) => {
       openIngest = await ingestOpenHistory(supa, targetUserId);
     }
 
-    // Intake ingestion runs on every refit unless opted out: local reads,
-    // idempotent upserts, and declared numbers should never lag the fit.
-    let intakeIngest: { upserted: number; gates_set: number; skipped: number } | { error: string } | null = null;
-    if (body.ingest_intake !== false) {
-      intakeIngest = await ingestIntake(supa, targetUserId);
-    }
 
     // ── Evidence → fit ───────────────────────────────────────────────────
     const { observations, skipped, sourceMix } = await loadEvidence(
@@ -571,7 +577,6 @@ Deno.serve(async (req) => {
       persisted,
       fit_log_id: fitLogId,
       open_ingest: openIngest,
-      intake_ingest: intakeIngest,
     });
   } catch (e) {
     console.error("signature-profile-refit error:", e);
