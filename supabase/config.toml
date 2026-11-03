@@ -306,3 +306,9 @@ verify_jwt = false
 
 [functions.discuss-paper]
 verify_jwt = false
+
+[functions.signature-workout]
+verify_jwt = false
+
+[functions.signature-profile-refit]
+verify_jwt = false
