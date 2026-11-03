@@ -17,6 +17,7 @@ export async function getAuthHeaders(): Promise<Record<string, string>> {
   if (!session?.access_token) throw new Error('Not authenticated');
   return { Authorization: 'Bearer ' + session.access_token, 'Content-Type': 'application/json' };
 }
+export const SIGNATURE_PROFILE_REFIT_ENDPOINT = SUPABASE_URL + '/functions/v1/signature-profile-refit';
 export const CHAT_ENDPOINT = SUPABASE_URL + '/functions/v1/chat';
 export const DISCUSS_PAPER_ENDPOINT = SUPABASE_URL + '/functions/v1/discuss-paper';
 export const CONTACT_COACH_ENDPOINT = SUPABASE_URL + '/functions/v1/contact-coach';

@@ -29,8 +29,9 @@ import CompetitionExplorer, { type Scope, type Filter } from './CompetitionExplo
 import MovementsPanel from './MovementsPanel';
 import SummaryPanel, { type SignatureLite } from './SummaryPanel';
 import PowerPanel from './PowerPanel';
+import SignatureProfilePanel from './SignatureProfilePanel';
 
-type ExperienceTab = 'summary' | 'map' | 'movements' | 'power';
+type ExperienceTab = 'summary' | 'map' | 'movements' | 'power' | 'signature';
 
 interface BundleIdentity {
   name: string;
@@ -750,7 +751,6 @@ export default function CompetitionHistoryExperience({
             const summaryPanel = (
               <SummaryPanel
                 name={linkedBundle.identity.name}
-                profileUrl={linkedBundle.identity.profile_url}
                 seasonsCompeted={cs.seasons_competed}
                 history={competitionHistory}
                 signature={linkedBundle.fitness_signature}
@@ -816,6 +816,7 @@ export default function CompetitionHistoryExperience({
                   {tabBtn('map', 'Workouts')}
                   {tabBtn('movements', 'All Movements')}
                   {tabBtn('power', 'Power')}
+                  {tabBtn('signature', 'Signature')}
                 </div>
 
                 {tab === 'summary' && summaryPanel}
@@ -844,6 +845,11 @@ export default function CompetitionHistoryExperience({
                 {tab === 'power' && (
                   <PowerPanel history={competitionHistory} userKg={userBodyMassKg} />
                 )}
+
+                {/* The fitted capability profile (Workout Signatures athlete
+                    layer): dials, limiter/unknown cards, templated story,
+                    concordance capture. Reads storage; refit on demand. */}
+                {tab === 'signature' && <SignatureProfilePanel userId={userId} />}
               </>
             );
           })()}

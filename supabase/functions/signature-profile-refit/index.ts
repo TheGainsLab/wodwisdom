@@ -298,13 +298,17 @@ Deno.serve(async (req) => {
     // ── Persist (only when there is evidence; the bare prior is not a
     //    profile worth storing, and zero-depth users read the prior live) ──
     let persisted = false;
+    let fitLogId: string | null = null;
     if (observations.length > 0) {
       const fittedAt = new Date().toISOString();
-      const vectorRows = params.axes.map((axis) => ({
+      const vectorRows = params.axes.map((axis, i) => ({
         user_id: targetUserId,
         axis,
         mean_pct: profile.axes[axis].mean,
         sd_pct: profile.axes[axis].sd,
+        // the prior sd THIS fit shrank from — the display computes
+        // resolution against it (never against client-side constants)
+        prior_sd_pct: Math.sqrt(Math.max(params.prior_cov_pct[i][i], 0)),
         n_evidence: observations.length,
         source_mix: sourceMix,
         model_params_key: paramsKey,
@@ -320,6 +324,7 @@ Deno.serve(async (req) => {
         .from("athlete_signature_profiles")
         .upsert({
           user_id: targetUserId,
+          cohort: (params as SignatureModelParams & { cohort?: string }).cohort ?? "open_rx_general",
           level_mean: profile.level.mean,
           level_sd: profile.level.sd,
           limiter: profile.limiterRanked.map((axis) => ({
@@ -331,6 +336,25 @@ Deno.serve(async (req) => {
           fitted_at: fittedAt,
         }, { onConflict: "user_id" });
       if (headerErr) return json({ error: "PERSIST_FAILED", detail: headerErr.message }, 500);
+      // Append-only research record (story-layer spec item 5): the fit log
+      // accumulates every production fit for concordance capture and
+      // params-version drift monitoring. Best-effort — never fails the fit.
+      const { data: logRow, error: logErr } = await supa.from("signature_fit_log").insert({
+        user_id: targetUserId,
+        fitted_at: fittedAt,
+        params_key: paramsKey,
+        n_evidence: observations.length,
+        level_mean: profile.level.mean,
+        level_sd: profile.level.sd,
+        axes: profile.axes,
+        limiter: profile.limiterRanked.map((axis) => ({
+          axis,
+          p: profile.limiterPosterior[axis],
+        })),
+        source_mix: sourceMix,
+      }).select("id").single();
+      if (logErr) console.warn("fit-log append failed:", logErr.message);
+      fitLogId = (logRow as { id: string } | null)?.id ?? null;
       persisted = true;
     }
 
@@ -342,6 +366,7 @@ Deno.serve(async (req) => {
       n_skipped_unsigned: skipped,
       params_key: paramsKey,
       persisted,
+      fit_log_id: fitLogId,
       open_ingest: openIngest,
     });
   } catch (e) {
