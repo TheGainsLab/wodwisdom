@@ -23,6 +23,7 @@ import type { WriterPayload } from "./build-writer-payload.ts";
 import {
   COACH_STATE_SYSTEM_PROMPT,
   ENGINE_COACH_STATE_ADDENDUM,
+  SIGNATURE_PROFILE_COACH_STATE_ADDENDUM,
   TWO_DAY_COACH_STATE_ADDENDUM,
 } from "./coach-state-prompt.ts";
 import {
@@ -66,7 +67,11 @@ async function callCoachState(
 ): Promise<CoachStateContent> {
   if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY not configured");
   const tool = buildEmitCoachStateTool(
-    athleteModelEvidenceKeys(payload.athlete_model),
+    [
+      ...athleteModelEvidenceKeys(payload.athlete_model),
+      // the fitted capability profile is citable evidence when present
+      ...(payload.signature_profile ? ["signature_profile"] : []),
+    ],
     allowedReasonCodes(payload),
   );
   const payloadBlock = `ATHLETE PAYLOAD (JSON):\n${JSON.stringify(payload, null, 2)}`;
@@ -91,6 +96,7 @@ async function callCoachState(
         // (a 2-day Engine athlete gets both). Athletes matching neither
         // get the byte-identical base prompt.
         system: COACH_STATE_SYSTEM_PROMPT +
+          (payload.signature_profile ? SIGNATURE_PROFILE_COACH_STATE_ADDENDUM : "") +
           (payload.engine_training ? ENGINE_COACH_STATE_ADDENDUM : "") +
           (payload.training_context.days_per_week === 2 ? TWO_DAY_COACH_STATE_ADDENDUM : ""),
         tools: [tool],

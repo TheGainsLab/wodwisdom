@@ -103,7 +103,15 @@ export type EvidenceKey = AthleteModelKey | (string & {});
 // Distinct from powerlifting_strength (maximal) the same way
 // gymnastics_pressing is distinct from upper_body_pressing. The bump
 // regenerates cached states so the coach's judgment can cite it.
-export const COACH_STATE_BUILDER_VERSION = "v1.19";
+// v1.20 (signature profile evidence, 2026-11-03): CoachState consumes the
+// fitted capability profile (payload.signature_profile) — level + relative
+// dials + pre-gated limiters/unknowns from the Workout Signatures athlete
+// layer. Limiters ground largest_competition_gap priorities (evidence key
+// "signature_profile"); unknowns justify assessment suggestions only. The
+// two-card discipline is applied in the payload builder, so the model can
+// only cite what the fit earned. Phase 4's named payoff: profiles now
+// steer what gets programmed. The bump regenerates cached states.
+export const COACH_STATE_BUILDER_VERSION = "v1.20";
 
 // ============================================================
 // Controlled vocabularies — LOCKED v1 (DATA, versioned with the schema;

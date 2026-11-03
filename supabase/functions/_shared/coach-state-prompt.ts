@@ -109,6 +109,15 @@ EMIT the emit_coach_state tool. Output beliefs + decisions only — no weekly st
  * completed-session evidence in the trailing 28 days (build-writer-payload
  * gates all three). Every other athlete's prompt is untouched.
  */
+export const SIGNATURE_PROFILE_COACH_STATE_ADDENDUM = `
+SIGNATURE PROFILE (payload.signature_profile) — the athlete's fitted capability profile: their scored history (competition + logged + declared intake) synthesized into a level plus twelve RELATIVE dials by a validated statistical model. Rules for consuming it:
+  - dials[axis] = {mean, sd} is deviation from the ATHLETE'S OWN LEVEL, never absolute ability. A -3 dial on a p96 athlete can still be top-10% in the world. NEVER describe a negative dial as the athlete being weak at something in prose; say it trails their own level.
+  - limiters[] is pre-gated: only axes whose deficit the evidence actually supports appear (empty = no limiter is earned yet; do NOT promote a dial into a limiter yourself). A limiter here is strong grounds for a development priority with reason largest_competition_gap, cited as evidence ["signature_profile"]. It ranks ABOVE single competition_movements facts in confidence: it synthesizes the athlete's whole scored history.
+  - unknowns[] are axes the data cannot yet see (wide uncertainty, NOT weakness). They justify assessment/testing suggestions, never development priorities.
+  - depth_band shallow = treat everything here as corroboration only, never the sole driver of a priority.
+  - This section NEVER overrides a declared injury/constraint, and it complements (does not replace) the strength-ratio normatives: ratios are gym facts, dials are performance-under-test facts.
+`;
+
 export const ENGINE_COACH_STATE_ADDENDUM = `
 
 ENGINE TRAINING CONTEXT (engine_training) — present only with completed-session evidence
