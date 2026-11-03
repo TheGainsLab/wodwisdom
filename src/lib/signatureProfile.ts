@@ -27,8 +27,9 @@
 export interface AxisPosterior {
   mean: number; // deviation from own level, percentile points (RELATIVE)
   sd: number;
-  /** the prior sd THIS fit shrank from (written by the refit; the model
-   *  owns it — PRIOR_SD below is a fixtures-only fallback, never truth) */
+  /** the prior sd THIS fit shrank from (written by the refit from the
+   *  live params row — the single source; absent only on rows persisted
+   *  before the column existed, in which case nothing classifies) */
   priorSd?: number;
 }
 
@@ -147,28 +148,12 @@ export const AXIS_META: Record<string, { label: string; definition: string; prob
   },
 };
 
-// FIXTURES-ONLY FALLBACK (review 2026-11-03, item 1): real profiles carry
-// priorSd per axis, written by the fit from the live params row — the
-// display must never own model constants. This table exists so the
-// synthetic fixtures (which predate the column) still classify; it
-// mirrors open_rx_general_v1 and is NOT kept in sync by anything.
-export const PRIOR_SD: Record<string, number> = {
-  aerobic_capacity: 8.8,
-  anaerobic_capacity: 4.4,
-  gymnastics_pressing: 7.4,
-  gymnastics_pulling: 13.0,
-  midline: 2.6,
-  mixed_modal_conditioning: 2.9,
-  olympic_lifting: 7.0,
-  posterior_chain: 3.7,
-  powerlifting_strength: 8.0,
-  skill_coordination: 5.9,
-  squat_cycling: 3.7,
-  upper_body_pressing: 3.0,
-};
-
-function priorSdOf(axis: string, ax: AxisPosterior): number {
-  return ax.priorSd ?? PRIOR_SD[axis] ?? (ax.sd || 1);
+/** The prior sd the fit shrank from. null = this row predates the
+ *  prior_sd_pct column; we then DECLINE to classify resolution rather
+ *  than classify against a client-side copy of model state (one
+ *  refresh backfills). */
+function priorSdOf(ax: AxisPosterior): number | null {
+  return ax.priorSd ?? null;
 }
 
 // ------------------------------------------------------ classification
@@ -198,11 +183,12 @@ export function evidenceLimiters(p: FittedProfileView, max = 2): LimiterItem[] {
 /** Width-driven unknowns: dials still mostly at the prior. */
 export function unknownDials(p: FittedProfileView, max = 3): UnknownItem[] {
   return Object.entries(p.axes)
-    .map(([axis, ax]) => ({
-      axis,
-      resolution: 1 - ax.sd / priorSdOf(axis, ax),
-    }))
-    .filter((d) => d.resolution < 0.35)
+    .map(([axis, ax]) => {
+      const ps = priorSdOf(ax);
+      return { axis, resolution: ps ? 1 - ax.sd / ps : null };
+    })
+    .filter((d) => d.resolution !== null && d.resolution < 0.35)
+    .map((d) => ({ axis: d.axis, resolution: d.resolution as number }))
     .sort((a, b) => a.resolution - b.resolution)
     .slice(0, max)
     .map((d) => ({
@@ -230,7 +216,10 @@ export function buildDials(p: FittedProfileView): DialView[] {
       relative: ax.mean,
       sd: ax.sd,
       absolute: Math.min(99, Math.max(1, p.level.mean + ax.mean)),
-      resolution: Math.max(0, Math.min(1, 1 - ax.sd / priorSdOf(axis, ax))),
+      resolution: (() => {
+        const ps = priorSdOf(ax);
+        return ps ? Math.max(0, Math.min(1, 1 - ax.sd / ps)) : 1;
+      })(),
     }))
     .sort((a, b) => b.relative - a.relative);
 }
