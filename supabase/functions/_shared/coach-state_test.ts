@@ -141,7 +141,11 @@ Deno.test("no duplicate enum members", () => {
 Deno.test("locked vocabulary counts (guards accidental edits)", () => {
   assertEquals(FOCUS_AREAS.length, 12); // v1.19: squat_cycling joined (Workout Signatures pilot evidence)
   assertEquals(REASON_CODES.length, 21); // v1.8: observed_progress/observed_plateau retired with the inference layer
-  assertEquals(NORMATIVE_KEYS.length, 12);
+  // 19 blessed 2026-11-03: 6 strength ratios + 5 intra-lift chains
+  // (thresholds v2) + 2 pace-retention + 4 bodyweight bars + 2 competition
+  // percentiles — the guard had been left at 12 through several documented
+  // additions and was failing on main, which disarms the tripwire.
+  assertEquals(NORMATIVE_KEYS.length, 19);
 });
 
 Deno.test("low_skill_proficiency exists — the unlinked-athlete gymnastics gap signal", () => {

@@ -287,6 +287,82 @@ export interface WriterPayload {
   training_evaluation: string | null;
   /** Concatenated RAG context (TODO: wire to v1's searchChunks chain). */
   rag: string;
+  /** Fitted capability profile (Workout Signatures athlete layer) when one
+   *  is persisted; null otherwise. The two-card discipline is applied HERE
+   *  (limiters = evidence-backed only; unknowns = width-driven), so the
+   *  coach LLM can only cite what the fit earned — the same narrator-
+   *  barrier principle as the athlete display. Optional so existing
+   *  payload constructors/fixtures stay valid. */
+  signature_profile?: SignatureProfilePayload | null;
+}
+
+export interface SignatureProfilePayload {
+  level_mean: number;
+  level_sd: number;
+  cohort: string;
+  n_evidence: number;
+  depth_band: "shallow" | "mid" | "deep";
+  fitted_at: string;
+  /** relative-to-own-level dials, percentile points */
+  dials: Record<string, { mean: number; sd: number }>;
+  /** evidence-backed only (mean < -0.5*sd, posterior mass >= 12%, depth
+   *  band mid+) — ranked, max 2. Empty = no limiter is earned. */
+  limiters: Array<{ axis: string; p: number }>;
+  /** width-driven unknowns (dial still mostly at the prior) — the axes a
+   *  targeted assessment would resolve; never to be read as weaknesses. */
+  unknowns: string[];
+}
+
+/** Read the persisted signature profile and apply the display rulings
+ *  (two-card split, shallow suppression) server-side. Soft-fails to null. */
+async function fetchSignatureProfile(
+  supa: SupabaseClient,
+  userId: string,
+): Promise<SignatureProfilePayload | null> {
+  const [{ data: header }, { data: vectors }] = await Promise.all([
+    supa.from("athlete_signature_profiles")
+      .select("level_mean, level_sd, cohort, limiter, n_evidence, fitted_at")
+      .eq("user_id", userId).maybeSingle(),
+    supa.from("athlete_capability_vectors")
+      .select("axis, mean_pct, sd_pct, prior_sd_pct")
+      .eq("user_id", userId),
+  ]);
+  if (!header || !vectors || vectors.length === 0) return null;
+  const h = header as {
+    level_mean: number; level_sd: number; cohort: string | null;
+    limiter: Array<{ axis: string; p: number }> | null;
+    n_evidence: number; fitted_at: string;
+  };
+  const n = h.n_evidence;
+  const band = n < 10 ? "shallow" : n < 20 ? "mid" : "deep";
+  const dials: SignatureProfilePayload["dials"] = {};
+  const unknowns: string[] = [];
+  for (const v of vectors as Array<{ axis: string; mean_pct: number; sd_pct: number; prior_sd_pct: number | null }>) {
+    const mean = Number(v.mean_pct);
+    const sd = Number(v.sd_pct);
+    dials[v.axis] = { mean, sd };
+    if (v.prior_sd_pct !== null && Number(v.prior_sd_pct) > 0 &&
+        1 - sd / Number(v.prior_sd_pct) < 0.35) {
+      unknowns.push(v.axis);
+    }
+  }
+  const limiters = band === "shallow" ? [] : (h.limiter ?? [])
+    .filter((l) => {
+      const d = dials[l.axis];
+      return d && d.mean < -0.5 * d.sd && l.p >= 0.12;
+    })
+    .slice(0, 2);
+  return {
+    level_mean: h.level_mean,
+    level_sd: h.level_sd,
+    cohort: h.cohort ?? "open_rx_general",
+    n_evidence: n,
+    depth_band: band,
+    fitted_at: h.fitted_at,
+    dials,
+    limiters,
+    unknowns,
+  };
 }
 
 // ============================================================
@@ -791,6 +867,15 @@ export async function buildWriterPayload(
     }
   }
 
+  // 3e. Fitted capability profile — competition + logged + intake evidence
+  // synthesized by the signature layer. Soft-fails to null.
+  let signature_profile: SignatureProfilePayload | null = null;
+  try {
+    signature_profile = await fetchSignatureProfile(supa, userId);
+  } catch (err) {
+    console.warn(`[build-writer-payload] signature profile fetch failed for ${userId}:`, err);
+  }
+
   // 4. Hydrate JSONB blobs to complete canonical-key maps. We need
   // these before the RAG call (it consumes lifts + skills directly).
   const lifts: Record<string, number | null> = {};
@@ -912,6 +997,7 @@ export async function buildWriterPayload(
       ? { competition: gridCompetition, training: gridTraining }
       : null,
     engine_training,
+    signature_profile,
     previous_cycle,
     vocabulary,
     profile_evaluation,

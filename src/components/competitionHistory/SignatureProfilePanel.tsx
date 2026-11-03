@@ -26,7 +26,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 }
 
 export default function SignatureProfilePanel({ userId }: { userId: string | undefined }) {
-  const { profile, loading, refreshing, error, refresh, sendConcordance, concordanceSent } =
+  const { profile, loading, refreshing, error, refresh, sendConcordance, concordanceSent, canConcord } =
     useSignatureProfile(userId);
   const [note, setNote] = useState('');
   const [showNote, setShowNote] = useState(false);
@@ -158,13 +158,18 @@ export default function SignatureProfilePanel({ userId }: { userId: string | und
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 20, flexWrap: 'wrap' }}>
         {!concordanceSent ? (
           <>
-            <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>Does this match how you see yourself?</span>
+            <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>
+              Does this match how you see yourself?
+              {!canConcord && ' (refresh first so your answer attaches to this read)'}
+            </span>
             {(['match', 'partial', 'miss'] as const).map((v) => (
               <button key={v}
+                disabled={!canConcord}
                 onClick={() => { if (v === 'match') void sendConcordance('match'); else setShowNote(true); }}
                 data-verdict={v}
                 style={{
-                  padding: '5px 12px', borderRadius: 7, fontSize: 12.5, cursor: 'pointer',
+                  padding: '5px 12px', borderRadius: 7, fontSize: 12.5,
+                  cursor: canConcord ? 'pointer' : 'not-allowed', opacity: canConcord ? 1 : 0.45,
                   border: '1px solid var(--surface2)', background: 'transparent', color: 'var(--text)',
                 }}>
                 {v === 'match' ? 'Yes' : v === 'partial' ? 'Partly' : 'No'}
