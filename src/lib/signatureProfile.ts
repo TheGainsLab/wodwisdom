@@ -27,6 +27,9 @@
 export interface AxisPosterior {
   mean: number; // deviation from own level, percentile points (RELATIVE)
   sd: number;
+  /** the prior sd THIS fit shrank from (written by the refit; the model
+   *  owns it — PRIOR_SD below is a fixtures-only fallback, never truth) */
+  priorSd?: number;
 }
 
 export interface FittedProfileView {
@@ -144,9 +147,11 @@ export const AXIS_META: Record<string, { label: string; definition: string; prob
   },
 };
 
-// Prior sds from the open_rx_general_v1 params (diagonal of prior_cov_pct).
-// Used only to compute per-dial RESOLUTION (how much of the prior has been
-// pinned down); the fit itself always reads the live params row.
+// FIXTURES-ONLY FALLBACK (review 2026-11-03, item 1): real profiles carry
+// priorSd per axis, written by the fit from the live params row — the
+// display must never own model constants. This table exists so the
+// synthetic fixtures (which predate the column) still classify; it
+// mirrors open_rx_general_v1 and is NOT kept in sync by anything.
 export const PRIOR_SD: Record<string, number> = {
   aerobic_capacity: 8.8,
   anaerobic_capacity: 4.4,
@@ -162,6 +167,10 @@ export const PRIOR_SD: Record<string, number> = {
   upper_body_pressing: 3.0,
 };
 
+function priorSdOf(axis: string, ax: AxisPosterior): number {
+  return ax.priorSd ?? PRIOR_SD[axis] ?? (ax.sd || 1);
+}
+
 // ------------------------------------------------------ classification
 
 /** Evidence-backed limiter: probability must come from a negative mean,
@@ -171,8 +180,11 @@ export function evidenceLimiters(p: FittedProfileView, max = 2): LimiterItem[] {
     .filter(([axis, prob]) => {
       const ax = p.axes[axis];
       if (!ax) return false;
-      // mean must be meaningfully negative AND carry real posterior mass
-      return ax.mean < -2 && prob >= 0.12;
+      // Evidence gate is RELATIVE to what the fit knows (review 2026-11-03
+      // item 2): a fixed percentile threshold breaks under compression —
+      // −2 is enormous at p96 and noise at p50. Require the mean to be
+      // half a posterior sd below zero, plus real posterior mass.
+      return ax.mean < -0.5 * ax.sd && prob >= 0.12;
     })
     .sort((a, b) => b[1] - a[1])
     .slice(0, max)
@@ -188,7 +200,7 @@ export function unknownDials(p: FittedProfileView, max = 3): UnknownItem[] {
   return Object.entries(p.axes)
     .map(([axis, ax]) => ({
       axis,
-      resolution: 1 - ax.sd / (PRIOR_SD[axis] ?? (ax.sd || 1)),
+      resolution: 1 - ax.sd / priorSdOf(axis, ax),
     }))
     .filter((d) => d.resolution < 0.35)
     .sort((a, b) => a.resolution - b.resolution)
@@ -202,7 +214,9 @@ export function unknownDials(p: FittedProfileView, max = 3): UnknownItem[] {
 
 export function depthBand(n: number): DepthBand {
   if (n <= 0) return 'zero';
-  if (n < 6) return 'shallow';
+  // shallow runs to 10: the limiter validation showed the individual read
+  // only beats the population prior from ~10-15 scores up (review item 5)
+  if (n < 10) return 'shallow';
   if (n < 20) return 'mid';
   return 'deep';
 }
@@ -216,7 +230,7 @@ export function buildDials(p: FittedProfileView): DialView[] {
       relative: ax.mean,
       sd: ax.sd,
       absolute: Math.min(99, Math.max(1, p.level.mean + ax.mean)),
-      resolution: Math.max(0, Math.min(1, 1 - ax.sd / (PRIOR_SD[axis] ?? (ax.sd || 1)))),
+      resolution: Math.max(0, Math.min(1, 1 - ax.sd / priorSdOf(axis, ax))),
     }))
     .sort((a, b) => b.relative - a.relative);
 }
@@ -233,6 +247,20 @@ function pctPhrase(level: number): string {
   }
   return `ahead of ${Math.max(1, Math.round(level))}%`;
 }
+
+/** How many of the 73 ratified library tests each gate walls (measured
+ *  from the signature library's gate annotations — a library fact,
+ *  versioned with the library, not a model parameter). */
+const GATE_EXPOSURE: Record<string, number> = {
+  ring_muscle_up: 9,
+  chest_to_bar: 9,
+  bar_muscle_up: 8,
+  kipping_hspu: 5,
+  double_unders: 4,
+  handstand_walk: 3,
+  toes_to_bar: 2,
+  single_leg_squat: 1,
+};
 
 const GATE_NAMES: Record<string, string> = {
   bar_muscle_up: 'the bar muscle-up',
@@ -275,13 +303,16 @@ export function buildStory(p: FittedProfileView): string[] {
       : ` (±${p.level.sd.toFixed(1)}), read from ${p.nEvidence} scored workouts.`);
   s.push(levelSentence);
 
-  // --- tilt / strengths: relative language only
-  const top = dials[0];
-  const tiltSize = Math.abs(dials[0].relative) > 10 || Math.abs(dials[dials.length - 1].relative) > 10
-    ? 'big'
-    : Math.abs(dials[0].relative) > 4 || Math.abs(dials[dials.length - 1].relative) > 4
-      ? 'mild'
-      : 'flat';
+  // --- tilt / strengths: relative language only; unknowns can't be the
+  // headline (a wide-prior axis with a small positive mean is not a
+  // "clearest surplus" — review 2026-11-03 item 6), and tilt size is
+  // judged in posterior-sd units, not raw points (item 2).
+  const unknownSet = new Set(unknowns.map((u) => u.axis));
+  const known = dials.filter((d) => !unknownSet.has(d.axis));
+  const top = known[0] ?? dials[0];
+  const zOf = (d: typeof dials[number]) => (d.sd > 0 ? Math.abs(d.relative) / d.sd : 0);
+  const maxZ = Math.max(...known.map(zOf), 0);
+  const tiltSize = maxZ > 1.5 ? 'big' : maxZ > 0.75 ? 'mild' : 'flat';
   if (band !== 'shallow') {
     if (tiltSize === 'flat') {
       s.push(`Your profile is even: no quality stands far from your own line yet.`);
@@ -319,10 +350,19 @@ export function buildStory(p: FittedProfileView): string[] {
 
   // --- gates clause
   if (shutGates.length > 0) {
-    const g = shutGates.slice(0, 2).map((m) => GATE_NAMES[m] ?? m.replace(/_/g, ' ')).join(' and ');
-    s.push(
-      `Unlocking ${g} would open more of the test than any capacity gain of the same effort.`,
-    );
+    // Copy rule (review 2026-11-03 item 3): never claim what training will
+    // do — "would open more than any capacity gain" is a response-model
+    // claim and there is no response model. State the measured exposure.
+    const worst = shutGates
+      .slice()
+      .sort((a, b) => (GATE_EXPOSURE[b] ?? 0) - (GATE_EXPOSURE[a] ?? 0))[0];
+    const nWalled = GATE_EXPOSURE[worst] ?? 0;
+    const gName = GATE_NAMES[worst] ?? worst.replace(/_/g, ' ');
+    if (nWalled > 0) {
+      s.push(
+        `Right now ${gName} walls you out of ${nWalled} of the library's 73 tests.`,
+      );
+    }
   }
 
   return s.slice(0, 4);

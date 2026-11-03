@@ -30,7 +30,12 @@ import {
 
 const profiles = fixture as unknown as FittedProfileView[];
 
-const BANNED = [/\bweak\b/i, /\bbad at\b/i, /\bpoor\b/i, /\bworst\b/i, /\bdeficien/i];
+const BANNED = [
+  /\bweak\b/i, /\bbad at\b/i, /\bpoor\b/i, /\bworst\b/i, /\bdeficien/i,
+  // R8: never claim what training will do (no response model exists) —
+  // gate copy states measured exposure, not predicted payoff
+  /would open more/i, /any capacity gain/i, /worth more than/i,
+];
 
 let failures = 0;
 const shapeCounts = new Map<string, number>();

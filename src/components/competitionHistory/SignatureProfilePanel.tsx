@@ -131,7 +131,9 @@ export default function SignatureProfilePanel({ userId }: { userId: string | und
                   <div style={{
                     position: 'absolute', left: `${left}%`, width: `${Math.max(width, 0.8)}%`,
                     top: 3, height: 8, borderRadius: 4,
-                    background: d.relative >= 0 ? 'var(--accent)' : 'var(--danger, #e5484d)',
+                    // color is copy (review item 4): below-your-own-line is
+                    // not danger — a neutral slate keeps red off this panel
+                    background: d.relative >= 0 ? 'var(--accent)' : '#7a8699',
                     opacity: 0.4 + 0.6 * d.resolution,
                   }} />
                 </div>

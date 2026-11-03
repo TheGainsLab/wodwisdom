@@ -28,11 +28,13 @@ interface VectorRow {
   axis: string;
   mean_pct: number;
   sd_pct: number;
+  prior_sd_pct: number | null;
 }
 
 interface HeaderRow {
   level_mean: number;
   level_sd: number;
+  cohort: string | null;
   limiter: Array<{ axis: string; p: number }>;
   n_evidence: number;
   model_params_key: string;
@@ -45,18 +47,19 @@ export function useSignatureProfile(userId: string | undefined): SignatureProfil
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [concordanceSent, setConcordanceSent] = useState(false);
+  const [pinnedFitId, setPinnedFitId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!userId) return;
     const [{ data: header }, { data: vectors }, { data: gates }] = await Promise.all([
       supabase
         .from('athlete_signature_profiles')
-        .select('level_mean, level_sd, limiter, n_evidence, model_params_key, fitted_at')
+        .select('level_mean, level_sd, cohort, limiter, n_evidence, model_params_key, fitted_at')
         .eq('user_id', userId)
         .maybeSingle(),
       supabase
         .from('athlete_capability_vectors')
-        .select('axis, mean_pct, sd_pct')
+        .select('axis, mean_pct, sd_pct, prior_sd_pct')
         .eq('user_id', userId),
       supabase
         .from('athlete_gate_possession')
@@ -70,7 +73,11 @@ export function useSignatureProfile(userId: string | undefined): SignatureProfil
     const h = header as HeaderRow;
     const axes: FittedProfileView['axes'] = {};
     for (const v of vectors as VectorRow[]) {
-      axes[v.axis] = { mean: Number(v.mean_pct), sd: Number(v.sd_pct) };
+      axes[v.axis] = {
+        mean: Number(v.mean_pct),
+        sd: Number(v.sd_pct),
+        priorSd: v.prior_sd_pct !== null ? Number(v.prior_sd_pct) : undefined,
+      };
     }
     const limiterPosterior: Record<string, number> = {};
     for (const l of h.limiter ?? []) limiterPosterior[l.axis] = l.p;
@@ -83,7 +90,7 @@ export function useSignatureProfile(userId: string | undefined): SignatureProfil
       axes,
       limiterPosterior,
       nEvidence: h.n_evidence,
-      cohort: 'open_rx_general',
+      cohort: h.cohort ?? 'open_rx_general',
       gates: Object.keys(gateMap).length > 0 ? gateMap : undefined,
     });
   }, [userId]);
@@ -116,10 +123,13 @@ export function useSignatureProfile(userId: string | undefined): SignatureProfil
         headers,
         body: JSON.stringify({ ingest_open: true }),
       });
+      const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
         throw new Error((body as { error?: string }).error ?? `Refit failed (${res.status})`);
       }
+      // pin concordance to THIS fit's log row (the log insert is
+      // best-effort server-side; "latest row" could be a previous fit)
+      setPinnedFitId((body as { fit_log_id?: string | null }).fit_log_id ?? null);
       await load();
       setConcordanceSent(false);
     } catch (e) {
@@ -132,15 +142,20 @@ export function useSignatureProfile(userId: string | undefined): SignatureProfil
   const sendConcordance = useCallback(
     async (verdict: 'match' | 'partial' | 'miss', note?: string): Promise<boolean> => {
       if (!userId) return false;
-      // attach to the latest fit-log row (the fit the athlete is reacting to)
-      const { data: latest } = await supabase
-        .from('signature_fit_log')
-        .select('id')
-        .eq('user_id', userId)
-        .order('fitted_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (!latest) return false;
+      // attach to the pinned fit when we have one (set by refresh());
+      // otherwise the latest row — the fit the athlete is looking at.
+      let targetId = pinnedFitId;
+      if (!targetId) {
+        const { data: latest } = await supabase
+          .from('signature_fit_log')
+          .select('id')
+          .eq('user_id', userId)
+          .order('fitted_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        targetId = (latest as { id: string } | null)?.id ?? null;
+      }
+      if (!targetId) return false;
       const { error: upErr } = await supabase
         .from('signature_fit_log')
         .update({
@@ -148,11 +163,11 @@ export function useSignatureProfile(userId: string | undefined): SignatureProfil
           concordance_note: note?.slice(0, 500) ?? null,
           concordance_at: new Date().toISOString(),
         })
-        .eq('id', (latest as { id: string }).id);
+        .eq('id', targetId);
       if (!upErr) setConcordanceSent(true);
       return !upErr;
     },
-    [userId],
+    [userId, pinnedFitId],
   );
 
   return { profile, loading, refreshing, error, refresh, sendConcordance, concordanceSent };

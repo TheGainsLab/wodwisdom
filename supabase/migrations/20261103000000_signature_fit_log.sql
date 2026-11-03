@@ -48,3 +48,14 @@ create policy sfl_update_own on public.signature_fit_log
 revoke update on public.signature_fit_log from authenticated;
 grant update (concordance, concordance_note, concordance_at)
   on public.signature_fit_log to authenticated;
+
+-- Review items 1 and 6 (2026-11-03): the display must never own model
+-- constants. The fit writes the prior sd it actually used onto each
+-- vector row (resolution = 1 - sd/prior_sd is then computed against the
+-- SAME prior the posterior came from, per stratum, forever), and the
+-- header carries the cohort so the client stops hardcoding it.
+alter table public.athlete_capability_vectors
+  add column if not exists prior_sd_pct numeric;
+
+alter table public.athlete_signature_profiles
+  add column if not exists cohort text not null default 'open_rx_general';
