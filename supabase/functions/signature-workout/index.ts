@@ -47,9 +47,10 @@ import { getCorsHeaders } from "../_shared/cors.ts";
 import { callClaude } from "../_shared/call-claude.ts";
 import { FOCUS_AREAS } from "../_shared/coach-state.ts";
 import {
-  computeBlockBenchmark,
+  computeBlockBenchmarkExplained,
   type ExpectedBenchmark,
 } from "../_shared/compute-block-benchmark.ts";
+import { __clearWorkCalcMemo } from "../_shared/compute-benchmarks.ts";
 import type { BlockPrescription } from "../_shared/v2-output-schema.ts";
 import type { Gender } from "../_shared/compute-benchmarks.ts";
 import {
@@ -326,16 +327,19 @@ async function parseWorkout(text: string): Promise<BlockPrescription> {
 }
 
 /** Deterministic layer — zero tokens. Null when the structure has no
- *  resolvable benchmark (non-metcon, unresolved movement). */
+ *  resolvable benchmark (non-metcon, unresolved movement). The reason is
+ *  always carried: silent nulls are how twelve absurd numbers nearly
+ *  became the acceptance verdict (audit run 1, 2026-11-03). */
 async function measure(
   workout: BlockPrescription,
   gender: Gender,
-): Promise<ExpectedBenchmark | null> {
+): Promise<{ bench: ExpectedBenchmark | null; reason: string | null }> {
   try {
-    return await computeBlockBenchmark(workout, gender);
+    return await computeBlockBenchmarkExplained(workout, gender);
   } catch (e) {
-    console.warn(`[signature-workout] measure failed: ${e instanceof Error ? e.message : e}`);
-    return null;
+    const msg = e instanceof Error ? e.message : String(e);
+    console.warn(`[signature-workout] measure failed: ${msg}`);
+    return { bench: null, reason: `measure_threw:${msg.slice(0, 80)}` };
   }
 }
 
@@ -637,12 +641,12 @@ Deno.serve(async (req) => {
         return json({ error: "MISSING_WORKOUT" }, 400);
       }
       const name = typeof body.name === "string" ? body.name.trim() : "";
-      const measured = await measure(workout, gender);
+      const { bench: measured, reason: measureReason } = await measure(workout, gender);
       const library = await fetchMeasuredLibrary(
         supa, name, gender, workout, measured?.median_seconds ?? null,
       );
       if (action === "measure") {
-        return json({ measured, measured_library: library });
+        return json({ measured, measure_reason: measureReason, measured_library: library });
       }
       const signature = await draftSignature(workout, library, measured);
       return json({ signature, measured, measured_library: library, drafted_model: "sonnet" });
@@ -814,6 +818,41 @@ Deno.serve(async (req) => {
         observed.set(`${r.workout_name.toLowerCase()}|${r.gender}`, r);
       }
 
+      // Determinism check ({"action":"scorescale_acceptance","determinism":true}):
+      // the protocol split (review 2026-11-03) certifies the harness as
+      // formula-only, but work-calc runs a server-side AI name resolver, so
+      // determinism is checked, not assumed: a dozen workouts, three fresh
+      // runs each (memo cleared between runs — otherwise the check is a
+      // tautology), byte-identical outputs required. If outputs vary, the
+      // repeat variance is a fourth acceptance figure, and the engine
+      // version must key the parse cache.
+      if (body.determinism === true) {
+        const picks = (sigRows ?? []).slice(0, 12) as Array<{ name: string; workout: BlockPrescription }>;
+        const mismatched: Array<{ name: string; outputs: string[] }> = [];
+        let measured = 0;
+        for (const s of picks) {
+          const outs: string[] = [];
+          for (let i = 0; i < 3; i++) {
+            __clearWorkCalcMemo();
+            const { bench } = await measure(s.workout, "men");
+            outs.push(JSON.stringify(bench));
+          }
+          if (outs[0] !== "null") measured++;
+          if (!(outs[0] === outs[1] && outs[1] === outs[2])) {
+            mismatched.push({ name: s.name, outputs: outs.map((o) => o.slice(0, 120)) });
+          }
+        }
+        return json({
+          determinism: {
+            workouts: picks.length,
+            measured,
+            runs_each: 3,
+            deterministic: mismatched.length === 0,
+            mismatched,
+          },
+        });
+      }
+
       // Where the predicted median falls in the observed distribution,
       // via piecewise-linear interpolation through the score-space
       // quartiles (direction auto-detected: seconds descend with
@@ -862,16 +901,16 @@ Deno.serve(async (req) => {
           const key = `${s.name.toLowerCase()}|${g === "women" ? "F" : "M"}`;
           const truth = observed.get(key);
           if (!truth) continue;
-          const bench = await measure(s.workout, g);
-          if (!bench) {
-            perWorkout.push({ name: s.name, gender: g, status: "no_prediction" });
-            continue;
-          }
-          // Max-lift pieces are scored in pounds — neither channel applies
-          // (a rep-vs-load comparison is nonsense and the structure-only
-          // predictor has nothing to say about a 1RM median).
+          // Max-lift pieces are scored in pounds — neither channel applies,
+          // and the label comes BEFORE the measure call so the denominator
+          // reads honestly (run-1 flaw: these surfaced as no_prediction).
           if (LOAD_SCORED.has(s.name)) {
             perWorkout.push({ name: s.name, gender: g, status: "skipped_load_scored" });
+            continue;
+          }
+          const { bench, reason } = await measure(s.workout, g);
+          if (!bench) {
+            perWorkout.push({ name: s.name, gender: g, status: `no_prediction:${reason ?? "unknown"}` });
             continue;
           }
           // measure() knows which scoring it produced — key on that alone.
@@ -930,6 +969,25 @@ Deno.serve(async (req) => {
             }
           } else {
             perWorkout.push({ name: s.name, gender: g, status: "skipped_no_basis" });
+            continue;
+          }
+
+          // Plausibility bounds (review 2026-11-03): crude physics checks
+          // run BEFORE any value enters the error statistics, and fail as
+          // named statuses with the value attached. Bounds catch the next
+          // reading error the audit has no twin for. 2.5 reps/s sustained
+          // is beyond any mixed workout (pure double-under pieces peak
+          // ~1.1 over a full cap).
+          const capS = truth.time_cap_seconds ?? null;
+          const implausible = kind === "reps"
+            ? (pred! < 1 || (capS !== null && pred! / capS > 2.5))
+            : pred! <= 0;
+          if (implausible) {
+            perWorkout.push({
+              name: s.name, gender: g,
+              status: "skipped_implausible",
+              predicted: Math.round(pred!), observed: Math.round(obs!), kind,
+            });
             continue;
           }
 

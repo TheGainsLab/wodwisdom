@@ -107,6 +107,9 @@ export interface ComputeBenchmarksResult {
   basis: string;
   /** Derived (or defaulted) time domain used for the curve lookup. */
   time_domain: TimeDomain;
+  /** stage_power_curve generation id (StagePowerCurve.calc_version) —
+   *  part of the scored row's engine_version. */
+  calc_version?: string;
   /** Full Open-stage cohort distribution for this workout: six anchors
    *  (p10/p25/p50/p75/p90/p99) of sustained watts converted to workout
    *  scores. Empty array when the Open cell is missing for the gender ×
@@ -122,6 +125,9 @@ export interface ComputeBenchmarksResult {
 
 export async function computeBenchmarks(
   input: ComputeBenchmarksInput,
+  /** Optional diagnostic sink: on a null return, `reason` names why —
+   *  the reason codes flow to evidence rows and audit statuses. */
+  diag?: { reason?: string },
 ): Promise<ComputeBenchmarksResult | null> {
   console.log(
     `[compute-benchmarks] called: workout_type=${input.workout_type} n_movements=${input.movements.length} time_cap=${input.time_cap_seconds ?? "none"} user_id=${input.user_id ?? "unknown"}`,
@@ -140,17 +146,20 @@ export async function computeBenchmarks(
   // writer's movement names through unchanged. If a movement can't be resolved
   // upstream, work-calc returns 404 with suggested_matches and our fetch
   // helper logs the failure + we fall back to PERFORMANCE_FACTORS.
-  const joules = await fetchWorkCalcJoules(input.movements, gender);
-  if (joules === null || joules <= 0) {
+  const wc = await fetchWorkCalcJoulesEx(input.movements, gender);
+  if (wc.joules === null || wc.joules <= 0) {
     console.warn(`[compute-benchmarks] returning null: fetchWorkCalcJoules failed (specific reason logged above by that fn)`);
+    if (diag) diag.reason = wc.reason ?? "work_calc_failed";
     return null;
   }
+  const joules = wc.joules;
   console.log(`[compute-benchmarks] joules=${joules}`);
 
   // 3. Fetch the stage power curve (cached).
   const curve = await getStagePowerCurve();
   if (curve === null) {
     console.warn(`[compute-benchmarks] returning null: getStagePowerCurve unavailable`);
+    if (diag) diag.reason = "power_curve_unavailable";
     return null;
   }
 
@@ -172,6 +181,7 @@ export async function computeBenchmarks(
       `[compute-benchmarks] returning null: Open ${gender} ${timeDomain} cell missing in stage_power_curve. ` +
         `available_open_${gender}_keys=${JSON.stringify(Object.keys(openGender))}`,
     );
+    if (diag) diag.reason = `curve_cell_missing:${gender}/${timeDomain}`;
     return null;
   }
   const excellent = pickExcellentWatts(curve, gender, timeDomain, median.watts);
@@ -185,6 +195,7 @@ export async function computeBenchmarks(
       console.warn(
         `[compute-benchmarks] returning null: AMRAP requires time_cap_seconds but got ${input.time_cap_seconds}`,
       );
+      if (diag) diag.reason = "amrap_no_cap";
       return null;
     }
     medianScore = formatAMRAP(joules, median.watts, input.time_cap_seconds, input.movements);
@@ -221,6 +232,10 @@ export async function computeBenchmarks(
     basis: `open_p50_vs_${excellent?.label ?? "null_all_excellent_missing"}`,
     time_domain: timeDomain,
     cohort_anchors: cohortAnchors,
+    // The curve's own generation id: a curve refresh is a silent model
+    // change, so it rides in engine_version on every scored row (scoring
+    // reliability review 2026-11-03) and the stale-rescore job sees it.
+    calc_version: curve.calc_version,
   };
 }
 
@@ -264,11 +279,59 @@ function buildCohortAnchors(
 // Upstream work-calc wrapper
 // ============================================================
 
-/** Calls POST /v1/work/calculate, returns total_joules. null on any failure. */
-async function fetchWorkCalcJoules(
+/** Work-calc outcome with the failure reason preserved — the reason codes
+ *  are product surface (scoring reliability review 2026-11-03): they land
+ *  on evidence rows and in the acceptance audit's per-workout statuses,
+ *  never only in logs. */
+interface WorkCalcOutcome {
+  joules: number | null;
+  reason: string | null;
+}
+
+// In-instance memo: identical movement sets ask identical questions — the
+// 6 p.m. class logging one whiteboard, or the audit's twin workouts
+// (12.4/13.3). One network call per distinct (gender, movements) per
+// cold start; the memo also caches DETERMINISTIC failures (a 404
+// resolver miss stays a miss), while transient failures are retried
+// before being memoized.
+const workCalcMemo = new Map<string, WorkCalcOutcome>();
+
+/** Determinism-check support ONLY: the acceptance audit's repeat runs
+ *  must hit the service fresh, or the memo makes the check a tautology. */
+export function __clearWorkCalcMemo(): void {
+  workCalcMemo.clear();
+}
+
+const TRANSIENT_WORK_CALC = /^work_calc_(http_429|http_5\d\d|timeout|network)/;
+
+/** Calls POST /v1/work/calculate with retry + backoff on transient
+ *  failures (429/5xx/timeout/network — never on a 404 resolver miss,
+ *  which is deterministic), memoized per instance. The burst case is the
+ *  NORMAL case (a class logging within minutes; the audit's 146-in-a-row),
+ *  so politeness lives here in the shared engine, not in callers. */
+async function fetchWorkCalcJoulesEx(
   movements: WorkCalcMovement[],
   gender: Gender,
-): Promise<number | null> {
+): Promise<WorkCalcOutcome> {
+  const key = `${gender}|${JSON.stringify(movements)}`;
+  const hit = workCalcMemo.get(key);
+  if (hit) return hit;
+  let out: WorkCalcOutcome = { joules: null, reason: "work_calc_unknown" };
+  for (let attempt = 0; attempt < 3; attempt++) {
+    out = await workCalcOnce(movements, gender);
+    if (out.joules !== null || out.reason === null || !TRANSIENT_WORK_CALC.test(out.reason)) {
+      break;
+    }
+    await new Promise((r) => setTimeout(r, 400 * (attempt + 1) * (attempt + 1)));
+  }
+  workCalcMemo.set(key, out);
+  return out;
+}
+
+async function workCalcOnce(
+  movements: WorkCalcMovement[],
+  gender: Gender,
+): Promise<WorkCalcOutcome> {
   const baseUrl = Deno.env.get("COMPETITION_SERVICE_BASE_URL");
   // work-calc function uses a SEPARATE per-consumer key, not the shared
   // COMPETITION_SERVICE_KEY used for programming-profile / catalog endpoints.
@@ -277,7 +340,7 @@ async function fetchWorkCalcJoules(
     console.warn(
       "[compute-benchmarks] missing COMPETITION_SERVICE_BASE_URL or WORK_CALC_SERVICE_KEY env; returning null",
     );
-    return null;
+    return { joules: null, reason: "work_calc_env_missing" };
   }
 
   const url = `${baseUrl.replace(/\/$/, "")}/work-calc/v1/work/calculate`;
@@ -303,14 +366,24 @@ async function fetchWorkCalcJoules(
       bodyText = await resp.text();
     } catch {
       console.warn(`[compute-benchmarks] work-calc body read failed (status=${resp.status}); returning null`);
-      return null;
+      return { joules: null, reason: "work_calc_network" };
     }
 
     if (!resp.ok) {
       console.warn(
         `[compute-benchmarks] work-calc HTTP ${resp.status}; body=${bodyText.slice(0, 400)}; returning null`,
       );
-      return null;
+      // 404 is the server-side AI resolver failing a movement name —
+      // deterministic, carries suggested_matches worth surfacing.
+      if (resp.status === 404) {
+        let hint = "";
+        try {
+          const j = JSON.parse(bodyText) as { suggested_matches?: unknown; movement?: unknown };
+          if (j.movement) hint = `:${String(j.movement).slice(0, 40)}`;
+        } catch { /* body shape is upstream's business */ }
+        return { joules: null, reason: `work_calc_movement_unresolved${hint}` };
+      }
+      return { joules: null, reason: `work_calc_http_${resp.status}` };
     }
 
     let json: unknown;
@@ -320,7 +393,7 @@ async function fetchWorkCalcJoules(
       console.warn(
         `[compute-benchmarks] work-calc response not JSON; body=${bodyText.slice(0, 200)}; returning null`,
       );
-      return null;
+      return { joules: null, reason: "work_calc_bad_json" };
     }
 
     const obj = json as Record<string, unknown>;
@@ -328,7 +401,7 @@ async function fetchWorkCalcJoules(
       console.warn(
         `[compute-benchmarks] work-calc returned no usable total_joules; full_response=${bodyText.slice(0, 400)}; returning null`,
       );
-      return null;
+      return { joules: null, reason: "work_calc_no_joules" };
     }
     // Gate on fully_computed. The stage_power_curve is built ONLY from
     // fully-computed workouts, and work-calc returns a PARTIAL total_joules when
@@ -342,16 +415,16 @@ async function fetchWorkCalcJoules(
         `[compute-benchmarks] work-calc not fully_computed (fully_computed=${String(obj.fully_computed)}, ` +
           `warnings=${JSON.stringify(warnings).slice(0, 200)}); skipping benchmark (returning null)`,
       );
-      return null;
+      return { joules: null, reason: "work_calc_partial" };
     }
-    return obj.total_joules;
+    return { joules: obj.total_joules, reason: null };
   } catch (err) {
     if ((err as Error).name === "AbortError") {
       console.warn("[compute-benchmarks] work-calc timeout; returning null");
-    } else {
-      console.warn(`[compute-benchmarks] work-calc error: ${(err as Error).message}; returning null`);
+      return { joules: null, reason: "work_calc_timeout" };
     }
-    return null;
+    console.warn(`[compute-benchmarks] work-calc error: ${(err as Error).message}; returning null`);
+    return { joules: null, reason: "work_calc_network" };
   } finally {
     clearTimeout(timer);
   }
