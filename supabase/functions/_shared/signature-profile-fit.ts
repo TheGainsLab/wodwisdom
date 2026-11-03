@@ -57,6 +57,11 @@ export interface SignatureModelParams {
   /** z-space cohort rows: the level (percentile) at and above which the
    *  two-pass refit hands the athlete to this cohort. */
   elite_level_min_pct?: number;
+  /** Hysteresis partner: an athlete ALREADY in the elite cohort stays until
+   *  the general fit drops below this (review 2026-11-03 — without it,
+   *  athletes near the entry line flip rulers between refits as their
+   *  fitted level wobbles). Defaults to entry minus 5. */
+  elite_level_exit_pct?: number;
 }
 
 export interface EvidenceObservation {

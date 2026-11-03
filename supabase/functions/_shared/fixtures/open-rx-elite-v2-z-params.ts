@@ -208,5 +208,6 @@ export const OPEN_RX_ELITE_V2_Z: SignatureModelParams = {
   "level_prior_mean": 0.0,
   "level_prior_var": 0.8241,
   "elite_level_min_pct": 85.0,
+  "elite_level_exit_pct": 80.0,
   "prior_note": "z-space (probit) refit of the same 30k study: prior = PD-clipped split-half signal covariance in z + 0.005 slack (deconvolved, same method as v1). Elite holdout (2,397 athletes >= p85, 53,924 scores): editorial-W Bayesian LOO beats year-baseline +5.2% in z; vs the v1 pct model on the same holdouts, z predictions win +8.0% in display units on the elite band. Elite-refit discrimination vectors tested and REJECTED (-0.57% vs editorial under the production predictor); editorial vectors stay."
 } as SignatureModelParams;

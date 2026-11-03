@@ -515,17 +515,26 @@ Deno.serve(async (req) => {
     // ── Two-pass cohort selection: elite athletes refit in z ────────────
     // Only from the default path (an explicit params_key is an operator
     // asking for exactly that row), and only when the elite row exists.
+    // HYSTERESIS (review 2026-11-03): enter at elite_level_min_pct, but an
+    // athlete already in the elite cohort stays until the general fit drops
+    // below elite_level_exit_pct — which side they were on is read from the
+    // persisted header, never recomputed from the (noisy) level alone, so
+    // near-threshold athletes don't flip rulers between refits.
     if (paramsKey === DEFAULT_PARAMS_KEY && observations.length > 0) {
-      const { data: eliteRow } = await supa
-        .from("signature_model_params")
-        .select("params")
-        .eq("key", ELITE_PARAMS_KEY)
-        .maybeSingle();
+      const [{ data: eliteRow }, { data: prevHeader }] = await Promise.all([
+        supa.from("signature_model_params")
+          .select("params").eq("key", ELITE_PARAMS_KEY).maybeSingle(),
+        supa.from("athlete_signature_profiles")
+          .select("cohort").eq("user_id", targetUserId).maybeSingle(),
+      ]);
       const eliteParams = (eliteRow?.params ?? null) as SignatureModelParams | null;
-      if (
-        eliteParams?.space === "z" &&
-        profile.level.mean >= (eliteParams.elite_level_min_pct ?? 85)
-      ) {
+      const wasElite = (prevHeader as { cohort?: string } | null)?.cohort === "open_rx_elite";
+      const enterAt = eliteParams?.elite_level_min_pct ?? 85;
+      const exitAt = eliteParams?.elite_level_exit_pct ?? enterAt - 5;
+      const eliteNow = wasElite
+        ? profile.level.mean >= exitAt
+        : profile.level.mean >= enterAt;
+      if (eliteParams?.space === "z" && eliteNow) {
         const zObs = convertEvidenceToZ(
           observations,
           params.noise_var_pct,
@@ -543,6 +552,14 @@ Deno.serve(async (req) => {
     // reader consumes. The conversion is exact for the display's arithmetic:
     // level_pct + dial_pct = 100*CDF(level_z + delta_z), so the panel's
     // "absolute = level + relative" lands on the true absolute percentile.
+    // KNOWN SATURATION EDGE (review 2026-11-03, accepted): evidence enters
+    // through the probit clip (p99.85 -> z 2.97), so an athlete at the very
+    // top of the world fits a level near that ceiling and CDF(level+delta)
+    // saturates — their positive dials convert to ~0 pct points while the
+    // z columns carry the real magnitudes. That is the percentile scale
+    // being out of room (the reason the elite cohort exists); the panel
+    // shows sigma for these fits, and the pct columns/fit log inherit the
+    // saturated values rather than a fabricated un-clipped percentile.
     const isZ = activeParams.space === "z";
     const Lz = profile.level.mean; // z units when isZ, pct otherwise
     const displayLevel = isZ
