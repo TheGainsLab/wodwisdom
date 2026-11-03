@@ -288,8 +288,20 @@ function anchorsPct(
 }
 
 /**
- * Declared intake → ledger evidence + gate possession (build item 2,
- * 2026-11-03). Lifts enter as bodyweight-ratio percentiles against the
+ * DORMANT — NO CALL PATH (founder ruling, 2026-11-03): the Signature is
+ * built from performance data (Open, future metcon results); the Profile
+ * is the athlete's self-reported intake. They stay COMPLETELY DISCONNECTED
+ * until the integration is designed properly. This function and the
+ * intake_standards_v1 params row are kept as the starting point for that
+ * work. Open design questions recorded in the design doc: anchor-scale
+ * calibration against the real RX Open field (linked-user regression);
+ * correlated anchor error (shared per-source bias term, not independent
+ * rows); the arbitration rule between direct-but-scale-uncertain
+ * declarations and blended-but-validated performance inference; and the
+ * reference-population framing of self-reported numbers.
+ *
+ * Original design: declared intake → ledger evidence + gate possession
+ * (build item 2, 2026-11-03). Lifts enter as bodyweight-ratio percentiles against the
  * editorial anchors (near-pure strength/oly vectors — the per-athlete
  * oly-vs-powerlifting split the Open provably cannot make); conditioning
  * times enter with the transference discount as widened noise; the skills
@@ -477,17 +489,6 @@ Deno.serve(async (req) => {
       openIngest = await ingestOpenHistory(supa, targetUserId);
     }
 
-    // Intake ingestion is OPT-IN (pulled back 2026-11-03 after the first
-    // production integration: the anchor scale is uncalibrated, and five
-    // lifts sharing one scale entered as independent evidence — correlated
-    // anchor error masquerading as sample size swung a confirmed profile
-    // by ~9 points. Design questions recorded in the design doc; re-enable
-    // by default only after the scale is calibrated on linked users and
-    // the fit carries a shared per-source bias term.)
-    let intakeIngest: { upserted: number; gates_set: number; skipped: number } | { error: string } | null = null;
-    if (body.ingest_intake === true) {
-      intakeIngest = await ingestIntake(supa, targetUserId);
-    }
 
     // ── Evidence → fit ───────────────────────────────────────────────────
     const { observations, skipped, sourceMix } = await loadEvidence(
@@ -576,7 +577,6 @@ Deno.serve(async (req) => {
       persisted,
       fit_log_id: fitLogId,
       open_ingest: openIngest,
-      intake_ingest: intakeIngest,
     });
   } catch (e) {
     console.error("signature-profile-refit error:", e);
