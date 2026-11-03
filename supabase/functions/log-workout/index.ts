@@ -456,8 +456,12 @@ Deno.serve(async (req) => {
             : {
               score_status: b.capped === true
                 ? "skipped_capped" // interval info; lands with the gate-aware model
-                : b.rx !== true
-                ? "skipped_scaled" // RX scale only until scaled cohorts exist
+                : b.rx === false
+                ? "skipped_scaled" // athlete DECLARED scaled; RX scale only until scaled cohorts exist
+                : b.rx == null
+                // rx never stated (non-UI caller; the app always sends a
+                // boolean) — not a scaled declaration, its own status
+                ? "pending_rx_unknown"
                 : "pending", // RX, uncapped, but no percentile resolved
               scored_at: null,
               engine_version: null,

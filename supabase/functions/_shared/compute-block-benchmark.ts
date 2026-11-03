@@ -322,7 +322,11 @@ export async function computeBlockBenchmarkExplained(
     if (reps !== null) {
       medianScore = `${reps} reps`;
       medianSeconds = null;
-      basis = `${basis}+reps_at_cap`;
+      // "_linear" is a caveat, not decoration: constant-watts conversion
+      // is fair on uniform-load pieces and optimistic on escalating-load
+      // ladders (16.2/19.2), where per-rep work climbs — the audit reads
+      // the basis string to see which rows used it (review 2026-11-04).
+      basis = `${basis}+reps_at_cap_linear`;
     }
   }
 

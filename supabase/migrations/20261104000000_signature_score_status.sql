@@ -27,7 +27,9 @@ update public.signature_evidence
 set score_status = case
   when percentile is not null then 'scored'
   when (score_raw ->> 'capped') = 'true' then 'skipped_capped'
-  when (score_raw ->> 'rx') is distinct from 'true' then 'skipped_scaled'
+  -- an explicit scaled declaration is not the same as rx never stated
+  when (score_raw ->> 'rx') = 'false' then 'skipped_scaled'
+  when (score_raw ->> 'rx') is null then 'pending_rx_unknown'
   else 'pending'
 end
 where score_status is null;

@@ -47,6 +47,7 @@ import { getCorsHeaders } from "../_shared/cors.ts";
 import { callClaude } from "../_shared/call-claude.ts";
 import { FOCUS_AREAS } from "../_shared/coach-state.ts";
 import {
+  composeEngineVersion,
   computeBlockBenchmarkExplained,
   type ExpectedBenchmark,
 } from "../_shared/compute-block-benchmark.ts";
@@ -1009,6 +1010,10 @@ Deno.serve(async (req) => {
             observed: Math.round(obs!),
             rel_error: Number(rel.toFixed(3)),
             percentile_error: pctErr !== null ? Number(pctErr.toFixed(1)) : null,
+            // a result you can't tie to the code and curve that produced
+            // it isn't evidence (review 2026-11-04)
+            engine_version: composeEngineVersion(bench.calc_version),
+            basis: bench.basis,
           });
         }
       }

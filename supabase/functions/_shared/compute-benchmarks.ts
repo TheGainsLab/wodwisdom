@@ -294,7 +294,18 @@ interface WorkCalcOutcome {
 // cold start; the memo also caches DETERMINISTIC failures (a 404
 // resolver miss stays a miss), while transient failures are retried
 // before being memoized.
-const workCalcMemo = new Map<string, WorkCalcOutcome>();
+interface WorkCalcMemoEntry {
+  promise: Promise<WorkCalcOutcome>;
+  /** null = cached forever (success, deterministic failure). A transient
+   *  failure gets a short negative TTL instead — review 2026-11-04: a
+   *  whiteboard that hit rate limiting at 6:01 p.m. must not stay
+   *  "failed" for the instance's lifetime, but a struggling service
+   *  needs the burst to back off, not retry in lockstep. */
+  expiresAt: number | null;
+}
+
+const workCalcMemo = new Map<string, WorkCalcMemoEntry>();
+const TRANSIENT_NEG_CACHE_MS = 45_000;
 
 /** Determinism-check support ONLY: the acceptance audit's repeat runs
  *  must hit the service fresh, or the memo makes the check a tautology. */
@@ -304,28 +315,69 @@ export function __clearWorkCalcMemo(): void {
 
 const TRANSIENT_WORK_CALC = /^work_calc_(http_429|http_5\d\d|timeout|network)/;
 
+// Per-instance semaphore: a burst of DIFFERENT structures (the 6 p.m.
+// class, the audit) must not reproduce the run-1 pile-up. Slot-transfer
+// semantics: a release hands its slot to the next waiter directly.
+// Per-instance only — cross-instance single-flight is the hash-keyed
+// queue worker's job (planned; see PR/doc).
+const MAX_CONCURRENT_WORK_CALC = 4;
+let workCalcInFlight = 0;
+const workCalcWaiters: Array<() => void> = [];
+
+function acquireWorkCalcSlot(): Promise<void> {
+  if (workCalcInFlight < MAX_CONCURRENT_WORK_CALC) {
+    workCalcInFlight++;
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => workCalcWaiters.push(resolve));
+}
+
+function releaseWorkCalcSlot(): void {
+  const next = workCalcWaiters.shift();
+  if (next) next(); // slot transfers; inFlight unchanged
+  else workCalcInFlight--;
+}
+
 /** Calls POST /v1/work/calculate with retry + backoff on transient
  *  failures (429/5xx/timeout/network — never on a 404 resolver miss,
- *  which is deterministic), memoized per instance. The burst case is the
- *  NORMAL case (a class logging within minutes; the audit's 146-in-a-row),
- *  so politeness lives here in the shared engine, not in callers. */
-async function fetchWorkCalcJoulesEx(
+ *  which is deterministic), throttled and memoized per instance. The
+ *  memo stores the IN-FLIGHT promise, so twenty concurrent logs of one
+ *  whiteboard share a single call (same pattern as the stage-curve
+ *  cache's inflightFetch). The burst case is the NORMAL case, so
+ *  politeness lives here in the shared engine, not in callers. */
+function fetchWorkCalcJoulesEx(
   movements: WorkCalcMovement[],
   gender: Gender,
 ): Promise<WorkCalcOutcome> {
   const key = `${gender}|${JSON.stringify(movements)}`;
   const hit = workCalcMemo.get(key);
-  if (hit) return hit;
-  let out: WorkCalcOutcome = { joules: null, reason: "work_calc_unknown" };
-  for (let attempt = 0; attempt < 3; attempt++) {
-    out = await workCalcOnce(movements, gender);
-    if (out.joules !== null || out.reason === null || !TRANSIENT_WORK_CALC.test(out.reason)) {
-      break;
-    }
-    await new Promise((r) => setTimeout(r, 400 * (attempt + 1) * (attempt + 1)));
+  if (hit && (hit.expiresAt === null || Date.now() < hit.expiresAt)) {
+    return hit.promise;
   }
-  workCalcMemo.set(key, out);
-  return out;
+  const entry: WorkCalcMemoEntry = { promise: undefined as unknown as Promise<WorkCalcOutcome>, expiresAt: null };
+  entry.promise = (async (): Promise<WorkCalcOutcome> => {
+    await acquireWorkCalcSlot();
+    try {
+      let out: WorkCalcOutcome = { joules: null, reason: "work_calc_unknown" };
+      for (let attempt = 0; attempt < 3; attempt++) {
+        out = await workCalcOnce(movements, gender);
+        if (out.joules !== null || out.reason === null || !TRANSIENT_WORK_CALC.test(out.reason)) {
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 400 * (attempt + 1) * (attempt + 1)));
+      }
+      // success + deterministic failure cache forever (per instance);
+      // transient exhaustion gets the short negative TTL
+      if (out.joules === null && out.reason !== null && TRANSIENT_WORK_CALC.test(out.reason)) {
+        entry.expiresAt = Date.now() + TRANSIENT_NEG_CACHE_MS;
+      }
+      return out;
+    } finally {
+      releaseWorkCalcSlot();
+    }
+  })();
+  workCalcMemo.set(key, entry);
+  return entry.promise;
 }
 
 async function workCalcOnce(
