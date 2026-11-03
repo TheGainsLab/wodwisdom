@@ -53,7 +53,9 @@ import {
 import type { BlockPrescription } from "../_shared/v2-output-schema.ts";
 import type { Gender } from "../_shared/compute-benchmarks.ts";
 import {
+  LOAD_SCORED,
   OPEN_OBSERVED_MEDIANS,
+  SECONDS_UNTRUSTED,
   type ObservedMedianRow,
 } from "../_shared/fixtures/open-observed-medians.ts";
 import {
@@ -865,21 +867,53 @@ Deno.serve(async (req) => {
             perWorkout.push({ name: s.name, gender: g, status: "no_prediction" });
             continue;
           }
+          // Max-lift pieces are scored in pounds — neither channel applies
+          // (a rep-vs-load comparison is nonsense and the structure-only
+          // predictor has nothing to say about a 1RM median).
+          if (LOAD_SCORED.has(s.name)) {
+            perWorkout.push({ name: s.name, gender: g, status: "skipped_load_scored" });
+            continue;
+          }
           // measure() knows which scoring it produced — key on that alone.
           const isRepScored = bench.median_seconds === null;
+          const q25 = truth.p25_score != null ? Number(truth.p25_score) : null;
+          const q50 = truth.p50_score != null ? Number(truth.p50_score) : null;
+          const q75 = truth.p75_score != null ? Number(truth.p75_score) : null;
+          const quartilesDescend = q25 != null && q75 != null && q25 > q75;
+          const quartilesAscend = q25 != null && q75 != null && q25 < q75;
+          // ONE source for the observed duration (seed review 2026-11-03):
+          // when the field is finisher-ranked (descending quartiles) the
+          // score-space median IS the median duration — prefer it over the
+          // features table, whose duration field defaulted to the cap on
+          // 18.2 M and disagrees by ~a minute on 24.1. Rows whose upstream
+          // time_domain is known-wrong (the 2017 season: 17.2/17.3/17.4)
+          // never contribute a features-table duration at all.
+          const obsDuration = quartilesDescend && q50 != null
+            ? q50
+            : SECONDS_UNTRUSTED.has(s.name)
+            ? null
+            : truth.observed_median_s;
           // Capped-median guard: when the observed median sits at the cap,
           // half the field never finished and a seconds comparison is
           // invalid (22.3, 19.2) — rep-space or nothing.
           const observedAtCap = truth.time_cap_seconds != null &&
-            truth.observed_median_s != null &&
-            truth.observed_median_s >= truth.time_cap_seconds * 0.98;
+            obsDuration != null &&
+            obsDuration >= truth.time_cap_seconds * 0.98;
+          // Scoring-direction cross-check (23.3-style encoding ambiguity):
+          // a seconds prediction against a rep-ranked field whose median
+          // supposedly finished is two sources contradicting each other
+          // about the workout's structure — skip visibly, don't guess.
+          if (!isRepScored && !observedAtCap && quartilesAscend && obsDuration) {
+            perWorkout.push({ name: s.name, gender: g, status: "skipped_scoring_mismatch" });
+            continue;
+          }
 
           let pred: number | null = null;
           let obs: number | null = null;
           let kind = "";
-          if (!isRepScored && !observedAtCap && truth.observed_median_s && s.name !== "17.3") {
+          if (!isRepScored && !observedAtCap && obsDuration) {
             pred = bench.median_seconds;
-            obs = truth.observed_median_s;
+            obs = obsDuration;
             kind = "time";
           } else if ((isRepScored || observedAtCap) && truth.p50_score) {
             pred = isRepScored

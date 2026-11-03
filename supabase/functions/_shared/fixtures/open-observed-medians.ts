@@ -205,3 +205,43 @@ export const OPEN_OBSERVED_MEDIANS: ObservedMedianRow[] = [
   { workout_name: "26.3", gender: "F", year: 2026, observed_median_s: 960, time_cap_seconds: 960, p25_score: 140, p50_score: 168, p75_score: 192 },
   { workout_name: "26.3", gender: "M", year: 2026, observed_median_s: 960, time_cap_seconds: 960, p25_score: 141, p50_score: 168, p75_score: 189 },
 ];
+
+// ---------------------------------------------------------------------
+// Row-quality metadata (founder review of the seed, 2026-11-03). The
+// acceptance harness consumes these; the seed-validation test asserts
+// them, so the next pull cannot silently regress past the same traps.
+
+/** Scored in pounds (max-lift pieces). The structure-only predictor has
+ *  nothing to say about a 1RM median; excluded from BOTH channels. */
+export const LOAD_SCORED: ReadonlySet<string> = new Set([
+  "15.1a", "18.2a", "21.4", "23.2B",
+]);
+
+/** Upstream time_domain_seconds is wrong for the WHOLE 2017 season's
+ *  AMRAP/chipper rows, not just 17.3: 17.2 (AMRAP 12) and 17.4 (AMRAP 13,
+ *  the 13.4 repeat) carry 430/500 and 649/640 against caps of 720/780 —
+ *  an AMRAP's duration IS its cap. The harness never trusts these rows'
+ *  observed_median_s. (Same family as the signature_censoring note.) */
+export const SECONDS_UNTRUSTED: ReadonlySet<string> = new Set([
+  "17.2", "17.3", "17.4",
+]);
+
+/** Finisher-ranked rows (descending quartiles) where the two time sources
+ *  disagree by more than 5 s: 18.2 M's duration field defaulted to the
+ *  cap (720 vs p50 533); 24.1's disagree by ~a minute both genders and
+ *  neither source is obviously right. DECISION (not a guess): wherever
+ *  quartiles descend, the harness uses p50_score as the observed median
+ *  duration — the score-space median comes from the actual ranked
+ *  distribution, one source of truth for both channels. These rows name
+ *  the known disagreements so the seed test fails loudly on new ones. */
+export const DURATION_DISAGREES: ReadonlySet<string> = new Set([
+  "18.2|M", "24.1|F", "24.1|M",
+]);
+
+/** 23.3 is a 6-minute AMRAP with extensions to 10 and 14, but the
+ *  features table encoded it as capped for-time (cap 900, median 668).
+ *  Whichever way its signature prescription is encoded, the harness's
+ *  scoring-direction cross-check (rep-ranked field vs a seconds
+ *  prediction) routes it out of the seconds channel rather than
+ *  comparing across structures. Listed for the audit trail. */
+export const EXTENSION_AMBIGUOUS: ReadonlySet<string> = new Set(["23.3"]);
