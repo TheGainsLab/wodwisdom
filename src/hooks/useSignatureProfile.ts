@@ -33,6 +33,8 @@ interface VectorRow {
   mean_pct: number;
   sd_pct: number;
   prior_sd_pct: number | null;
+  mean_z: number | null;
+  sd_z: number | null;
 }
 
 interface HeaderRow {
@@ -63,7 +65,7 @@ export function useSignatureProfile(userId: string | undefined): SignatureProfil
         .maybeSingle(),
       supabase
         .from('athlete_capability_vectors')
-        .select('axis, mean_pct, sd_pct, prior_sd_pct')
+        .select('axis, mean_pct, sd_pct, prior_sd_pct, mean_z, sd_z')
         .eq('user_id', userId),
       supabase
         .from('athlete_gate_possession')
@@ -81,6 +83,8 @@ export function useSignatureProfile(userId: string | undefined): SignatureProfil
         mean: Number(v.mean_pct),
         sd: Number(v.sd_pct),
         priorSd: v.prior_sd_pct !== null ? Number(v.prior_sd_pct) : undefined,
+        meanZ: v.mean_z !== null ? Number(v.mean_z) : undefined,
+        sdZ: v.sd_z !== null ? Number(v.sd_z) : undefined,
       };
     }
     const limiterPosterior: Record<string, number> = {};

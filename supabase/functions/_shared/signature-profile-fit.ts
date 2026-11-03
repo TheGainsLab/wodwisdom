@@ -33,7 +33,14 @@
 
 export interface SignatureModelParams {
   axes: string[]; // canonical axis order for every matrix/vector below
-  /** Sigma: prior covariance of TRUE deltas, percentile units. Must be the
+  /** Which ruler this row's numbers are on. 'pct' (default): worldwide
+   *  percentile points. 'z': probit space — standard-normal units, where
+   *  the elite tail is un-compressed (model upgrade 2026-11-03). NAMING
+   *  DEBT: the *_pct field names below are historical and mean "model
+   *  units"; a space='z' row carries z values in them. The math in this
+   *  module is unit-agnostic either way. */
+  space?: "pct" | "z";
+  /** Sigma: prior covariance of TRUE deltas, model units. Must be the
    *  noise-cancelled (deconvolved) signal covariance plus slack, NEVER the
    *  raw covariance of estimated deltas — that one is estimation-noise
    *  inflated and under-shrinks (review 2026-11-02; the shallow-band
@@ -47,6 +54,14 @@ export interface SignatureModelParams {
   level_prior_mean?: number;
   level_prior_var?: number;
   draft_noise_inflation?: number;
+  /** z-space cohort rows: the level (percentile) at and above which the
+   *  two-pass refit hands the athlete to this cohort. */
+  elite_level_min_pct?: number;
+  /** Hysteresis partner: an athlete ALREADY in the elite cohort stays until
+   *  the general fit drops below this (review 2026-11-03 — without it,
+   *  athletes near the entry line flip rulers between refits as their
+   *  fitted level wobbles). Defaults to entry minus 5. */
+  elite_level_exit_pct?: number;
 }
 
 export interface EvidenceObservation {
@@ -341,6 +356,98 @@ export function predictScore(
     }
   }
 
-  mean = Math.min(Math.max(mean, 0), 100);
+  // the [0,100] bound is a percentile fact; z is unbounded (a z-space
+  // caller passes its gate wall in z too)
+  if (params.space !== "z") mean = Math.min(Math.max(mean, 0), 100);
   return { mean, sd, gateClamped };
+}
+
+// ------------------------------------------------------- scale conversion
+// pct <-> z (probit) for the z-space cohorts. The FIT never converts —
+// callers transform evidence in and posteriors out, so this module stays
+// unit-agnostic. Accuracy: inverse (Acklam) ~1e-9 relative, CDF
+// (Abramowitz-Stegun 26.2.17) ~7.5e-8 absolute — well inside the model's
+// own noise; golden parity tests carry z natively so they do not depend
+// on these approximations.
+//
+// INVARIANT for every display conversion (this ruler, the next cohort's,
+// any future one): resolution ratios are computed in MODEL space, and the
+// conversion must preserve them — a dial's sd and its prior sd convert
+// through the same local factor (the same phi evaluation point), so
+// sd/priorSd downstream equals the ratio the fit actually achieved.
+// Converting the two at different points silently reclassifies dials
+// (review 2026-11-03: well-measured limiters read as unknowns).
+
+/** Standard normal CDF. */
+export function normCdf(x: number): number {
+  const t = 1 / (1 + 0.2316419 * Math.abs(x));
+  const d = Math.exp((-x * x) / 2) / Math.sqrt(2 * Math.PI);
+  const p = d * t *
+    (0.31938153 +
+      t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))));
+  return x >= 0 ? 1 - p : p;
+}
+
+/** Standard normal density. */
+export function normPdf(x: number): number {
+  return Math.exp((-x * x) / 2) / Math.sqrt(2 * Math.PI);
+}
+
+/** Inverse standard normal CDF (Acklam's rational approximation). */
+export function normInv(p: number): number {
+  if (!(p > 0 && p < 1)) throw new Error(`normInv domain: ${p}`);
+  const a = [-39.69683028665376, 220.9460984245205, -275.9285104469687,
+    138.357751867269, -30.66479806614716, 2.506628277459239];
+  const b = [-54.47609879822406, 161.5858368580409, -155.6989798598866,
+    66.80131188771972, -13.28068155288572];
+  const c = [-0.007784894002430293, -0.3223964580411365, -2.400758277161838,
+    -2.549732539343734, 4.374664141464968, 2.938163982698783];
+  const d = [0.007784695709041462, 0.3224671290700398, 2.445134137142996,
+    3.754408661907416];
+  const pl = 0.02425;
+  let q: number, r: number;
+  if (p < pl) {
+    q = Math.sqrt(-2 * Math.log(p));
+    return (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) /
+      ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1);
+  }
+  if (p <= 1 - pl) {
+    q = p - 0.5;
+    r = q * q;
+    return (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q /
+      (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1);
+  }
+  q = Math.sqrt(-2 * Math.log(1 - p));
+  return -(((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) /
+    ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1);
+}
+
+/** Worldwide percentile (0..100) -> z, with the research pipeline's clip
+ *  ([0.15, 99.85] — exactly the clip every z constant was measured under;
+ *  the derivation scripts use NormalDist().inv_cdf(clip(p/100, .0015, .9985))). */
+export function probitFromPct(percentile: number): number {
+  return normInv(Math.min(Math.max(percentile / 100, 0.0015), 0.9985));
+}
+
+/** z -> worldwide percentile (0..100). */
+export function pctFromZ(z: number): number {
+  return 100 * normCdf(z);
+}
+
+/** Re-express evidence in z for a z-space cohort fit: percentiles through
+ *  the probit, per-row noise overrides preserved as MULTIPLES of the
+ *  default noise (a row twice as noisy in pct is twice as noisy in z —
+ *  relative weighting is what the overrides encode). */
+export function convertEvidenceToZ(
+  evidence: EvidenceObservation[],
+  pctNoiseVar: number,
+  zNoiseVar: number,
+): EvidenceObservation[] {
+  return evidence.map((e) => ({
+    ...e,
+    percentile: probitFromPct(e.percentile),
+    obsNoiseVar: e.obsNoiseVar !== undefined
+      ? (e.obsNoiseVar / pctNoiseVar) * zNoiseVar
+      : undefined,
+  }));
 }
