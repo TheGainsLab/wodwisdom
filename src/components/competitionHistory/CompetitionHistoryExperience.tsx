@@ -31,7 +31,7 @@ import SummaryPanel, { type SignatureLite } from './SummaryPanel';
 import PowerPanel from './PowerPanel';
 import SignatureProfilePanel from './SignatureProfilePanel';
 
-type ExperienceTab = 'summary' | 'map' | 'movements' | 'power' | 'profile';
+type ExperienceTab = 'summary' | 'map' | 'movements' | 'power' | 'signature';
 
 interface BundleIdentity {
   name: string;
@@ -817,7 +817,7 @@ export default function CompetitionHistoryExperience({
                   {tabBtn('map', 'Workouts')}
                   {tabBtn('movements', 'All Movements')}
                   {tabBtn('power', 'Power')}
-                  {tabBtn('profile', 'Profile')}
+                  {tabBtn('signature', 'Signature')}
                 </div>
 
                 {tab === 'summary' && summaryPanel}
@@ -850,7 +850,7 @@ export default function CompetitionHistoryExperience({
                 {/* The fitted capability profile (Workout Signatures athlete
                     layer): dials, limiter/unknown cards, templated story,
                     concordance capture. Reads storage; refit on demand. */}
-                {tab === 'profile' && <SignatureProfilePanel userId={userId} />}
+                {tab === 'signature' && <SignatureProfilePanel userId={userId} />}
               </>
             );
           })()}
