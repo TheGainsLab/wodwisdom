@@ -477,10 +477,15 @@ Deno.serve(async (req) => {
       openIngest = await ingestOpenHistory(supa, targetUserId);
     }
 
-    // Intake ingestion runs on every refit unless opted out: local reads,
-    // idempotent upserts, and declared numbers should never lag the fit.
+    // Intake ingestion is OPT-IN (pulled back 2026-11-03 after the first
+    // production integration: the anchor scale is uncalibrated, and five
+    // lifts sharing one scale entered as independent evidence — correlated
+    // anchor error masquerading as sample size swung a confirmed profile
+    // by ~9 points. Design questions recorded in the design doc; re-enable
+    // by default only after the scale is calibrated on linked users and
+    // the fit carries a shared per-source bias term.)
     let intakeIngest: { upserted: number; gates_set: number; skipped: number } | { error: string } | null = null;
-    if (body.ingest_intake !== false) {
+    if (body.ingest_intake === true) {
       intakeIngest = await ingestIntake(supa, targetUserId);
     }
 
