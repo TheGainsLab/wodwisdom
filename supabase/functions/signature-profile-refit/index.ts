@@ -37,7 +37,10 @@ import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supa
 import { getCorsHeaders } from "../_shared/cors.ts";
 import {
   type EvidenceObservation,
+  convertEvidenceToZ,
   fitProfile,
+  normPdf,
+  pctFromZ,
   type SignatureModelParams,
 } from "../_shared/signature-profile-fit.ts";
 import {
@@ -49,6 +52,14 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const DEFAULT_PARAMS_KEY = "open_rx_general_v1";
+/** Two-pass cohort selection (model upgrade 2026-11-03): the general fit
+ *  runs first; an athlete it places at or above the elite row's threshold
+ *  (p85) is refit in z-space, where the percentile scale's top-end
+ *  compression no longer flattens their dials. The general field stays on
+ *  v1 — on the mid-field each space wins only its own metric, while on the
+ *  elite band z wins in BOTH (validation 2026-11-03: +8.0% vs v1 in
+ *  display units, +5.2% vs year-baseline in z). */
+const ELITE_PARAMS_KEY = "open_rx_elite_v2_z";
 
 interface LedgerRow {
   id: string;
@@ -497,7 +508,56 @@ Deno.serve(async (req) => {
       (params as SignatureModelParams & { draft_noise_inflation?: number }).draft_noise_inflation,
       params.noise_var_pct,
     );
-    const profile = fitProfile(observations, params);
+    let profile = fitProfile(observations, params);
+    let activeParams = params;
+    let activeKey = paramsKey;
+
+    // ── Two-pass cohort selection: elite athletes refit in z ────────────
+    // Only from the default path (an explicit params_key is an operator
+    // asking for exactly that row), and only when the elite row exists.
+    if (paramsKey === DEFAULT_PARAMS_KEY && observations.length > 0) {
+      const { data: eliteRow } = await supa
+        .from("signature_model_params")
+        .select("params")
+        .eq("key", ELITE_PARAMS_KEY)
+        .maybeSingle();
+      const eliteParams = (eliteRow?.params ?? null) as SignatureModelParams | null;
+      if (
+        eliteParams?.space === "z" &&
+        profile.level.mean >= (eliteParams.elite_level_min_pct ?? 85)
+      ) {
+        const zObs = convertEvidenceToZ(
+          observations,
+          params.noise_var_pct,
+          eliteParams.noise_var_pct,
+        );
+        profile = fitProfile(zObs, eliteParams);
+        activeParams = eliteParams;
+        activeKey = ELITE_PARAMS_KEY;
+      }
+    }
+
+    // ── Display conversion ───────────────────────────────────────────────
+    // A z fit persists BOTH rulers: the z posterior natively (sigma display,
+    // future refits) and the pct conversion in the columns every existing
+    // reader consumes. The conversion is exact for the display's arithmetic:
+    // level_pct + dial_pct = 100*CDF(level_z + delta_z), so the panel's
+    // "absolute = level + relative" lands on the true absolute percentile.
+    const isZ = activeParams.space === "z";
+    const Lz = profile.level.mean; // z units when isZ, pct otherwise
+    const displayLevel = isZ
+      ? { mean: pctFromZ(Lz), sd: 100 * normPdf(Lz) * profile.level.sd }
+      : profile.level;
+    const displayAxes: Record<string, { mean: number; sd: number }> = {};
+    for (const axis of activeParams.axes) {
+      const ax = profile.axes[axis];
+      displayAxes[axis] = isZ
+        ? {
+          mean: pctFromZ(Lz + ax.mean) - pctFromZ(Lz),
+          sd: 100 * normPdf(Lz + ax.mean) * ax.sd,
+        }
+        : { mean: ax.mean, sd: ax.sd };
+    }
 
     const limiterTop2 = profile.limiterRanked.slice(0, 2).map((axis) => ({
       axis,
@@ -510,19 +570,29 @@ Deno.serve(async (req) => {
     let fitLogId: string | null = null;
     if (observations.length > 0) {
       const fittedAt = new Date().toISOString();
-      const vectorRows = params.axes.map((axis, i) => ({
-        user_id: targetUserId,
-        axis,
-        mean_pct: profile.axes[axis].mean,
-        sd_pct: profile.axes[axis].sd,
-        // the prior sd THIS fit shrank from — the display computes
-        // resolution against it (never against client-side constants)
-        prior_sd_pct: Math.sqrt(Math.max(params.prior_cov_pct[i][i], 0)),
-        n_evidence: observations.length,
-        source_mix: sourceMix,
-        model_params_key: paramsKey,
-        fitted_at: fittedAt,
-      }));
+      const vectorRows = activeParams.axes.map((axis, i) => {
+        const priorSd = Math.sqrt(Math.max(activeParams.prior_cov_pct[i][i], 0));
+        return {
+          user_id: targetUserId,
+          axis,
+          mean_pct: displayAxes[axis].mean,
+          sd_pct: displayAxes[axis].sd,
+          // the prior sd THIS fit shrank from — the display computes
+          // resolution against it (never against client-side constants).
+          // For a z fit, converted at the athlete's level so sd/priorSd
+          // stays the same resolution ratio the fit actually achieved.
+          prior_sd_pct: isZ ? 100 * normPdf(Lz) * priorSd : priorSd,
+          // z natives — explicitly null on pct fits so an athlete who
+          // drops below the elite threshold doesn't keep stale z columns
+          mean_z: isZ ? profile.axes[axis].mean : null,
+          sd_z: isZ ? profile.axes[axis].sd : null,
+          prior_sd_z: isZ ? priorSd : null,
+          n_evidence: observations.length,
+          source_mix: sourceMix,
+          model_params_key: activeKey,
+          fitted_at: fittedAt,
+        };
+      });
       const { error: upsertErr } = await supa
         .from("athlete_capability_vectors")
         .upsert(vectorRows, { onConflict: "user_id,axis" });
@@ -533,29 +603,35 @@ Deno.serve(async (req) => {
         .from("athlete_signature_profiles")
         .upsert({
           user_id: targetUserId,
-          cohort: (params as SignatureModelParams & { cohort?: string }).cohort ?? "open_rx_general",
-          level_mean: profile.level.mean,
-          level_sd: profile.level.sd,
+          cohort: (activeParams as SignatureModelParams & { cohort?: string }).cohort ??
+            "open_rx_general",
+          level_mean: displayLevel.mean,
+          level_sd: displayLevel.sd,
+          level_mean_z: isZ ? profile.level.mean : null,
+          level_sd_z: isZ ? profile.level.sd : null,
           limiter: profile.limiterRanked.map((axis) => ({
             axis,
             p: profile.limiterPosterior[axis],
           })),
           n_evidence: observations.length,
-          model_params_key: paramsKey,
+          model_params_key: activeKey,
           fitted_at: fittedAt,
         }, { onConflict: "user_id" });
       if (headerErr) return json({ error: "PERSIST_FAILED", detail: headerErr.message }, 500);
       // Append-only research record (story-layer spec item 5): the fit log
       // accumulates every production fit for concordance capture and
       // params-version drift monitoring. Best-effort — never fails the fit.
+      // The log records what the athlete was SHOWN (display units — the
+      // read concordance reacts to); the z natives live on the capability
+      // vectors, addressable from here via params_key + fitted_at.
       const { data: logRow, error: logErr } = await supa.from("signature_fit_log").insert({
         user_id: targetUserId,
         fitted_at: fittedAt,
-        params_key: paramsKey,
+        params_key: activeKey,
         n_evidence: observations.length,
-        level_mean: profile.level.mean,
-        level_sd: profile.level.sd,
-        axes: profile.axes,
+        level_mean: displayLevel.mean,
+        level_sd: displayLevel.sd,
+        axes: displayAxes,
         limiter: profile.limiterRanked.map((axis) => ({
           axis,
           p: profile.limiterPosterior[axis],
@@ -568,12 +644,15 @@ Deno.serve(async (req) => {
     }
 
     return json({
-      level: profile.level,
-      axes: profile.axes,
+      level: displayLevel,
+      axes: displayAxes,
+      // z natives when the elite cohort served this fit (null otherwise)
+      level_z: isZ ? profile.level : null,
+      axes_z: isZ ? profile.axes : null,
       limiter_top2: limiterTop2,
       n_evidence: observations.length,
       n_skipped_unsigned: skipped,
-      params_key: paramsKey,
+      params_key: activeKey,
       persisted,
       fit_log_id: fitLogId,
       open_ingest: openIngest,

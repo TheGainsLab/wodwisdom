@@ -31,6 +31,10 @@ export interface AxisPosterior {
    *  live params row — the single source; absent only on rows persisted
    *  before the column existed, in which case nothing classifies) */
   priorSd?: number;
+  /** z-native dial (standard-normal units), present only on elite-cohort
+   *  fits (open_rx_elite_v2_z) — the un-compressed ruler the fit ran on */
+  meanZ?: number;
+  sdZ?: number;
 }
 
 export interface FittedProfileView {
@@ -51,6 +55,9 @@ export interface DialView {
   /** relative-to-self, percentile points */
   relative: number;
   sd: number;
+  /** relative-to-self in sigma (z) units — elite-cohort fits only */
+  relativeZ?: number;
+  sdZ?: number;
   /** absolute percentile estimate for this axis (level + delta, clamped) */
   absolute: number;
   /** how settled this dial is: fraction of prior uncertainty resolved */
@@ -215,6 +222,8 @@ export function buildDials(p: FittedProfileView): DialView[] {
       definition: AXIS_META[axis]?.definition ?? '',
       relative: ax.mean,
       sd: ax.sd,
+      relativeZ: ax.meanZ,
+      sdZ: ax.sdZ,
       absolute: Math.min(99, Math.max(1, p.level.mean + ax.mean)),
       resolution: (() => {
         const ps = priorSdOf(ax);
@@ -228,6 +237,9 @@ export function buildDials(p: FittedProfileView): DialView[] {
 
 const COHORT_NAMES: Record<string, string> = {
   open_rx_general: 'the worldwide RX Open field',
+  // same field, same scores — the elite cohort changes the RULER (z-space
+  // fit above p85, where percentiles compress), not the comparison group
+  open_rx_elite: 'the worldwide RX Open field',
 };
 
 function pctPhrase(level: number): string {

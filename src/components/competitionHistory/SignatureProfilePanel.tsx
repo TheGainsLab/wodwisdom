@@ -61,7 +61,14 @@ export default function SignatureProfilePanel({ userId }: { userId: string | und
     );
   }
 
-  const maxAbs = Math.max(8, ...read.dials.map((d) => Math.abs(d.relative) + d.sd));
+  // elite-cohort fits carry the z-native dials; bars and numbers both use
+  // that ruler (the pct conversion is compressed at elite levels — showing
+  // it geometrically would undo the upgrade). One fit = one ruler, so the
+  // mix is never per-dial.
+  const isZ = read.dials.some((d) => d.relativeZ !== undefined);
+  const relOf = (d: (typeof read.dials)[number]) => (isZ ? d.relativeZ ?? 0 : d.relative);
+  const sdOf = (d: (typeof read.dials)[number]) => (isZ ? d.sdZ ?? 0 : d.sd);
+  const maxAbs = Math.max(isZ ? 0.8 : 8, ...read.dials.map((d) => Math.abs(relOf(d)) + sdOf(d)));
 
   return (
     <div style={{ paddingTop: 4 }}>
@@ -106,12 +113,14 @@ export default function SignatureProfilePanel({ userId }: { userId: string | und
         <SectionLabel>Your shape — each quality vs your own level</SectionLabel>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {read.dials.map((d) => {
+            const rel = relOf(d);
+            const sd = sdOf(d);
             const center = 50; // % position of zero
-            const scale = 50 / maxAbs; // % per percentile point
-            const left = center + Math.min(0, d.relative) * scale;
-            const width = Math.abs(d.relative) * scale;
-            const sdLeft = center + (d.relative - d.sd) * scale;
-            const sdWidth = 2 * d.sd * scale;
+            const scale = 50 / maxAbs; // % per unit (pct point, or σ on z fits)
+            const left = center + Math.min(0, rel) * scale;
+            const width = Math.abs(rel) * scale;
+            const sdLeft = center + (rel - sd) * scale;
+            const sdWidth = 2 * sd * scale;
             return (
               <div key={d.axis} title={d.definition}
                 style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
@@ -133,12 +142,16 @@ export default function SignatureProfilePanel({ userId }: { userId: string | und
                     top: 3, height: 8, borderRadius: 4,
                     // color is copy (review item 4): below-your-own-line is
                     // not danger — a neutral slate keeps red off this panel
-                    background: d.relative >= 0 ? 'var(--accent)' : '#7a8699',
+                    background: rel >= 0 ? 'var(--accent)' : '#7a8699',
                     opacity: 0.4 + 0.6 * d.resolution,
                   }} />
                 </div>
                 <div style={{ flex: '0 0 52px', textAlign: 'right', color: 'var(--text)' }}>
-                  {d.relative >= 0 ? '+' : ''}{d.relative.toFixed(1)}
+                  {d.relativeZ !== undefined
+                    // elite-cohort fit: the z-native dial, the un-compressed
+                    // ruler (percentile points stop resolving above ~p95)
+                    ? `${d.relativeZ >= 0 ? '+' : ''}${d.relativeZ.toFixed(2)}σ`
+                    : `${d.relative >= 0 ? '+' : ''}${d.relative.toFixed(1)}`}
                 </div>
                 <div style={{ flex: '0 0 46px', textAlign: 'right', color: 'var(--text-dim)', fontSize: 12 }}>
                   ~p{Math.round(d.absolute)}
@@ -151,6 +164,8 @@ export default function SignatureProfilePanel({ userId }: { userId: string | und
           Bars are relative to your own level (p{Math.round(profile.level.mean)}); the right column is
           the absolute read. Faded bars are less certain. A below-line quality can still be far above
           the field.
+          {read.dials.some((d) => d.relativeZ !== undefined) &&
+            ' At your level percentile points stop resolving differences, so dials are in σ — standard deviations of the field, the scale your profile was actually fitted on.'}
         </div>
       </div>
 
