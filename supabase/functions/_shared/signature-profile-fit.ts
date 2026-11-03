@@ -369,6 +369,14 @@ export function predictScore(
 // (Abramowitz-Stegun 26.2.17) ~7.5e-8 absolute — well inside the model's
 // own noise; golden parity tests carry z natively so they do not depend
 // on these approximations.
+//
+// INVARIANT for every display conversion (this ruler, the next cohort's,
+// any future one): resolution ratios are computed in MODEL space, and the
+// conversion must preserve them — a dial's sd and its prior sd convert
+// through the same local factor (the same phi evaluation point), so
+// sd/priorSd downstream equals the ratio the fit actually achieved.
+// Converting the two at different points silently reclassifies dials
+// (review 2026-11-03: well-measured limiters read as unknowns).
 
 /** Standard normal CDF. */
 export function normCdf(x: number): number {

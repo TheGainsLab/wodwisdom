@@ -1,0 +1,50 @@
+# Signature-layer gates — the repo's first CI, created deliberately narrow
+# (review 2026-11-03): the copy checker is a HARD gate because it verifies
+# the rendered claims, not the numbers — it caught two display-layer bugs
+# (the z-conversion evaluation point and the two-card disjointness) that
+# every unit test was green for. The fixture it runs on permanently
+# includes the 40 elite z-space profiles alongside the 250 percentile
+# ones, so both rulers are checked on every change.
+#
+# The deno suites here are the dependency-light signature tests (golden
+# parity in both spaces, cohort handoff, coach-state tripwire). The wider
+# _shared test directory needs service env and remote deps; it is not in
+# this gate on purpose — add suites individually as they are made hermetic.
+
+name: signature-checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  copy-rules:
+    name: story copy rules (both rulers)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit -p tsconfig.json
+      - run: npx tsx scripts/verify-signature-story.ts
+
+  fit-tests:
+    name: fit golden parity + cohort handoff
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: |
+          deno test --no-check \
+            supabase/functions/_shared/signature-profile-fit_test.ts \
+            supabase/functions/_shared/signature-profile-fit_golden_test.ts \
+            supabase/functions/_shared/signature-profile-fit_golden_z_test.ts \
+            supabase/functions/_shared/signature-cohort-select_test.ts \
+            supabase/functions/_shared/signature-hash_test.ts
+      - run: deno test --no-check --allow-env supabase/functions/_shared/coach-state_test.ts
