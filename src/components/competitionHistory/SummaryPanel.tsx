@@ -1,6 +1,6 @@
 /**
  * SummaryPanel — the "Summary" tab of /competition-history. A brief overview
- * (name · seasons · workout count · profile ↗) plus a few key data points:
+ * (name · seasons · workout count) plus a few key data points:
  *   - Across durations (Short / Mid / Long): count + share, bar = the athlete's
  *     avg age-cohort percentile in that bucket
  *   - Across modalities (Gymnastics / Weightlifting / Monostructural / Mixed /
@@ -136,14 +136,12 @@ function BreakdownBlock({ title, rows }: { title: string; rows: BreakdownRow[] }
 
 export default function SummaryPanel({
   name,
-  profileUrl,
   seasonsCompeted,
   history,
   signature,
   onPickMovement,
 }: {
   name: string;
-  profileUrl: string | null;
   seasonsCompeted: number;
   history: NormalizedCompetitionHistory;
   signature?: SignatureLite;
@@ -207,9 +205,7 @@ export default function SummaryPanel({
       <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 2 }}>
         {seasonsCompeted} season{seasonsCompeted === 1 ? '' : 's'}
         {history.total > 0 ? ` · ${history.total} competition workout${history.total === 1 ? '' : 's'}` : ''}
-        {profileUrl && (
-          <> · <a href={profileUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>profile ↗</a></>
-        )}
+
       </div>
 
       <BreakdownBlock title="Across durations" rows={timeRows} />

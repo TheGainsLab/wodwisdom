@@ -751,7 +751,6 @@ export default function CompetitionHistoryExperience({
             const summaryPanel = (
               <SummaryPanel
                 name={linkedBundle.identity.name}
-                profileUrl={linkedBundle.identity.profile_url}
                 seasonsCompeted={cs.seasons_competed}
                 history={competitionHistory}
                 signature={linkedBundle.fitness_signature}
