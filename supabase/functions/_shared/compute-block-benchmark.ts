@@ -166,10 +166,14 @@ export function toWorkCalcMovement(
     return null;
   }
 
-  // 4. Load — pass on both gender slots; upstream picks per athlete gender.
+  // 4. Load — upstream picks the slot for the athlete's gender. weight is
+  // the men's/RX-primary load; weight_women splits the slots when present
+  // (audit run 2's women's-ladder family: the women's field was being
+  // modeled at men's loads — 11.6 W predicted 28 reps vs observed 73).
   if (typeof m.weight === "number" && m.weight > 0) {
     out.load_lbs_men = m.weight;
-    out.load_lbs_women = m.weight;
+    const ww = (m as { weight_women?: number }).weight_women;
+    out.load_lbs_women = typeof ww === "number" && ww > 0 ? ww : m.weight;
   }
 
   return out;

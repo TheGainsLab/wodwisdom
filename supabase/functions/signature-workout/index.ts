@@ -817,11 +817,24 @@ Deno.serve(async (req) => {
       }
       const { data: sigRowsRaw, error: sigErr } = await supa
         .from("workout_signatures")
-        .select("name, workout")
+        .select("name, workout, loads_women")
         .eq("source", "open").eq("status", "approved");
       if (sigErr) return json({ error: sigErr.message }, 500);
       // Stable order so slices are reproducible across calls.
-      const allSigs = ((sigRowsRaw ?? []) as Array<{ name: string; workout: BlockPrescription }>)
+      // Merge women's loads (sibling column — never the workout jsonb,
+      // whose canonical hash is identity) into in-memory prescriptions:
+      // movement index -> lbs lands as weight_women on that movement.
+      const allSigs = ((sigRowsRaw ?? []) as Array<
+        { name: string; workout: BlockPrescription; loads_women: Record<string, number> | null }
+      >)
+        .map((r) => {
+          if (!r.loads_women) return { name: r.name, workout: r.workout };
+          const movements = (r.workout.movements ?? []).map((mv, i) => {
+            const ww = r.loads_women?.[String(i)];
+            return typeof ww === "number" && ww > 0 ? { ...mv, weight_women: ww } : mv;
+          });
+          return { name: r.name, workout: { ...r.workout, movements } as BlockPrescription };
+        })
         .sort((a, b) => a.name.localeCompare(b.name));
 
       // Batching ({"offset": 0, "limit": 20}): the full polite run (146

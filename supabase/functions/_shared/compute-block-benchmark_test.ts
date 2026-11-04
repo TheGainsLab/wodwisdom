@@ -82,3 +82,12 @@ Deno.test("engine version composes code + curve generation", () => {
     "without calc_version",
   );
 });
+
+Deno.test("weight_women splits the gender load slots; absent falls back", () => {
+  const m = { movement: "Thruster", rep_scheme: [21], weight: 100, weight_women: 65 } as unknown as MovementPrescription;
+  const out = toWorkCalcMovement(m, "for_time")!;
+  expectEq(out.load_lbs_men, 100, "men at RX");
+  expectEq(out.load_lbs_women, 65, "women at women's RX");
+  const single = { movement: "Thruster", rep_scheme: [21], weight: 100 } as unknown as MovementPrescription;
+  expectEq(toWorkCalcMovement(single, "for_time")!.load_lbs_women, 100, "no split = status quo");
+});
