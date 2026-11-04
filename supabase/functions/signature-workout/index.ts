@@ -1089,8 +1089,31 @@ Deno.serve(async (req) => {
               row.rel_error_field = Number(((predVal - obsField!.s) / obsField!.s).toFixed(3));
             }
             if (fieldPct !== null) row.percentile_in_field = Number(fieldPct.toFixed(1));
+            // Movement list rides every graded row so residuals can be
+            // regressed on movement-family shares offline (review
+            // 2026-11-04: the "era gradient" may be movement composition —
+            // the test needs real prescriptions, not year bands).
+            row.movements = (s.workout.movements ?? [])
+              .map((m) => (m as { movement?: string }).movement ?? "")
+              .filter((n) => n.length > 0);
             if (!unitOk(headlineObs)) {
               row.status = "skipped_scoring_mismatch";
+              // Still graded in the percentile channel (review 2026-11-04):
+              // "engine says finisher, field median didn't finish" is not
+              // unmeasurable — it's the engine's placement of the median
+              // athlete in the field, and it holds the worst optimism
+              // (+30..+45 points). When the grid has no matching-unit
+              // segment the engine claims past the grid's edge: grade at
+              // the edge and mark it censored rather than drop it.
+              let pe: number;
+              if (fieldPct !== null) {
+                pe = fieldPct - 50;
+              } else {
+                pe = isRepScored ? 5 - 50 : 95 - 50;
+                row.pct_censored = "grid_edge";
+              }
+              row.percentile_error = Number(pe.toFixed(1));
+              pctErrs.push(pe);
               perWorkout.push(row);
               continue;
             }
@@ -1104,7 +1127,15 @@ Deno.serve(async (req) => {
                 ? unspliceGatedPercentile(fieldPct, gatedW) - 50
                 : fieldPct - 50;
               row.percentile_error = Number(pe.toFixed(1));
-              pctErrs.push(pe);
+              if (gatedW !== null && fieldPct <= 100 * gatedW) {
+                // unsplice floored at 0: the engine's field placement is
+                // inside the wall band, so −50 is the floor, not a
+                // measurement — stays on the row, stays out of every
+                // aggregate (review 2026-11-04)
+                row.pct_floor = true;
+              } else {
+                pctErrs.push(pe);
+              }
             }
             perWorkout.push(row);
             continue;
@@ -1235,7 +1266,10 @@ Deno.serve(async (req) => {
         rep_scored: summarize(relErrsReps),
         // THE number for params: variance of where predicted medians land
         // in the observed distributions, percentile² — plus the bias,
-        // which should be ~0 if the watts layer is honest.
+        // which should be ~0 if the watts layer is honest. Includes
+        // scoring_mismatch rows (their field placement is a measured
+        // error); excludes gated rows pinned at the unsplice floor
+        // (pct_floor — a bound, not a measurement).
         percentile_error: pctErrs.length
           ? {
             n: pctErrs.length,
