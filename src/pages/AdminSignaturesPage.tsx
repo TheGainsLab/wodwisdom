@@ -55,7 +55,8 @@ interface SigRow {
   id?: string; name: string; source: 'open' | 'quarterfinals' | 'adhoc';
   competition_workout_id?: string | null; workout: Workout;
   demand: Weights; discrimination?: Weights | null; stimulus?: Weights | null;
-  gates: Gate[]; time_domain?: string | null; format?: string | null;
+  gates: Gate[]; loads_women?: Record<string, number> | null;
+  time_domain?: string | null; format?: string | null;
   archetype?: string | null; rationale?: string | null; measured?: Measured | null;
   status?: string; created_at?: string;
 }
@@ -132,6 +133,7 @@ export default function AdminSignaturesPage({ session }: { session: Session }) {
   const [gender, setGender] = useState<'men' | 'women'>('men');
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [wwWarn, setWwWarn] = useState('');
   const [sysCheck, setSysCheck] = useState<string | null>(null);
 
   useEffect(() => {
@@ -230,7 +232,10 @@ export default function AdminSignaturesPage({ session }: { session: Session }) {
   });
 
   const doDraft = () => sel && run('draft', async () => {
-    const out = await invokeSig({ action: 'draft', workout: sel.workout, gender, name: sel.name });
+    const out = await invokeSig({
+      action: 'draft', workout: sel.workout, gender, name: sel.name,
+      loads_women: sel.loads_women ?? null,
+    });
     setLib((out.measured_library as MeasuredLib | null) ?? null);
     const sig = out.signature as Partial<SigRow>;
     const next = {
@@ -250,7 +255,12 @@ export default function AdminSignaturesPage({ session }: { session: Session }) {
   });
 
   const doMeasure = () => sel && run('measure', async () => {
-    const out = await invokeSig({ action: 'measure', workout: sel.workout, gender, name: sel.name });
+    const out = await invokeSig({
+      action: 'measure', workout: sel.workout, gender, name: sel.name,
+      loads_women: sel.loads_women ?? null,
+    });
+    const refused = out.loads_women_invalid as number[] | null;
+    setWwWarn(refused ? `women's loads refused at movement ${refused.join(', ')} — fix the ♀ field` : '');
     setLib((out.measured_library as MeasuredLib | null) ?? null);
     setSel({ ...sel, measured: (out.measured as Measured | null) });
   });
@@ -264,6 +274,7 @@ export default function AdminSignaturesPage({ session }: { session: Session }) {
       gates: sel.gates, time_domain: sel.time_domain ?? null, format: sel.format ?? null,
       archetype: sel.archetype ?? null, rationale: sel.rationale ?? null,
       measured: sel.measured ?? null, drafted_model: 'sonnet',
+      loads_women: sel.loads_women ?? null,
     };
     if (statusAction === 'reject') { await invokeSig({ action: 'reject', id: sel.id }); }
     else {
@@ -297,6 +308,15 @@ export default function AdminSignaturesPage({ session }: { session: Session }) {
     const movements = sel.workout.movements.map((mv, j) => (j === i ? { ...mv, ...m } : mv));
     setSel({ ...sel, workout: { ...sel.workout, movements } });
   };
+  /** Women's RX load per movement index — stored in the loads_women
+   *  SIBLING map (never the workout jsonb: its hash is identity). */
+  const setLoadWoman = (i: number, v: number | undefined) => {
+    if (!sel) return;
+    const lw = { ...(sel.loads_women ?? {}) };
+    if (v === undefined) delete lw[String(i)];
+    else lw[String(i)] = v;
+    setSel({ ...sel, loads_women: Object.keys(lw).length > 0 ? lw : null });
+  };
   const stepWeight = (vec: 'demand' | 'discrimination' | 'stimulus', axis: string, d: number) => {
     if (!sel) return;
     const w = { ...((sel[vec] ?? {}) as Weights) };
@@ -324,6 +344,7 @@ export default function AdminSignaturesPage({ session }: { session: Session }) {
 
         <div className="page-body" style={{ padding: '0 20px 60px', maxWidth: 980 }}>
           {error && <div style={{ color: 'var(--accent)', fontSize: 13, margin: '10px 0' }}>{error}</div>}
+          {wwWarn && <div style={{ color: '#b58a00', fontSize: 13, margin: '10px 0' }}>{wwWarn}</div>}
 
           {!sel && (
             <>
@@ -421,7 +442,13 @@ export default function AdminSignaturesPage({ session }: { session: Session }) {
                     key={`rs-${i}-${sel.id ?? 'new'}`}
                     onBlur={(e) => setMovement(i, { rep_scheme: parseNums(e.target.value) })}
                     placeholder="21,15,9" style={{ ...field, ...mono }} />
-                  <input type="number" value={m.weight ?? ''} onChange={(e) => setMovement(i, { weight: e.target.value ? Number(e.target.value) : undefined })} style={field} />
+                  <input type="number" title="men's RX load" value={m.weight ?? ''} onChange={(e) => setMovement(i, { weight: e.target.value ? Number(e.target.value) : undefined })} style={field} />
+                  {typeof m.weight === 'number' && (
+                    <input type="number" title="women's RX load (loads_women — sibling to the jsonb)" placeholder="♀"
+                      value={sel.loads_women?.[String(i)] ?? ''}
+                      onChange={(e) => setLoadWoman(i, e.target.value ? Number(e.target.value) : undefined)}
+                      style={{ ...field, width: 64 }} />
+                  )}
                   <select value={m.weight_unit ?? 'lbs'} onChange={(e) => setMovement(i, { weight_unit: e.target.value as 'lbs' | 'kg' })} style={field}>
                     <option value="lbs">lbs</option><option value="kg">kg</option>
                   </select>
