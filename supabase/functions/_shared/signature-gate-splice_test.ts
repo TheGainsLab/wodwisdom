@@ -95,3 +95,29 @@ Deno.test("percentileAtScore inverts the grid, unit-filtered", () => {
   close(percentileAtScore(g, 600, true), 90, 1e-9, "faster than fastest clamps high");
   eq(percentileAtScore([{ p: 50, s: 100, fin: false }], 100, false), null, "one point is no grid");
 });
+
+Deno.test("wall is a plateau: one-rep-past athletes are still walled (20.5 F shape)", () => {
+  const g205: CurvePoint[] = [
+    { p: 10, s: 200, fin: false },
+    { p: 40, s: 200, fin: false },
+    { p: 45, s: 201, fin: false }, // one ring muscle-up, then parked
+    { p: 80, s: 201, fin: false },
+    { p: 85, s: 207, fin: false },
+    { p: 95, s: 227, fin: false },
+  ];
+  // tolerance max(1, 4) = 4 → plateau extends through 201 at p80
+  close(wallMassFromCurve(g205, 200), 0.8, 1e-9, "plateau top, not pile top");
+  // conditional median now reads real possessor territory
+  const q = conditionalQuartiles(g205, 0.8);
+  if ((q.p50?.s ?? 0) <= 204) throw new Error(`conditional p50 still on the wall: ${q.p50?.s}`);
+});
+
+Deno.test("plateau requires reaching the pile first", () => {
+  const g: CurvePoint[] = [
+    { p: 10, s: 150, fin: false },
+    { p: 50, s: 199, fin: false }, // within tolerance of 200 but pile never reached
+    { p: 90, s: 240, fin: false },
+  ];
+  close(wallMassFromCurve(g, 200), 0.5, 1e-9, "199 <= pile counts as reaching");
+  eq(wallMassFromCurve([{ p: 50, s: 240, fin: false }], 200), null, "never reached");
+});
