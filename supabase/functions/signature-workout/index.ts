@@ -1007,6 +1007,11 @@ Deno.serve(async (req) => {
       const relErrsTime: number[] = [];
       const relErrsReps: number[] = [];
       const pctErrs: number[] = [];
+      // Bounds, not measurements — counted beside the aggregate, never in
+      // it: floored gated rows (true error ≤ −50) and grid-edge censored
+      // mismatch rows (true error ≥ +45 / ≤ −45).
+      let pctFloorN = 0;
+      let pctCensoredN = 0;
       for (const s of sigRows) {
         for (const g of ["men", "women"] as Gender[]) {
           const key = `${s.name.toLowerCase()}|${g === "women" ? "F" : "M"}`;
@@ -1089,13 +1094,32 @@ Deno.serve(async (req) => {
               row.rel_error_field = Number(((predVal - obsField!.s) / obsField!.s).toFixed(3));
             }
             if (fieldPct !== null) row.percentile_in_field = Number(fieldPct.toFixed(1));
-            // Movement list rides every graded row so residuals can be
-            // regressed on movement-family shares offline (review
+            // Movements WITH volume ride every graded row so residuals can
+            // be regressed on movement-family SHARES offline (review
             // 2026-11-04: the "era gradient" may be movement composition —
-            // the test needs real prescriptions, not year bands).
-            row.movements = (s.workout.movements ?? [])
-              .map((m) => (m as { movement?: string }).movement ?? "")
-              .filter((n) => n.length > 0);
+            // the test needs each movement's fraction of the workout, and
+            // presence alone can't tell 350 double-unders from 30).
+            row.movements = (s.workout.movements ?? []).flatMap((mv) => {
+              const m = mv as {
+                movement?: string;
+                reps?: number;
+                rep_scheme?: number[];
+                calories?: number;
+                distance?: number;
+              };
+              const name = (m.movement ?? "").trim();
+              if (!name) return [];
+              const schemeSum = Array.isArray(m.rep_scheme)
+                ? m.rep_scheme.filter((n) => typeof n === "number" && n > 0)
+                  .reduce((a, b) => a + b, 0)
+                : 0;
+              const entry: Record<string, unknown> = { movement: name };
+              const reps = typeof m.reps === "number" && m.reps > 0 ? m.reps : schemeSum;
+              if (reps > 0) entry.reps = reps;
+              if (typeof m.calories === "number" && m.calories > 0) entry.calories = m.calories;
+              if (typeof m.distance === "number" && m.distance > 0) entry.distance = m.distance;
+              return [entry];
+            });
             if (!unitOk(headlineObs)) {
               row.status = "skipped_scoring_mismatch";
               // Still graded in the percentile channel (review 2026-11-04):
@@ -1103,17 +1127,18 @@ Deno.serve(async (req) => {
               // unmeasurable — it's the engine's placement of the median
               // athlete in the field, and it holds the worst optimism
               // (+30..+45 points). When the grid has no matching-unit
-              // segment the engine claims past the grid's edge: grade at
-              // the edge and mark it censored rather than drop it.
-              let pe: number;
+              // segment the engine claims past the grid's edge: that is a
+              // BOUND ("at least ±45"), same as the unsplice floor — on
+              // the row, counted beside the aggregate, never in it.
               if (fieldPct !== null) {
-                pe = fieldPct - 50;
+                const pe = fieldPct - 50;
+                row.percentile_error = Number(pe.toFixed(1));
+                pctErrs.push(pe);
               } else {
-                pe = isRepScored ? 5 - 50 : 95 - 50;
+                row.percentile_error = isRepScored ? -45 : 45;
                 row.pct_censored = "grid_edge";
+                pctCensoredN++;
               }
-              row.percentile_error = Number(pe.toFixed(1));
-              pctErrs.push(pe);
               perWorkout.push(row);
               continue;
             }
@@ -1133,6 +1158,7 @@ Deno.serve(async (req) => {
                 // measurement — stays on the row, stays out of every
                 // aggregate (review 2026-11-04)
                 row.pct_floor = true;
+                pctFloorN++;
               } else {
                 pctErrs.push(pe);
               }
@@ -1276,6 +1302,11 @@ Deno.serve(async (req) => {
             bias: Number(pctMean!.toFixed(2)),
             sd: Number(Math.sqrt(pctVar ?? 0).toFixed(2)),
             var_for_obs_noise: Number((pctVar ?? 0).toFixed(1)),
+            // bounds, excluded above: floored gated rows (error ≤ −50)
+            // and grid-edge censored mismatches (|error| ≥ 45) — the
+            // optimism is visible here without distorting the number
+            floored_rows: pctFloorN,
+            censored_rows: pctCensoredN,
           }
           : null,
         per_workout: perWorkout.sort((a, b) =>
