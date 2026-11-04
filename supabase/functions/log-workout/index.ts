@@ -438,10 +438,16 @@ Deno.serve(async (req) => {
               b.percentile >= 1 && b.percentile <= 99
             ? b.percentile
             : null,
-          // Structure-derived percentile → provisional noise sd ≈ 20
-          // (var 400) until the scorescale_acceptance protocol measures the
-          // real error (design doc 2026-11-02: that error feeds calibration).
-          obs_noise_var: 400,
+          // PROVISIONAL noise sd ≈ 25 (var 625). Acceptance run 3
+          // (2026-11-04) measured pure-time median |pct err| ≈ 20 points,
+          // so the old sd 20 was already optimistic — and the error is not
+          // one variance: it depends on the workout's movement composition
+          // (bodyweight-cheap movements read ~+57 pts/share optimistic) and
+          // the women's short-duration curve cell is ~half of true. One
+          // wide placeholder until the cost table is FITTED, not audited —
+          // do not narrow this per-family from audit slices (review
+          // 2026-11-04: users' workouts won't resemble the audited slice).
+          obs_noise_var: 625,
           source: "logged_solo",
           performed_at: priorPerformedBySort.get(bi) ?? dateStr,
           source_ref: `log:${log.id}:${bi}`,
