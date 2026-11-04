@@ -110,6 +110,11 @@ export interface MovementPrescription {
    */
   max_effort?: boolean;
   weight?: number;
+  /** Women's RX load when it differs (library/Open prescriptions carry
+   *  the men's load in `weight`; the engine's gender slots split here —
+   *  merged from workout_signatures.loads_women at measure time, or set
+   *  directly on in-memory prescriptions). Same unit as weight_unit. */
+  weight_women?: number;
   weight_unit?: "lbs" | "kg";
   rpe?: number;
   /** Duration prescription (e.g., "row 5 min" → 300). */

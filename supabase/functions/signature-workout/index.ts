@@ -49,9 +49,17 @@ import { FOCUS_AREAS } from "../_shared/coach-state.ts";
 import {
   composeEngineVersion,
   computeBlockBenchmarkExplained,
+  measurableSignatureWorkout,
   type ExpectedBenchmark,
 } from "../_shared/compute-block-benchmark.ts";
 import { __clearWorkCalcMemo } from "../_shared/compute-benchmarks.ts";
+import {
+  percentileAtScore,
+  scoreAtPercentile,
+  spliceGatedPercentile,
+  unspliceGatedPercentile,
+  wallMassFromCurve,
+} from "../_shared/signature-gate-splice.ts";
 import type { BlockPrescription } from "../_shared/v2-output-schema.ts";
 import type { Gender } from "../_shared/compute-benchmarks.ts";
 import {
@@ -568,6 +576,7 @@ function staleMarkProvenance(
 // ============================================================
 
 const ROW_FIELDS = [
+  "loads_women",
   "source",
   "competition_workout_id",
   "name",
@@ -637,7 +646,46 @@ Deno.serve(async (req) => {
     }
 
     if (action === "draft" || action === "measure") {
-      const workout = body.workout as BlockPrescription | undefined;
+      let workout = body.workout as BlockPrescription | undefined;
+      let loadsWomenInvalid: number[] | null = null;
+      // A stored signature is measured THROUGH ITS ROW (chokepoint), not
+      // through a client-posted copy of its jsonb — the client copy
+      // lacks loads_women and would quietly model women at men's bars
+      // (review 2026-11-04). Pass signature_id to measure a saved row.
+      // Women's loads precedence (review 2026-11-04): the editor's POSTED
+      // map wins (the visible, editable field is the source of truth for
+      // a what-if); the stored row's map is the fallback when only
+      // signature_id is sent. Everything merges through the chokepoint,
+      // and the guard refuses whatever no longer lines up — surfaced as
+      // loads_women_invalid, with loads_women_applied echoing exactly
+      // which women's bars the numbers on screen assumed.
+      let loadsWomenApplied: Record<string, number> | null = null;
+      const postedLoads = body.loads_women !== undefined
+        ? (body.loads_women as Record<string, number> | null)
+        : undefined;
+      let rowLoads: Record<string, number> | null = null;
+      if (typeof body.signature_id === "string") {
+        const { data: sigRow } = await supa
+          .from("workout_signatures")
+          .select("workout, loads_women")
+          .eq("id", body.signature_id)
+          .maybeSingle();
+        if (!sigRow) return json({ error: "NOT_FOUND" }, 404);
+        const row = sigRow as { workout: BlockPrescription; loads_women: Record<string, number> | null };
+        rowLoads = row.loads_women;
+        if (!workout) workout = row.workout;
+      }
+      const effLoads = postedLoads !== undefined ? postedLoads : rowLoads;
+      if (workout && effLoads && Object.keys(effLoads).length > 0) {
+        const merged = measurableSignatureWorkout({ workout, loads_women: effLoads });
+        workout = merged.workout;
+        loadsWomenInvalid = merged.invalid.length > 0 ? merged.invalid : null;
+        const applied: Record<string, number> = {};
+        for (const [k, v] of Object.entries(effLoads)) {
+          if (!merged.invalid.includes(Number(k))) applied[k] = v;
+        }
+        loadsWomenApplied = Object.keys(applied).length > 0 ? applied : null;
+      }
       if (!workout || !Array.isArray(workout.movements) || workout.movements.length === 0) {
         return json({ error: "MISSING_WORKOUT" }, 400);
       }
@@ -647,10 +695,21 @@ Deno.serve(async (req) => {
         supa, name, gender, workout, measured?.median_seconds ?? null,
       );
       if (action === "measure") {
-        return json({ measured, measure_reason: measureReason, measured_library: library });
+        return json({
+          measured,
+          measure_reason: measureReason,
+          measured_library: library,
+          loads_women_invalid: loadsWomenInvalid,
+          loads_women_applied: loadsWomenApplied,
+        });
       }
       const signature = await draftSignature(workout, library, measured);
-      return json({ signature, measured, measured_library: library, drafted_model: "sonnet" });
+      return json({
+        signature, measured, measured_library: library,
+        drafted_model: "sonnet",
+        loads_women_invalid: loadsWomenInvalid,
+        loads_women_applied: loadsWomenApplied,
+      });
     }
 
     if (action === "save") {
@@ -810,11 +869,24 @@ Deno.serve(async (req) => {
       }
       const { data: sigRowsRaw, error: sigErr } = await supa
         .from("workout_signatures")
-        .select("name, workout")
+        .select("name, workout, loads_women")
         .eq("source", "open").eq("status", "approved");
       if (sigErr) return json({ error: sigErr.message }, 500);
       // Stable order so slices are reproducible across calls.
-      const allSigs = ((sigRowsRaw ?? []) as Array<{ name: string; workout: BlockPrescription }>)
+      // Merge women's loads (sibling column — never the workout jsonb,
+      // whose canonical hash is identity) into in-memory prescriptions:
+      // movement index -> lbs lands as weight_women on that movement.
+      const loadsWomenWarnings: Array<{ name: string; invalid_indices: number[] }> = [];
+      const allSigs = ((sigRowsRaw ?? []) as Array<
+        { name: string; workout: BlockPrescription; loads_women: Record<string, number> | null }
+      >)
+        .map((r) => {
+          const merged = measurableSignatureWorkout(r);
+          if (merged.invalid.length > 0) {
+            loadsWomenWarnings.push({ name: r.name, invalid_indices: merged.invalid });
+          }
+          return { name: r.name, workout: merged.workout };
+        })
         .sort((a, b) => a.name.localeCompare(b.name));
 
       // Batching ({"offset": 0, "limit": 20}): the full polite run (146
@@ -842,6 +914,18 @@ Deno.serve(async (req) => {
       const observed = new Map<string, ObservedMedianRow>();
       for (const r of OPEN_OBSERVED_MEDIANS) {
         observed.set(`${r.workout_name.toLowerCase()}|${r.gender}`, r);
+      }
+      // Gate piles (signature_gate_catalog): the measured wall per
+      // workout x gender, for conditional grading — the engine predicts
+      // the possession-conditional distribution, so on gated pieces it
+      // is graded against the above-wall segment, the population real
+      // users belong to (founder reframe 2026-11-04).
+      const { data: pileRows } = await supa
+        .from("signature_gate_catalog")
+        .select("workout_name, gender, pile_at_score");
+      const pileMap = new Map<string, number>();
+      for (const pr of (pileRows ?? []) as Array<{ workout_name: string; gender: string; pile_at_score: number }>) {
+        pileMap.set(`${pr.workout_name.toLowerCase()}|${pr.gender}`, Number(pr.pile_at_score));
       }
 
       // Determinism check ({"action":"scorescale_acceptance","determinism":true}):
@@ -939,6 +1023,74 @@ Deno.serve(async (req) => {
             perWorkout.push({ name: s.name, gender: g, status: `no_prediction:${reason ?? "unknown"}` });
             continue;
           }
+          // ── v3 grading (fixture carries the observed grid) ──────────
+          if (truth.points && truth.points.length >= 5) {
+            const pts = truth.points;
+            const isRepScored = bench.median_seconds === null;
+            const predVal = isRepScored
+              ? amrapTotalReps(String(bench.median_score), s.workout)
+              : bench.median_seconds;
+            if (predVal === null) {
+              perWorkout.push({ name: s.name, gender: g, status: "unparseable_prediction" });
+              continue;
+            }
+            const capS3 = truth.time_cap_seconds ?? null;
+            if (isRepScored ? (predVal < 1 || (capS3 !== null && predVal / capS3 > 2.5)) : predVal <= 0) {
+              perWorkout.push({
+                name: s.name, gender: g, status: "skipped_implausible",
+                predicted: Math.round(predVal), kind: isRepScored ? "reps" : "time",
+              });
+              continue;
+            }
+            const pile = pileMap.get(key);
+            const wRaw = pile !== undefined ? wallMassFromCurve(pts, pile) : null;
+            // a wall under 15% barely censors; over 97% leaves no segment
+            const gatedW = wRaw !== null && wRaw >= 0.15 && wRaw <= 0.97 ? wRaw : null;
+            const fieldPct = percentileAtScore(pts, predVal, !isRepScored);
+            const obsField = scoreAtPercentile(pts, 50);
+            const headlineObs = gatedW !== null
+              ? scoreAtPercentile(pts, spliceGatedPercentile(50, gatedW))
+              : obsField;
+            const unitOk = (pt: { fin: boolean | null } | null) =>
+              pt !== null && (pt.fin === true) === !isRepScored;
+            const row: Record<string, unknown> = {
+              name: s.name, gender: g, kind: isRepScored ? "reps" : "time",
+              predicted: Math.round(predVal),
+              gated_wall: gatedW !== null ? Number(gatedW.toFixed(3)) : null,
+              // review caveat 2026-11-04: at-or-below counts slow
+              // possessors who ran out of clock as walled, so the
+              // above-wall segment reads slightly strong; tie-group
+              // bottom lands with the grid fixture, then this flips
+              gated_wall_method: gatedW !== null ? "at_or_below" : null,
+              engine_version: composeEngineVersion(bench.calc_version),
+              basis: bench.basis,
+            };
+            if (unitOk(obsField)) {
+              row.observed_field_p50 = Math.round(obsField!.s);
+              row.rel_error_field = Number(((predVal - obsField!.s) / obsField!.s).toFixed(3));
+            }
+            if (fieldPct !== null) row.percentile_in_field = Number(fieldPct.toFixed(1));
+            if (!unitOk(headlineObs)) {
+              row.status = "skipped_scoring_mismatch";
+              perWorkout.push(row);
+              continue;
+            }
+            // headline = the population users belong to: above-wall when gated
+            const relC = (predVal - headlineObs!.s) / headlineObs!.s;
+            row.observed = Math.round(headlineObs!.s);
+            row.rel_error = Number(relC.toFixed(3));
+            (isRepScored ? relErrsReps : relErrsTime).push(Math.abs(relC));
+            if (fieldPct !== null) {
+              const pe = gatedW !== null
+                ? unspliceGatedPercentile(fieldPct, gatedW) - 50
+                : fieldPct - 50;
+              row.percentile_error = Number(pe.toFixed(1));
+              pctErrs.push(pe);
+            }
+            perWorkout.push(row);
+            continue;
+          }
+
           // measure() knows which scoring it produced — key on that alone.
           const isRepScored = bench.median_seconds === null;
           const q25 = truth.p25_score != null ? Number(truth.p25_score) : null;
@@ -1057,6 +1209,9 @@ Deno.serve(async (req) => {
       return json({
         in_sample: true,
         slice,
+        // non-empty = seeded loads no longer match the prescriptions the
+        // migration author saw — fix the row, never ship the mismatch
+        loads_women_warnings: loadsWomenWarnings,
         time_scored: summarize(relErrsTime),
         rep_scored: summarize(relErrsReps),
         // THE number for params: variance of where predicted medians land

@@ -166,10 +166,14 @@ export function toWorkCalcMovement(
     return null;
   }
 
-  // 4. Load — pass on both gender slots; upstream picks per athlete gender.
+  // 4. Load — upstream picks the slot for the athlete's gender. weight is
+  // the men's/RX-primary load; weight_women splits the slots when present
+  // (audit run 2's women's-ladder family: the women's field was being
+  // modeled at men's loads — 11.6 W predicted 28 reps vs observed 73).
   if (typeof m.weight === "number" && m.weight > 0) {
     out.load_lbs_men = m.weight;
-    out.load_lbs_women = m.weight;
+    const ww = (m as { weight_women?: number }).weight_women;
+    out.load_lbs_women = typeof ww === "number" && ww > 0 ? ww : m.weight;
   }
 
   return out;
@@ -223,6 +227,48 @@ export function repsAtCap(
 ): number | null {
   if (totalReps <= 0 || capSeconds <= 0 || predictedSeconds <= capSeconds) return null;
   return Math.max(1, Math.floor(totalReps * (capSeconds / predictedSeconds)));
+}
+
+/** Apply a loads_women map (movement index -> lbs) onto a prescription,
+ *  REFUSING any entry whose target doesn't look like what the migration
+ *  author saw (review 2026-11-04): the index must name an existing
+ *  movement that carries a numeric weight STRICTLY GREATER than the
+ *  women's value. A reorder or collapsed-duplicate fails loudly as an
+ *  invalid index instead of putting 80 lb on the wrong movement. Valid
+ *  entries apply; invalid ones are returned for the caller to surface. */
+export function mergeLoadsWomen(
+  workout: BlockPrescription,
+  loads: Record<string, number> | null | undefined,
+): { workout: BlockPrescription; invalid: number[] } {
+  if (!loads || Object.keys(loads).length === 0) return { workout, invalid: [] };
+  const movements = [...(workout.movements ?? [])];
+  const invalid: number[] = [];
+  for (const [k, ww] of Object.entries(loads)) {
+    const i = Number(k);
+    const mv = Number.isInteger(i) ? movements[i] : undefined;
+    const ok = mv !== undefined &&
+      typeof mv.weight === "number" && mv.weight > 0 &&
+      typeof ww === "number" && ww > 0 && ww < mv.weight;
+    if (!ok) {
+      invalid.push(Number.isFinite(i) ? i : -1);
+      continue;
+    }
+    movements[i] = { ...mv, weight_women: ww };
+  }
+  return { workout: { ...workout, movements } as BlockPrescription, invalid };
+}
+
+/** THE chokepoint for measuring a STORED signature (review 2026-11-04):
+ *  every path that measures one — the acceptance audit, the measure/
+ *  draft actions, and any future scoring of a hash-joined user log —
+ *  goes through here, so the women's-loads merge cannot be forgotten
+ *  on one door while the audit certifies another. Takes the row shape
+ *  (workout + loads_women) and returns the measurable prescription
+ *  plus any refused load indices (surface them; never ship silently). */
+export function measurableSignatureWorkout(
+  row: { workout: BlockPrescription; loads_women?: Record<string, number> | null },
+): { workout: BlockPrescription; invalid: number[] } {
+  return mergeLoadsWomen(row.workout, row.loads_women ?? null);
 }
 
 export interface BlockBenchmarkExplained {
