@@ -258,6 +258,19 @@ export function mergeLoadsWomen(
   return { workout: { ...workout, movements } as BlockPrescription, invalid };
 }
 
+/** THE chokepoint for measuring a STORED signature (review 2026-11-04):
+ *  every path that measures one — the acceptance audit, the measure/
+ *  draft actions, and any future scoring of a hash-joined user log —
+ *  goes through here, so the women's-loads merge cannot be forgotten
+ *  on one door while the audit certifies another. Takes the row shape
+ *  (workout + loads_women) and returns the measurable prescription
+ *  plus any refused load indices (surface them; never ship silently). */
+export function measurableSignatureWorkout(
+  row: { workout: BlockPrescription; loads_women?: Record<string, number> | null },
+): { workout: BlockPrescription; invalid: number[] } {
+  return mergeLoadsWomen(row.workout, row.loads_women ?? null);
+}
+
 export interface BlockBenchmarkExplained {
   bench: ExpectedBenchmark | null;
   /** Named reason when bench is null — the reason codes are product

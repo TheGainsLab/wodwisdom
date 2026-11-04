@@ -49,7 +49,7 @@ import { FOCUS_AREAS } from "../_shared/coach-state.ts";
 import {
   composeEngineVersion,
   computeBlockBenchmarkExplained,
-  mergeLoadsWomen,
+  measurableSignatureWorkout,
   type ExpectedBenchmark,
 } from "../_shared/compute-block-benchmark.ts";
 import { __clearWorkCalcMemo } from "../_shared/compute-benchmarks.ts";
@@ -645,7 +645,25 @@ Deno.serve(async (req) => {
     }
 
     if (action === "draft" || action === "measure") {
-      const workout = body.workout as BlockPrescription | undefined;
+      let workout = body.workout as BlockPrescription | undefined;
+      let loadsWomenInvalid: number[] | null = null;
+      // A stored signature is measured THROUGH ITS ROW (chokepoint), not
+      // through a client-posted copy of its jsonb — the client copy
+      // lacks loads_women and would quietly model women at men's bars
+      // (review 2026-11-04). Pass signature_id to measure a saved row.
+      if (typeof body.signature_id === "string") {
+        const { data: sigRow } = await supa
+          .from("workout_signatures")
+          .select("workout, loads_women")
+          .eq("id", body.signature_id)
+          .maybeSingle();
+        if (!sigRow) return json({ error: "NOT_FOUND" }, 404);
+        const merged = measurableSignatureWorkout(
+          sigRow as { workout: BlockPrescription; loads_women: Record<string, number> | null },
+        );
+        workout = merged.workout;
+        loadsWomenInvalid = merged.invalid.length > 0 ? merged.invalid : null;
+      }
       if (!workout || !Array.isArray(workout.movements) || workout.movements.length === 0) {
         return json({ error: "MISSING_WORKOUT" }, 400);
       }
@@ -655,7 +673,12 @@ Deno.serve(async (req) => {
         supa, name, gender, workout, measured?.median_seconds ?? null,
       );
       if (action === "measure") {
-        return json({ measured, measure_reason: measureReason, measured_library: library });
+        return json({
+          measured,
+          measure_reason: measureReason,
+          measured_library: library,
+          loads_women_invalid: loadsWomenInvalid,
+        });
       }
       const signature = await draftSignature(workout, library, measured);
       return json({ signature, measured, measured_library: library, drafted_model: "sonnet" });
@@ -830,7 +853,7 @@ Deno.serve(async (req) => {
         { name: string; workout: BlockPrescription; loads_women: Record<string, number> | null }
       >)
         .map((r) => {
-          const merged = mergeLoadsWomen(r.workout, r.loads_women);
+          const merged = measurableSignatureWorkout(r);
           if (merged.invalid.length > 0) {
             loadsWomenWarnings.push({ name: r.name, invalid_indices: merged.invalid });
           }
