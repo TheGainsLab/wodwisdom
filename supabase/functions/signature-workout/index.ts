@@ -808,11 +808,36 @@ Deno.serve(async (req) => {
           detail: "Seed _shared/fixtures/open-observed-medians.ts from the SQL in its header, then redeploy.",
         }, 400);
       }
-      const { data: sigRows, error: sigErr } = await supa
+      const { data: sigRowsRaw, error: sigErr } = await supa
         .from("workout_signatures")
         .select("name, workout")
         .eq("source", "open").eq("status", "approved");
       if (sigErr) return json({ error: sigErr.message }, 500);
+      // Stable order so slices are reproducible across calls.
+      const allSigs = ((sigRowsRaw ?? []) as Array<{ name: string; workout: BlockPrescription }>)
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      // Batching ({"offset": 0, "limit": 20}): the full polite run (146
+      // throttled, retried service calls) exceeds the edge function's
+      // 150 s wall clock, so the audit runs in slices and the caller
+      // stitches per_workout rows; the summary blocks on a sliced
+      // response cover THAT SLICE ONLY (slice.next_offset says where to
+      // continue; final figures are computed over the stitched rows).
+      const offset = typeof body.offset === "number" && body.offset > 0
+        ? Math.floor(body.offset)
+        : 0;
+      const limit = typeof body.limit === "number" && body.limit > 0
+        ? Math.min(Math.floor(body.limit), 200)
+        : null;
+      const sigRows = limit !== null ? allSigs.slice(offset, offset + limit) : allSigs;
+      const slice = limit !== null
+        ? {
+          offset,
+          count: sigRows.length,
+          total: allSigs.length,
+          next_offset: offset + limit < allSigs.length ? offset + limit : null,
+        }
+        : null;
 
       const observed = new Map<string, ObservedMedianRow>();
       for (const r of OPEN_OBSERVED_MEDIANS) {
@@ -828,7 +853,7 @@ Deno.serve(async (req) => {
       // repeat variance is a fourth acceptance figure, and the engine
       // version must key the parse cache.
       if (body.determinism === true) {
-        const picks = (sigRows ?? []).slice(0, 12) as Array<{ name: string; workout: BlockPrescription }>;
+        const picks = allSigs.slice(0, 12); // always the first 12 by name, unaffected by slicing
         const mismatched: Array<{ name: string; outputs: string[] }> = [];
         let measured = 0;
         for (const s of picks) {
@@ -897,7 +922,7 @@ Deno.serve(async (req) => {
       const relErrsTime: number[] = [];
       const relErrsReps: number[] = [];
       const pctErrs: number[] = [];
-      for (const s of (sigRows ?? []) as Array<{ name: string; workout: BlockPrescription }>) {
+      for (const s of sigRows) {
         for (const g of ["men", "women"] as Gender[]) {
           const key = `${s.name.toLowerCase()}|${g === "women" ? "F" : "M"}`;
           const truth = observed.get(key);
@@ -1031,6 +1056,7 @@ Deno.serve(async (req) => {
         : null;
       return json({
         in_sample: true,
+        slice,
         time_scored: summarize(relErrsTime),
         rep_scored: summarize(relErrsReps),
         // THE number for params: variance of where predicted medians land
