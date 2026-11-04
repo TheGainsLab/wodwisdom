@@ -10,6 +10,7 @@ import { getCorsHeaders } from "../_shared/cors.ts";
 import { computeMetconPower, type MetconBlockInput } from "../_shared/metcon-workcalc.ts";
 import { computeCardioPower } from "../_shared/cardio-power.ts";
 import { hashWorkoutText } from "../_shared/signature-hash.ts";
+import { SCORE_ENGINE_CODE_VERSION } from "../_shared/compute-block-benchmark.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -438,6 +439,33 @@ Deno.serve(async (req) => {
           source: "logged_solo",
           performed_at: priorPerformedBySort.get(bi) ?? dateStr,
           source_ref: `log:${log.id}:${bi}`,
+          // Scoring reliability (review 2026-11-03): every row carries its
+          // scoring state and engine version, so "what fraction of rows is
+          // in each status" is one GROUP BY, and a fixed engine bug makes
+          // its old rows identifiable and re-scorable. A row that can't be
+          // trusted is VISIBLY unscored, never plausibly wrong.
+          ...(b.rx === true && !b.capped && b.percentile != null &&
+              b.percentile >= 1 && b.percentile <= 99
+            ? {
+              score_status: "scored",
+              scored_at: new Date().toISOString(),
+              // percentile computed client-side against served anchors;
+              // curve generation unknown at this hop — 'client' marks it
+              engine_version: `${SCORE_ENGINE_CODE_VERSION}+calc:client`,
+            }
+            : {
+              score_status: b.capped === true
+                ? "skipped_capped" // interval info; lands with the gate-aware model
+                : b.rx === false
+                ? "skipped_scaled" // athlete DECLARED scaled; RX scale only until scaled cohorts exist
+                : b.rx == null
+                // rx never stated (non-UI caller; the app always sends a
+                // boolean) — not a scaled declaration, its own status
+                ? "pending_rx_unknown"
+                : "pending", // RX, uncapped, but no percentile resolved
+              scored_at: null,
+              engine_version: null,
+            }),
         });
       }
       // Replace, don't merge: a re-log with fewer or reordered blocks must

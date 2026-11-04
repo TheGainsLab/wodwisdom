@@ -33,6 +33,18 @@ import {
   type WorkCalcMovement,
 } from "./compute-benchmarks.ts";
 
+/** Code version of the scoring engine (this module + compute-benchmarks
+ *  semantics). Composed with the power curve's own calc_version into the
+ *  engine_version stamped on every scored evidence row, so a parser or
+ *  curve change makes stale rows identifiable and re-scorable (scoring
+ *  reliability review 2026-11-03). Bump on any semantic change here. */
+export const SCORE_ENGINE_CODE_VERSION = "se2026.11.04-1";
+
+/** The engine_version string for a scored row. */
+export function composeEngineVersion(calcVersion: string | null | undefined): string {
+  return `${SCORE_ENGINE_CODE_VERSION}+calc:${calcVersion ?? "unknown"}`;
+}
+
 export interface ExpectedBenchmark {
   median_score: string;
   median_seconds: number | null;
@@ -45,6 +57,8 @@ export interface ExpectedBenchmark {
   basis: string;
   cohort_anchors: Array<{ p: number; watts: number; score: string }>;
   compute_status: "computed";
+  /** Power-curve generation id, for engine_version composition. */
+  calc_version?: string;
 }
 
 /**
@@ -87,7 +101,7 @@ function extractRounds(scheme: string | undefined): number {
  * but reads typed fields from a writer-emitted MovementPrescription rather
  * than a client `MetconEntry`. Single translation logic, two source shapes.
  */
-function toWorkCalcMovement(
+export function toWorkCalcMovement(
   m: MovementPrescription,
   workoutType: "for_time" | "amrap",
 ): WorkCalcMovement | null {
@@ -104,21 +118,25 @@ function toWorkCalcMovement(
   const calTotal = typeof m.calories === "number" && m.calories > 0 ? m.calories : sumScheme(m.cal_scheme);
   const distTotal = typeof m.distance === "number" && m.distance > 0 ? m.distance : sumScheme(m.distance_scheme);
 
+  // 2. Distance mapping, resolved up front: an UNMAPPABLE unit no longer
+  // kills the movement — inches are a box HEIGHT, not travel volume
+  // (audit finding 2026-11-03: 11.2's 24-in box jump nulled the whole
+  // block), so an unmapped unit falls through to the rep count below.
+  const unit = m.distance_unit?.toLowerCase();
+  const mappedUnit: WorkCalcMovement["distance_unit"] | null =
+    unit === "m" || unit === "meter" || unit === "meters" ? "meters"
+      : unit === "ft" || unit === "foot" || unit === "feet" ? "feet"
+      : unit === "mi" || unit === "mile" || unit === "miles" ? "miles"
+      : unit === "km" || unit === "kilometer" || unit === "kilometers" ? "kilometers"
+      : null;
+
   // 1. Calorie-counted (Cal Row, Cal Bike, Cal Ski) — typed field wins.
   if (calTotal > 0) {
     out.calories = calTotal;
-  } else if (distTotal > 0 && m.distance_unit) {
+  } else if (distTotal > 0 && mappedUnit !== null) {
     // 2. Distance-counted (rowing meters, running meters/miles).
-    const unit = m.distance_unit.toLowerCase();
-    const mapped: WorkCalcMovement["distance_unit"] | null =
-      unit === "m" || unit === "meter" || unit === "meters" ? "meters"
-        : unit === "ft" || unit === "foot" || unit === "feet" ? "feet"
-        : unit === "mi" || unit === "mile" || unit === "miles" ? "miles"
-        : unit === "km" || unit === "kilometer" || unit === "kilometers" ? "kilometers"
-        : null;
-    if (mapped === null) return null;
     out.distance_value = distTotal;
-    out.distance_unit = mapped;
+    out.distance_unit = mappedUnit;
   } else if (typeof m.reps === "number" && m.reps > 0) {
     // 3a. Rep-counted with reps already populated (legacy / programmatic-
     //     fix derived case). Upstream expects different specifier by workout type.
@@ -179,21 +197,74 @@ function parseScoreToSeconds(score: string | null | undefined): number | null {
   return null;
 }
 
+/** An ascending/varying ladder prescribed under an "AMRAP" scheme is NOT
+ *  rounds of rep_scheme[0] — treating 3-6-9-12... as endless 3-rep rounds
+ *  produced the audit's 2,356-reps-in-7-minutes blowup (11.6). Detect: any
+ *  movement whose rep_scheme has 2+ entries that are not all equal. */
+export function isVaryingLadder(block: BlockPrescription): boolean {
+  for (const mv of block.movements ?? []) {
+    const rs = (mv as { rep_scheme?: number[] }).rep_scheme;
+    if (Array.isArray(rs) && rs.length > 1 && rs.some((n) => n !== rs[0])) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Linear-in-time reps-at-cap conversion: when a capped piece's predicted
+ *  median finish exceeds the cap, the median athlete scores REPS, not a
+ *  time. Constant-watts approximation: reps completed ≈ total prescribed
+ *  reps × cap / predicted_time (calories count as rep-equivalents, the
+ *  leaderboard convention). Exported for its own test. */
+export function repsAtCap(
+  totalReps: number,
+  capSeconds: number,
+  predictedSeconds: number,
+): number | null {
+  if (totalReps <= 0 || capSeconds <= 0 || predictedSeconds <= capSeconds) return null;
+  return Math.max(1, Math.floor(totalReps * (capSeconds / predictedSeconds)));
+}
+
+export interface BlockBenchmarkExplained {
+  bench: ExpectedBenchmark | null;
+  /** Named reason when bench is null — the reason codes are product
+   *  surface: evidence-row statuses and audit per-workout statuses. */
+  reason: string | null;
+}
+
 /**
- * Compute the expected benchmark for one metcon block. Skips non-metcon
- * blocks. Returns null on any failure path so callers can store null and
- * the client falls through to legacy local math.
+ * Compute the expected benchmark for one metcon block, with the failure
+ * reason preserved. Returns { bench: null, reason } on every failure path.
  */
-export async function computeBlockBenchmark(
+export async function computeBlockBenchmarkExplained(
   block: BlockPrescription,
   gender: Gender | null,
-): Promise<ExpectedBenchmark | null> {
-  if (block.block_type !== "metcon") return null;
+): Promise<BlockBenchmarkExplained> {
+  if (block.block_type !== "metcon") return { bench: null, reason: "non_metcon_block" };
 
-  const workoutType = inferWorkoutType(block.block_scheme);
-  const rounds = workoutType === "for_time" ? extractRounds(block.block_scheme) : 1;
+  let workoutType = inferWorkoutType(block.block_scheme);
+  // Ladder reclassification: a varying-rep ladder under an AMRAP clock is
+  // a fixed body of work raced against the cap — model it as capped
+  // for-time over the TOTAL prescribed reps, and let the reps-at-cap
+  // conversion below express the rep-ranked outcome.
+  const ladder = workoutType === "amrap" && isVaryingLadder(block);
+  if (ladder) workoutType = "for_time";
+  let rounds = workoutType === "for_time" && !ladder ? extractRounds(block.block_scheme) : 1;
+  // Expanded-scheme guard: library/signature prescriptions often list the
+  // FULL work ("10 rounds" with a 10-entry rep_scheme per movement), where
+  // generator output lists one round and relies on the rounds multiplier.
+  // When every multi-entry rep_scheme's length equals the extracted round
+  // count, the scheme is already expanded — multiplying again would
+  // double-count the work (20.1: 80 reps × 10 rounds).
+  if (rounds > 1) {
+    const multi = (block.movements ?? [])
+      .map((mv) => (mv as { rep_scheme?: number[] }).rep_scheme)
+      .filter((rs): rs is number[] => Array.isArray(rs) && rs.length > 1);
+    if (multi.length > 0 && multi.every((rs) => rs.length === rounds)) rounds = 1;
+  }
 
   const movements: WorkCalcMovement[] = [];
+  let totalReps = 0;
   for (const mv of block.movements ?? []) {
     const wcm = toWorkCalcMovement(mv, workoutType);
     if (wcm === null) {
@@ -201,11 +272,12 @@ export async function computeBlockBenchmark(
       console.warn(
         `[compute-block-benchmark] dropping block: movement "${mv.movement}" has no resolvable volume specifier`,
       );
-      return null;
+      return { bench: null, reason: `movement_no_volume:${(mv.movement ?? "?").slice(0, 40)}` };
     }
     movements.push(wcm);
+    totalReps += (wcm.reps_total ?? wcm.reps_per_round ?? 0) + (wcm.calories ?? 0);
   }
-  if (movements.length === 0) return null;
+  if (movements.length === 0) return { bench: null, reason: "no_movements" };
 
   const input: ComputeBenchmarksInput = {
     movements,
@@ -219,30 +291,68 @@ export async function computeBlockBenchmark(
   // AMRAP requires a cap; if the writer didn't set one, skip benchmarking
   // (the audit will fire on the AMRAP-missing-cap structural error
   // separately, no need to double-report here).
-  if (workoutType === "amrap" && !block.time_cap_seconds) return null;
+  if (workoutType === "amrap" && !block.time_cap_seconds) {
+    return { bench: null, reason: "amrap_no_cap" };
+  }
 
+  const diag: { reason?: string } = {};
   let result: ComputeBenchmarksResult | null;
   try {
-    result = await computeBenchmarks(input);
+    result = await computeBenchmarks(input, diag);
   } catch (e) {
     console.warn(`[compute-block-benchmark] computeBenchmarks threw: ${(e as Error).message}`);
-    return null;
+    return { bench: null, reason: `engine_threw:${(e as Error).message.slice(0, 80)}` };
   }
-  if (result === null) return null;
+  if (result === null) return { bench: null, reason: diag.reason ?? "engine_null" };
 
-  return {
-    median_score: result.median_score,
-    median_seconds: parseScoreToSeconds(result.median_score),
+  let medianScore = result.median_score;
+  let medianSeconds = parseScoreToSeconds(result.median_score);
+  let basis = result.basis;
+  // Reps-at-cap: on a capped for-time piece whose predicted median finish
+  // exceeds the cap, the median athlete's score is a rep count. This is
+  // what makes capped-median workouts (17.1-style) comparable in rep
+  // space at all — before it, "predicted 14:50 against a 12:00 cap" was
+  // unusable on both channels.
+  if (
+    workoutType === "for_time" &&
+    typeof block.time_cap_seconds === "number" && block.time_cap_seconds > 0 &&
+    medianSeconds !== null && medianSeconds > block.time_cap_seconds
+  ) {
+    const reps = repsAtCap(totalReps * rounds, block.time_cap_seconds, medianSeconds);
+    if (reps !== null) {
+      medianScore = `${reps} reps`;
+      medianSeconds = null;
+      // "_linear" is a caveat, not decoration: constant-watts conversion
+      // is fair on uniform-load pieces and optimistic on escalating-load
+      // ladders (16.2/19.2), where per-rep work climbs — the audit reads
+      // the basis string to see which rows used it (review 2026-11-04).
+      basis = `${basis}+reps_at_cap_linear`;
+    }
+  }
+
+  const bench: ExpectedBenchmark = {
+    median_score: medianScore,
+    median_seconds: medianSeconds,
     excellent_score: result.excellent_score,
     excellent_seconds: parseScoreToSeconds(result.excellent_score),
     median_watts: result.median_watts,
     excellent_watts: result.excellent_watts,
     joules: result.joules,
     time_domain: result.time_domain,
-    basis: result.basis,
+    basis,
     cohort_anchors: result.cohort_anchors,
     compute_status: "computed",
+    calc_version: result.calc_version,
   };
+  return { bench, reason: null };
+}
+
+/** Back-compat wrapper: the original reason-less shape. */
+export async function computeBlockBenchmark(
+  block: BlockPrescription,
+  gender: Gender | null,
+): Promise<ExpectedBenchmark | null> {
+  return (await computeBlockBenchmarkExplained(block, gender)).bench;
 }
 
 /** A specific block's location within a WriterOutput. Used by the targeted

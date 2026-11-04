@@ -47,5 +47,6 @@ jobs:
             supabase/functions/_shared/signature-profile-fit_golden_z_test.ts \
             supabase/functions/_shared/signature-cohort-select_test.ts \
             supabase/functions/_shared/signature-hash_test.ts \
-            supabase/functions/_shared/fixtures/open-observed-medians_test.ts
+            supabase/functions/_shared/fixtures/open-observed-medians_test.ts \
+            supabase/functions/_shared/compute-block-benchmark_test.ts
       - run: deno test --no-check --allow-env supabase/functions/_shared/coach-state_test.ts
