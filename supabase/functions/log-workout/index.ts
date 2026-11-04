@@ -393,7 +393,13 @@ Deno.serve(async (req) => {
 
     // 3b. Evidence ingestion (Workout Signatures athlete layer): every scored
     // metcon block becomes a signature_evidence row keyed by the workout's
-    // text-hash — the universal join key. Unsigned today; when the judge signs
+    // text-hash — the universal join key.
+    // NOTE for the hash-joined scoring path (queue worker / rescore job):
+    // when server-side scoring of these rows against a stored signature
+    // lands, the prescription MUST come through
+    // measurableSignatureWorkout() (compute-block-benchmark) — the one
+    // door that merges loads_women — never from the row's workout jsonb
+    // directly, or women are modeled at men's bars again (2026-11-04). Unsigned today; when the judge signs
     // the same structure these rows join its signature retroactively, and the
     // next profile refit consumes them. Idempotent across the destructive
     // re-log path via (user_id, source_ref). Best-effort: never blocks logging.

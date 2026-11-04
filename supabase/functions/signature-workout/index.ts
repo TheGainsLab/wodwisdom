@@ -658,9 +658,20 @@ Deno.serve(async (req) => {
           .eq("id", body.signature_id)
           .maybeSingle();
         if (!sigRow) return json({ error: "NOT_FOUND" }, 404);
-        const merged = measurableSignatureWorkout(
-          sigRow as { workout: BlockPrescription; loads_women: Record<string, number> | null },
-        );
+        const row = sigRow as { workout: BlockPrescription; loads_women: Record<string, number> | null };
+        // What-if flow (review 2026-11-04): the editor may post an EDITED
+        // copy of the jsonb alongside signature_id to re-measure a change.
+        // Merge the ROW's women's loads onto the posted copy through the
+        // chokepoint: a load-only edit keeps indices valid and merges
+        // cleanly; a reorder (or an edit that drops men's load at or
+        // below the women's) is refused by the guard and surfaced in
+        // loads_women_invalid rather than silently measuring women at
+        // men's bars. No signature_id + no row = a genuinely new
+        // structure, where having no women's loads is correct.
+        const merged = measurableSignatureWorkout({
+          workout: workout ?? row.workout,
+          loads_women: row.loads_women,
+        });
         workout = merged.workout;
         loadsWomenInvalid = merged.invalid.length > 0 ? merged.invalid : null;
       }
@@ -681,7 +692,10 @@ Deno.serve(async (req) => {
         });
       }
       const signature = await draftSignature(workout, library, measured);
-      return json({ signature, measured, measured_library: library, drafted_model: "sonnet" });
+      return json({
+        signature, measured, measured_library: library,
+        drafted_model: "sonnet", loads_women_invalid: loadsWomenInvalid,
+      });
     }
 
     if (action === "save") {
