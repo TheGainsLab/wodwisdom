@@ -44,6 +44,11 @@ interface Movement {
   calories?: number; distance?: number; distance_unit?: 'm' | 'ft';
   weight?: number; weight_unit?: 'lbs' | 'kg'; time_seconds?: number;
   sets?: number; reps?: number;
+  /** Women's RX load — EDITING SHAPE ONLY (review 2026-11-04): it rides
+   *  the movement object so add/remove/reorder can't shear it off the
+   *  index it belongs to, and is split back into the loads_women sibling
+   *  map on every post/save. Never serialized into the workout jsonb. */
+  weight_women?: number;
 }
 interface Workout { block_type: string; block_scheme?: string; time_cap_seconds?: number; movements: Movement[] }
 interface Measured {
@@ -156,7 +161,30 @@ export default function AdminSignaturesPage({ session }: { session: Session }) {
     measured: r.measured ?? null,
   });
 
-  const open = (r: SigRow) => { setSel(structuredClone(r)); setBaseline(snapshot(r)); setLib(null); setError(''); };
+  /** Index map -> movement objects (editing shape): women's loads ride
+   *  the movement so reorders keep them attached. */
+  const hydrateLoads = (r: SigRow): SigRow => {
+    if (!r.loads_women) return r;
+    const movements = r.workout.movements.map((mv, i) => {
+      const ww = r.loads_women?.[String(i)];
+      return typeof ww === 'number' && ww > 0 ? { ...mv, weight_women: ww } : mv;
+    });
+    return { ...r, workout: { ...r.workout, movements } };
+  };
+  /** Movement objects -> clean jsonb + index map (wire/storage shape):
+   *  the sibling-column rule holds on the wire and in storage; only the
+   *  in-memory editing shape differs. */
+  const splitLoads = (w: Workout): { workout: Workout; loads: Record<string, number> | null } => {
+    const loads: Record<string, number> = {};
+    const movements = w.movements.map((mv, i) => {
+      const { weight_women, ...rest } = mv;
+      if (typeof weight_women === 'number' && weight_women > 0) loads[String(i)] = weight_women;
+      return rest as Movement;
+    });
+    return { workout: { ...w, movements }, loads: Object.keys(loads).length > 0 ? loads : null };
+  };
+
+  const open = (r: SigRow) => { setSel(hydrateLoads(structuredClone(r))); setBaseline(snapshot(r)); setLib(null); setError(''); setWwWarn(''); };
 
   const run = async (name: string, fn: () => Promise<void>) => {
     setBusy(name); setError('');
@@ -232,9 +260,10 @@ export default function AdminSignaturesPage({ session }: { session: Session }) {
   });
 
   const doDraft = () => sel && run('draft', async () => {
+    const split = splitLoads(sel.workout);
     const out = await invokeSig({
-      action: 'draft', workout: sel.workout, gender, name: sel.name,
-      loads_women: sel.loads_women ?? null,
+      action: 'draft', workout: split.workout, gender, name: sel.name,
+      loads_women: split.loads,
     });
     setLib((out.measured_library as MeasuredLib | null) ?? null);
     const sig = out.signature as Partial<SigRow>;
@@ -255,9 +284,10 @@ export default function AdminSignaturesPage({ session }: { session: Session }) {
   });
 
   const doMeasure = () => sel && run('measure', async () => {
+    const split = splitLoads(sel.workout);
     const out = await invokeSig({
-      action: 'measure', workout: sel.workout, gender, name: sel.name,
-      loads_women: sel.loads_women ?? null,
+      action: 'measure', workout: split.workout, gender, name: sel.name,
+      loads_women: split.loads,
     });
     const refused = out.loads_women_invalid as number[] | null;
     setWwWarn(refused ? `women's loads refused at movement ${refused.join(', ')} — fix the ♀ field` : '');
@@ -266,15 +296,16 @@ export default function AdminSignaturesPage({ session }: { session: Session }) {
   });
 
   const doSave = (statusAction?: 'approve' | 'reject') => sel && run(statusAction ?? 'save', async () => {
+    const split = splitLoads(sel.workout);
     const payload: Record<string, unknown> = {
       action: statusAction ?? 'save', id: sel.id,
       source: sel.source, competition_workout_id: sel.competition_workout_id ?? null,
-      name: sel.name, workout: sel.workout, demand: sel.demand,
+      name: sel.name, workout: split.workout, demand: sel.demand,
       discrimination: sel.discrimination ?? null, stimulus: sel.stimulus ?? null,
       gates: sel.gates, time_domain: sel.time_domain ?? null, format: sel.format ?? null,
       archetype: sel.archetype ?? null, rationale: sel.rationale ?? null,
       measured: sel.measured ?? null, drafted_model: 'sonnet',
-      loads_women: sel.loads_women ?? null,
+      loads_women: split.loads,
     };
     if (statusAction === 'reject') { await invokeSig({ action: 'reject', id: sel.id }); }
     else {
@@ -307,15 +338,6 @@ export default function AdminSignaturesPage({ session }: { session: Session }) {
     if (!sel) return;
     const movements = sel.workout.movements.map((mv, j) => (j === i ? { ...mv, ...m } : mv));
     setSel({ ...sel, workout: { ...sel.workout, movements } });
-  };
-  /** Women's RX load per movement index — stored in the loads_women
-   *  SIBLING map (never the workout jsonb: its hash is identity). */
-  const setLoadWoman = (i: number, v: number | undefined) => {
-    if (!sel) return;
-    const lw = { ...(sel.loads_women ?? {}) };
-    if (v === undefined) delete lw[String(i)];
-    else lw[String(i)] = v;
-    setSel({ ...sel, loads_women: Object.keys(lw).length > 0 ? lw : null });
   };
   const stepWeight = (vec: 'demand' | 'discrimination' | 'stimulus', axis: string, d: number) => {
     if (!sel) return;
@@ -444,9 +466,9 @@ export default function AdminSignaturesPage({ session }: { session: Session }) {
                     placeholder="21,15,9" style={{ ...field, ...mono }} />
                   <input type="number" title="men's RX load" value={m.weight ?? ''} onChange={(e) => setMovement(i, { weight: e.target.value ? Number(e.target.value) : undefined })} style={field} />
                   {typeof m.weight === 'number' && (
-                    <input type="number" title="women's RX load (loads_women — sibling to the jsonb)" placeholder="♀"
-                      value={sel.loads_women?.[String(i)] ?? ''}
-                      onChange={(e) => setLoadWoman(i, e.target.value ? Number(e.target.value) : undefined)}
+                    <input type="number" title="women's RX load (rides the movement while editing; stored as the loads_women sibling map)" placeholder="♀"
+                      value={m.weight_women ?? ''}
+                      onChange={(e) => setMovement(i, { weight_women: e.target.value ? Number(e.target.value) : undefined })}
                       style={{ ...field, width: 64 }} />
                   )}
                   <select value={m.weight_unit ?? 'lbs'} onChange={(e) => setMovement(i, { weight_unit: e.target.value as 'lbs' | 'kg' })} style={field}>
