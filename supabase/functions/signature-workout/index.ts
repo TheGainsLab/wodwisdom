@@ -52,6 +52,13 @@ import {
   type ExpectedBenchmark,
 } from "../_shared/compute-block-benchmark.ts";
 import { __clearWorkCalcMemo } from "../_shared/compute-benchmarks.ts";
+import {
+  percentileAtScore,
+  scoreAtPercentile,
+  spliceGatedPercentile,
+  unspliceGatedPercentile,
+  wallMassFromCurve,
+} from "../_shared/signature-gate-splice.ts";
 import type { BlockPrescription } from "../_shared/v2-output-schema.ts";
 import type { Gender } from "../_shared/compute-benchmarks.ts";
 import {
@@ -843,6 +850,18 @@ Deno.serve(async (req) => {
       for (const r of OPEN_OBSERVED_MEDIANS) {
         observed.set(`${r.workout_name.toLowerCase()}|${r.gender}`, r);
       }
+      // Gate piles (signature_gate_catalog): the measured wall per
+      // workout x gender, for conditional grading — the engine predicts
+      // the possession-conditional distribution, so on gated pieces it
+      // is graded against the above-wall segment, the population real
+      // users belong to (founder reframe 2026-11-04).
+      const { data: pileRows } = await supa
+        .from("signature_gate_catalog")
+        .select("workout_name, gender, pile_at_score");
+      const pileMap = new Map<string, number>();
+      for (const pr of (pileRows ?? []) as Array<{ workout_name: string; gender: string; pile_at_score: number }>) {
+        pileMap.set(`${pr.workout_name.toLowerCase()}|${pr.gender}`, Number(pr.pile_at_score));
+      }
 
       // Determinism check ({"action":"scorescale_acceptance","determinism":true}):
       // the protocol split (review 2026-11-03) certifies the harness as
@@ -939,6 +958,69 @@ Deno.serve(async (req) => {
             perWorkout.push({ name: s.name, gender: g, status: `no_prediction:${reason ?? "unknown"}` });
             continue;
           }
+          // ── v3 grading (fixture carries the observed grid) ──────────
+          if (truth.points && truth.points.length >= 5) {
+            const pts = truth.points;
+            const isRepScored = bench.median_seconds === null;
+            const predVal = isRepScored
+              ? amrapTotalReps(String(bench.median_score), s.workout)
+              : bench.median_seconds;
+            if (predVal === null) {
+              perWorkout.push({ name: s.name, gender: g, status: "unparseable_prediction" });
+              continue;
+            }
+            const capS3 = truth.time_cap_seconds ?? null;
+            if (isRepScored ? (predVal < 1 || (capS3 !== null && predVal / capS3 > 2.5)) : predVal <= 0) {
+              perWorkout.push({
+                name: s.name, gender: g, status: "skipped_implausible",
+                predicted: Math.round(predVal), kind: isRepScored ? "reps" : "time",
+              });
+              continue;
+            }
+            const pile = pileMap.get(key);
+            const wRaw = pile !== undefined ? wallMassFromCurve(pts, pile) : null;
+            // a wall under 15% barely censors; over 97% leaves no segment
+            const gatedW = wRaw !== null && wRaw >= 0.15 && wRaw <= 0.97 ? wRaw : null;
+            const fieldPct = percentileAtScore(pts, predVal, !isRepScored);
+            const obsField = scoreAtPercentile(pts, 50);
+            const headlineObs = gatedW !== null
+              ? scoreAtPercentile(pts, spliceGatedPercentile(50, gatedW))
+              : obsField;
+            const unitOk = (pt: { fin: boolean | null } | null) =>
+              pt !== null && (pt.fin === true) === !isRepScored;
+            const row: Record<string, unknown> = {
+              name: s.name, gender: g, kind: isRepScored ? "reps" : "time",
+              predicted: Math.round(predVal),
+              gated_wall: gatedW !== null ? Number(gatedW.toFixed(3)) : null,
+              engine_version: composeEngineVersion(bench.calc_version),
+              basis: bench.basis,
+            };
+            if (unitOk(obsField)) {
+              row.observed_field_p50 = Math.round(obsField!.s);
+              row.rel_error_field = Number(((predVal - obsField!.s) / obsField!.s).toFixed(3));
+            }
+            if (fieldPct !== null) row.percentile_in_field = Number(fieldPct.toFixed(1));
+            if (!unitOk(headlineObs)) {
+              row.status = "skipped_scoring_mismatch";
+              perWorkout.push(row);
+              continue;
+            }
+            // headline = the population users belong to: above-wall when gated
+            const relC = (predVal - headlineObs!.s) / headlineObs!.s;
+            row.observed = Math.round(headlineObs!.s);
+            row.rel_error = Number(relC.toFixed(3));
+            (isRepScored ? relErrsReps : relErrsTime).push(Math.abs(relC));
+            if (fieldPct !== null) {
+              const pe = gatedW !== null
+                ? unspliceGatedPercentile(fieldPct, gatedW) - 50
+                : fieldPct - 50;
+              row.percentile_error = Number(pe.toFixed(1));
+              pctErrs.push(pe);
+            }
+            perWorkout.push(row);
+            continue;
+          }
+
           // measure() knows which scoring it produced — key on that alone.
           const isRepScored = bench.median_seconds === null;
           const q25 = truth.p25_score != null ? Number(truth.p25_score) : null;

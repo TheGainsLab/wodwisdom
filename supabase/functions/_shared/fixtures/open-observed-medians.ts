@@ -55,6 +55,12 @@ export interface ObservedMedianRow {
   p25_score: number | null;
   p50_score: number | null;
   p75_score: number | null;
+  /** v3 fixture: the observed percentile curve as a ~19-point grid with
+   *  per-point finisher flags — lets the harness read ANY conditional
+   *  slice (above-wall grading for gated pieces, unit-aware comparisons)
+   *  without re-pulling. Absent on v2 rows; the harness falls back to
+   *  the quartile columns. */
+  points?: Array<{ p: number; s: number; fin: boolean | null }>;
 }
 
 export const OPEN_OBSERVED_MEDIANS: ObservedMedianRow[] = [
