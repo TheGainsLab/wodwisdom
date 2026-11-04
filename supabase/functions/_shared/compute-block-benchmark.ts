@@ -229,6 +229,35 @@ export function repsAtCap(
   return Math.max(1, Math.floor(totalReps * (capSeconds / predictedSeconds)));
 }
 
+/** Apply a loads_women map (movement index -> lbs) onto a prescription,
+ *  REFUSING any entry whose target doesn't look like what the migration
+ *  author saw (review 2026-11-04): the index must name an existing
+ *  movement that carries a numeric weight STRICTLY GREATER than the
+ *  women's value. A reorder or collapsed-duplicate fails loudly as an
+ *  invalid index instead of putting 80 lb on the wrong movement. Valid
+ *  entries apply; invalid ones are returned for the caller to surface. */
+export function mergeLoadsWomen(
+  workout: BlockPrescription,
+  loads: Record<string, number> | null | undefined,
+): { workout: BlockPrescription; invalid: number[] } {
+  if (!loads || Object.keys(loads).length === 0) return { workout, invalid: [] };
+  const movements = [...(workout.movements ?? [])];
+  const invalid: number[] = [];
+  for (const [k, ww] of Object.entries(loads)) {
+    const i = Number(k);
+    const mv = Number.isInteger(i) ? movements[i] : undefined;
+    const ok = mv !== undefined &&
+      typeof mv.weight === "number" && mv.weight > 0 &&
+      typeof ww === "number" && ww > 0 && ww < mv.weight;
+    if (!ok) {
+      invalid.push(Number.isFinite(i) ? i : -1);
+      continue;
+    }
+    movements[i] = { ...mv, weight_women: ww };
+  }
+  return { workout: { ...workout, movements } as BlockPrescription, invalid };
+}
+
 export interface BlockBenchmarkExplained {
   bench: ExpectedBenchmark | null;
   /** Named reason when bench is null — the reason codes are product

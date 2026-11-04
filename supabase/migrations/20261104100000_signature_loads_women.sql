@@ -12,6 +12,8 @@
 -- INDEX (as a string key, matching the movements array position) to the
 -- women's pounds; the engine merges it in-memory before measuring.
 --
+-- Review round 1 (2026-11-04): values verified by founder where known;
+-- 18.4 (DL 155/205) and 19.1 (wall ball 14) added on review.
 -- FOUNDER REVIEW REQUIRED on the values: this is editorial data entry
 -- from Open history. Flagged as lower-confidence: 23.3 final snatch
 -- (155), 25.3 (clean 85 / snatch 65), 26.1/26.2 (standard 14 lb ball /
@@ -63,7 +65,9 @@ update public.workout_signatures set loads_women = '{"0": 65}'::jsonb where name
 update public.workout_signatures set loads_women = '{"1": 35}'::jsonb where name = '18.1' and source = 'open';
 update public.workout_signatures set loads_women = '{"0": 35}'::jsonb where name = '18.2' and source = 'open';
 update public.workout_signatures set loads_women = '{"1": 80, "3": 35}'::jsonb where name = '18.3' and source = 'open';
+update public.workout_signatures set loads_women = '{"0": 155, "2": 205}'::jsonb where name = '18.4' and source = 'open';
 update public.workout_signatures set loads_women = '{"0": 65}'::jsonb where name = '18.5' and source = 'open';
+update public.workout_signatures set loads_women = '{"0": 14}'::jsonb where name = '19.1' and source = 'open';
 update public.workout_signatures set loads_women = '{"2": 85, "5": 115, "8": 145, "11": 175, "14": 205}'::jsonb where name = '19.2' and source = 'open';
 update public.workout_signatures set loads_women = '{"0": 35, "1": 35}'::jsonb where name = '19.3' and source = 'open';
 update public.workout_signatures set loads_women = '{"0": 65}'::jsonb where name = '19.4' and source = 'open';

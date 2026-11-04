@@ -49,6 +49,7 @@ import { FOCUS_AREAS } from "../_shared/coach-state.ts";
 import {
   composeEngineVersion,
   computeBlockBenchmarkExplained,
+  mergeLoadsWomen,
   type ExpectedBenchmark,
 } from "../_shared/compute-block-benchmark.ts";
 import { __clearWorkCalcMemo } from "../_shared/compute-benchmarks.ts";
@@ -824,16 +825,16 @@ Deno.serve(async (req) => {
       // Merge women's loads (sibling column — never the workout jsonb,
       // whose canonical hash is identity) into in-memory prescriptions:
       // movement index -> lbs lands as weight_women on that movement.
+      const loadsWomenWarnings: Array<{ name: string; invalid_indices: number[] }> = [];
       const allSigs = ((sigRowsRaw ?? []) as Array<
         { name: string; workout: BlockPrescription; loads_women: Record<string, number> | null }
       >)
         .map((r) => {
-          if (!r.loads_women) return { name: r.name, workout: r.workout };
-          const movements = (r.workout.movements ?? []).map((mv, i) => {
-            const ww = r.loads_women?.[String(i)];
-            return typeof ww === "number" && ww > 0 ? { ...mv, weight_women: ww } : mv;
-          });
-          return { name: r.name, workout: { ...r.workout, movements } as BlockPrescription };
+          const merged = mergeLoadsWomen(r.workout, r.loads_women);
+          if (merged.invalid.length > 0) {
+            loadsWomenWarnings.push({ name: r.name, invalid_indices: merged.invalid });
+          }
+          return { name: r.name, workout: merged.workout };
         })
         .sort((a, b) => a.name.localeCompare(b.name));
 
@@ -1005,6 +1006,11 @@ Deno.serve(async (req) => {
               name: s.name, gender: g, kind: isRepScored ? "reps" : "time",
               predicted: Math.round(predVal),
               gated_wall: gatedW !== null ? Number(gatedW.toFixed(3)) : null,
+              // review caveat 2026-11-04: at-or-below counts slow
+              // possessors who ran out of clock as walled, so the
+              // above-wall segment reads slightly strong; tie-group
+              // bottom lands with the grid fixture, then this flips
+              gated_wall_method: gatedW !== null ? "at_or_below" : null,
               engine_version: composeEngineVersion(bench.calc_version),
               basis: bench.basis,
             };
@@ -1152,6 +1158,9 @@ Deno.serve(async (req) => {
       return json({
         in_sample: true,
         slice,
+        // non-empty = seeded loads no longer match the prescriptions the
+        // migration author saw — fix the row, never ship the mismatch
+        loads_women_warnings: loadsWomenWarnings,
         time_scored: summarize(relErrsTime),
         rep_scored: summarize(relErrsReps),
         // THE number for params: variance of where predicted medians land

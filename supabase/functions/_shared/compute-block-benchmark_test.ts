@@ -12,6 +12,7 @@
 import {
   composeEngineVersion,
   isVaryingLadder,
+  mergeLoadsWomen,
   repsAtCap,
   SCORE_ENGINE_CODE_VERSION,
   toWorkCalcMovement,
@@ -90,4 +91,23 @@ Deno.test("weight_women splits the gender load slots; absent falls back", () => 
   expectEq(out.load_lbs_women, 65, "women at women's RX");
   const single = { movement: "Thruster", rep_scheme: [21], weight: 100 } as unknown as MovementPrescription;
   expectEq(toWorkCalcMovement(single, "for_time")!.load_lbs_women, 100, "no split = status quo");
+});
+
+Deno.test("mergeLoadsWomen refuses indices that don't match what was seeded", () => {
+  const block = {
+    block_type: "metcon",
+    movements: [
+      { movement: "Thruster", rep_scheme: [21], weight: 100 },
+      { movement: "Double-Under", rep_scheme: [42] }, // no weight
+    ],
+  } as unknown as BlockPrescription;
+  const ok = mergeLoadsWomen(block, { "0": 65 });
+  expectEq(ok.invalid, [], "valid entry applies");
+  expectEq((ok.workout.movements![0] as { weight_women?: number }).weight_women, 65, "weight_women set");
+  // reorder/collapse scenarios fail loudly instead of mis-applying:
+  expectEq(mergeLoadsWomen(block, { "1": 80 }).invalid, [1], "weightless movement refused");
+  expectEq(mergeLoadsWomen(block, { "5": 65 }).invalid, [5], "index beyond array refused");
+  expectEq(mergeLoadsWomen(block, { "0": 100 }).invalid, [0], "women >= men refused");
+  expectEq(mergeLoadsWomen(block, { "0": 0 }).invalid, [0], "zero refused");
+  expectEq(mergeLoadsWomen(block, null).invalid, [], "null loads = no-op");
 });
