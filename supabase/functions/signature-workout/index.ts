@@ -59,6 +59,7 @@ import {
   spliceGatedPercentile,
   unspliceGatedPercentile,
   wallMassFromCurve,
+  wallPlateauTolerance,
 } from "../_shared/signature-gate-splice.ts";
 import type { BlockPrescription } from "../_shared/v2-output-schema.ts";
 import type { Gender } from "../_shared/compute-benchmarks.ts";
@@ -1051,17 +1052,35 @@ Deno.serve(async (req) => {
             const headlineObs = gatedW !== null
               ? scoreAtPercentile(pts, spliceGatedPercentile(50, gatedW))
               : obsField;
+            // Even with the plateau, a wall can own so much of the field
+            // that the "conditional median" still sits within tolerance
+            // of the pile — then no possessor distribution is visible in
+            // the grid and there is nothing honest to grade against.
+            if (
+              gatedW !== null && pile !== undefined && headlineObs !== null &&
+              headlineObs.fin !== true &&
+              headlineObs.s <= pile + wallPlateauTolerance(pile)
+            ) {
+              perWorkout.push({
+                name: s.name, gender: g, status: "skipped_wall_dominates",
+                gated_wall: Number(gatedW.toFixed(3)),
+                pile_at_score: pile,
+                conditional_p50: Math.round(headlineObs.s),
+              });
+              continue;
+            }
             const unitOk = (pt: { fin: boolean | null } | null) =>
               pt !== null && (pt.fin === true) === !isRepScored;
             const row: Record<string, unknown> = {
               name: s.name, gender: g, kind: isRepScored ? "reps" : "time",
               predicted: Math.round(predVal),
               gated_wall: gatedW !== null ? Number(gatedW.toFixed(3)) : null,
-              // review caveat 2026-11-04: at-or-below counts slow
-              // possessors who ran out of clock as walled, so the
-              // above-wall segment reads slightly strong; tie-group
-              // bottom lands with the grid fixture, then this flips
-              gated_wall_method: gatedW !== null ? "at_or_below" : null,
+              // plateau_top: the wall extends through scores within
+              // tolerance of the pile (one-rep-past athletes are still
+              // walled); slow possessors below the pile still count as
+              // walled, so the segment reads slightly strong — bounded
+              // and tagged rather than guessed
+              gated_wall_method: gatedW !== null ? "plateau_top" : null,
               engine_version: composeEngineVersion(bench.calc_version),
               basis: bench.basis,
             };

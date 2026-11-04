@@ -72,19 +72,33 @@ export function scoreAtPercentile(
   return null;
 }
 
+/** The wall is a PLATEAU, not a point (review 2026-11-04): athletes who
+ *  get one rep past the pile and are done still sit on the wall. 20.5 F
+ *  is the canonical case — pile 200 (row + wall balls, no muscle-up),
+ *  but the curve reads 200 from p10–p40 and 201 from p45–p80: one ring
+ *  muscle-up, then parked. Scores within this tolerance of the pile
+ *  count as the wall, or the "conditional median" lands ON the wall and
+ *  the audit reports an artifact as an engine error. */
+export function wallPlateauTolerance(pileAtScore: number): number {
+  return Math.max(1, 0.02 * pileAtScore);
+}
+
 /** Locate the wall on the observed grid from the gate catalog's pile
- *  score: the wall mass is the highest field percentile still at or
- *  below the pile (rep-ranked curves ascend; a tie group shares the
- *  pile score, so the TOP of the tie is the wall's upper edge).
- *  Returns 0..1, or null when the grid never reaches the pile (no
- *  visible wall in this field). Only meaningful on rep-ranked segments
- *  (fin !== true). */
+ *  score: the wall mass is the highest field percentile still within
+ *  the pile's PLATEAU (s ≤ pile + tolerance, reached from the pile —
+ *  rep-ranked curves ascend, so the plateau is contiguous and this is
+ *  its top edge). Returns 0..1, or null when the grid never reaches
+ *  the pile (no visible wall in this field). Only meaningful on
+ *  rep-ranked segments (fin !== true). */
 export function wallMassFromCurve(points: CurvePoint[], pileAtScore: number): number | null {
   const reps = points.filter((pt) => pt.fin !== true).sort((a, b) => a.p - b.p);
   if (reps.length === 0) return null;
+  const ceiling = pileAtScore + wallPlateauTolerance(pileAtScore);
   let mass: number | null = null;
+  let reached = false;
   for (const pt of reps) {
-    if (pt.s <= pileAtScore) mass = pt.p / 100;
+    if (pt.s <= pileAtScore) reached = true;
+    if (reached && pt.s <= ceiling) mass = pt.p / 100;
   }
   return mass;
 }
