@@ -49,6 +49,7 @@ import {
 } from "../_shared/engine/pipeline.ts";
 import type { EngineGenerateResult } from "../_shared/engine/contract.ts";
 import { persistCohortResult } from "../_shared/cohort/persist-cohort-result.ts";
+import { autodraftSignaturesForWeeks } from "../_shared/signature-autodraft.ts";
 import {
   type GymProgramJobRow,
   type GymResumeState,
@@ -393,6 +394,19 @@ async function stageSaving(
       .update({ cohort_program_id: cohortProgramId })
       .eq("job_id", job.id)
       .then(() => {}, () => {});
+  }
+
+  // Generation-time signature autodraft (rev-61 automation chain, link 1):
+  // gym cohort metcons get signatures too — the highest-leverage dedup case,
+  // since one class structure serves every member. After the persist,
+  // budget-capped, never throws (same contract as the retail hook).
+  try {
+    const sigStats = await autodraftSignaturesForWeeks(supa, output.weeks ?? []);
+    console.log(
+      `[gym-generate] signature autodraft: metcons=${sigStats.metcons} unique=${sigStats.unique_structures} reused=${sigStats.reused} drafted=${sigStats.drafted} budget_skipped=${sigStats.budget_skipped} failed=${sigStats.failed}`,
+    );
+  } catch (sigErr) {
+    console.warn("[gym-generate] signature autodraft error (non-fatal):", sigErr);
   }
 
   // Success stamp on the gym config (moved here from the old cron — only a

@@ -54,3 +54,5 @@ jobs:
       # from CI and rotted against the fully_computed strictness unnoticed.
       - run: deno test --no-check --allow-env --allow-net supabase/functions/_shared/compute-benchmarks_test.ts
       - run: deno test --no-check --allow-env supabase/functions/_shared/coach-state_test.ts
+      # Generation-time autodraft hook: dedup, budget cap, identity rules.
+      - run: deno test --no-check --allow-env supabase/functions/_shared/signature-autodraft_test.ts
