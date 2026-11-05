@@ -108,8 +108,34 @@ Deno.serve(async (_req) => {
   }
 
   console.log(`[job-reaper] swept ${stale.length} stale job(s): ${JSON.stringify(results)}`);
+
+  // Signature draft queue sweep — THE correctness guarantee for the
+  // signature-draft-worker chain (the self-retrigger is latency only):
+  // requeue vanished claims, then kick the worker if anything is queued.
+  // Its atomic claim makes a redundant kick a no-op.
+  let sigQueued = 0;
+  try {
+    const { data: queued, error: reapErr } = await supa.rpc("reap_signature_drafts", {});
+    if (reapErr) throw new Error(reapErr.message);
+    sigQueued = (queued as number) ?? 0;
+    if (sigQueued > 0) {
+      await fetch(`${SUPABASE_URL}/functions/v1/signature-draft-worker`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${SUPABASE_SERVICE_KEY}`,
+        },
+        body: JSON.stringify({ kick: true }),
+        signal: AbortSignal.timeout(10_000),
+      });
+      console.log(`[job-reaper] signature queue: ${sigQueued} queued — worker kicked`);
+    }
+  } catch (e) {
+    console.warn("[job-reaper] signature queue sweep failed (next sweep retries):", (e as Error).message);
+  }
+
   return new Response(
-    JSON.stringify({ ok: true, swept: stale.length, results }),
+    JSON.stringify({ ok: true, swept: stale.length, results, signature_queue: sigQueued }),
     { status: 200, headers: { "Content-Type": "application/json" } },
   );
 });

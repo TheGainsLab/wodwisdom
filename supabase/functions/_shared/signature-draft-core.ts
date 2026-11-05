@@ -150,6 +150,29 @@ Also emit:
 Output STRICT JSON only — one object with keys IN THIS ORDER: archetype, rationale, time_domain, format, demand, discrimination, stimulus, gates. Commit to the structural reading (archetype, rationale) first; the numbers follow from it. No markdown fences, no commentary.
 Never use the word "CrossFit" anywhere in your output.`;
 
+export const PARSE_SYSTEM = `You parse ONE workout from raw text into a strict JSON structure. Output JSON only — no fences, no commentary.
+
+Shape:
+{
+  "block_type": "metcon" | "strength" | "skills" | "cardio" | "accessory",
+  "block_scheme": string,          // the rendered header, e.g. "21-15-9 for time (12-min cap)" or "AMRAP 15"
+  "time_cap_seconds": number|null, // stated cap OR fixed clock (AMRAP 15 → 900); null if uncapped
+  "movements": [{
+    "movement": string,            // canonical movement name, e.g. "Dumbbell Snatch"
+    "rep_scheme": number[]|null,   // per-round reps: "21-15-9" → [21,15,9]; 3 RFT of 15 → [15,15,15]; AMRAP round of 10 → [10]; 100 straight → [100]
+    "cal_scheme": number[]|null,   // per-round calories when they vary; uniform rounds use "calories" instead
+    "distance_scheme": number[]|null, // per-round meters when they vary
+    "calories": number|null,       // per-round calories (uniform)
+    "distance": number|null,       // per-round distance (uniform)
+    "distance_unit": "m"|"ft"|null,
+    "weight": number|null,         // RX men's load when stated
+    "weight_unit": "lbs"|"kg"|null,
+    "time_seconds": number|null    // duration prescriptions ("row 5 min" → 300)
+  }]
+}
+
+Rules: movements in performed order. Every movement needs at least one volume field. Use the men's RX load when two are given ("50/35" → 50, "♀ 85 lb / ♂ 135 lb" → 135). VARYING LOADS SPLIT THE MOVEMENT: when the same movement appears at different loads across a ladder or sections, emit ONE ENTRY PER LOAD with its own reps (15 squat cleans at 135, then 13 at 185 → two entries) — never a single collapsed entry with the load dropped; the loads are the workout's defining feature. Do arithmetic for schemes ("5 rounds: 12 snatches" → rep_scheme [12,12,12,12,12]). Default block_type "metcon" for scored mixed work. Never use the word "CrossFit" in output.`;
+
 // ============================================================
 // Model call helpers
 // ============================================================
@@ -182,12 +205,26 @@ export interface MeasuredLibrary {
   expected_rel_iqr?: number;
 }
 
+/** A ratified signature passed to the judge as a consistency anchor —
+ *  precedent, not answer (the 19.1/22.1 consistency mechanism). */
+export interface SignatureExemplar {
+  name?: string;
+  archetype?: string | null;
+  time_domain?: string | null;
+  format?: string | null;
+  demand: Weights;
+  discrimination: Weights | null;
+  stimulus: Weights | null;
+  gates: unknown;
+}
+
 /** One drafting call with one validation-driven repair attempt. */
 export async function draftSignature(
   workout: BlockPrescription,
   library: MeasuredLibrary | null,
   measured: ExpectedBenchmark | null,
   apiKey: string,
+  exemplars?: SignatureExemplar[],
 ): Promise<SignatureDraft> {
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not configured");
   const workoutJson = JSON.stringify(workout, null, 2);
@@ -210,7 +247,12 @@ export async function draftSignature(
   const measuredBlock = parts.length
     ? `\n\nMEASURED CONTEXT (condition your judgments on these — they outrank your priors):\n${parts.join("\n")}`
     : "";
-  const ask = `Tag this workout:\n\n${workoutJson}${measuredBlock}`;
+  const exemplarBlock = exemplars && exemplars.length > 0
+    ? `\n\nRATIFIED PRECEDENTS (reviewed signatures of similar workouts — consistency anchors, NOT answers; this workout's own structure governs):\n${
+      JSON.stringify(exemplars)
+    }`
+    : "";
+  const ask = `Tag this workout:\n\n${workoutJson}${measuredBlock}${exemplarBlock}`;
 
   let raw = await callClaude({
     apiKey,
@@ -241,6 +283,30 @@ export async function draftSignature(
   }
   sig.gates = Array.isArray(sig.gates) ? sig.gates : [];
   return sig;
+}
+
+/** One parsing call: raw workout text → BlockPrescription. */
+export async function parseWorkout(text: string, apiKey: string): Promise<BlockPrescription> {
+  if (!apiKey) throw new Error("ANTHROPIC_API_KEY not configured");
+  const raw = await callClaude({
+    apiKey,
+    system: PARSE_SYSTEM,
+    userContent: text,
+    maxTokens: 2000,
+    fallbackToHaiku: false,
+  });
+  const parsed = extractJson(raw) as Record<string, unknown>;
+  if (!Array.isArray(parsed.movements) || parsed.movements.length === 0) {
+    throw new Error("parse produced no movements");
+  }
+  // Strip nulls so the object matches the optional-field BlockPrescription shape.
+  const clean = (o: Record<string, unknown>) => {
+    for (const k of Object.keys(o)) if (o[k] === null) delete o[k];
+    return o;
+  };
+  clean(parsed);
+  parsed.movements = (parsed.movements as Record<string, unknown>[]).map(clean);
+  return parsed as unknown as BlockPrescription;
 }
 
 // ============================================================

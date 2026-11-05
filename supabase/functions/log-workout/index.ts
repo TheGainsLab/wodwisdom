@@ -11,6 +11,10 @@ import { computeMetconPower, type MetconBlockInput } from "../_shared/metcon-wor
 import { computeCardioPower } from "../_shared/cardio-power.ts";
 import { hashWorkoutText } from "../_shared/signature-hash.ts";
 import { SCORE_ENGINE_CODE_VERSION } from "../_shared/compute-block-benchmark.ts";
+import {
+  enqueueSignatureDraftForLoggedText,
+  triggerDraftWorker,
+} from "../_shared/signature-draft-queue.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -560,6 +564,34 @@ Deno.serve(async (req) => {
         }
       })();
       EdgeRuntime.waitUntil(task);
+    }
+
+    // Background: every scored metcon gets a signature (ruling 2026-11-05).
+    // Enqueue by text hash — the same key the evidence rows above carry, so
+    // the drafted signature claims them the moment it lands. Priority 1:
+    // evidence is already waiting. Dedup makes re-logs free. Best-effort.
+    {
+      const sigTask = (async () => {
+        let enqueued = 0;
+        for (const b of blocks) {
+          if (b.type !== "metcon") continue;
+          const scored = Boolean(b.score?.trim()) || b.capped === true;
+          if (!scored || !b.text?.trim()) continue;
+          const stats = await enqueueSignatureDraftForLoggedText(
+            supa,
+            b.text,
+            b.block_scheme ?? null,
+            b.time_cap_seconds ?? null,
+            "log-workout",
+          );
+          enqueued += stats.enqueued;
+        }
+        if (enqueued > 0) {
+          console.log(`[log-workout] signature enqueue: ${enqueued} logged structure(s)`);
+          await triggerDraftWorker(SUPABASE_URL, SUPABASE_KEY);
+        }
+      })();
+      EdgeRuntime.waitUntil(sigTask);
     }
 
     return new Response(

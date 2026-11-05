@@ -376,7 +376,9 @@ export function buildEmitCoachStateTool(
   const props = tool.input_schema.properties;
   props.priorities.items.properties.evidence.items.enum = [...evidenceEnum];
   if (reasonEnum) {
-    const reasons = [...reasonEnum];
+    // The template's enum fields are typed as its literal defaults; the
+    // whole point of this builder is replacing them, so widen the slot.
+    const reasons = [...reasonEnum] as never[];
     props.priorities.items.properties.reasons.items.enum = reasons;
     props.maintain.items.properties.reasons.items.enum = reasons;
     props.deprioritize.items.properties.reasons.items.enum = reasons;

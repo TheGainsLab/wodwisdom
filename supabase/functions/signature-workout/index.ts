@@ -73,6 +73,7 @@ import {
   claimEvidence,
   DEFAULT_PROVENANCE,
   draftSignature,
+  parseWorkout,
   evidenceHashesFor,
   extractJson,
   hashWorkout,
@@ -89,55 +90,9 @@ const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY_PIPELINE") ??
   Deno.env.get("ANTHROPIC_API_KEY");
 
 const MAX_TEXT_CHARS = 8_000;
-const PARSE_SYSTEM = `You parse ONE workout from raw text into a strict JSON structure. Output JSON only — no fences, no commentary.
-
-Shape:
-{
-  "block_type": "metcon" | "strength" | "skills" | "cardio" | "accessory",
-  "block_scheme": string,          // the rendered header, e.g. "21-15-9 for time (12-min cap)" or "AMRAP 15"
-  "time_cap_seconds": number|null, // stated cap OR fixed clock (AMRAP 15 → 900); null if uncapped
-  "movements": [{
-    "movement": string,            // canonical movement name, e.g. "Dumbbell Snatch"
-    "rep_scheme": number[]|null,   // per-round reps: "21-15-9" → [21,15,9]; 3 RFT of 15 → [15,15,15]; AMRAP round of 10 → [10]; 100 straight → [100]
-    "cal_scheme": number[]|null,   // per-round calories when they vary; uniform rounds use "calories" instead
-    "distance_scheme": number[]|null, // per-round meters when they vary
-    "calories": number|null,       // per-round calories (uniform)
-    "distance": number|null,       // per-round distance (uniform)
-    "distance_unit": "m"|"ft"|null,
-    "weight": number|null,         // RX men's load when stated
-    "weight_unit": "lbs"|"kg"|null,
-    "time_seconds": number|null    // duration prescriptions ("row 5 min" → 300)
-  }]
-}
-
-Rules: movements in performed order. Every movement needs at least one volume field. Use the men's RX load when two are given ("50/35" → 50, "♀ 85 lb / ♂ 135 lb" → 135). VARYING LOADS SPLIT THE MOVEMENT: when the same movement appears at different loads across a ladder or sections, emit ONE ENTRY PER LOAD with its own reps (15 squat cleans at 135, then 13 at 185 → two entries) — never a single collapsed entry with the load dropped; the loads are the workout's defining feature. Do arithmetic for schemes ("5 rounds: 12 snatches" → rep_scheme [12,12,12,12,12]). Default block_type "metcon" for scored mixed work. Never use the word "CrossFit" in output.`;
-
 // ============================================================
 // Model call helpers
 // ============================================================
-
-async function parseWorkout(text: string): Promise<BlockPrescription> {
-  if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY not configured");
-  const raw = await callClaude({
-    apiKey: ANTHROPIC_API_KEY,
-    system: PARSE_SYSTEM,
-    userContent: text,
-    maxTokens: 2000,
-    fallbackToHaiku: false,
-  });
-  const parsed = extractJson(raw) as Record<string, unknown>;
-  if (!Array.isArray(parsed.movements) || parsed.movements.length === 0) {
-    throw new Error("parse produced no movements");
-  }
-  // Strip nulls so the object matches the optional-field BlockPrescription shape.
-  const clean = (o: Record<string, unknown>) => {
-    for (const k of Object.keys(o)) if (o[k] === null) delete o[k];
-    return o;
-  };
-  clean(parsed);
-  parsed.movements = (parsed.movements as Record<string, unknown>[]).map(clean);
-  return parsed as unknown as BlockPrescription;
-}
 
 /** Deterministic layer — zero tokens. Null when the structure has no
  *  resolvable benchmark (non-metcon, unresolved movement). The reason is
@@ -344,7 +299,7 @@ Deno.serve(async (req) => {
       const text = typeof body.text === "string" ? body.text.trim() : "";
       if (!text) return json({ error: "MISSING_TEXT" }, 400);
       if (text.length > MAX_TEXT_CHARS) return json({ error: "TEXT_TOO_LONG" }, 400);
-      const workout = await parseWorkout(text);
+      const workout = await parseWorkout(text, ANTHROPIC_API_KEY!);
       return json({ workout });
     }
 

@@ -47,7 +47,11 @@ import {
 } from "../_shared/movement-name-repair.ts";
 import { buildStratifiedMetconExamples } from "../_shared/metcon-examples.ts";
 import { formatAuditFailuresForLog, logGenerationAudit } from "../_shared/generation-audit-log.ts";
-import { autodraftSignaturesForWeeks } from "../_shared/signature-autodraft.ts";
+import {
+  enqueueSignatureDraftsForWeeks,
+  formatEnqueueStats,
+  triggerDraftWorker,
+} from "../_shared/signature-draft-queue.ts";
 import { MODELS } from "../_shared/model-profiles.ts";
 import { buildTrainingDesignInput } from "../_shared/training-design-input.ts";
 import { type SkeletonOutput } from "../_shared/v3-output-schema.ts";
@@ -965,19 +969,17 @@ async function stageSaving(
     console.log(`[generate-program-v3] month ${monthNumber} already saved for ${programId}; idempotent skip`);
   }
 
-  // Generation-time signature autodraft (rev-61 automation chain, link 1):
-  // every metcon in the saved program gets a signature — hash-dedup first,
-  // so only NOVEL structures cost a drafting call. Runs AFTER the save and
-  // never throws: a signature failure must never fail a program that saved.
-  // Budget-capped (sequential, MAX_DRAFTS_PER_RUN) per the per-invocation
-  // outbound limit ruling (2026-11-05); leftovers dedup-skip next run.
+  // Signature queue (rev-61 automation chain, link 1 — every workout gets a
+  // signature): enqueue this program's metcon structures and kick the
+  // drafting worker. This stage never drafts (its outbound budget is the
+  // save's); the worker chain drains within minutes, the reaper guarantees
+  // it. Runs AFTER the save and never throws.
   try {
-    const sigStats = await autodraftSignaturesForWeeks(supa, output.weeks ?? []);
-    console.log(
-      `[generate-program-v3] signature autodraft: metcons=${sigStats.metcons} unique=${sigStats.unique_structures} reused=${sigStats.reused} drafted=${sigStats.drafted} budget_skipped=${sigStats.budget_skipped} failed=${sigStats.failed}`,
-    );
+    const sigStats = await enqueueSignatureDraftsForWeeks(supa, output.weeks ?? [], "generate-program-v3");
+    console.log(`[generate-program-v3] signature enqueue: ${formatEnqueueStats(sigStats)}`);
+    if (sigStats.enqueued > 0) await triggerDraftWorker(SUPABASE_URL, SUPABASE_SERVICE_KEY);
   } catch (sigErr) {
-    console.warn("[generate-program-v3] signature autodraft error (non-fatal):", sigErr);
+    console.warn("[generate-program-v3] signature enqueue error (non-fatal):", sigErr);
   }
 
   // Reveal this month's coaching evaluations (non-fatal, scoped to user+month).
