@@ -501,7 +501,19 @@ async function workCalcOnce(
       console.warn("[compute-benchmarks] work-calc timeout; returning null");
       return { joules: null, reason: "work_calc_timeout" };
     }
-    console.warn(`[compute-benchmarks] work-calc error: ${(err as Error).message}; returning null`);
+    const msg = (err as Error).message ?? "";
+    // Supabase platform rate limiter on outbound calls per invocation
+    // ("Rate limit exceeded for trace ... Retry after Nms"): a fixed
+    // ~1-minute window that, once tripped, rejects every further call
+    // from this invocation. Deterministic for the rest of the window —
+    // retrying burns attempts against a closed door, so it is NOT
+    // classified transient. Callers that need many calc calls must
+    // stay under the per-invocation budget (audit: small slices).
+    if (/rate limit exceeded/i.test(msg)) {
+      console.warn(`[compute-benchmarks] work-calc platform rate limit: ${msg.slice(0, 120)}; returning null`);
+      return { joules: null, reason: "work_calc_platform_rate_limited" };
+    }
+    console.warn(`[compute-benchmarks] work-calc error: ${msg}; returning null`);
     return { joules: null, reason: "work_calc_network" };
   } finally {
     clearTimeout(timer);
