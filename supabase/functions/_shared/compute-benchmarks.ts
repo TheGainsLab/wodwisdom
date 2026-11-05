@@ -34,6 +34,27 @@ const WORK_CALC_TIMEOUT_MS = 8_000;
 export type TimeDomain = "short" | "medium" | "long";
 export type Gender = "men" | "women";
 
+/** Score-scale calibration constant κ (acceptance run 6, 2026-11-05).
+ *  After the service-side movement cost corrections (service sql/165/166)
+ *  the engine still predicted exp(+0.187) ≈ 1.21× more output than the
+ *  field produced — uniformly, across 77 scored workout-gender pairs
+ *  (mean of ln(predicted/observed), time rows inverted). Cause: a
+ *  pooled cell p50 overstates what the median athlete sustains on a
+ *  single NEW workout (selection toward favorable workouts in the
+ *  pool). Every watts value drawn from the curve for prediction or
+ *  percentile anchoring is divided by κ. Re-measure after any curve
+ *  rebuild or cost-table refit; bump SCORE_ENGINE_CODE_VERSION when
+ *  this changes. */
+export const SCORESCALE_KAPPA = 1.206;
+let kappa = SCORESCALE_KAPPA;
+const sustainableWatts = (cellWatts: number): number => cellWatts / kappa;
+
+/** Test-only: run the arithmetic suite at κ=1 (pass nothing to restore
+ *  the production constant). Production code never calls this. */
+export function __setKappaForTests(value?: number): void {
+  kappa = value ?? SCORESCALE_KAPPA;
+}
+
 /** A movement in the format upstream POST /v1/work/calculate expects.
  *
  *  Volume specifiers are mutually exclusive per movement — caller sets
@@ -255,12 +276,12 @@ function buildCohortAnchors(
   const cell = curve.stages.open[gender][timeDomain];
   if (!cell) return [];
   const wattsByP: Array<{ p: number; watts: number }> = [
-    { p: 10, watts: cell.p10 },
-    { p: 25, watts: cell.p25 },
-    { p: 50, watts: cell.p50 },
-    { p: 75, watts: cell.p75 },
-    { p: 90, watts: cell.p90 },
-    { p: 99, watts: cell.p99 },
+    { p: 10, watts: sustainableWatts(cell.p10) },
+    { p: 25, watts: sustainableWatts(cell.p25) },
+    { p: 50, watts: sustainableWatts(cell.p50) },
+    { p: 75, watts: sustainableWatts(cell.p75) },
+    { p: 90, watts: sustainableWatts(cell.p90) },
+    { p: 99, watts: sustainableWatts(cell.p99) },
   ];
   return wattsByP.flatMap(({ p, watts }) => {
     if (!Number.isFinite(watts) || watts <= 0) return [];
@@ -550,7 +571,7 @@ function findSelfConsistentBucket(
   for (const bucket of ["short", "medium", "long"] as const) {
     const cell = open[bucket];
     if (!cell) continue;
-    const time = joules / cell.p50;
+    const time = joules / sustainableWatts(cell.p50);
     if (bucket === "short" && time <= 480) return "short";
     if (bucket === "medium" && time > 480 && time <= 900) return "medium";
     if (bucket === "long" && time > 900) return "long";
@@ -574,7 +595,7 @@ function pickMedianWatts(
 ): PickedWatts | null {
   const open = curve.stages.open[gender];
   const cell = open[timeDomain];
-  if (cell) return { watts: cell.p50, label: "open_p50" };
+  if (cell) return { watts: sustainableWatts(cell.p50), label: "open_p50" };
   return null;
 }
 
@@ -588,13 +609,13 @@ function pickExcellentWatts(
   // p50 lands below median — would produce nonsensical "excellent worse
   // than median" output. Fall through to the Open p90 fallback.
   const qfCell: StagePowerCurveCell | undefined = curve.stages.quarterfinals[gender][timeDomain];
-  if (qfCell && qfCell.p50 > medianWatts) {
-    return { watts: qfCell.p50, label: "qf_p50" };
+  if (qfCell && sustainableWatts(qfCell.p50) > medianWatts) {
+    return { watts: sustainableWatts(qfCell.p50), label: "qf_p50" };
   }
   // Fallback: Open p90 from the same cell (always > Open p50 by definition).
   const openCell: StagePowerCurveCell | undefined = curve.stages.open[gender][timeDomain];
   if (openCell) {
-    return { watts: openCell.p90, label: "open_p90_qf_missing_or_too_low" };
+    return { watts: sustainableWatts(openCell.p90), label: "open_p90_qf_missing_or_too_low" };
   }
   return null;
 }

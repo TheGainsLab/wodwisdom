@@ -328,6 +328,11 @@ export interface StagePowerCurveStage {
 export interface StagePowerCurve {
   /** ISO date stamp of the underlying materialized view refresh. */
   version: string;
+  /** Curve generation id (sql/164 upstream): max refreshed_at at second
+   *  precision, UTC — distinguishes same-day rebuilds, which the
+   *  date-only `version` cannot. Rides into engine_version on every
+   *  scored row. Absent from pre-164 service responses. */
+  calc_version?: string;
   body_mass_basis: "default_84m_64w";
   n_underlying_results: number;
   cache_ttl_seconds: number;

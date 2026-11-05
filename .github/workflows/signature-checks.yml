@@ -50,4 +50,7 @@ jobs:
             supabase/functions/_shared/fixtures/open-observed-medians_test.ts \
             supabase/functions/_shared/compute-block-benchmark_test.ts \
             supabase/functions/_shared/signature-gate-splice_test.ts
+      # compute-benchmarks needs env+net for its fetch stubs; it was absent
+      # from CI and rotted against the fully_computed strictness unnoticed.
+      - run: deno test --no-check --allow-env --allow-net supabase/functions/_shared/compute-benchmarks_test.ts
       - run: deno test --no-check --allow-env supabase/functions/_shared/coach-state_test.ts

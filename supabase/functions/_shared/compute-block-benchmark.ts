@@ -38,7 +38,10 @@ import {
  *  engine_version stamped on every scored evidence row, so a parser or
  *  curve change makes stale rows identifiable and re-scorable (scoring
  *  reliability review 2026-11-03). Bump on any semantic change here. */
-export const SCORE_ENGINE_CODE_VERSION = "se2026.11.04-1";
+// se2026.11.05-1: κ score-scale calibration (SCORESCALE_KAPPA in
+// compute-benchmarks) — every curve watts draw divided by 1.206,
+// measured from acceptance run 6.
+export const SCORE_ENGINE_CODE_VERSION = "se2026.11.05-1";
 
 /** The engine_version string for a scored row. */
 export function composeEngineVersion(calcVersion: string | null | undefined): string {

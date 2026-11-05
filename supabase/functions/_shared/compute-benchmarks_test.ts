@@ -13,12 +13,21 @@ import { assert, assertEquals, assertAlmostEquals } from "jsr:@std/assert";
 import { _resetCacheForTests } from "./stage-power-curve-cache.ts";
 import type { StagePowerCurve } from "./fetch-tier4-bundle.ts";
 import {
+  __clearWorkCalcMemo,
+  __setKappaForTests,
   _deriveTimeDomain,
   _formatAMRAP,
   _formatTimeSeconds,
   computeBenchmarks,
+  SCORESCALE_KAPPA,
   type WorkCalcMovement,
 } from "./compute-benchmarks.ts";
+
+// The arithmetic suite below predates the κ score-scale calibration
+// (se2026.11.05-1) and pins exact joules/watts arithmetic, so it runs
+// at κ=1; the dedicated test at the bottom asserts the production κ
+// is really applied to every curve watts draw.
+__setKappaForTests(1);
 
 // ============================================================
 // Fixtures
@@ -108,7 +117,9 @@ function installFetchStub(opts: StubOpts) {
         return Promise.resolve(new Response("err", { status: opts.workCalcStatus ?? 500 }));
       }
       return Promise.resolve(
-        new Response(JSON.stringify({ total_joules: opts.workCalcJoules }), {
+        // fully_computed required since the scoring-reliability pass
+        // (se2026.11.04): a partial total must never price a benchmark.
+        new Response(JSON.stringify({ total_joules: opts.workCalcJoules, fully_computed: true }), {
           status: 200,
           headers: { "content-type": "application/json" },
         }),
@@ -130,6 +141,10 @@ function setEnv() {
 
 async function withClean<T>(fn: () => Promise<T>): Promise<T> {
   _resetCacheForTests();
+  // The work-calc memo outlives a single call by design (success entries
+  // are kept forever; scoring-reliability pass se2026.11.04) — without
+  // clearing it, one test's joules leak into the next test's stub.
+  __clearWorkCalcMemo();
   setEnv();
   try {
     return await fn();
@@ -460,4 +475,28 @@ Deno.test("computeBenchmarks: arithmetic sanity check (joules / watts → time)"
     assertAlmostEquals(result.median_watts, 250);
     assertAlmostEquals(result.excellent_watts ?? 0, 330);
   });
+});
+
+Deno.test("computeBenchmarks: production κ divides every curve watts draw", async () => {
+  __setKappaForTests(); // restore the production constant
+  try {
+    await withClean(async () => {
+      installFetchStub({ workCalcJoules: 50000, curve: makeFullCurve() });
+      const result = await computeBenchmarks({
+        movements: FRAN_MOVEMENTS,
+        gender: "men",
+        workout_type: "for_time",
+        time_cap_seconds: 360,
+      });
+      assert(result !== null);
+      // men's short p50 = 250 in the fixture → 250 / κ
+      assertAlmostEquals(result.median_watts, 250 / SCORESCALE_KAPPA, 1e-9);
+      assertAlmostEquals(result.excellent_watts ?? 0, 330 / SCORESCALE_KAPPA, 1e-9);
+      const p50Anchor = result.cohort_anchors.find((a) => a.p === 50);
+      assert(p50Anchor !== undefined);
+      assertAlmostEquals(p50Anchor.watts, 250 / SCORESCALE_KAPPA, 1e-9);
+    });
+  } finally {
+    __setKappaForTests(1); // leave the suite the way it runs
+  }
 });
