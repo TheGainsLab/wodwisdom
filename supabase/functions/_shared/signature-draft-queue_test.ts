@@ -363,20 +363,73 @@ Deno.test("worker: failure requeues below the cap, fails final at it", async () 
   assertEquals(m2.row.status, "failed");
 });
 
-Deno.test("worker: insert race (23505) counts as already_signed", async () => {
+Deno.test("worker: insert race (23505) teaches the winner this job's hashes", async () => {
+  const job = await structureJob();
+  let selects = 0;
+  // deno-lint-ignore no-explicit-any
+  const sigUpdates: any[] = [];
   const { client } = fakeSupa({
-    "workout_signatures.select": ok,
+    // First select (claim-time re-check): nothing signed. Second select
+    // (after the 23505): the race winner's row, missing this job's text
+    // hash — the loser must teach it.
+    "workout_signatures.select": () => {
+      selects++;
+      return selects === 1 ? { data: [], error: null } : {
+        data: [{ id: "winner", evidence_hashes: ["wsh1_otherhash00000000000000000000"] }],
+        error: null,
+      };
+    },
     "workout_signatures.insert": () => ({
       error: { code: "23505", message: "duplicate key value violates unique constraint" },
     }),
+    "workout_signatures.update": (q) => {
+      sigUpdates.push(q.row);
+      return { data: [], error: null };
+    },
+    "signature_evidence.update": ok,
     "signature_draft_queue.update": ok,
     "signature_duration_curve.select": ok,
   });
-  const stats = await processClaimedJobs(client, [await structureJob()], {
+  const stats = await processClaimedJobs(client, [job], {
     draftFn: stubDraft,
     measureFn: measuredStub,
     apiKey: "test",
   });
   assertEquals(stats.already_signed, 1);
   assertEquals(stats.failed_retry, 0);
+  // The winner's evidence_hashes gained this job's structure hash.
+  assertEquals(sigUpdates.length, 1);
+  assertEquals(sigUpdates[0].evidence_hashes.includes(job.workout_hash), true);
+});
+
+Deno.test("worker: lost drainer lease stops the batch and requeues the remainder", async () => {
+  // deno-lint-ignore no-explicit-any
+  const queueMarks: any[] = [];
+  const { client } = fakeSupa({
+    "workout_signatures.select": ok,
+    "workout_signatures.insert": () => ({ data: { id: "sig1" }, error: null }),
+    "signature_evidence.update": ok,
+    "signature_draft_queue.update": (q) => {
+      queueMarks.push(q.row);
+      return { data: [], error: null };
+    },
+    "signature_duration_curve.select": ok,
+  });
+  const jobs = [
+    { ...(await structureJob()), id: "j1" },
+    { ...(await structureJob(metconBlock({}, [{ movement: "Burpee", rep_scheme: [50] }]))), id: "j2" },
+    { ...(await structureJob(metconBlock({}, [{ movement: "Row", calories: 30 }]))), id: "j3" },
+  ];
+  const stats = await processClaimedJobs(client, jobs, {
+    draftFn: stubDraft,
+    measureFn: measuredStub,
+    apiKey: "test",
+    heartbeatFn: () => Promise.resolve(false), // lease lost after job 1
+  });
+  assertEquals(stats.done, 1);
+  // j1 marked done; j2 and j3 requeued untouched.
+  assertEquals(queueMarks.length, 3);
+  assertEquals(queueMarks[0].status, "done");
+  assertEquals(queueMarks[1].status, "queued");
+  assertEquals(queueMarks[2].status, "queued");
 });

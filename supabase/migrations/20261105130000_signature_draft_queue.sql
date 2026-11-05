@@ -73,6 +73,10 @@ alter table public.signature_draft_drainer enable row level security;
 -- Atomic claim: take/renew the drainer lease, then claim up to p_limit
 -- queued jobs. Returns zero rows when another drainer holds a live lease
 -- (the caller exits quietly) or the queue is empty.
+--
+-- Priority with age escalation: logged-evidence jobs (priority 1) claim
+-- first, but anything queued past 4 hours claims as priority 1 too, so a
+-- steady trickle of logged structures can never starve program inventory.
 create or replace function public.claim_signature_drafts(
   p_token uuid,
   p_limit int default 5,
@@ -101,12 +105,36 @@ begin
    where q.id in (
      select sq.id from public.signature_draft_queue sq
       where sq.status = 'queued'
-      order by sq.priority desc, sq.created_at
+      order by greatest(
+          sq.priority,
+          case when sq.created_at < now() - interval '4 hours' then 1 else 0 end
+        ) desc,
+        sq.created_at
       for update skip locked
       limit p_limit
    )
    returning q.*;
 end;
+$$;
+
+-- Heartbeat: renew the drainer lease between jobs. A batch of sequential
+-- drafts can outlive any fixed lease (four parse+draft+measure jobs can
+-- run minutes), and an expired lease would let a second drainer start —
+-- silently doubling the global in-flight cap the lease exists to enforce.
+-- Returns true while the lease is still this worker's; false means it was
+-- lost (the worker should stop claiming more work after this batch).
+create or replace function public.heartbeat_signature_drainer(
+  p_token uuid,
+  p_lease_seconds int default 180
+)
+returns boolean
+language sql
+security definer
+as $$
+  update public.signature_draft_drainer
+     set lease_until = now() + make_interval(secs => p_lease_seconds)
+   where id = 1 and claim_token = p_token
+  returning true;
 $$;
 
 -- Release the drainer lease (only the holder's token releases it).
@@ -123,8 +151,12 @@ $$;
 -- Reaper sweep: claimed rows whose worker vanished (stale) go back to
 -- queued for another attempt, or to failed past the attempt cap. Returns
 -- the number of still-queued jobs so the reaper knows to fire the worker.
+-- The stale threshold sits ABOVE worst-case batch wall time (4 jobs x
+-- ~2 min each): a live worker heartbeats its lease but not its claimed
+-- rows, so a threshold below batch time would requeue jobs a healthy
+-- worker is still holding.
 create or replace function public.reap_signature_drafts(
-  p_stale_seconds int default 300,
+  p_stale_seconds int default 900,
   p_max_attempts int default 3
 )
 returns int
@@ -148,13 +180,17 @@ end;
 $$;
 
 -- Depth-by-age gauge: the early-warning dial for account-wide rate
--- pressure (drain rate < enqueue rate shows up here first).
+-- pressure (drain rate < enqueue rate shows up here first). Age is only
+-- meaningful for LIVE statuses — a terminal 'failed' row would otherwise
+-- age forever and keep the dial alarming permanently, so failed reports
+-- its count alone.
 create or replace view public.signature_draft_queue_gauge as
 select
   status,
   count(*) as n,
-  min(created_at) as oldest,
-  extract(epoch from (now() - min(created_at)))::int as oldest_age_seconds
+  case when status in ('queued', 'claimed') then min(created_at) end as oldest,
+  case when status in ('queued', 'claimed')
+    then extract(epoch from (now() - min(created_at)))::int end as oldest_age_seconds
 from public.signature_draft_queue
 where status in ('queued', 'claimed', 'failed')
 group by status;

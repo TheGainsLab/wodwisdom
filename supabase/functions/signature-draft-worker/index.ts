@@ -5,12 +5,16 @@
  * One invocation = one claimed batch (DRAFT_BATCH_SIZE, sequential drafts —
  * the per-invocation outbound budget, saga ruling 2026-11-05), then a
  * self-retrigger while the queue is nonempty. Safety is NOT this chain:
- *   - claim_signature_drafts is atomic (single-drainer lease + SKIP LOCKED),
- *     so a stray or duplicate invocation claims nothing or claims safely —
- *     which is why, like job-reaper, there is no inbound auth gate.
+ *   - every caller (producers, job-reaper, self-retrigger) holds the
+ *     service key, so the inbound bearer is checked against it — a free
+ *     gate on making the database and Anthropic do work. The atomic claim
+ *     (single-drainer lease + SKIP LOCKED in claim_signature_drafts) is
+ *     the correctness backstop regardless.
  *   - the reaper (job-reaper → reap_signature_drafts) requeues vanished
  *     claims and fires this worker; a lost retrigger costs latency only.
- *   - the single-drainer lease is the global Anthropic in-flight cap.
+ *   - the single-drainer lease is the global Anthropic in-flight cap,
+ *     heartbeat-renewed between jobs so a long batch can't silently
+ *     let a second drainer start.
  */
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -50,6 +54,12 @@ Deno.serve(async (req) => {
       headers: { ...cors, "Content-Type": "application/json" },
     });
 
+  // Service callers only (producers / reaper / self-retrigger all hold it).
+  const bearer = (req.headers.get("Authorization") ?? "").replace("Bearer ", "");
+  if (bearer !== SERVICE_KEY) {
+    return json({ error: "UNAUTHORIZED" }, 401);
+  }
+
   const supa = createClient(SUPABASE_URL, SERVICE_KEY);
   const token = crypto.randomUUID();
 
@@ -70,7 +80,12 @@ Deno.serve(async (req) => {
 
   let stats;
   try {
-    stats = await processClaimedJobs(supa, batch);
+    stats = await processClaimedJobs(supa, batch, {
+      heartbeatFn: async () => {
+        const { data, error } = await supa.rpc("heartbeat_signature_drainer", { p_token: token });
+        return !error && data === true;
+      },
+    });
   } finally {
     await supa.rpc("release_signature_drainer", { p_token: token })
       .then(() => {}, () => {});

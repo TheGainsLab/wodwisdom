@@ -318,6 +318,10 @@ export interface QueueJob {
 export interface ProcessDeps {
   apiKey?: string;
   maxAttempts?: number;
+  /** Renews the single-drainer lease between jobs; returns false when the
+   *  lease was lost (the batch stops and requeues its remainder, so two
+   *  drainers never draft at once — the lease IS the global in-flight cap). */
+  heartbeatFn?: () => Promise<boolean>;
   draftFn?: (
     workout: BlockPrescription,
     library: MeasuredLibrary | null,
@@ -446,22 +450,7 @@ async function draftOneJob(
   //    STRUCTURE but not this job's text hash, teach it the text hash —
   //    same structure, lenient joining by design.
   const checkHashes = [...new Set([...hashes, job.workout_hash])];
-  const { data: existing, error: exErr } = await supa
-    .from("workout_signatures")
-    .select("id, evidence_hashes")
-    .overlaps("evidence_hashes", checkHashes)
-    .limit(1);
-  if (exErr) throw new Error(exErr.message);
-  if (existing && existing.length > 0) {
-    const row = existing[0] as { id: string; evidence_hashes: string[] | null };
-    const have = new Set(row.evidence_hashes ?? []);
-    const missing = checkHashes.filter((h) => !have.has(h));
-    if (missing.length > 0) {
-      await supa.from("workout_signatures")
-        .update({ evidence_hashes: [...have, ...missing], updated_at: new Date().toISOString() })
-        .eq("id", row.id);
-    }
-    await claimEvidence(supa, row.id, checkHashes);
+  if (await attachToExistingSignature(supa, checkHashes)) {
     return "already_signed";
   }
 
@@ -519,11 +508,44 @@ async function draftOneJob(
     .select("id")
     .single();
   if (error) {
-    if (isDupError(error)) return "already_signed"; // lost the race = dedup working
+    if (isDupError(error)) {
+      // Lost the insert race = dedup working — but the winner's row may not
+      // know THIS job's hashes (two logged texts parsing to one structure
+      // race here; dropping the loser's text hash would strand its
+      // evidence). Teach the winner, same as the claim-time path.
+      await attachToExistingSignature(supa, checkHashes);
+      return "already_signed";
+    }
     throw new Error(error.message);
   }
   await claimEvidence(supa, (data as { id: string }).id, row.evidence_hashes);
   return "done";
+}
+
+/** Find the signature that claims any of these hashes (exact identity);
+ *  teach it the ones it is missing and point waiting evidence at it.
+ *  Returns false when no signature covers them. */
+async function attachToExistingSignature(
+  supa: SupaLike,
+  checkHashes: string[],
+): Promise<boolean> {
+  const { data: existing, error } = await supa
+    .from("workout_signatures")
+    .select("id, evidence_hashes")
+    .overlaps("evidence_hashes", checkHashes)
+    .limit(1);
+  if (error) throw new Error(error.message);
+  if (!existing || existing.length === 0) return false;
+  const row = existing[0] as { id: string; evidence_hashes: string[] | null };
+  const have = new Set(row.evidence_hashes ?? []);
+  const missing = checkHashes.filter((h) => !have.has(h));
+  if (missing.length > 0) {
+    await supa.from("workout_signatures")
+      .update({ evidence_hashes: [...have, ...missing], updated_at: new Date().toISOString() })
+      .eq("id", row.id);
+  }
+  await claimEvidence(supa, row.id, checkHashes);
+  return true;
 }
 
 /**
@@ -538,7 +560,8 @@ export async function processClaimedJobs(
 ): Promise<ProcessStats> {
   const stats: ProcessStats = { done: 0, already_signed: 0, failed_retry: 0, failed_final: 0 };
   const maxAttempts = deps.maxAttempts ?? 3;
-  for (const job of jobs) {
+  for (let i = 0; i < jobs.length; i++) {
+    const job = jobs[i];
     try {
       const outcome = await draftOneJob(supa, job, deps);
       stats[outcome === "done" ? "done" : "already_signed"]++;
@@ -551,9 +574,35 @@ export async function processClaimedJobs(
         status: final ? "failed" : "queued",
         last_error: msg,
       });
+      // KNOWN GAP until the self-nominating trigger (link 3): a TEXT job
+      // that fails final strands its waiting evidence unless the athlete
+      // re-logs the same text ('failed' falls out of the live-hash index,
+      // so a re-log re-enqueues). Link 3's unsigned-evidence sweep closes
+      // it for good.
       console.warn(
         `[signature-worker] job ${job.id} (${job.workout_hash}) attempt ${job.attempts} failed${final ? " FINAL" : ""}: ${msg}`,
       );
+    }
+    // Renew the drainer lease between jobs: a sequential batch can outlive
+    // any fixed lease, and an expired lease starts a second drainer —
+    // doubling the global in-flight cap the lease exists to enforce. A
+    // lost lease stops the batch; the untouched remainder requeues so the
+    // new drainer picks it up.
+    if (deps.heartbeatFn && i < jobs.length - 1) {
+      let alive = false;
+      try {
+        alive = await deps.heartbeatFn();
+      } catch (_) { /* treat as lost */ }
+      if (!alive) {
+        const remainder = jobs.slice(i + 1);
+        console.warn(
+          `[signature-worker] drainer lease lost after job ${i + 1}/${jobs.length}; requeueing ${remainder.length} job(s)`,
+        );
+        for (const r of remainder) {
+          await markJob(supa, r.id, { status: "queued" });
+        }
+        break;
+      }
     }
   }
   return stats;
