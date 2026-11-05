@@ -20,6 +20,11 @@ import {
   refreshMetconBenchmark,
 } from "../_shared/block-edit.ts";
 import type { BlockPrescription } from "../_shared/v2-output-schema.ts";
+import {
+  enqueueSignatureDraftForBlock,
+  formatEnqueueStats,
+  triggerDraftWorker,
+} from "../_shared/signature-draft-queue.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -77,12 +82,18 @@ Deno.serve(async (req) => {
 
     // Benchmark refresh runs after the response — the athlete's Apply is
     // instant; the prediction refills seconds later (or stays null, honestly).
+    // The edited structure is a new identity, so it also enqueues for a
+    // signature (every workout gets one — ruling 2026-11-05). Best-effort.
     if (proposal.block_type === "metcon") {
       const { data: prof } = await supa
         .from("athlete_profiles").select("gender").eq("user_id", user.id).maybeSingle();
-      EdgeRuntime.waitUntil(
-        refreshMetconBenchmark(supa, logRow.block_id as string, proposal, prof?.gender ?? null),
-      );
+      // deno-lint-ignore no-explicit-any
+      (globalThis as any).EdgeRuntime?.waitUntil?.((async () => {
+        await refreshMetconBenchmark(supa, logRow.block_id as string, proposal, prof?.gender ?? null);
+        const stats = await enqueueSignatureDraftForBlock(supa, proposal, "apply-block-edit");
+        console.log(`[apply-block-edit] signature enqueue: ${formatEnqueueStats(stats)}`);
+        if (stats.enqueued > 0) await triggerDraftWorker(SUPABASE_URL, SUPABASE_KEY);
+      })());
     }
 
     return json({ ok: true, outcome: "accepted" }, cors);

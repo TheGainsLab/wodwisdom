@@ -50,6 +50,11 @@ import {
 import type { EngineGenerateResult } from "../_shared/engine/contract.ts";
 import { persistCohortResult } from "../_shared/cohort/persist-cohort-result.ts";
 import {
+  enqueueSignatureDraftsForWeeks,
+  formatEnqueueStats,
+  triggerDraftWorker,
+} from "../_shared/signature-draft-queue.ts";
+import {
   type GymProgramJobRow,
   type GymResumeState,
   type GymStage,
@@ -393,6 +398,18 @@ async function stageSaving(
       .update({ cohort_program_id: cohortProgramId })
       .eq("job_id", job.id)
       .then(() => {}, () => {});
+  }
+
+  // Signature queue (rev-61 automation chain, link 1): enqueue the cohort
+  // program's metcon structures and kick the drafting worker — the
+  // highest-leverage dedup case, since one class structure serves every
+  // member. After the persist, never throws.
+  try {
+    const sigStats = await enqueueSignatureDraftsForWeeks(supa, output.weeks ?? [], "gym-generate");
+    console.log(`[gym-generate] signature enqueue: ${formatEnqueueStats(sigStats)}`);
+    if (sigStats.enqueued > 0) await triggerDraftWorker(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+  } catch (sigErr) {
+    console.warn("[gym-generate] signature enqueue error (non-fatal):", sigErr);
   }
 
   // Success stamp on the gym config (moved here from the old cron — only a
