@@ -432,4 +432,7 @@ Deno.test("worker: lost drainer lease stops the batch and requeues the remainder
   assertEquals(queueMarks[0].status, "done");
   assertEquals(queueMarks[1].status, "queued");
   assertEquals(queueMarks[2].status, "queued");
+  // The claim-charged attempt is refunded: these jobs were never drafted.
+  assertEquals(queueMarks[1].attempts, 0);
+  assertEquals(queueMarks[2].attempts, 0);
 });

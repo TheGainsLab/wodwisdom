@@ -77,6 +77,10 @@ alter table public.signature_draft_drainer enable row level security;
 -- Priority with age escalation: logged-evidence jobs (priority 1) claim
 -- first, but anything queued past 4 hours claims as priority 1 too, so a
 -- steady trickle of logged structures can never starve program inventory.
+-- KNOWN LIMIT: the greatest(...) ordering is not indexable, so each claim
+-- sorts all queued rows — fine at hundreds; if the gauge ever shows
+-- sustained thousands, switch to a two-pass claim (priority-1 first, then
+-- oldest) over an index on (status, created_at).
 create or replace function public.claim_signature_drafts(
   p_token uuid,
   p_limit int default 5,

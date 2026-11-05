@@ -512,9 +512,14 @@ async function draftOneJob(
       // Lost the insert race = dedup working — but the winner's row may not
       // know THIS job's hashes (two logged texts parsing to one structure
       // race here; dropping the loser's text hash would strand its
-      // evidence). Teach the winner, same as the claim-time path.
-      await attachToExistingSignature(supa, checkHashes);
-      return "already_signed";
+      // evidence). Teach the winner, same as the claim-time path. If attach
+      // finds nothing, the 23505 came from some OTHER constraint (not the
+      // hash index) and nothing is signed — that is a retryable failure,
+      // never a quiet "done".
+      if (await attachToExistingSignature(supa, checkHashes)) {
+        return "already_signed";
+      }
+      throw new Error(`duplicate key with no attachable signature: ${error.message}`);
     }
     throw new Error(error.message);
   }
@@ -599,7 +604,9 @@ export async function processClaimedJobs(
           `[signature-worker] drainer lease lost after job ${i + 1}/${jobs.length}; requeueing ${remainder.length} job(s)`,
         );
         for (const r of remainder) {
-          await markJob(supa, r.id, { status: "queued" });
+          // Refund the attempt the claim charged: these jobs were never
+          // drafted, and three lease stalls must not 'fail' an untried job.
+          await markJob(supa, r.id, { status: "queued", attempts: Math.max(0, r.attempts - 1) });
         }
         break;
       }
