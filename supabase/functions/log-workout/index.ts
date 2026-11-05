@@ -438,16 +438,19 @@ Deno.serve(async (req) => {
               b.percentile >= 1 && b.percentile <= 99
             ? b.percentile
             : null,
-          // PROVISIONAL noise sd ≈ 25 (var 625). Acceptance run 3
-          // (2026-11-04) measured pure-time median |pct err| ≈ 20 points,
-          // so the old sd 20 was already optimistic — and the error is not
-          // one variance: it depends on the workout's movement composition
-          // (bodyweight-cheap movements read ~+57 pts/share optimistic) and
-          // the women's short-duration curve cell is ~half of true. One
-          // wide placeholder until the cost table is FITTED, not audited —
-          // do not narrow this per-family from audit slices (review
-          // 2026-11-04: users' workouts won't resemble the audited slice).
-          obs_noise_var: 625,
+          // MEASURED noise (acceptance run 7, 2026-11-05, in-sample):
+          // against the calibrated engine (service cost corrections
+          // sql/165/166, mono gauge, κ = se2026.11.05-1) the scoreable
+          // core — 56 non-capability-cliff workout-gender pairs — read
+          // bias −8.7 points, var 547, median |error| 18.2 points; the
+          // pure-time channel read sd 6.6. Seeded as var 550 (sd ≈ 23.4),
+          // one variance for all structure-derived percentiles: the
+          // composition dependence now lives in the engine's cost table,
+          // not here. Re-measure after any engine_version or curve
+          // generation change; capability-cliff structures (skill-
+          // capacity-dominated, e.g. HSPU/muscle-up-gated short pieces)
+          // remain the known family this number understates.
+          obs_noise_var: 550,
           source: "logged_solo",
           performed_at: priorPerformedBySort.get(bi) ?? dateStr,
           source_ref: `log:${log.id}:${bi}`,
