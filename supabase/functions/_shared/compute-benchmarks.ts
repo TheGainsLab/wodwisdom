@@ -29,7 +29,12 @@
 import type { StagePowerCurve, StagePowerCurveCell } from "./fetch-tier4-bundle.ts";
 import { getStagePowerCurve } from "./stage-power-curve-cache.ts";
 
-const WORK_CALC_TIMEOUT_MS = 8_000;
+// 15s (was 8s): burst diagnosis 2026-11-05 — tail-of-queue work-calc
+// calls die under instance churn + connection pressure built by the
+// first ~25 burst calls (the same workouts score instantly when run
+// first; positional, not payload). Longer timeout + one fewer slot
+// lets the tail survive the pressure the head creates.
+const WORK_CALC_TIMEOUT_MS = 15_000;
 
 export type TimeDomain = "short" | "medium" | "long";
 export type Gender = "men" | "women";
@@ -341,7 +346,7 @@ const TRANSIENT_WORK_CALC = /^work_calc_(http_429|http_5\d\d|timeout|network)/;
 // semantics: a release hands its slot to the next waiter directly.
 // Per-instance only — cross-instance single-flight is the hash-keyed
 // queue worker's job (planned; see PR/doc).
-const MAX_CONCURRENT_WORK_CALC = 4;
+const MAX_CONCURRENT_WORK_CALC = 3; // 4→3: see WORK_CALC_TIMEOUT_MS note
 let workCalcInFlight = 0;
 const workCalcWaiters: Array<() => void> = [];
 
