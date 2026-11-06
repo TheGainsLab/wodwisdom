@@ -206,7 +206,7 @@ export default function LogActivityPage({ session }: { session: Session }) {
           <button className="menu-btn" onClick={() => setNavOpen(true)}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
           </button>
-          <h1>Log Activity</h1>
+          <h1>Add External Activity</h1>
         </header>
 
         {!allowed ? (
@@ -228,10 +228,13 @@ export default function LogActivityPage({ session }: { session: Session }) {
               <div className="engine-card">
                 <div className="engine-section">
                   <p style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.6, marginBottom: 12 }}>
-                    Did something outside your program — conditioning, a metcon, extra
-                    strength or skills work? Describe it in plain words, or snap the
-                    machine screen. It'll show on your calendar, your coach sees it right
-                    away, and your programming accounts for it.
+                    For training outside your program — runs, classes, sports, a drop-in
+                    WOD, extra strength or skills work. Describe it in plain words, or snap
+                    the machine screen. It'll show on your calendar, your coach sees it
+                    right away, and your programming accounts for it.
+                  </p>
+                  <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: 12 }}>
+                    Program workouts are logged from the day itself.
                   </p>
                   <span className="engine-label">Date</span>
                   <input

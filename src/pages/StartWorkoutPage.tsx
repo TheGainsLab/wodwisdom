@@ -1639,7 +1639,7 @@ export default function StartWorkoutPage({ session, sourceStateProp, onExit, onD
                 <h3 style={{ marginBottom: 12 }}>Workout saved!</h3>
                 <p style={{ color: 'var(--text-dim)', marginBottom: 20 }}>Your workout has been logged.</p>
                 <button className="auth-btn" onClick={goDone} style={{ maxWidth: 200 }}>
-                  View Training Log
+                  View in Calendar
                 </button>
               </div>
             ) : loading ? (

@@ -739,6 +739,12 @@ body.landing-body{overflow:auto;height:auto}
 .tl-tab:not(:last-child){border-right:1px solid var(--border)}
 .tl-tab.active{background:var(--accent);color:white}
 .tl-tab:hover:not(.active){color:var(--text-dim)}
+/* Calendar | Analytics switch — the page-level toggle above the analytics
+   sub-tabs; pill-shaped so it never reads as one more sub-tab. */
+.tl-view-switch{display:flex;width:fit-content;margin:0 auto 20px;padding:3px;gap:3px;background:var(--surface);border:1px solid var(--border);border-radius:999px}
+.tl-view-switch-btn{padding:8px 22px;border:none;border-radius:999px;background:none;color:var(--text-muted);font-family:'Outfit',sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s}
+.tl-view-switch-btn.active{background:var(--accent);color:white}
+.tl-view-switch-btn:hover:not(.active){color:var(--text-dim)}
 
 /* ── Training Log Strength / Skills Tabs ─────────────── */
 .tl-search{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font-family:'Outfit',sans-serif;font-size:14px;margin-bottom:12px;outline:none;transition:border-color .15s}

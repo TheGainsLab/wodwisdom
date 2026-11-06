@@ -86,14 +86,15 @@ export default function Nav({ isOpen, onClose }: NavProps) {
                     </button>
                     {/* Coach capabilities (not Engine features) — but Engine-only
                         athletes have no Training group, so they surface here.
-                        My Calendar is where logged activities render. */}
+                        The Calendar is where external activities render;
+                        Engine-only athletes have no Analytics section. */}
                     {!hasProgramming && (
                       <>
                         <button className={"nav-link sub " + (location.pathname === "/training-log" ? "active" : "")} onClick={() => goTo("/training-log")}>
-                          <span className="nav-sub-dot" />My Calendar
+                          <span className="nav-sub-dot" />Calendar
                         </button>
                         <button className={"nav-link sub " + (location.pathname === "/log-activity" ? "active" : "")} onClick={() => goTo("/log-activity")}>
-                          <span className="nav-sub-dot" />Log Activity
+                          <span className="nav-sub-dot" />Add External
                         </button>
                       </>
                     )}
@@ -120,15 +121,12 @@ export default function Nav({ isOpen, onClose }: NavProps) {
                     <button className={"nav-link sub " + (location.pathname.startsWith("/programs") ? "active" : "")} onClick={() => goTo("/programs")}>
                       <span className="nav-sub-dot" />My Programs
                     </button>
-                    <button className={"nav-link sub " + (location.pathname === "/training-log" && !location.search.includes("view=analytics") ? "active" : "")} onClick={() => goTo("/training-log")}>
-                      <span className="nav-sub-dot" />My Calendar
-                    </button>
-                    <button className={"nav-link sub " + (location.pathname === "/training-log" && location.search.includes("view=analytics") ? "active" : "")} onClick={() => goTo("/training-log?view=analytics")}>
-                      <span className="nav-sub-dot" />Analytics
+                    <button className={"nav-link sub " + (location.pathname === "/training-log" ? "active" : "")} onClick={() => goTo("/training-log")}>
+                      <span className="nav-sub-dot" />Calendar &amp; Analytics
                     </button>
                     {(hasProgramming || hasEngine || isAdmin) && (
                       <button className={"nav-link sub " + (location.pathname === "/log-activity" ? "active" : "")} onClick={() => goTo("/log-activity")}>
-                        <span className="nav-sub-dot" />Log Activity
+                        <span className="nav-sub-dot" />Add External
                       </button>
                     )}
                   </div>
