@@ -541,13 +541,22 @@ export default function TrainingLogPage({ session }: { session: Session }) {
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [blockFilter, setBlockFilter] = useState<string>('all');
-  // Section is its own hub destination now (My Calendar vs Analytics) — driven
-  // by ?view=, not an in-page switch. Default calendar. The analytics sub-tab
-  // applies within the Analytics section.
-  const [searchParams] = useSearchParams();
-  const [view, setView] = useState<'calendar' | 'analytics'>(
-    searchParams.get('view') === 'analytics' ? 'analytics' : 'calendar',
-  );
+  // One destination, "Calendar & Analytics": the calendar is the front door and
+  // a Calendar | Analytics switch under the title moves between the two.
+  // ?view=analytics is kept in the URL so refresh/back land on the same view.
+  // The analytics sub-tabs apply within the Analytics section.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlView: 'calendar' | 'analytics' =
+    searchParams.get('view') === 'analytics' ? 'analytics' : 'calendar';
+  const [view, setView] = useState<'calendar' | 'analytics'>(urlView);
+  useEffect(() => { setView(urlView); }, [urlView]);
+  const switchView = (next: 'calendar' | 'analytics') => {
+    setView(next);
+    const params = new URLSearchParams(searchParams);
+    if (next === 'analytics') params.set('view', 'analytics');
+    else params.delete('view');
+    setSearchParams(params, { replace: true });
+  };
   // Overview lands first (Sep '26, My Progress fold-in): "how is it going
   // overall" — counts, adherence, monthly reports — before the deep-dive tabs.
   const [tab, setTab] = useState<'overview' | 'strength' | 'skills' | 'accessory' | 'cardio' | 'metcons' | 'history'>('overview');
@@ -584,37 +593,24 @@ export default function TrainingLogPage({ session }: { session: Session }) {
   // ruling: "adherence" framing scolds; counts credit). my_training_counts
   // returns days trained (distinct dates with a completed log — sidesteps
   // finish-button/partial-day semantics) plus per-program logged blocks by
-  // type. Monthly reports are the athlete's own evaluations (full history —
-  // re-reads over time ARE the progress story). Loaded once when the
-  // Analytics section is open.
+  // type. Loaded once when the Analytics section is open. (Monthly
+  // evaluations live on the Profile page only — they are reports, not
+  // analytics.)
   interface OverviewProgram {
     id: string; name: string | null; created_at: string; days_trained: number;
     strength_blocks: number; metcon_blocks: number; skills_blocks: number; accessory_blocks: number;
   }
   const [overviewPrograms, setOverviewPrograms] = useState<OverviewProgram[]>([]);
-  const [overviewEvals, setOverviewEvals] = useState<{ id: string; month_number: number | null; created_at: string; analysis: string | null }[]>([]);
   const [overviewCounts, setOverviewCounts] = useState<{ total: number; last30: number } | null>(null);
-  const [openEvalId, setOpenEvalId] = useState<string | null>(null);
   useEffect(() => {
     if (view !== 'analytics' || overviewCounts != null) return;
     (async () => {
-      const [counts, ev] = await Promise.all([
-        supabase.rpc('my_training_counts'),
-        supabase
-          .from('profile_evaluations')
-          .select('id, month_number, created_at, analysis')
-          .eq('user_id', session.user.id)
-          .eq('visible', true)
-          .eq('status', 'complete')
-          .order('created_at', { ascending: false })
-          .limit(36),
-      ]);
+      const counts = await supabase.rpc('my_training_counts');
       const c = counts.data as { days_trained_total?: number; days_trained_30d?: number; programs?: OverviewProgram[] } | null;
       setOverviewPrograms(c?.programs ?? []);
-      setOverviewEvals((ev.data as typeof overviewEvals) ?? []);
       setOverviewCounts({ total: c?.days_trained_total ?? 0, last30: c?.days_trained_30d ?? 0 });
     })();
-  }, [view, overviewCounts, session.user.id]);
+  }, [view, overviewCounts]);
 
   // ── Edit state ──
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
@@ -1643,14 +1639,28 @@ export default function TrainingLogPage({ session }: { session: Session }) {
           <button className="menu-btn" onClick={() => setNavOpen(true)}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
           </button>
-          <h1>{view === 'analytics' ? 'Analytics' : 'My Calendar'}</h1>
+          {/* Engine-only athletes have no Analytics section, so their page is
+              just "Calendar". */}
+          <h1>{hasProgramming ? 'Calendar & Analytics' : 'Calendar'}</h1>
         </header>
 
         <div className="page-body">
           <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 0' }}>
-            {/* Calendar and Analytics are now separate hub destinations (reached
-                from the /programs cards via ?view=), so there's no in-page switch.
-                Analytics sub-tabs still live within the Analytics section. */}
+            {hasProgramming && (
+              <div className="tl-view-switch" role="tablist" aria-label="Calendar or Analytics">
+                {([['calendar', 'Calendar'], ['analytics', 'Analytics']] as const).map(([id, label]) => (
+                  <button
+                    key={id}
+                    role="tab"
+                    aria-selected={view === id}
+                    className={`tl-view-switch-btn${view === id ? ' active' : ''}`}
+                    onClick={() => switchView(id)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
             {hasProgramming && view === 'analytics' && (
               <div className="tl-tabs">
                 {([['overview', 'Overview'], ['strength', 'Strength'], ['skills', 'Skills'], ['accessory', 'Accessory'], ['cardio', 'Cardio'], ['metcons', 'Metcons'], ['history', 'History']] as const)
@@ -1689,7 +1699,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                     style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
                     onClick={() => navigate(`/log-activity?date=${todayStr}`)}
                   >
-                    <Plus size={14} /> Log activity
+                    <Plus size={14} /> Add External Activity
                   </button>
                 </div>
                 <WorkoutCalendar
@@ -2012,7 +2022,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                           style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
                           onClick={() => navigate(`/log-activity?date=${selectedDate}`)}
                         >
-                          <Plus size={14} /> Log activity
+                          <Plus size={14} /> Add External Activity
                         </button>
                       </div>
                     )}
@@ -2043,7 +2053,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                                   style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
                                   onClick={() => navigate(`/log-activity?date=${selectedDate}`)}
                                 >
-                                  <Plus size={14} /> Log activity
+                                  <Plus size={14} /> Add External Activity
                                 </button>
                               )}
                             </div>
@@ -2120,8 +2130,8 @@ export default function TrainingLogPage({ session }: { session: Session }) {
               </div>
             ) : tab === 'overview' ? (
               /* ── Overview Tab (My Progress fold-in) — how it's going overall:
-                    counts, program progress, monthly reports. The deep-dive
-                    tabs answer "show me exactly". ── */
+                    counts and program progress. The deep-dive tabs answer
+                    "show me exactly". ── */
               <div>
                 {overviewCounts && (
                   <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 12 }}>
@@ -2176,33 +2186,6 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                           </div>
                         );
                       })}
-                    </div>
-                  </>
-                )}
-                {overviewEvals.length > 0 && (
-                  <>
-                    <h3 style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--accent)', marginTop: 24, marginBottom: 12 }}>Monthly reports</h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 24 }}>
-                      {overviewEvals.map(e => (
-                        <div key={e.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8 }}>
-                          <button
-                            onClick={() => setOpenEvalId(openEvalId === e.id ? null : e.id)}
-                            style={{ width: '100%', background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontFamily: "'Outfit', sans-serif", fontSize: 13 }}
-                          >
-                            <span style={{ fontWeight: 500 }}>
-                              {e.month_number != null ? `Month ${e.month_number} evaluation` : 'Evaluation'}
-                            </span>
-                            <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>
-                              {new Date(e.created_at).toLocaleDateString()}
-                            </span>
-                          </button>
-                          {openEvalId === e.id && e.analysis && (
-                            <div style={{ padding: '0 16px 14px', fontSize: 13, lineHeight: 1.6, color: 'var(--text)', whiteSpace: 'pre-wrap' }}>
-                              {e.analysis}
-                            </div>
-                          )}
-                        </div>
-                      ))}
                     </div>
                   </>
                 )}

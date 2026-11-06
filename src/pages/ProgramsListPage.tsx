@@ -4,7 +4,7 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { useEntitlements } from '../hooks/useEntitlements';
 import Nav from '../components/Nav';
-import { Plus, Zap, Brain, Calendar, BarChart3 } from 'lucide-react';
+import { Plus, Zap, Brain, Calendar } from 'lucide-react';
 
 interface Program {
   id: string;
@@ -128,7 +128,11 @@ export default function ProgramsListPage({ session }: { session: Session }) {
         </header>
         <div className="page-body">
           <div className="programs-list-wrap">
-            {/* My Calendar — schedule + log + launch (anyone with training access) */}
+            {/* Calendar & Analytics — the one front door to training history
+                and analytics (anyone with training access). The page opens on
+                the calendar with a Calendar | Analytics switch. Engine-only
+                athletes have no Analytics section, so for them it's
+                "Calendar". */}
             {(hasProgramming || hasEngine || isAdmin) && (
               <div
                 className="history-item"
@@ -137,44 +141,18 @@ export default function ProgramsListPage({ session }: { session: Session }) {
               >
                 <div className="history-item-header" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <Calendar size={18} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-                  <span className="history-question">My Calendar</span>
+                  <span className="history-question">
+                    {hasProgramming || isAdmin ? 'Calendar & Analytics' : 'Calendar'}
+                  </span>
                   <span className="history-time" style={{ marginLeft: 'auto' }}>
-                    {programs.length === 0 && !hasEngine ? 'Generate a program to schedule training' : 'Schedule & log your training'}
+                    {programs.length === 0 && !hasEngine
+                      ? 'Generate a program to schedule training'
+                      : hasProgramming || isAdmin
+                        ? 'Your training log, trends & progress'
+                        : 'Schedule & log your training'}
                   </span>
                 </div>
               </div>
-            )}
-
-            {/* Analytics — progress dashboards (AI Programming only). Locked until
-                there's a program to analyze; tapping the locked state routes to
-                the profile to generate. */}
-            {(hasProgramming || isAdmin) && (
-              programs.length > 0 ? (
-                <div
-                  className="history-item"
-                  style={{ marginBottom: 16, cursor: 'pointer', borderLeft: '3px solid var(--accent)' }}
-                  onClick={() => navigate('/training-log?view=analytics')}
-                >
-                  <div className="history-item-header" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <BarChart3 size={18} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-                    <span className="history-question">Analytics</span>
-                    <span className="history-time" style={{ marginLeft: 'auto' }}>Strength, metcons &amp; progress</span>
-                  </div>
-                </div>
-              ) : (
-                <div
-                  className="history-item"
-                  style={{ marginBottom: 16, cursor: 'pointer', borderLeft: '3px solid var(--border)', opacity: 0.6 }}
-                  onClick={() => navigate('/profile')}
-                  title="Create your program to unlock Analytics"
-                >
-                  <div className="history-item-header" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <BarChart3 size={18} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                    <span className="history-question" style={{ color: 'var(--text-dim)' }}>Analytics</span>
-                    <span className="history-time" style={{ marginLeft: 'auto' }}>Create your program to unlock</span>
-                  </div>
-                </div>
-              )
             )}
 
             {/* Engine card */}
