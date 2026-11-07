@@ -1,7 +1,10 @@
 /**
- * PowerPanel — the "Power" tab. A flat ranking of every workout the athlete has
- * a power read for, sorted by personalized W/kg (highest first), with a
- * short/medium/long time-domain filter.
+ * PowerPanel — the "Power" tab. Two views of every workout the athlete has a
+ * power read for, under one short/medium/long time-domain filter:
+ *   - Historical Power: W/kg in competition order (year, stage, workout), the
+ *     year-over-year view. Moved here from the Training Log's Metcons tab,
+ *     which is program training only.
+ *   - A ranking by personalized W/kg, highest first.
  *
  * Power is personalized client-side via personalizedPower() (rescaled to the
  * athlete's real body mass for competed results, computed at real mass for
@@ -13,8 +16,9 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { CompetitionWorkoutEntry, NormalizedCompetitionHistory } from '../../lib/competitionHistory';
-import { personalizedPower, p99WPerKg } from '../../lib/competitionHistory';
+import { personalizedPower, p99WPerKg, STAGE_ORDER_LIST } from '../../lib/competitionHistory';
 import WorkoutDetail from './WorkoutDetail';
+import { BucketLegend, Stat, WkgBarChart } from '../WkgBarChart';
 
 const STAGE_LABEL: Record<string, string> = {
   open: 'Open',
@@ -72,6 +76,23 @@ export default function PowerPanel({
       .sort((a, b) => b.wPerKg - a.wPerKg);
   }, [withPower, domain]);
 
+  // Historical Power: the same rows in competition order (year, then stage,
+  // then workout number), so improvement reads left to right across years.
+  // Self-logged workouts sit at their competition year (entries carry no
+  // performed date) and are marked "logged".
+  const chronological = useMemo(() => {
+    const stageIdx = (st: string) => {
+      const i = STAGE_ORDER_LIST.indexOf(st as (typeof STAGE_ORDER_LIST)[number]);
+      return i < 0 ? 99 : i;
+    };
+    return [...rows].sort((a, b) =>
+      a.entry.year - b.entry.year
+      || stageIdx(a.entry.stage) - stageIdx(b.entry.stage)
+      || (a.entry.ordinal ?? 99) - (b.entry.ordinal ?? 99)
+      || a.entry.workout_name.localeCompare(b.entry.workout_name));
+  }, [rows]);
+  const avgWPerKg = rows.length > 0 ? rows.reduce((sum, r) => sum + r.wPerKg, 0) / rows.length : null;
+
   return (
     <div>
       {/* Time-domain filter */}
@@ -97,6 +118,37 @@ export default function PowerPanel({
           </button>
         ))}
       </div>
+
+      {chronological.length > 0 && (
+        <div style={{ padding: 14, marginBottom: 16, background: 'var(--surface2)', borderRadius: 8 }}>
+          <div style={{ fontSize: 13, fontWeight: 800, letterSpacing: 0.8, color: 'var(--text)', textTransform: 'uppercase', marginBottom: 10 }}>
+            Historical Power
+          </div>
+          <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', marginBottom: 12 }}>
+            <Stat label="Workouts" value={chronological.length.toString()} />
+            <Stat label="Average" value={avgWPerKg != null ? `${avgWPerKg.toFixed(2)} W/kg` : '—'} />
+          </div>
+          <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
+            Competition workouts, oldest → newest
+          </div>
+          <BucketLegend />
+          <div style={{ height: 8 }} />
+          <WkgBarChart
+            items={chronological.map((r) => ({
+              key: r.entry.competition_workout_id,
+              label: `${r.entry.year} ${STAGE_LABEL[r.entry.stage] ?? r.entry.stage} ${r.entry.workout_name}${r.entry.source === 'logged' ? ' (logged)' : ''}`,
+              value: r.wPerKg,
+              bucket: r.entry.workout.time_domain?.bucket ?? undefined,
+            }))}
+            referenceValue={avgWPerKg}
+            selectedKey={selected?.competition_workout_id ?? null}
+            onSelect={(k) => {
+              const hit = chronological.find((r) => r.entry.competition_workout_id === k);
+              if (hit) setSelected(hit.entry);
+            }}
+          />
+        </div>
+      )}
 
       {/* Coverage — power only exists for movements with a power model. */}
       <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 10 }}>
