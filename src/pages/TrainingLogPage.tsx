@@ -277,14 +277,27 @@ function classifyLift(movement: string): string {
   return 'other';
 }
 
-const STRENGTH_CYCLE_DAYS = 90;
-// Longitudinal windows for the Strength/Skills stats (founder request,
-// 2026-10-01): cycle stays the default coaching frame; Year/All show the
-// long arc. Cutoffs apply client-side over the loaded logs (currently the
-// latest 200), so "All" is bounded by that fetch.
-type StatsWindow = 'cycle' | 'year' | 'all';
-const WINDOW_DAYS: Record<StatsWindow, number> = { cycle: STRENGTH_CYCLE_DAYS, year: 365, all: 36500 };
-const WINDOW_LABELS: Record<StatsWindow, string> = { cycle: '90 days', year: '1 year', all: 'all time' };
+// Look-back windows for the Strength/Skills/Accessory stats: the last 30,
+// 90 or 180 days, or everything. 90 is the default coaching frame. Cutoffs
+// apply client-side over the loaded logs (currently the latest 200), so
+// "All" is bounded by that fetch.
+type StatsWindow = 'd30' | 'd90' | 'd180' | 'all';
+const STATS_WINDOWS: readonly StatsWindow[] = ['d30', 'd90', 'd180', 'all'];
+const WINDOW_DAYS: Record<StatsWindow, number> = { d30: 30, d90: 90, d180: 180, all: 36500 };
+const WINDOW_BUTTON: Record<StatsWindow, string> = { d30: '30', d90: '90', d180: '180', all: 'All' };
+const WINDOW_LABELS: Record<StatsWindow, string> = { d30: '30 days', d90: '90 days', d180: '180 days', all: 'all time' };
+const WINDOW_SHORT: Record<StatsWindow, string> = { d30: '30d', d90: '90d', d180: '180d', all: 'all time' };
+
+/** Separates a tab's summary charts from its per-movement list below. */
+function SectionDivider({ label }: { label: string }) {
+  return (
+    <div style={{ borderTop: '1px solid var(--border)', marginTop: 20, paddingTop: 14 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.5, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+        {label}
+      </div>
+    </div>
+  );
+}
 const LB_PER_KG = 2.20462;
 const toLbs = (weight: number, unit: string): number =>
   unit === 'kg' ? weight * LB_PER_KG : weight;
@@ -574,9 +587,8 @@ export default function TrainingLogPage({ session }: { session: Session }) {
   const [skillRatings, setSkillRatings] = useState<Record<string, string>>({});
   const [profileUnits, setProfileUnits] = useState<string>('lb');
   const [bodyweightKg, setBodyweightKg] = useState<number | null>(null);
-  const [competitionAthleteId, setCompetitionAthleteId] = useState<string | null>(null);
   const [skillsSearch, setSkillsSearch] = useState('');
-  const [statsWindow, setStatsWindow] = useState<StatsWindow>('cycle');
+  const [statsWindow, setStatsWindow] = useState<StatsWindow>('d90');
   const [expandedSkillFamilies, setExpandedSkillFamilies] = useState<Set<string>>(new Set());
   // Skills ledger: per-day session lines expand to their raw set rows; the
   // list caps at 20 session lines until "Show all" (founder call, 2026-10-02).
@@ -584,6 +596,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
   const [showAllSkillSessions, setShowAllSkillSessions] = useState<Set<string>>(new Set());
   const [accessorySearch, setAccessorySearch] = useState('');
   const [accessorySort, setAccessorySort] = useState<'weight' | 'date'>('date');
+  const [expandedAccessory, setExpandedAccessory] = useState<Set<string>>(new Set());
 
   const [allEntries, setAllEntries] = useState<(WorkoutLogEntry & { workout_date: string })[]>([]);
   const [blockTypeMap, setBlockTypeMap] = useState<Map<string, string>>(new Map());
@@ -999,7 +1012,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
     (async () => {
       const { data } = await supabase
         .from('athlete_profiles')
-        .select('lifts, skills, units, bodyweight, competition_athlete_id')
+        .select('lifts, skills, units, bodyweight')
         .eq('user_id', session.user.id)
         .maybeSingle();
       if (!data) return;
@@ -1008,7 +1021,6 @@ export default function TrainingLogPage({ session }: { session: Session }) {
         skills: Record<string, unknown> | null;
         units: string | null;
         bodyweight: number | string | null;
-        competition_athlete_id: string | null;
       };
       const numeric: Record<string, number> = {};
       if (row.lifts) {
@@ -1033,7 +1045,6 @@ export default function TrainingLogPage({ session }: { session: Session }) {
       if (Number.isFinite(bwRaw) && bwRaw > 0) {
         setBodyweightKg(unit === 'kg' ? bwRaw : bwRaw * 0.453592);
       }
-      setCompetitionAthleteId(row.competition_athlete_id ?? null);
     })();
   }, [session.user.id]);
 
@@ -1342,34 +1353,43 @@ export default function TrainingLogPage({ session }: { session: Session }) {
     return { volume, topSet };
   }, [strengthByGroup]);
 
-  // ── Accessory data: group entries by movement (mirrors strength, but
-  // tolerant of weightless entries like band/bodyweight work). PR badge
-  // applies only to weighted PRs; bestLbs = 0 ⇒ no TOP SET badge. ──
+  // ── Accessory data: group entries by movement within the stats window
+  // (mirrors strength, but tolerant of weightless entries like band or
+  // bodyweight work). PR badge applies only to weighted PRs; bestLbs = 0
+  // means no "Best" in the summary line. ──
   const accessoryByMovement = useMemo(() => {
     type Row = WorkoutLogEntry & { workout_date: string; isPR?: boolean };
-    const map = new Map<string, { entries: Row[]; best: number; bestUnit: string; bestLbs: number; bestReps: number | null }>();
+    interface AccessoryData {
+      entries: Row[];
+      best: number; bestUnit: string; bestLbs: number; bestReps: number | null;
+      trainingDays: number; totalSets: number; totalReps: number; lastDate: string;
+      // Heaviest weight per training day, for the collapsed-card sparkline.
+      perSessionTopLbs: number[];
+    }
+    const cutoff = new Date();
+    cutoff.setHours(0, 0, 0, 0);
+    cutoff.setDate(cutoff.getDate() - WINDOW_DAYS[statsWindow]);
+    const cutoffStr = cutoff.toISOString().slice(0, 10);
+
+    const map = new Map<string, AccessoryData>();
     for (const e of allEntries) {
       if (!e.block_id || blockTypeMap.get(e.block_id) !== 'accessory') continue;
-      const lbs = e.weight != null && e.weight > 0
-        ? (e.weight_unit === 'kg' ? e.weight * 2.20462 : e.weight)
-        : 0;
-      const existing = map.get(e.movement);
-      if (existing) {
-        existing.entries.push(e);
-        if (lbs > existing.bestLbs) {
-          existing.bestLbs = lbs;
-          existing.best = e.weight ?? 0;
-          existing.bestUnit = e.weight_unit ?? '';
-          existing.bestReps = e.reps_completed ?? e.reps ?? null;
-        }
-      } else {
-        map.set(e.movement, {
-          entries: [e],
-          best: e.weight ?? 0,
-          bestUnit: e.weight_unit ?? '',
-          bestLbs: lbs,
-          bestReps: e.reps_completed ?? e.reps ?? null,
-        });
+      if (e.workout_date < cutoffStr) continue;
+      const lbs = e.weight != null && e.weight > 0 ? toLbs(e.weight, e.weight_unit ?? '') : 0;
+      let d = map.get(e.movement);
+      if (!d) {
+        d = {
+          entries: [], best: 0, bestUnit: '', bestLbs: 0, bestReps: null,
+          trainingDays: 0, totalSets: 0, totalReps: 0, lastDate: '', perSessionTopLbs: [],
+        };
+        map.set(e.movement, d);
+      }
+      d.entries.push(e);
+      if (lbs > d.bestLbs) {
+        d.bestLbs = lbs;
+        d.best = e.weight ?? 0;
+        d.bestUnit = e.weight_unit ?? '';
+        d.bestReps = e.reps_completed ?? e.reps ?? null;
       }
     }
     for (const data of map.values()) {
@@ -1380,17 +1400,34 @@ export default function TrainingLogPage({ session }: { session: Session }) {
       );
       let runMax = 0;
       const prIds = new Set<string>();
+      const days = new Set<string>();
+      const perDayTop = new Map<string, number>();
+      let totalSets = 0;
+      let totalReps = 0;
       for (const e of chrono) {
+        days.add(e.workout_date);
+        // A row can carry several sets ("3 sets 155lbs x8").
+        const setCount = e.sets != null && e.sets > 0 ? e.sets : 1;
+        totalSets += setCount;
+        totalReps += setCount * ((e.reps_completed ?? e.reps) ?? 0);
         if (e.weight == null || e.weight <= 0) continue;
-        const lbs = e.weight_unit === 'kg' ? e.weight * 2.20462 : e.weight;
+        const lbs = toLbs(e.weight, e.weight_unit ?? '');
+        if (lbs > (perDayTop.get(e.workout_date) ?? 0)) perDayTop.set(e.workout_date, lbs);
         // A PR must beat something: the first weighted entry sets the baseline
         // without a badge, otherwise sparse movements are wall-to-wall "PR".
         if (lbs > runMax) { if (runMax > 0) prIds.add(e.id); runMax = lbs; }
       }
       data.entries = data.entries.map(e => ({ ...e, isPR: prIds.has(e.id) }));
+      data.trainingDays = days.size;
+      data.totalSets = totalSets;
+      data.totalReps = totalReps;
+      data.lastDate = chrono.length > 0 ? chrono[chrono.length - 1].workout_date : '';
+      data.perSessionTopLbs = [...perDayTop.entries()]
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([, lbs]) => lbs);
     }
     return map;
-  }, [allEntries, blockTypeMap]);
+  }, [allEntries, blockTypeMap, statsWindow]);
 
   // ── Cardio data: group blocks by modality (row/run/bike/...). Each cardio
   // block is one session; aggregated power metrics live on the block, not
@@ -2136,7 +2173,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                 {overviewCounts && (
                   <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 12 }}>
                     {[
-                      { label: 'Days trained', value: overviewCounts.total },
+                      { label: 'Total days trained', value: overviewCounts.total },
                       { label: 'Last 30 days', value: overviewCounts.last30 },
                     ].map(s => (
                       <div key={s.label} style={{ flex: 1, minWidth: 120, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 16px' }}>
@@ -2166,19 +2203,22 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                               <div style={{ fontSize: 13, fontWeight: 500 }}>{p.name || 'Untitled program'}</div>
                               <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{new Date(p.created_at).toLocaleDateString()}</div>
                             </div>
-                            <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 88 }}>
-                                <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.6, color: 'var(--text-muted)' }}>Days trained</div>
+                            {/* Equal-width grid so a wrapped second row lines up
+                                under the first (flex-wrap sized each cell to its
+                                label and the rows drifted apart). */}
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '12px 20px' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.6, color: 'var(--text-muted)' }}>Days on this program</div>
                                 <div style={{ fontSize: 14, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace" }}>{p.days_trained}</div>
                               </div>
                               {nonzero.map(([label, n]) => (
-                                <div key={label} style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 72 }}>
+                                <div key={label} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                                   <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.6, color: 'var(--text-muted)' }}>{label}</div>
                                   <div style={{ fontSize: 14, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace" }}>{n}</div>
                                 </div>
                               ))}
                               {nonzero.length === 0 && (
-                                <div style={{ fontSize: 12, color: 'var(--text-muted)', alignSelf: 'center' }}>
+                                <div style={{ fontSize: 12, color: 'var(--text-muted)', alignSelf: 'center', gridColumn: 'span 2' }}>
                                   Log a training day and your work shows up here.
                                 </div>
                               )}
@@ -2202,9 +2242,9 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                 />
 
                 <div className="source-toggle" style={{ margin: '10px 0 0' }}>
-                  {(['cycle', 'year', 'all'] as const).map(w => (
+                  {STATS_WINDOWS.map(w => (
                     <button key={w} className={'source-btn ' + (statsWindow === w ? 'active' : '')} onClick={() => setStatsWindow(w)}>
-                      {w === 'cycle' ? 'Cycle' : w === 'year' ? 'Year' : 'All'}
+                      {WINDOW_BUTTON[w]}
                     </button>
                   ))}
                 </div>
@@ -2251,6 +2291,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                           ))}
                         </div>
                       )}
+                      <SectionDivider label="By lift" />
                     </div>
                   );
                 })()}
@@ -2323,7 +2364,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                             {data.totalReps > 0 && <> · {data.totalReps} reps</>}
                             {oneRM != null && <> · {oneRMLabel} {oneRM}{profileUnits}</>}
                             {data.cycleBest && (
-                              <> · {statsWindow === 'cycle' ? 'Cycle best' : 'Best'} {data.cycleBest.weight}{data.cycleBest.unit}
+                              <> · Best ({WINDOW_SHORT[statsWindow]}) {data.cycleBest.weight}{data.cycleBest.unit}
                                 {data.cycleBest.reps != null && <> x{data.cycleBest.reps}</>}
                                 {pctOfOneRM != null && <> ({pctOfOneRM}% of 1RM)</>}
                               </>
@@ -2520,7 +2561,6 @@ export default function TrainingLogPage({ session }: { session: Session }) {
               <MetconsTab
                 userId={session.user.id}
                 bodyweightKg={bodyweightKg}
-                competitionAthleteId={competitionAthleteId}
                 metconBlocks={metconBlocks}
               />
             ) : tab === 'skills' ? (
@@ -2535,9 +2575,9 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                 />
 
                 <div className="source-toggle" style={{ margin: '10px 0 0' }}>
-                  {(['cycle', 'year', 'all'] as const).map(w => (
+                  {STATS_WINDOWS.map(w => (
                     <button key={w} className={'source-btn ' + (statsWindow === w ? 'active' : '')} onClick={() => setStatsWindow(w)}>
-                      {w === 'cycle' ? 'Cycle' : w === 'year' ? 'Year' : 'All'}
+                      {WINDOW_BUTTON[w]}
                     </button>
                   ))}
                 </div>
@@ -2575,6 +2615,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                     <div style={{ marginTop: 12, marginBottom: 16 }}>
                       {chart(`Volume — ${WINDOW_LABELS[statsWindow]} (reps)`, reps)}
                       {chart(`Holds — ${WINDOW_LABELS[statsWindow]} (time)`, holds)}
+                      <SectionDivider label="By skill" />
                     </div>
                   );
                 })()}
@@ -2848,6 +2889,13 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                   value={accessorySearch}
                   onChange={e => setAccessorySearch(e.target.value)}
                 />
+                <div className="source-toggle" style={{ margin: '10px 0 0' }}>
+                  {STATS_WINDOWS.map(w => (
+                    <button key={w} className={'source-btn ' + (statsWindow === w ? 'active' : '')} onClick={() => setStatsWindow(w)}>
+                      {WINDOW_BUTTON[w]}
+                    </button>
+                  ))}
+                </div>
                 <div className="tl-sort-bar">
                   <span>Sort:</span>
                   <button className={`tl-sort-btn${accessorySort === 'date' ? ' active' : ''}`} onClick={() => setAccessorySort('date')}>By Date</button>
@@ -2855,16 +2903,12 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                 </div>
                 {(() => {
                   const q = accessorySearch.toLowerCase();
-                  let movements = [...accessoryByMovement.entries()]
+                  const movements = [...accessoryByMovement.entries()]
                     .filter(([m]) => !q || formatMovementName(m).toLowerCase().includes(q));
                   if (accessorySort === 'weight') {
                     movements.sort((a, b) => b[1].bestLbs - a[1].bestLbs);
                   } else {
-                    movements.sort((a, b) => {
-                      const latestA = a[1].entries.reduce((d, e) => e.workout_date > d ? e.workout_date : d, '');
-                      const latestB = b[1].entries.reduce((d, e) => e.workout_date > d ? e.workout_date : d, '');
-                      return latestB.localeCompare(latestA);
-                    });
+                    movements.sort((a, b) => b[1].lastDate.localeCompare(a[1].lastDate));
                   }
                   if (movements.length === 0) {
                     return (
@@ -2875,67 +2919,160 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                       </div>
                     );
                   }
+                  // Same card shape as Strength and Skills: collapsed summary,
+                  // expanding to one line per training day, each expanding to
+                  // its individual (editable) set rows.
                   return movements.map(([movement, data]) => {
-                    const sorted = [...data.entries].sort((a, b) =>
-                      accessorySort === 'weight'
-                        ? toLbs(b.weight ?? 0, b.weight_unit ?? '') - toLbs(a.weight ?? 0, a.weight_unit ?? '')
-                        : b.workout_date.localeCompare(a.workout_date)
+                    const expanded = expandedAccessory.has(movement);
+                    const trendValues = data.perSessionTopLbs.length >= 2 ? data.perSessionTopLbs : null;
+                    const sessionsDesc = [...data.entries].sort((a, b) =>
+                      b.workout_date !== a.workout_date
+                        ? b.workout_date.localeCompare(a.workout_date)
+                        : (b.sort_order ?? 0) - (a.sort_order ?? 0)
                     );
-                    const recent = sorted.slice(0, 8);
-                    // Rows can carry multiple sets ("3 sets 155lbs x8"), so sum
-                    // them — an entry count reads as "1 set" under a 3-set row.
-                    const totalSets = data.entries.reduce((s, e) => s + (e.sets != null && e.sets > 0 ? e.sets : 1), 0);
+                    const renderEntryRow = (e: typeof sessionsDesc[number], i: number) => {
+                      if (editingEntryId === e.id) {
+                        return (
+                          <div key={i} className="tl-set-row" style={{ flexWrap: 'wrap', gap: 6 }}>
+                            <input type="number" value={editFields.weight} onChange={ev => setEditFields(f => ({ ...f, weight: ev.target.value }))} placeholder="Weight" style={{ width: 70, padding: '3px 6px', fontSize: 12, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)' }} />
+                            <input type="number" value={editFields.reps} onChange={ev => setEditFields(f => ({ ...f, reps: ev.target.value }))} placeholder="Reps" style={{ width: 50, padding: '3px 6px', fontSize: 12, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)' }} />
+                            <input type="number" value={editFields.rpe} onChange={ev => setEditFields(f => ({ ...f, rpe: ev.target.value }))} placeholder="RPE" style={{ width: 45, padding: '3px 6px', fontSize: 12, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)' }} />
+                            <button onClick={() => saveEdit(e.id)} disabled={editSaving} style={{ padding: '2px 8px', fontSize: 11, background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>{editSaving ? '...' : 'Save'}</button>
+                            <button onClick={cancelEdit} style={{ padding: '2px 8px', fontSize: 11, background: 'var(--surface2)', color: 'var(--text-dim)', border: 'none', borderRadius: 4, cursor: 'pointer' }}>Cancel</button>
+                            <button onClick={() => deleteEntry(e.id)} disabled={editSaving} style={{ padding: '2px 8px', fontSize: 11, background: 'transparent', color: 'var(--danger, #e74c3c)', border: 'none', cursor: 'pointer' }}>Delete</button>
+                          </div>
+                        );
+                      }
+                      const rowSets = e.sets != null && e.sets > 0 ? e.sets : null;
+                      const rowReps = e.reps_completed ?? e.reps;
+                      return (
+                        <div key={i} className="tl-set-row">
+                          <span className="tl-set-date">{fmtShortDate(e.workout_date)}</span>
+                          <span className="tl-set-value">
+                            {rowSets != null && `${rowSets} set${rowSets !== 1 ? 's' : ''}`}
+                            {e.weight != null && e.weight > 0 && ` ${e.weight}${e.weight_unit}`}
+                            {rowReps != null && ` x${rowReps}`}
+                            {e.hold_seconds != null && ` ${e.hold_seconds}s`}
+                          </span>
+                          {e.rpe != null && <span className="tl-set-detail">RPE {e.rpe}</span>}
+                          {e.isPR && (
+                            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.5, background: 'var(--accent)', color: '#fff', padding: '1px 5px', borderRadius: 3 }}>PR</span>
+                          )}
+                          <button onClick={(ev) => { ev.stopPropagation(); startEdit(e); }} style={{ marginLeft: 'auto', padding: '1px 6px', fontSize: 11, background: 'transparent', color: 'var(--text-muted)', border: 'none', cursor: 'pointer', opacity: 0.6 }} title="Edit">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                          </button>
+                        </div>
+                      );
+                    };
                     return (
-                      <div key={movement} className="tl-movement-card">
-                        <div className="tl-movement-header">
-                          <span className="tl-movement-name">{formatMovementName(movement)}</span>
-                          {data.bestLbs > 0 && (
-                            <span className="tl-pr-badge">TOP SET: {data.best}{data.bestUnit}{data.bestReps != null ? ` x${data.bestReps}` : ''}</span>
-                          )}
-                        </div>
-                        <div className="tl-session-count">{totalSets} set{totalSets !== 1 ? 's' : ''} logged</div>
-                        <div style={{ marginTop: 8 }}>
-                          {recent.map((e, i) => (
-                            editingEntryId === e.id ? (
-                              <div key={i} className="tl-set-row" style={{ flexWrap: 'wrap', gap: 6 }}>
-                                <input type="number" value={editFields.weight} onChange={ev => setEditFields(f => ({ ...f, weight: ev.target.value }))} placeholder="Weight" style={{ width: 70, padding: '3px 6px', fontSize: 12, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)' }} />
-                                <input type="number" value={editFields.reps} onChange={ev => setEditFields(f => ({ ...f, reps: ev.target.value }))} placeholder="Reps" style={{ width: 50, padding: '3px 6px', fontSize: 12, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)' }} />
-                                <input type="number" value={editFields.rpe} onChange={ev => setEditFields(f => ({ ...f, rpe: ev.target.value }))} placeholder="RPE" style={{ width: 45, padding: '3px 6px', fontSize: 12, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)' }} />
-                                <button onClick={() => saveEdit(e.id)} disabled={editSaving} style={{ padding: '2px 8px', fontSize: 11, background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
-                                  {editSaving ? '...' : 'Save'}
-                                </button>
-                                <button onClick={cancelEdit} style={{ padding: '2px 8px', fontSize: 11, background: 'var(--surface2)', color: 'var(--text-dim)', border: 'none', borderRadius: 4, cursor: 'pointer' }}>Cancel</button>
-                                <button onClick={() => deleteEntry(e.id)} disabled={editSaving} style={{ padding: '2px 8px', fontSize: 11, background: 'transparent', color: 'var(--danger, #e74c3c)', border: 'none', cursor: 'pointer' }}>Delete</button>
-                              </div>
-                            ) : (
-                            <div key={i} className="tl-set-row">
-                              <span className="tl-set-date">{fmtShortDate(e.workout_date)}</span>
-                              <span className="tl-set-value">
-                                {e.sets != null && `${e.sets} sets`}
-                                {e.weight != null && e.weight > 0 && ` ${e.weight}${e.weight_unit}`}
-                                {(e.reps_completed ?? e.reps) != null && ` x${e.reps_completed ?? e.reps}`}
-                                {e.hold_seconds != null && ` ${e.hold_seconds}s`}
+                      <div key={movement} className="tl-movement-card" style={{ padding: 0 }}>
+                        <button
+                          onClick={() => setExpandedAccessory(prev => {
+                            const next = new Set(prev);
+                            if (next.has(movement)) next.delete(movement); else next.add(movement);
+                            return next;
+                          })}
+                          style={{ width: '100%', background: 'transparent', border: 'none', color: 'var(--text)', cursor: 'pointer', padding: 12, textAlign: 'left', fontFamily: 'inherit' }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                            <span style={{ fontWeight: 600, fontSize: 15 }}>{formatMovementName(movement)}</span>
+                            <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>{data.trainingDays} day{data.trainingDays !== 1 ? 's' : ''}</span>
+                            {trendValues && (
+                              <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
+                                <Sparkline values={trendValues} width={72} height={22} />
                               </span>
-                              {e.rpe != null && <span className="tl-set-detail">RPE {e.rpe}</span>}
-                              {e.isPR && (
-                                <span style={{
-                                  fontSize: 10, fontWeight: 700, letterSpacing: 0.5,
-                                  background: 'var(--accent)', color: '#fff',
-                                  padding: '1px 5px', borderRadius: 3,
-                                }}>PR</span>
-                              )}
-                              <button onClick={(ev) => { ev.stopPropagation(); startEdit(e); }} style={{ marginLeft: 'auto', padding: '1px 6px', fontSize: 11, background: 'transparent', color: 'var(--text-muted)', border: 'none', cursor: 'pointer', opacity: 0.6 }} title="Edit">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
-                              </button>
-                            </div>
-                            )
-                          ))}
-                          {sorted.length > 8 && (
-                            <div style={{ fontSize: 12, color: 'var(--text-muted)', paddingTop: 6 }}>
-                              +{sorted.length - 8} more
-                            </div>
-                          )}
-                        </div>
+                            )}
+                            <span style={{ marginLeft: trendValues ? 0 : 'auto', color: 'var(--text-muted)', fontSize: 11 }}>{expanded ? '▲' : '▼'}</span>
+                          </div>
+                          <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+                            {data.totalSets} set{data.totalSets !== 1 ? 's' : ''}
+                            {data.totalReps > 0 && <> · {data.totalReps} reps</>}
+                            {data.bestLbs > 0 && (
+                              <> · Best ({WINDOW_SHORT[statsWindow]}) {data.best}{data.bestUnit}
+                                {data.bestReps != null && <> x{data.bestReps}</>}
+                              </>
+                            )}
+                            {data.lastDate && <> · Last {fmtShortDate(data.lastDate)}</>}
+                          </div>
+                        </button>
+                        {expanded && (
+                          <div style={{ padding: '0 12px 12px' }}>
+                            {(() => {
+                              const groups: Array<{ date: string; entries: typeof sessionsDesc }> = [];
+                              for (const e of sessionsDesc) {
+                                const lastG = groups[groups.length - 1];
+                                if (lastG && lastG.date === e.workout_date) lastG.entries.push(e);
+                                else groups.push({ date: e.workout_date, entries: [e] });
+                              }
+                              const showKey = `acc|${movement}`;
+                              const showAll = showAllSkillSessions.has(showKey);
+                              const visibleGroups = showAll ? groups : groups.slice(0, 20);
+                              return (
+                                <>
+                                  {visibleGroups.map(g => {
+                                    const gkey = `acc|${movement}|${g.date}`;
+                                    const gExpanded = expandedSkillSessions.has(gkey) || g.entries.some(e => e.id === editingEntryId);
+                                    const setCounts = g.entries.map(e => (e.sets != null && e.sets > 0 ? e.sets : 1));
+                                    const totSets = setCounts.reduce((a2, b2) => a2 + b2, 0);
+                                    const effVals = g.entries.map(e => e.reps_completed ?? e.reps);
+                                    const totReps = g.entries.reduce((sum, e, i2) => sum + setCounts[i2] * ((e.reps_completed ?? e.reps) ?? 0), 0);
+                                    const totHold = g.entries.reduce((sum, e, i2) => sum + setCounts[i2] * (e.hold_seconds ?? 0), 0);
+                                    const uniformReps = totReps > 0 && effVals.every(v => v != null && v === effVals[0]) ? effVals[0] : null;
+                                    const weights = g.entries.filter(e => e.weight != null && e.weight > 0);
+                                    const topWeight = weights.reduce<typeof weights[number] | null>(
+                                      (best, e) => (best == null || toLbs(e.weight!, e.weight_unit ?? '') > toLbs(best.weight!, best.weight_unit ?? '') ? e : best),
+                                      null,
+                                    );
+                                    const uniformWeight = weights.length === g.entries.length && weights.length > 0 &&
+                                      weights.every(e => e.weight === weights[0].weight && e.weight_unit === weights[0].weight_unit);
+                                    const weightPart = topWeight
+                                      ? ` · ${uniformWeight ? '' : 'top '}${topWeight.weight}${topWeight.weight_unit}`
+                                      : '';
+                                    const rpeMax = g.entries.reduce((m, e) => (e.rpe != null && e.rpe > m ? e.rpe : m), 0);
+                                    const volume = totReps > 0
+                                      ? (totSets === 1 ? `1 set · ${totReps} reps`
+                                        : uniformReps != null ? `${totSets}×${uniformReps} · ${totReps} reps`
+                                        : `${totSets} sets · ${totReps} reps`)
+                                      : totHold > 0
+                                        ? (totSets === 1 ? `${totHold}s hold` : `${totSets} sets · ${totHold}s total`)
+                                        : `${totSets} set${totSets !== 1 ? 's' : ''}`;
+                                    return (
+                                      <div key={gkey}>
+                                        <div
+                                          className="tl-set-row"
+                                          style={{ cursor: 'pointer' }}
+                                          onClick={() => setExpandedSkillSessions(prev => {
+                                            const next = new Set(prev);
+                                            if (next.has(gkey)) next.delete(gkey); else next.add(gkey);
+                                            return next;
+                                          })}
+                                        >
+                                          <span className="tl-set-date">{fmtShortDate(g.date)}</span>
+                                          <span className="tl-set-value" style={{ flex: 1 }}>{volume}{weightPart}</span>
+                                          {rpeMax > 0 && <span className="tl-set-detail">RPE {rpeMax}</span>}
+                                          <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{gExpanded ? '▲' : '▼'}</span>
+                                        </div>
+                                        {gExpanded && (
+                                          <div style={{ paddingLeft: 10, borderLeft: '2px solid var(--border)', marginLeft: 4 }}>
+                                            {g.entries.map((e, i2) => renderEntryRow(e, i2))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                  {groups.length > 20 && !showAll && (
+                                    <button
+                                      onClick={() => setShowAllSkillSessions(prev => new Set(prev).add(showKey))}
+                                      style={{ width: '100%', marginTop: 8, padding: '8px 0', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text-dim)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
+                                    >
+                                      Show all ({groups.length} sessions)
+                                    </button>
+                                  )}
+                                </>
+                              );
+                            })()}
+                          </div>
+                        )}
                       </div>
                     );
                   });
