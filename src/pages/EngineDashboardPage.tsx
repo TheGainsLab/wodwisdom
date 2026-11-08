@@ -14,7 +14,7 @@ import {
   calculateWorkDurationMinutes,
 } from '../lib/engineService';
 import { useEntitlements } from '../hooks/useEntitlements';
-import { ChevronLeft, Lock, Check, Play, Settings, BarChart3, Calendar, Trophy, Target } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Lock, Check, Play, Settings, BarChart3, Calendar, Trophy, Target } from 'lucide-react';
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -525,6 +525,12 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
                                 background: isComplete ? '#4ade80' : undefined,
                               }}
                             />
+                          </div>
+                          {/* The card is the only door to a month's day list, so it
+                              has to read as tappable — a bare progress bar didn't
+                              (a user asked the Coach how to see upcoming days). */}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 2, marginTop: 10, fontSize: 12, fontWeight: 600, color: 'var(--accent)' }}>
+                            View days <ChevronRight size={14} />
                           </div>
                         </>
                       )}
