@@ -130,6 +130,26 @@ const SCORE_UNITS = [
  * (e.g. 222W) is already the pace, so it must NOT be divided by duration the
  * way cal / meters / km / miles are. All other units accumulate over time.
  */
+/** Baseline summary shared by the setup line and the preview stat card.
+ *  `pace` is the per-minute rate (or the raw figure for rate units like
+ *  watts, which already are a pace); `extra` is the modality-specific
+ *  equivalence (erg split, Echo Bike RPM) when one applies. */
+function baselineSummary(bl: EngineTimeTrial, modalityValue: string | null | undefined): { total: string; pace: string; extra: string | null } {
+  const units = bl.units ?? 'cal';
+  const total = `${bl.total_output} ${units}`;
+  if (isRateUnit(units)) {
+    return { total, pace: total, extra: echoRpm(bl.total_output ?? NaN, 'watts', modalityValue) };
+  }
+  const rpm = bl.calculated_rpm;
+  const pace = rpm ? `${rpm.toFixed(1)} ${units}/min` : '';
+  const extra = rpm
+    ? units === 'meters' ? ergSplit(rpm, modalityValue)
+    : units === 'cal' ? echoRpm(rpm, 'cal_min', modalityValue)
+    : null
+    : null;
+  return { total, pace, extra };
+}
+
 function isRateUnit(unit: string): boolean {
   return unit === 'watts';
 }
@@ -1184,22 +1204,20 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                 </>
               )}
 
-              {/* Baseline display */}
-              {hasMatchingBaseline && baseline && (
-                <>
-                  <hr className="engine-divider" />
-                  <div className="engine-stat" style={{ textAlign: 'center' }}>
-                  <div className="engine-stat-label" style={{ color: 'var(--text)' }}>Time Trial Baseline ({selectedMod?.label})</div>
-                  <div className="engine-stat-value" style={{ fontSize: 22 }}>
-                    {baseline.total_output} {baseline.units ?? 'cal'}
+              {/* Baseline note — one quiet line tied to the modality/unit
+                  selection. The full figure lives on the preview beside the
+                  targets it drives. */}
+              {hasMatchingBaseline && baseline && (() => {
+                const { total, pace, extra } = baselineSummary(baseline, modality);
+                const unitLabel = SCORE_UNITS.find(u => u.value === selectedUnit)?.label;
+                const figures = [total, pace !== total ? pace : null, extra].filter(Boolean).join(' · ');
+                return (
+                  <div style={{ fontSize: 13, color: 'var(--text-dim)', textAlign: 'center', lineHeight: 1.5 }}>
+                    {isTimeTrial ? 'Current baseline' : 'Baseline'} for <strong style={{ color: 'var(--text)', fontWeight: 600 }}>{selectedMod?.label} · {unitLabel}</strong>
+                    <span style={{ display: 'block', fontFamily: "'JetBrains Mono', monospace", color: 'var(--text)' }}>{figures}</span>
                   </div>
-                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>
-                    {/* Rate units (watts): total_output above already IS the pace; no "/min" line. */}
-                    {isRateUnit(baseline.units ?? '') ? (echoRpm(baseline.total_output ?? NaN, 'watts', modality) ?? '') : baseline.calculated_rpm ? `${baseline.calculated_rpm.toFixed(1)} ${baseline.units ?? 'cal'}/min${(baseline.units === 'meters' ? ergSplit(baseline.calculated_rpm, modality) : baseline.units === 'cal' ? echoRpm(baseline.calculated_rpm, 'cal_min', modality) : null) ? ` · ${baseline.units === 'meters' ? ergSplit(baseline.calculated_rpm, modality) : echoRpm(baseline.calculated_rpm, 'cal_min', modality)}` : ''}` : ''}
-                  </div>
-                  </div>
-                </>
-              )}
+                );
+              })()}
 
               {/* Baseline warning */}
               {modality && selectedUnit && !hasMatchingBaseline && !isTimeTrial && (
@@ -1277,7 +1295,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
 
               {/* Stats row — forced 2-up on all platforms (engine-grid stacks on
                   mobile; these values are short and read fine side-by-side). */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div className={'engine-stats-row' + (hasMatchingBaseline ? ' engine-stats-row--3' : '')}>
                 <div className="engine-stat">
                   <div className="engine-stat-value" style={{ fontSize: 22 }}>
                     {workout ? calculateWorkDurationMinutes(workout) : '—'}
@@ -1290,6 +1308,17 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                   </div>
                   <div className="engine-stat-label">Blocks</div>
                 </div>
+                {/* Baseline the interval targets below are computed from. */}
+                {hasMatchingBaseline && baseline && (() => {
+                  const { pace, extra } = baselineSummary(baseline, modality);
+                  const modLabel = MODALITIES.find(m => m.value === modality)?.label ?? 'Baseline';
+                  return (
+                    <div className="engine-stat engine-stat--span">
+                      <div className="engine-stat-value" style={{ fontSize: 22 }}>{pace || '—'}</div>
+                      <div className="engine-stat-label">{modLabel} Baseline{extra ? ` · ${extra}` : ''}</div>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Plain parameters summary — states the structure in words, since the
