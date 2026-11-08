@@ -47,6 +47,11 @@
 
 /* Stat card */
 .engine-stat{background:var(--surface);border:1px solid var(--border-light);border-radius:12px;padding:18px 22px}
+/* Preview stats: 2-up; with a baseline card the third spans the row on
+   phones and the row goes 3-across on wider screens. */
+.engine-stats-row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.engine-stats-row .engine-stat--span{grid-column:1 / -1}
+@media (min-width:641px){.engine-stats-row--3{grid-template-columns:1fr 1fr 1fr}.engine-stats-row--3 .engine-stat--span{grid-column:auto}}
 .engine-stat-value{font-family:'JetBrains Mono',monospace;font-size:28px;font-weight:700;color:var(--text);margin-bottom:4px}
 .engine-stat-label{font-size:12px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px}
 

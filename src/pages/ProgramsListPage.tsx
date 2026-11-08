@@ -141,10 +141,10 @@ export default function ProgramsListPage({ session }: { session: Session }) {
               >
                 <div className="history-item-header" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <Calendar size={18} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-                  <span className="history-question">
+                  <span className="history-question" style={{ flex: '0 0 auto', overflow: 'visible' }}>
                     {hasProgramming || isAdmin ? 'Calendar & Analytics' : 'Calendar'}
                   </span>
-                  <span className="history-time" style={{ marginLeft: 'auto' }}>
+                  <span className="history-time" style={{ marginLeft: 'auto', flexShrink: 1, minWidth: 0, textAlign: 'right' }}>
                     {programs.length === 0 && !hasEngine
                       ? 'Generate a program to schedule training'
                       : hasProgramming || isAdmin
@@ -164,8 +164,8 @@ export default function ProgramsListPage({ session }: { session: Session }) {
               >
                 <div className="history-item-header" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <Zap size={18} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-                  <span className="history-question">Year of the Engine</span>
-                  <span className="history-time" style={{ marginLeft: 'auto' }}>AI-Powered Conditioning</span>
+                  <span className="history-question" style={{ flex: '0 0 auto', overflow: 'visible' }}>Year of the Engine</span>
+                  <span className="history-time" style={{ marginLeft: 'auto', flexShrink: 1, minWidth: 0, textAlign: 'right' }}>AI-Powered Conditioning</span>
                 </div>
               </div>
             )}

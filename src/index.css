@@ -313,6 +313,7 @@ body.landing-body{overflow:auto;height:auto}
 .wr-sources-toggle:hover{background:var(--surface2)}
 .wr-sources-label{font-size:13px;font-weight:600;text-transform:uppercase;color:var(--accent)}
 .wr-sources-list{display:flex;flex-wrap:wrap;gap:8px;padding:0 20px 16px}
+.wr-intent-body{padding:0 20px 18px}
 /* Collapsible block */
 .workout-review-block{padding:0;overflow:hidden}
 .workout-review-block-header{display:flex;align-items:center;justify-content:space-between;width:100%;padding:16px 20px;background:none;border:none;cursor:pointer;font-family:'Outfit',sans-serif;color:var(--text);text-align:left}

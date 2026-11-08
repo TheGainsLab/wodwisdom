@@ -9,7 +9,7 @@ import Nav from '../components/Nav';
 import WorkoutBlocksDisplay, { BlockContent } from '../components/WorkoutBlocksDisplay';
 import { BlockCoachingBody, coachingForBlockType, formatReviewMarkdown, CHEVRON_DOWN, type ReviewBlock } from '../components/reviewCoaching';
 import { useWorkoutReview } from '../lib/useWorkoutReview';
-import BlockLog, { type DayLogController, loggedMovementNames, blockFullyLogged } from '../components/blockLog';
+import BlockLog, { type DayLogController, loggedMovementNames, blockFullyLogged, isLoggableBlock, isRowLoggerBlock } from '../components/blockLog';
 import { formatMovementName } from '../lib/movementName';
 
 interface ProgramBlock {
@@ -1502,7 +1502,7 @@ export function V3DayView({ blocks, sourceId, workoutText, logging, onUpdateMove
           </button>
           {intentOpen && (
             review?.intent
-              ? <div className="wr-intent-card" style={{ marginTop: 8 }}><div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatReviewMarkdown(review.intent) }} /></div>
+              ? <div className="wr-intent-body"><div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatReviewMarkdown(review.intent) }} /></div>
               : loading ? <div style={{ fontSize: 13, color: 'var(--text-dim)', padding: '8px 2px' }}>Loading coaching…</div>
               : error ? <div style={{ fontSize: 13, color: 'var(--accent)', padding: '8px 2px' }}>{error}</div>
               : null
@@ -1592,9 +1592,17 @@ function V3BlockCard({ block, onUpdateMovement, onUpdateBlock, onAddMovement, on
   const loggedNames = loggedMovementNames(savedSnap);
   const fullyLogged = !!logging && logging.isSaved(block.sort_order) && blockFullyLogged(block, savedSnap);
   const isLogged = fullyLogged && !editing;
+  // The card owns the log panel's open state and renders its "Log" / "Edit
+  // log" toggle in the header row (rightmost, after Edit and Coach).
+  const showLog = !!logging && isLoggableBlock(block.block_type) && !editing;
+  const [logPanelOpen, setLogPanelOpen] = useState(false);
   // Rows-as-logger: while the log panel is open (strength/skills/accessory),
   // BlockLog renders the movement rows itself — hide the card's own copy.
-  const [logOpen, setLogOpen] = useState(false);
+  const logOpen = logPanelOpen && isRowLoggerBlock(block.block_type);
+  const showActions = canEdit || showLog;
+  // Logged blocks dim to read as "done". The header action buttons stay
+  // full-bright so Edit log is always clearly tappable.
+  const dimStyle: React.CSSProperties | undefined = isLogged ? { opacity: 0.5, transition: 'opacity 0.15s' } : undefined;
   const [coachOpen, setCoachOpen] = useState(false);
   const toggleCoach = () => { const n = !coachOpen; setCoachOpen(n); if (n) onEnsureCoaching?.(); };
   // Logged blocks render collapsed — done work gets out of the way so the
@@ -1660,17 +1668,16 @@ function V3BlockCard({ block, onUpdateMovement, onUpdateBlock, onAddMovement, on
 
   return (
     <div className="workout-block" data-block={block.block_type}>
-      <div style={isLogged ? { opacity: 0.5, transition: 'opacity 0.15s' } : undefined}>
       <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-        <span className="workout-block-label" data-block={block.block_type}>{displayLabel}</span>
-        {block.block_label && <span style={labelStyle}>{block.block_label}</span>}
-        {canEdit && (
+        <span className="workout-block-label" data-block={block.block_type} style={dimStyle}>{displayLabel}</span>
+        {block.block_label && <span style={{ ...labelStyle, ...dimStyle }}>{block.block_label}</span>}
+        {showActions && (
           <span style={{ display: 'inline-flex', gap: 6, marginLeft: 'auto' }}>
             {canEdit && (
               <button
                 type="button"
                 className="block-edit-toggle"
-                onClick={() => setEditing(e => !e)}
+                onClick={() => { if (!editing) setLogPanelOpen(false); setEditing(e => !e); }}
                 aria-label={editing ? 'Done editing block' : 'Edit block'}
               >
                 {editing ? (
@@ -1697,6 +1704,17 @@ function V3BlockCard({ block, onUpdateMovement, onUpdateBlock, onAddMovement, on
                 Coach
               </button>
             )}
+            {showLog && (
+              <button
+                type="button"
+                className={`block-edit-toggle${logPanelOpen ? ' block-coach-toggle--open' : ''}`}
+                onClick={() => { const n = !logPanelOpen; setLogPanelOpen(n); if (n) onEnsureCoaching?.(); }}
+                aria-expanded={logPanelOpen}
+                aria-label={fullyLogged ? 'Edit log' : 'Log block'}
+              >
+                {fullyLogged ? 'Edit log' : 'Log'}
+              </button>
+            )}
           </span>
         )}
         {isLogged && (
@@ -1705,7 +1723,7 @@ function V3BlockCard({ block, onUpdateMovement, onUpdateBlock, onAddMovement, on
             className="block-edit-toggle"
             onClick={() => setLogExpanded(false)}
             aria-label="Collapse logged block"
-            style={canEdit ? undefined : { marginLeft: 'auto' }}
+            style={showActions ? undefined : { marginLeft: 'auto' }}
           >
             ▲
           </button>
@@ -1723,6 +1741,7 @@ function V3BlockCard({ block, onUpdateMovement, onUpdateBlock, onAddMovement, on
           </button>
         )}
       </div>
+      <div style={dimStyle}>
       {editing && onUpdateBlock ? (
         <input
           type="text"
@@ -1754,7 +1773,7 @@ function V3BlockCard({ block, onUpdateMovement, onUpdateBlock, onAddMovement, on
       </div>
       </div>
 
-      {logging && !editing && <BlockLog block={block} controller={logging} coaching={coaching ?? null} onEnsureCoaching={onEnsureCoaching} onOpenChange={setLogOpen} />}
+      {showLog && <BlockLog block={block} controller={logging!} coaching={coaching ?? null} open={logPanelOpen} onOpenChange={setLogPanelOpen} />}
 
       {showCoach && coachOpen && (
         <div className="block-coach-body" style={{ marginTop: 10 }}>

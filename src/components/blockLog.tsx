@@ -28,8 +28,8 @@
 //  - Per-exercise RPE lands on that movement's entry rows (entries.rpe);
 //    the block row's rpe stores the max — the limiter is the block's story.
 //  - The saved card shows a red ✓ on each logged movement's plan row (parent
-//    renders those); the footer button reads "Log block" while movements
-//    remain, "Edit log" once all are logged.
+//    renders those); the header button reads "Log" while movements remain,
+//    "Edit log" once all are logged. The card owns the open state.
 import { useMemo, useState } from 'react';
 import type { ProgramBlockV2, ProgramMovementV2 } from '../pages/ProgramDetailPage';
 import type { ReviewBlock } from '../components/reviewCoaching';
@@ -364,9 +364,11 @@ function SaveFooter({ saving, canSave, onSave, notes, onNotes }: {
   notes: string; onNotes: (v: string) => void;
 }) {
   return (
-    <>
+    // Dashed divider above the notes field, matching the line between
+    // movements in the row logger, so the footer reads as its own section.
+    <div style={{ marginTop: 10, paddingTop: 12, borderTop: '1px dashed var(--border)' }}>
       <input
-        style={{ ...inputStyle, textAlign: 'left', marginTop: 12 }}
+        style={{ ...inputStyle, textAlign: 'left' }}
         placeholder="Additional notes (optional)"
         maxLength={1000}
         value={notes}
@@ -375,7 +377,7 @@ function SaveFooter({ saving, canSave, onSave, notes, onNotes }: {
       <button type="button" className="auth-btn" style={{ width: '100%', marginTop: 10, opacity: canSave ? 1 : 0.45 }} onClick={onSave} disabled={saving || !canSave}>
         {saving ? 'Saving…' : 'Save block'}
       </button>
-    </>
+    </div>
   );
 }
 
@@ -817,48 +819,23 @@ const LOGGABLE_TYPES = ['strength', 'metcon', 'skills', 'accessory', 'cardio'];
  *  their rows ARE the logger. Metcon and cardio panels are fields below the
  *  rows (score, watts), so the plan rows stay visible for context. */
 const ROW_LOGGER_TYPES = ['strength', 'skills', 'accessory'];
+export const isLoggableBlock = (type: string) => LOGGABLE_TYPES.includes(type);
+export const isRowLoggerBlock = (type: string) => ROW_LOGGER_TYPES.includes(type);
 
-export default function BlockLog({ block, controller, coaching, onEnsureCoaching, onOpenChange }: {
+export default function BlockLog({ block, controller, coaching, open, onOpenChange }: {
   block: ProgramBlockV2;
   controller: DayLogController;
   coaching?: ReviewBlock | null;
-  onEnsureCoaching?: () => void;
-  /** Fires when the logger opens/closes so the parent card can hide its own
-   *  movement rows while the logger's live rows are showing. */
-  onOpenChange?: (open: boolean) => void;
+  /** Controlled: the parent card owns the open state and renders the "Log" /
+   *  "Edit log" toggle in its header row alongside Edit and Coach. BlockLog
+   *  renders nothing while closed and only the logger body while open. */
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
-  const [open, setOpenRaw] = useState(false);
-  const setOpen = (o: boolean) => { setOpenRaw(o); onOpenChange?.(o && ROW_LOGGER_TYPES.includes(block.block_type)); };
-  if (!LOGGABLE_TYPES.includes(block.block_type)) return null;
-
-  const saved = controller.isSaved(block.sort_order);
-  const snap = controller.savedSnapshot?.(block.sort_order) ?? null;
-  const complete = saved && blockFullyLogged(block, snap);
-
-  if (!open) {
-    return (
-      <div style={{ marginTop: 12 }}>
-        <button
-          type="button"
-          onClick={() => { setOpen(true); onEnsureCoaching?.(); }}
-          style={{ padding: '7px 16px', background: 'transparent', border: '1px solid var(--accent)', borderRadius: 8, color: 'var(--text)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: "'Outfit', sans-serif" }}
-        >
-          {complete ? 'Edit log' : 'Log block'}
-        </button>
-      </div>
-    );
-  }
-  const onSaved = () => setOpen(false);
+  if (!LOGGABLE_TYPES.includes(block.block_type) || !open) return null;
+  const onSaved = () => onOpenChange(false);
   return (
     <div>
-      <button
-        type="button"
-        onClick={() => setOpen(false)}
-        style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', color: 'var(--accent)', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, cursor: 'pointer', marginTop: 10, padding: '4px 0', fontFamily: "'Outfit', sans-serif" }}
-      >
-        Log
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15" /></svg>
-      </button>
       {block.block_type === 'metcon'
         ? <MetconLog block={block} controller={controller} coaching={coaching ?? null} onSaved={onSaved} />
         : block.block_type === 'cardio'
