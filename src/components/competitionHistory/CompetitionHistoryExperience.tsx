@@ -27,7 +27,7 @@ import type { AllResultsEntry, ThrowbackRow, CatalogWorkoutSummary } from '../..
 import { normalizeWithThrowbacks, throwbacksToEntries, normalizeCatalog } from '../../lib/competitionHistory';
 import CompetitionExplorer, { type Scope, type Filter } from './CompetitionExplorer';
 import MovementsPanel from './MovementsPanel';
-import SummaryPanel, { type SignatureLite } from './SummaryPanel';
+import SummaryPanel from './SummaryPanel';
 import PowerPanel from './PowerPanel';
 import SignatureProfilePanel from './SignatureProfilePanel';
 
@@ -73,10 +73,6 @@ interface Tier4Bundle {
   recent_raw_results: BundleRecentResult[];
   // Present only when fetched with include:['all_results'] (bundle 1.3.0).
   all_results?: AllResultsEntry[];
-  // Present only when fetched with include:['signature'] (bundle 1.5.0). Only
-  // the bits the Summary uses are typed here (the full shape lives in the edge
-  // fn's Tier4FitnessSignature).
-  fitness_signature?: SignatureLite;
 }
 
 interface SearchResult {
@@ -205,7 +201,9 @@ export default function CompetitionHistoryExperience({
 
   // Linked-state view: tab strip + the Map's scope/filter (lifted here so the
   // Movements / Summary tabs can switch to Map with a movement pre-applied).
-  const [tab, setTab] = useState<ExperienceTab>('summary');
+  // Browse mode (unlinked) starts on Workouts — the catalog is why they came;
+  // Summary is one tap away once they've logged a throwback.
+  const [tab, setTab] = useState<ExperienceTab>(initialBrowse ? 'map' : 'summary');
   const [scope, setScope] = useState<Scope>(initialBrowse ? 'all' : 'mine');
   const [filter, setFilter] = useState<Filter>({});
   // Unlinked users (incl. those who never competed, so nothing to link) can
@@ -245,7 +243,7 @@ export default function CompetitionHistoryExperience({
     (async () => {
       const { data, error } = await supabase.functions.invoke<{ bundle: Tier4Bundle; error?: string }>(
         'verify-competition-athlete',
-        { body: { competition_athlete_id: linkedId, include: ['all_results', 'signature'] } },
+        { body: { competition_athlete_id: linkedId, include: ['all_results'] } },
       );
       if (cancelled) return;
       setBundleLoading(false);
@@ -305,7 +303,7 @@ export default function CompetitionHistoryExperience({
 
     const { data, error } = await supabase.functions.invoke<{ bundle: Tier4Bundle; error?: string }>(
       'verify-competition-athlete',
-      { body: { competition_athlete_id: trimmed, include: ['all_results', 'signature'] } },
+      { body: { competition_athlete_id: trimmed, include: ['all_results'] } },
     );
     setVerifying(false);
 
@@ -608,15 +606,14 @@ export default function CompetitionHistoryExperience({
             Browse real competition workouts and log your own attempts to see where you'd stack up.
           </p>
           {/* Once the athlete has logged throwbacks, surface the same analytics
-              (All Movements / Power) computed from them — no linking required.
-              Sparse with few logs, but it lets an unlinked athlete see their own
-              analysis. Summary is skipped (it leans on the linked bundle's
-              signature/identity). */}
+              (Summary / All Movements / Power) computed from them — no linking
+              required. Sparse with few logs, but it lets an unlinked athlete
+              see their own analysis. */}
           {throwbackRows.length > 0 && (
             <div style={{ display: 'flex', gap: 16, marginBottom: 16, borderBottom: '1px solid var(--border)' }}>
-              {(['map', 'movements', 'power'] as ExperienceTab[]).map((id) => {
-                const label = id === 'map' ? 'Workouts' : id === 'movements' ? 'All Movements' : 'Power';
-                const active = tab === id || (id === 'map' && tab === 'summary');
+              {(['summary', 'map', 'movements', 'power'] as ExperienceTab[]).map((id) => {
+                const label = id === 'summary' ? 'Summary' : id === 'map' ? 'Workouts' : id === 'movements' ? 'All Movements' : 'Power';
+                const active = tab === id;
                 return (
                   <button
                     key={id}
@@ -639,8 +636,9 @@ export default function CompetitionHistoryExperience({
           )}
 
           {/* Workouts grid — kept mounted (display-toggled) so the catalog + logged
-              throwbacks survive tab switches. Default (incl. 'summary') = grid. */}
-          <div style={{ display: (throwbackRows.length === 0 || tab === 'map' || tab === 'summary') ? 'block' : 'none' }}>
+              throwbacks survive tab switches. With no throwbacks there are no
+              tabs, so the grid always shows. */}
+          <div style={{ display: (throwbackRows.length === 0 || tab === 'map') ? 'block' : 'none' }}>
             <CompetitionExplorer
               history={competitionHistory}
               userAge={userAge}
@@ -654,6 +652,9 @@ export default function CompetitionHistoryExperience({
             />
           </div>
 
+          {throwbackRows.length > 0 && tab === 'summary' && (
+            <SummaryPanel history={competitionHistory} />
+          )}
           {throwbackRows.length > 0 && tab === 'movements' && (
             <MovementsPanel history={competitionHistory} onPick={goToMapForMovement} />
           )}
@@ -753,8 +754,6 @@ export default function CompetitionHistoryExperience({
                 name={linkedBundle.identity.name}
                 seasonsCompeted={cs.seasons_competed}
                 history={competitionHistory}
-                signature={linkedBundle.fitness_signature}
-                onPickMovement={goToMapForMovement}
               />
             );
 
@@ -896,7 +895,7 @@ export default function CompetitionHistoryExperience({
           type="button"
           className="auth-btn"
           style={{ maxWidth: 260, padding: '10px 18px', fontSize: 13 }}
-          onClick={() => { setScope('all'); setBrowseUnlinked(true); }}
+          onClick={() => { setScope('all'); setTab('map'); setBrowseUnlinked(true); }}
         >
           Browse the workouts →
         </button>
