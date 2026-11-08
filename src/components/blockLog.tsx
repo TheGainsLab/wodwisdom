@@ -364,9 +364,11 @@ function SaveFooter({ saving, canSave, onSave, notes, onNotes }: {
   notes: string; onNotes: (v: string) => void;
 }) {
   return (
-    <>
+    // Dashed divider above the notes field, matching the line between
+    // movements in the row logger, so the footer reads as its own section.
+    <div style={{ marginTop: 10, paddingTop: 12, borderTop: '1px dashed var(--border)' }}>
       <input
-        style={{ ...inputStyle, textAlign: 'left', marginTop: 12 }}
+        style={{ ...inputStyle, textAlign: 'left' }}
         placeholder="Additional notes (optional)"
         maxLength={1000}
         value={notes}
@@ -375,7 +377,7 @@ function SaveFooter({ saving, canSave, onSave, notes, onNotes }: {
       <button type="button" className="auth-btn" style={{ width: '100%', marginTop: 10, opacity: canSave ? 1 : 0.45 }} onClick={onSave} disabled={saving || !canSave}>
         {saving ? 'Saving…' : 'Save block'}
       </button>
-    </>
+    </div>
   );
 }
 
