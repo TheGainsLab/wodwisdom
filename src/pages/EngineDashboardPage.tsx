@@ -14,7 +14,8 @@ import {
   calculateWorkDurationMinutes,
 } from '../lib/engineService';
 import { useEntitlements } from '../hooks/useEntitlements';
-import { ChevronLeft, Lock, Check, Play, Settings, BarChart3, Calendar, Trophy, Target } from 'lucide-react';
+import { describeWorkout } from '../lib/engineStructure';
+import { ChevronLeft, ChevronRight, Lock, Check, Play, Settings, BarChart3, Calendar, Trophy, Target } from 'lucide-react';
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -286,6 +287,7 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
                       onClick={() => !isLocked && navigate(`/engine/training/${day.sequence_position ?? day.day_number}`)}
                       disabled={isLocked}
                       style={{
+                        alignItems: 'flex-start',
                         opacity: isLocked ? 0.4 : 1,
                         cursor: isLocked ? 'not-allowed' : 'pointer',
                         color: 'var(--text)',
@@ -310,17 +312,29 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
                         {status === 'completed' ? <Check size={14} /> : status === 'locked' ? <Lock size={12} /> : (day.sequence_position ?? day.day_number)}
                       </span>
 
-                      <span className="engine-exercise-name">Day {day.sequence_position ?? day.day_number}</span>
-
-                      <span className={'engine-badge ' + dayTypeBadge(day.day_type)}>
-                        {day.day_type.replace(/_/g, ' ')}
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span className="engine-exercise-name" style={{ minWidth: 0 }}>Day {day.sequence_position ?? day.day_number}</span>
+                          <span className={'engine-badge ' + dayTypeBadge(day.day_type)} style={{ minWidth: 0 }}>
+                            {day.day_type.replace(/_/g, ' ')}
+                          </span>
+                          <span className="engine-exercise-detail" style={{ minWidth: 0 }}>{calculateWorkDurationMinutes(day)} min</span>
+                          {status === 'current' && (
+                            <Play size={16} color="var(--accent)" style={{ flexShrink: 0 }} />
+                          )}
+                        </span>
+                        {/* Structure line — the month list doubles as the
+                            "what's coming" view, so each day states its
+                            rounds / work / rest without being opened. */}
+                        {(() => {
+                          const compact = describeWorkout(day).compact;
+                          return compact ? (
+                            <span style={{ display: 'block', marginTop: 4, fontFamily: "'JetBrains Mono', monospace", fontSize: 12.5, color: 'var(--text-dim)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {compact}
+                            </span>
+                          ) : null;
+                        })()}
                       </span>
-
-                      <span className="engine-exercise-detail">{calculateWorkDurationMinutes(day)}min work</span>
-
-                      {status === 'current' && (
-                        <Play size={16} color="var(--accent)" style={{ flexShrink: 0 }} />
-                      )}
                     </button>
                   );
                 })}
@@ -525,6 +539,12 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
                                 background: isComplete ? '#4ade80' : undefined,
                               }}
                             />
+                          </div>
+                          {/* The card is the only door to a month's day list, so it
+                              has to read as tappable — a bare progress bar didn't
+                              (a user asked the Coach how to see upcoming days). */}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 2, marginTop: 10, fontSize: 12, fontWeight: 600, color: 'var(--accent)' }}>
+                            View days <ChevronRight size={14} />
                           </div>
                         </>
                       )}

@@ -43,6 +43,7 @@
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { fetchWithTimeout } from "../_shared/fetch-with-timeout.ts";
+import { countPaidPeriods, ENGINE_MONTHS_CAP, entitledEngineMonths, lastUnlockIso, subscriptionCadence } from "../_shared/engine-entitlement.ts";
 import { ALERT_EMAIL, emailWrap, escapeHtml, sendViaResend } from "../_shared/checkout-emails.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -50,8 +51,6 @@ const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const STRIPE_SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY")!;
 
 const STRIPE_AUTH = "Basic " + btoa(STRIPE_SECRET_KEY + ":");
-const MS_PER_DAY = 1000 * 60 * 60 * 24;
-const ENGINE_MONTHS_CAP = 36;
 
 interface Report {
   user_id: string;
@@ -255,16 +254,12 @@ async function reconcileOne(
     return { user_id: userId, email: profile.email, before: currentUnlocked, after: currentUnlocked, reason };
   }
 
-  const recurring = sub.items?.data?.[0]?.price?.recurring ?? {};
-  const interval = recurring.interval as string | undefined;
-  const intervalCount = (recurring.interval_count as number | undefined) ?? 1;
-  const isQuarterly =
-    (interval === "month" && intervalCount === 3) ||
-    (interval === "quarter" && intervalCount === 1);
-  const isMonthly = interval === "month" && intervalCount === 1;
-  if (!isMonthly && !isQuarterly) {
-    return { user_id: userId, email: profile.email, before: currentUnlocked, after: currentUnlocked, reason: `unsupported_interval:${interval}x${intervalCount}` };
+  const cadence = subscriptionCadence(sub);
+  if (!cadence) {
+    const rec = sub.items?.data?.[0]?.price?.recurring ?? {};
+    return { user_id: userId, email: profile.email, before: currentUnlocked, after: currentUnlocked, reason: `unsupported_interval:${rec.interval}x${rec.interval_count ?? 1}` };
   }
+  const isMonthly = cadence === "monthly";
 
   // Count succeeded invoices on this subscription. Cap query at 100 — any
   // user with 100+ invoices is way past the 36-month ceiling anyway.
@@ -275,44 +270,21 @@ async function reconcileOne(
   );
   if (!invResp.ok) throw new Error(`stripe invoices ${invResp.status}`);
   const invData = await invResp.json();
-  // Only invoices that billed a NEW period count toward entitlement:
-  // subscription_create (first invoice), subscription_cycle (renewals),
-  // and subscription_update ONLY when it charged real money (founder
-  // policy, 2026-10-05: a paid anchor-reset upgrade buys that period). A
-  // €0 update is a plan flip paid by proration credit — it shows
-  // status=paid too, and counting it re-mints exactly the phantom months
-  // the stripe-webhook gate blocks (2026-10-05 incident: same-day plan
-  // flips → 2 payments, 4 unlocked months). The webhook and this sweep
-  // apply the SAME predicate — keep them in lockstep.
-  const paidInvoiceCount: number =
-    ((invData.data ?? []) as Array<{ billing_reason?: string; amount_paid?: number }>)
-      .filter((inv) =>
-        inv.billing_reason === "subscription_create" ||
-        inv.billing_reason === "subscription_cycle" ||
-        (inv.billing_reason === "subscription_update" && (inv.amount_paid ?? 0) > 0)
-      )
-      .length;
+  // Only invoices that billed a NEW period count toward entitlement — the
+  // shared predicate (engine-entitlement.ts) keeps this sweep, the webhook
+  // and the cron in lockstep.
+  const paidInvoiceCount = countPaidPeriods(invData.data ?? []);
   if (paidInvoiceCount === 0) {
     return { user_id: userId, email: profile.email, before: currentUnlocked, after: currentUnlocked, reason: "no_paid_invoices" };
   }
 
-  // Entitled months by cadence.
-  let entitled: number;
-  let monthsIntoCurrentQuarter = 1;
-  if (isMonthly) {
-    entitled = paidInvoiceCount;
-  } else {
-    // Quarterly: drip 1/2/3 inside the current period.
-    const periodStartSec = sub.current_period_start as number | undefined;
-    const periodStartMs = typeof periodStartSec === "number" ? periodStartSec * 1000 : null;
-    if (periodStartMs == null) {
-      return { user_id: userId, email: profile.email, before: currentUnlocked, after: currentUnlocked, reason: "missing_period_start" };
-    }
-    const daysIntoPeriod = (Date.now() - periodStartMs) / MS_PER_DAY;
-    monthsIntoCurrentQuarter = Math.min(Math.floor(daysIntoPeriod / 30) + 1, 3);
-    entitled = (paidInvoiceCount - 1) * 3 + monthsIntoCurrentQuarter;
+  // Entitled months by cadence (shared math).
+  const ent = entitledEngineMonths(cadence, paidInvoiceCount, sub.current_period_start as number | undefined);
+  if (!ent) {
+    return { user_id: userId, email: profile.email, before: currentUnlocked, after: currentUnlocked, reason: "missing_period_start" };
   }
-  entitled = Math.min(entitled, ENGINE_MONTHS_CAP);
+  const entitled = Math.min(ent.entitled, ENGINE_MONTHS_CAP);
+  const monthsIntoCurrentQuarter = ent.monthsIntoCurrentQuarter;
 
   if (entitled <= currentUnlocked) {
     // over_entitled: unlocked exceeds what Stripe says was paid for. The sweep
@@ -332,21 +304,9 @@ async function reconcileOne(
     };
   }
 
-  // Compute the "last unlock" timestamp so the next drip lands on time.
-  let lastAtIso: string;
-  if (isMonthly) {
-    // For monthly, the most recent unlock was at the latest invoice's date.
-    // Approximation: subtract ~30 days * (months past entitled) — but since
-    // entitled = paidInvoiceCount and we're setting unlocked = entitled,
-    // the next drip is the next monthly invoice (handled by webhook), so
-    // last_at just needs to NOT be older than 30 days. Use now().
-    lastAtIso = new Date().toISOString();
-  } else {
-    // Quarterly: last unlock happened at periodStart + (m - 1) * 30 days.
-    const periodStartSec = sub.current_period_start as number;
-    const lastAtMs = periodStartSec * 1000 + (monthsIntoCurrentQuarter - 1) * 30 * MS_PER_DAY;
-    lastAtIso = new Date(lastAtMs).toISOString();
-  }
+  // When the most recent unlock "should" have happened, so the quarterly
+  // drip's next step lands on time (shared helper).
+  const lastAtIso = lastUnlockIso(cadence, sub.current_period_start as number | undefined, monthsIntoCurrentQuarter);
 
   if (!dryRun) {
     const { error: upErr } = await supa
