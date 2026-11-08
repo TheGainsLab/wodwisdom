@@ -113,17 +113,17 @@ export default function HomePage({ session }: { session: Session }) {
   // the locked ones, which pitch the feature instead of just the padlock
   // (2026-10-08 onboarding pass: hand-holding at the resting-copy level).
   const tiles: Array<{ key: string; label: string; sub: string; to: string; icon: React.ReactNode; locked: boolean; plan: string; badge?: boolean; lockLabel?: string; lockTo?: string }> = [
-    { key: 'coach', label: 'AI Coach', sub: 'Ask any training question — 3 free to start.', to: '/chat', icon: <MessageSquare size={20} />, locked: false, plan: '' },
-    { key: 'training', label: 'AI Program', sub: 'A month of training built around your numbers and goals.', to: '/programs', icon: <Dumbbell size={20} />, locked: !hasProgramming, plan: 'programming' },
-    { key: 'engine', label: 'Engine', sub: 'Daily conditioning paced from your own time trial.', to: '/engine', icon: <Flame size={20} />, locked: !hasEngine, plan: 'engine' },
+    { key: 'coach', label: 'AI Coach', sub: 'Training, nutrition, recovery. Available anytime.', to: '/chat', icon: <MessageSquare size={20} />, locked: false, plan: '' },
+    { key: 'training', label: 'AI Programming', sub: 'Personalized programming, built around you.', to: '/programs', icon: <Dumbbell size={20} />, locked: !hasProgramming, plan: 'programming' },
+    { key: 'engine', label: 'Year of the Engine', sub: 'Exceptional conditioning.', to: '/engine', icon: <Flame size={20} />, locked: !hasEngine, plan: 'engine' },
     // Nutrition is NOT sold standalone — it rides along with Engine or AI
     // Programming (founder, 2026-10-08). Locked state says so and sends the
     // user to the plans page instead of a nutrition checkout.
-    { key: 'nutrition', label: 'Nutrition', sub: 'Snap or type your meals; the AI tracks the macros.', to: '/nutrition', icon: <Apple size={20} />, locked: !hasNutrition, plan: '', lockLabel: 'Included with Engine or AI Programming →', lockTo: '/pricing' },
+    { key: 'nutrition', label: 'Nutrition', sub: 'Track meals and macros.', to: '/nutrition', icon: <Apple size={20} />, locked: !hasNutrition, plan: '', lockLabel: 'Included with Year of the Engine or AI Programming →', lockTo: '/pricing' },
     // The library is free to read for every account (3 questions to taste),
     // so the tile is never locked — the paywall lives on the asking, not
     // the reading. First in-app door to /knowledge (2026-10-21).
-    { key: 'research', label: 'Research Library', sub: 'The science, translated — read free, ask the research.', to: '/knowledge', icon: <BookOpen size={20} />, locked: false, plan: '' },
+    { key: 'research', label: 'Research Library', sub: 'The science of training, in plain language.', to: '/knowledge', icon: <BookOpen size={20} />, locked: false, plan: '' },
     { key: 'athletedata', label: 'Athlete Data', sub: 'Done the Open? Link it — free percentile breakdown.', to: '/athletedata', icon: <Trophy size={20} />, locked: false, plan: '' },
     // Pre-eval, the tile tells the truth about itself: a dot + "not
     // finished" (2026-10-08). The welcome card above says it loudly; the
@@ -131,7 +131,7 @@ export default function HomePage({ session }: { session: Session }) {
     {
       key: 'profile', label: 'Profile',
       sub: hasEvaluation
-        ? 'Your numbers — they power everything.'
+        ? 'Your lifts, benchmarks, and goals.'
         : profileReviewed
           ? 'Ready — run your evaluation.'
           : 'Not finished — pick up where you left off.',
