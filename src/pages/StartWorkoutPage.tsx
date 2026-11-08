@@ -1668,7 +1668,7 @@ export default function StartWorkoutPage({ session, sourceStateProp, onExit, onD
                     </button>
                     {intentOpen && (
                       coachReview?.intent
-                        ? <div className="wr-intent-card" style={{ marginTop: 8 }}><div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatReviewMarkdown(coachReview.intent) }} /></div>
+                        ? <div className="wr-intent-body"><div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatReviewMarkdown(coachReview.intent) }} /></div>
                         : coachLoading ? <div style={{ fontSize: 13, color: 'var(--text-dim)', padding: '8px 2px' }}>Loading coaching…</div>
                         : coachError ? <div style={{ fontSize: 13, color: 'var(--accent)', padding: '8px 2px' }}>{coachError}</div>
                         : null

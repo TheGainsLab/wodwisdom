@@ -177,7 +177,7 @@ export function IntentDisclosure({ intent }: { intent: string }) {
         <span className={`workout-review-block-chevron${open ? ' workout-review-block-chevron--open' : ''}`}>{CHEVRON_DOWN}</span>
       </button>
       {open && (
-        <div className="wr-intent-card" style={{ marginTop: 8 }}>
+        <div className="wr-intent-body">
           <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatReviewMarkdown(intent) }} />
         </div>
       )}

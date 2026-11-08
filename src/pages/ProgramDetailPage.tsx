@@ -1502,7 +1502,7 @@ export function V3DayView({ blocks, sourceId, workoutText, logging, onUpdateMove
           </button>
           {intentOpen && (
             review?.intent
-              ? <div className="wr-intent-card" style={{ marginTop: 8 }}><div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatReviewMarkdown(review.intent) }} /></div>
+              ? <div className="wr-intent-body"><div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatReviewMarkdown(review.intent) }} /></div>
               : loading ? <div style={{ fontSize: 13, color: 'var(--text-dim)', padding: '8px 2px' }}>Loading coaching…</div>
               : error ? <div style={{ fontSize: 13, color: 'var(--accent)', padding: '8px 2px' }}>{error}</div>
               : null
