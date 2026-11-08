@@ -142,7 +142,7 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
               fontSize: 13, fontWeight: 700, letterSpacing: 0.4, textTransform: 'uppercase',
               color: 'var(--accent)', marginBottom: 8,
             }}>
-              Talk to the Research
+              AI Research Assistant
             </div>
             <KnowledgeDiscuss signedIn={signedIn} noHistory />
           </div>
@@ -190,7 +190,7 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
                 const row = index?.find((r) => r.slug === t.slug);
                 let name = t.slug;
                 if (isLibrary) {
-                  name = 'Talk to the Research';
+                  name = 'AI Research Assistant';
                 } else if (row) {
                   name = shortCitation(row.authors, row.year) || t.slug;
                 }
