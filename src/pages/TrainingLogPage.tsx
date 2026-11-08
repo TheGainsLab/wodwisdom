@@ -553,7 +553,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
   const [entriesByLog, setEntriesByLog] = useState<Record<string, WorkoutLogEntry[]>>({});
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [blockFilter, setBlockFilter] = useState<string>('all');
+  const [recentLimit, setRecentLimit] = useState(10);
   // One destination, "Calendar & Analytics": the calendar is the front door and
   // a Calendar | Analytics switch under the title moves between the two.
   // ?view=analytics is kept in the URL so refresh/back land on the same view.
@@ -572,7 +572,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
   };
   // Overview lands first (Sep '26, My Progress fold-in): "how is it going
   // overall" — counts, adherence, monthly reports — before the deep-dive tabs.
-  const [tab, setTab] = useState<'overview' | 'strength' | 'skills' | 'accessory' | 'cardio' | 'metcons' | 'history'>('overview');
+  const [tab, setTab] = useState<'overview' | 'strength' | 'skills' | 'accessory' | 'cardio' | 'metcons'>('overview');
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   // Engine-only users only have the Calendar section; never leave them stranded
@@ -1500,37 +1500,6 @@ export default function TrainingLogPage({ session }: { session: Session }) {
     return best;
   }, [allEntries, blockTypeMap]);
 
-  // 30-day power baselines for per-block "vs usual" comparison.
-  // Bucketed by block_type + (time_domain for metcons / cardio_modality for
-  // cardio) so comparisons stay within comparable efforts.
-  const powerBaselines = useMemo(() => {
-    const cutoff = new Date();
-    cutoff.setHours(0, 0, 0, 0);
-    cutoff.setDate(cutoff.getDate() - 30);
-    const cutoffStr = cutoff.toISOString().slice(0, 10);
-    const buckets: Record<string, number[]> = {};
-    for (const log of logs) {
-      if (log.workout_date < cutoffStr) continue;
-      for (const b of blocksByLog[log.id] || []) {
-        if (b.avg_power_watts == null) continue;
-        const w = Number(b.avg_power_watts);
-        if (!Number.isFinite(w) || w <= 0) continue;
-        const key = b.block_type === 'metcon'
-          ? `metcon:${b.time_domain ?? 'unknown'}`
-          : b.block_type === 'cardio'
-          ? `cardio:${b.cardio_modality ?? 'unknown'}`
-          : null;
-        if (!key) continue;
-        (buckets[key] ||= []).push(w);
-      }
-    }
-    const out: Record<string, { avg: number; count: number }> = {};
-    for (const [k, vs] of Object.entries(buckets)) {
-      out[k] = { avg: vs.reduce((s, n) => s + n, 0) / vs.length, count: vs.length };
-    }
-    return out;
-  }, [logs, blocksByLog]);
-
   // ── Skills data: bucket entries into SKILL_FAMILIES over the cycle window.
   // Per-family "best" depends on metric: reps families track max reps_completed
   // in a single set; seconds families track longest hold. ──
@@ -1700,7 +1669,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
             )}
             {hasProgramming && view === 'analytics' && (
               <div className="tl-tabs">
-                {([['overview', 'Overview'], ['strength', 'Strength'], ['skills', 'Skills'], ['accessory', 'Accessory'], ['cardio', 'Cardio'], ['metcons', 'Metcons'], ['history', 'History']] as const)
+                {([['overview', 'Overview'], ['strength', 'Strength'], ['skills', 'Skills'], ['accessory', 'Accessory'], ['cardio', 'Cardio'], ['metcons', 'Metcons']] as const)
                   .filter(([id]) => id !== 'cardio' || cardioByModality.size > 0)
                   .map(([id, label]) => (
                   <button
@@ -2229,6 +2198,295 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                     </div>
                   </>
                 )}
+                {/* Recent workouts (formerly the History tab): the last-7-days
+                    rollup, then logged workouts newest first, 10 at a time. */}
+                <h3 style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--accent)', marginTop: 24, marginBottom: 12 }}>Recent workouts</h3>
+                {/* Last-7d rollup — descriptive only; never flags gaps. */}
+                {last7dStats.workoutCount > 0 && (() => {
+                  const segments = Object.entries(last7dStats.blockTypeCounts).sort((a, b) => b[1] - a[1]);
+                  return (
+                    <div style={{
+                      marginBottom: 16,
+                      padding: '12px 14px',
+                      background: 'var(--surface2)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 8,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 6,
+                    }}>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600 }}>
+                        Last 7 days
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'baseline' }}>
+                        <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>
+                          {last7dStats.workoutCount} workout{last7dStats.workoutCount === 1 ? '' : 's'}
+                        </span>
+                        {segments.length > 0 && (
+                          <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>
+                            · {segments.map(([t, n]) => `${n} ${BLOCK_TYPE_LABELS[t] ?? t}`).join(' · ')}
+                          </span>
+                        )}
+                      </div>
+                      {topSet7d && (
+                        <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>
+                          Top set: <span style={{ fontWeight: 600, color: 'var(--text)' }}>{formatMovementName(topSet7d.movement)}</span>{' '}
+                          <span style={{ fontFamily: 'JetBrains Mono', color: 'var(--accent)' }}>{topSet7d.weight}{topSet7d.unit}</span>{' '}
+                          <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>
+                            · {new Date(topSet7d.date + 'T12:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+                {(() => {
+                  const recent = logs.slice(0, recentLimit);
+                  return recent.length === 0 ? null : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {recent.map(log => {
+                      const logBlocks = blocksByLog[log.id] || [];
+                      return (
+                        <div
+                          key={log.id}
+                          className="workout-review-section"
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => setExpandedId(expandedId === log.id ? null : log.id)}
+                        >
+                          <div>
+                            <span style={{ fontWeight: 700, fontSize: 15 }}>{formatDate(log.workout_date)}</span>
+                          </div>
+
+                          {expandedId === log.id && (() => {
+                            const logEntries = entriesByLog[log.id] || [];
+                            return (
+                              <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      navigate('/workout/start', { state: { edit_log_id: log.id } });
+                                    }}
+                                    style={{
+                                      background: 'none', border: '1px solid var(--border)', borderRadius: 6,
+                                      color: 'var(--text-dim)', cursor: 'pointer', padding: '4px 12px',
+                                      fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5,
+                                      fontFamily: "'Outfit', sans-serif",
+                                    }}
+                                  >
+                                    Edit Workout
+                                  </button>
+                                </div>
+                                {logBlocks.length > 0 ? (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                    {logBlocks.map((block, i) => {
+                                      const blockEntries = logEntries.filter(e => e.block_id ? e.block_id === block.id : e.block_label === block.block_label);
+                                      const isSkills = block.block_type === 'skills';
+                                      return (
+                                        <div key={i}>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                                            <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--accent)', textTransform: 'uppercase' }}>
+                                              {getBlockLabel(block)}
+                                            </span>
+                                            {block.score && (
+                                              <span style={{ fontFamily: 'JetBrains Mono', fontSize: 13, color: 'var(--text-dim)' }}>
+                                                {block.score}
+                                              </span>
+                                            )}
+                                            {block.rx && (
+                                              <span style={{ fontSize: 11, background: 'var(--accent-glow)', color: 'var(--accent)', padding: '1px 6px', borderRadius: 4 }}>Rx</span>
+                                            )}
+                                            {block.capped ? (
+                                              <span style={{
+                                                fontSize: 11, padding: '1px 6px', borderRadius: 4, fontWeight: 600,
+                                                background: 'rgba(234,179,8,0.15)', color: '#eab308',
+                                              }}>
+                                                {block.capped_reps != null ? `Capped @ ${block.capped_reps} reps` : 'Capped'}
+                                              </span>
+                                            ) : block.percentile != null && (
+                                              <span style={{
+                                                fontSize: 11,
+                                                padding: '1px 6px',
+                                                borderRadius: 4,
+                                                fontWeight: 600,
+                                                background: block.percentile >= 75 ? 'rgba(34,197,94,0.15)' : block.percentile >= 40 ? 'rgba(234,179,8,0.15)' : 'rgba(239,68,68,0.15)',
+                                                color: block.percentile >= 75 ? '#22c55e' : block.percentile >= 40 ? '#eab308' : '#ef4444',
+                                              }}>
+                                                {block.percentile}th %ile
+                                              </span>
+                                            )}
+                                          </div>
+                                          <div style={{ whiteSpace: 'pre-wrap', fontSize: 14, color: 'var(--text-dim)', paddingLeft: 8 }}>
+                                            {block.block_text}
+                                          </div>
+
+                                          {/* Power (P5/P5b) — metcon + cardio blocks that computed a watts figure. */}
+                                          {block.avg_power_watts != null && Number.isFinite(Number(block.avg_power_watts)) && (() => {
+                                            const w = Number(block.avg_power_watts);
+                                            const wkg = block.avg_w_per_kg != null ? Number(block.avg_w_per_kg) : null;
+                                            const j = block.joules != null ? Number(block.joules) : null;
+                                            return (
+                                              <div style={{ paddingLeft: 8, marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'baseline', fontFamily: 'JetBrains Mono' }}>
+                                                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)' }}>
+                                                  {Math.round(w)} W
+                                                </span>
+                                                {wkg != null && Number.isFinite(wkg) && (
+                                                  <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{wkg.toFixed(2)} W/kg</span>
+                                                )}
+                                                {block.block_type === 'cardio' && block.work_seconds != null && (
+                                                  <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{formatDuration(Number(block.work_seconds))}</span>
+                                                )}
+                                                {j != null && Number.isFinite(j) && (
+                                                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{formatJoules(j)}</span>
+                                                )}
+                                              </div>
+                                            );
+                                          })()}
+
+                                          {block.block_type === 'strength' && blockEntries.length > 0 && (() => {
+                                            // One-line top-set per movement. Full per-set detail + edit
+                                            // lives on the Strength tab — strength's single home.
+                                            const lbsOf = (w: number, u: string) => u === 'kg' ? w * 2.20462 : w;
+                                            const tops = new Map<string, { weight: number; reps: number | null; unit: string }>();
+                                            for (const e of blockEntries) {
+                                              if (e.weight == null || e.weight <= 0) continue;
+                                              const cur = tops.get(e.movement);
+                                              if (!cur || lbsOf(e.weight, e.weight_unit) > lbsOf(cur.weight, cur.unit)) {
+                                                tops.set(e.movement, { weight: e.weight, reps: e.reps, unit: e.weight_unit });
+                                              }
+                                            }
+                                            if (tops.size === 0) return null;
+                                            return (
+                                              <div style={{ paddingLeft: 8, marginTop: 8, fontSize: 13, color: 'var(--text-dim)' }}>
+                                                {[...tops.entries()].map(([m, top], i) => (
+                                                  <span key={m}>
+                                                    {i > 0 && <span style={{ color: 'var(--text-muted)' }}> · </span>}
+                                                    <span style={{ fontWeight: 600, color: 'var(--text)' }}>{formatMovementName(m)}</span>
+                                                    {' '}{top.weight}{top.unit}{top.reps != null ? ` x${top.reps}` : ''}
+                                                  </span>
+                                                ))}
+                                              </div>
+                                            );
+                                          })()}
+
+                                          {isSkills && blockEntries.length > 0 && (
+                                            <div style={{ paddingLeft: 8, marginTop: 8, fontSize: 13, color: 'var(--text-dim)' }}>
+                                              {blockEntries.map((entry, ei) => {
+                                                const effReps = entry.reps_completed ?? entry.reps;
+                                                const parts: string[] = [];
+                                                if (entry.sets != null) parts.push(`${entry.sets} set${entry.sets !== 1 ? 's' : ''}`);
+                                                if (effReps != null) parts.push(`x${effReps}`);
+                                                if (entry.hold_seconds != null) parts.push(`${entry.hold_seconds}s hold`);
+                                                const detail = parts.length > 0 ? parts.join(' ') : 'practiced';
+                                                return (
+                                                  <span key={entry.id}>
+                                                    {ei > 0 && <span style={{ color: 'var(--text-muted)' }}> · </span>}
+                                                    <span style={{ fontWeight: 600, color: 'var(--text)' }}>{formatMovementName(entry.movement)}</span>
+                                                    {' '}{detail}
+                                                  </span>
+                                                );
+                                              })}
+                                            </div>
+                                          )}
+
+                                          {block.block_type === 'accessory' && blockEntries.length > 0 && (() => {
+                                            // One-line top-set per movement. Full detail + edit
+                                            // lives on the Accessory tab — accessory's single home.
+                                            const lbsOf = (w: number, u: string) => u === 'kg' ? w * 2.20462 : w;
+                                            const tops = new Map<string, { weight: number | null; reps: number | null; unit: string }>();
+                                            for (const e of blockEntries) {
+                                              const cur = tops.get(e.movement);
+                                              if (e.weight != null && e.weight > 0) {
+                                                if (!cur || cur.weight == null || lbsOf(e.weight, e.weight_unit) > lbsOf(cur.weight, cur.unit)) {
+                                                  tops.set(e.movement, { weight: e.weight, reps: e.reps, unit: e.weight_unit });
+                                                }
+                                              } else if (!cur) {
+                                                tops.set(e.movement, { weight: null, reps: e.reps, unit: '' });
+                                              }
+                                            }
+                                            if (tops.size === 0) return null;
+                                            return (
+                                              <div style={{ paddingLeft: 8, marginTop: 8, fontSize: 13, color: 'var(--text-dim)' }}>
+                                                {[...tops.entries()].map(([m, top], i) => (
+                                                  <span key={m}>
+                                                    {i > 0 && <span style={{ color: 'var(--text-muted)' }}> · </span>}
+                                                    <span style={{ fontWeight: 600, color: 'var(--text)' }}>{formatMovementName(m)}</span>
+                                                    {top.weight != null ? ` ${top.weight}${top.unit}` : ''}
+                                                    {top.reps != null ? ` x${top.reps}` : ''}
+                                                  </span>
+                                                ))}
+                                              </div>
+                                            );
+                                          })()}
+
+                                          {block.block_type === 'metcon' && blockEntries.length > 0 && (
+                                            <div style={{ paddingLeft: 8, marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                              {blockEntries.map((entry, ei) => (
+                                                editingEntryId === entry.id ? (
+                                                  <div key={ei} style={{ display: 'flex', flexWrap: 'wrap', gap: 4, width: '100%', alignItems: 'center' }}>
+                                                    <span style={{ fontSize: 12, fontWeight: 600 }}>{formatMovementName(entry.movement)}</span>
+                                                    <input type="number" value={editFields.reps} onChange={ev => setEditFields(f => ({ ...f, reps: ev.target.value }))} placeholder="Reps" style={{ width: 50, padding: '2px 5px', fontSize: 12, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)' }} />
+                                                    <input type="number" value={editFields.weight} onChange={ev => setEditFields(f => ({ ...f, weight: ev.target.value }))} placeholder="Weight" style={{ width: 70, padding: '2px 5px', fontSize: 12, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)' }} />
+                                                    <button onClick={() => saveEdit(entry.id)} disabled={editSaving} style={{ padding: '2px 6px', fontSize: 11, background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>{editSaving ? '...' : 'Save'}</button>
+                                                    <button onClick={cancelEdit} style={{ padding: '2px 6px', fontSize: 11, background: 'var(--surface2)', color: 'var(--text-dim)', border: 'none', borderRadius: 4, cursor: 'pointer' }}>Cancel</button>
+                                                    <button onClick={() => deleteEntry(entry.id)} disabled={editSaving} style={{ padding: '2px 6px', fontSize: 11, background: 'transparent', color: 'var(--danger, #e74c3c)', border: 'none', cursor: 'pointer' }}>Delete</button>
+                                                  </div>
+                                                ) : (
+                                                <span key={ei} onClick={(ev) => { ev.stopPropagation(); startEdit(entry); }} style={{ fontSize: 12, color: 'var(--text-dim)', background: 'var(--surface2)', padding: '3px 8px', borderRadius: 4, cursor: 'pointer' }} title="Click to edit">
+                                                  {formatMovementName(entry.movement)}
+                                                  {entry.reps != null && ` x${entry.reps}`}
+                                                  {entry.weight != null && ` @${entry.weight}${entry.weight_unit}`}
+                                                  {entry.distance != null && ` ${entry.distance}${entry.distance_unit || 'm'}`}
+                                                  {entry.scaling_note && ` (${entry.scaling_note})`}
+                                                </span>
+                                                )
+                                              ))}
+                                            </div>
+                                          )}
+
+                                          {/* Faults the athlete flagged on this metcon — their qualitative limiters. */}
+                                          {block.block_type === 'metcon' && blockEntries.some(e => e.faults_observed && e.faults_observed.length > 0) && (
+                                            <div style={{ paddingLeft: 8, marginTop: 6, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                              {blockEntries.filter(e => e.faults_observed && e.faults_observed.length > 0).map((e, ei) => (
+                                                <span key={ei} style={{ fontSize: 11, color: 'var(--danger, #e74c3c)' }}>
+                                                  <span style={{ fontWeight: 600 }}>{formatMovementName(e.movement)}:</span> {e.faults_observed!.join(', ')}
+                                                </span>
+                                              ))}
+                                            </div>
+                                          )}
+
+                                          {/* Block-level note the athlete left (e.g. "New Fran PR!"). */}
+                                          {block.notes && (
+                                            <div style={{ paddingLeft: 8, marginTop: 6, fontSize: 12, color: 'var(--text-dim)', fontStyle: 'italic' }}>
+                                              {block.notes}
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                ) : (
+                                  <div style={{ whiteSpace: 'pre-wrap', fontSize: 14, color: 'var(--text-dim)' }}>
+                                    {log.workout_text}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      );
+                    })}
+                    {logs.length > recentLimit && (
+                      <button
+                        onClick={() => setRecentLimit(n => n + 10)}
+                        style={{ width: '100%', padding: '8px 0', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text-dim)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
+                      >
+                        Show more
+                      </button>
+                    )}
+                  </div>
+                  );
+                })()}
               </div>
             ) : tab === 'strength' ? (
               /* ── Strength Tab ── */
@@ -3078,8 +3336,8 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                   });
                 })()}
               </div>
-            ) : tab === 'cardio' ? (
-              /* ── Cardio Tab ── */
+            ) : (
+              /* ── Cardio Tab (only reachable when it has data) ── */
               <div>
                 {(() => {
                   if (cardioByModality.size === 0) {
@@ -3141,324 +3399,6 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                   });
                 })()}
               </div>
-            ) : (
-              /* ── History Tab ── */
-              <>
-                {/* Last-7d rollup — descriptive only; never flags gaps. */}
-                {last7dStats.workoutCount > 0 && (() => {
-                  const segments = Object.entries(last7dStats.blockTypeCounts).sort((a, b) => b[1] - a[1]);
-                  return (
-                    <div style={{
-                      marginBottom: 16,
-                      padding: '12px 14px',
-                      background: 'var(--surface2)',
-                      border: '1px solid var(--border)',
-                      borderRadius: 8,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 6,
-                    }}>
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600 }}>
-                        Last 7 days
-                      </div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'baseline' }}>
-                        <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>
-                          {last7dStats.workoutCount} workout{last7dStats.workoutCount === 1 ? '' : 's'}
-                        </span>
-                        {segments.length > 0 && (
-                          <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>
-                            · {segments.map(([t, n]) => `${n} ${BLOCK_TYPE_LABELS[t] ?? t}`).join(' · ')}
-                          </span>
-                        )}
-                      </div>
-                      {topSet7d && (
-                        <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>
-                          Top set: <span style={{ fontWeight: 600, color: 'var(--text)' }}>{formatMovementName(topSet7d.movement)}</span>{' '}
-                          <span style={{ fontFamily: 'JetBrains Mono', color: 'var(--accent)' }}>{topSet7d.weight}{topSet7d.unit}</span>{' '}
-                          <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>
-                            · {new Date(topSet7d.date + 'T12:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
-                <div className="source-toggle" style={{ marginBottom: 16 }}>
-                  {(['all', 'metcon'] as const).map(f => (
-                    <button
-                      key={f}
-                      className={'source-btn' + (blockFilter === f ? ' active' : '')}
-                      onClick={() => { setBlockFilter(f); setExpandedId(null); }}
-                    >
-                      {f === 'all' ? 'All' : BLOCK_TYPE_LABELS[f] || f}
-                    </button>
-                  ))}
-                </div>
-                {(() => {
-                  const filtered = blockFilter === 'all'
-                    ? logs
-                    : logs.filter(log => (blocksByLog[log.id] || []).some(b => b.block_type === blockFilter));
-                  return filtered.length === 0 ? (
-                    <div className="workout-review-section" style={{ textAlign: 'center', padding: 40 }}>
-                      <p style={{ color: 'var(--text-dim)' }}>No {BLOCK_TYPE_LABELS[blockFilter]?.toLowerCase() || ''} workouts found.</p>
-                    </div>
-                  ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    {filtered.map(log => {
-                      const allBlocks = blocksByLog[log.id] || [];
-                      const logBlocks = blockFilter === 'all'
-                        ? allBlocks
-                        : allBlocks.filter(b => b.block_type === blockFilter);
-                      return (
-                        <div
-                          key={log.id}
-                          className="workout-review-section"
-                          style={{ cursor: 'pointer' }}
-                          onClick={() => setExpandedId(expandedId === log.id ? null : log.id)}
-                        >
-                          <div>
-                            <span style={{ fontWeight: 700, fontSize: 15 }}>{formatDate(log.workout_date)}</span>
-                          </div>
-
-                          {expandedId === log.id && (() => {
-                            const logEntries = entriesByLog[log.id] || [];
-                            return (
-                              <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
-                                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      navigate('/workout/start', { state: { edit_log_id: log.id } });
-                                    }}
-                                    style={{
-                                      background: 'none', border: '1px solid var(--border)', borderRadius: 6,
-                                      color: 'var(--text-dim)', cursor: 'pointer', padding: '4px 12px',
-                                      fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5,
-                                      fontFamily: "'Outfit', sans-serif",
-                                    }}
-                                  >
-                                    Edit Workout
-                                  </button>
-                                </div>
-                                {logBlocks.length > 0 ? (
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                                    {logBlocks.map((block, i) => {
-                                      const blockEntries = logEntries.filter(e => e.block_id ? e.block_id === block.id : e.block_label === block.block_label);
-                                      const isSkills = block.block_type === 'skills';
-                                      return (
-                                        <div key={i}>
-                                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                                            <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--accent)', textTransform: 'uppercase' }}>
-                                              {getBlockLabel(block)}
-                                            </span>
-                                            {block.score && (
-                                              <span style={{ fontFamily: 'JetBrains Mono', fontSize: 13, color: 'var(--text-dim)' }}>
-                                                {block.score}
-                                              </span>
-                                            )}
-                                            {block.rx && (
-                                              <span style={{ fontSize: 11, background: 'var(--accent-glow)', color: 'var(--accent)', padding: '1px 6px', borderRadius: 4 }}>Rx</span>
-                                            )}
-                                            {block.capped ? (
-                                              <span style={{
-                                                fontSize: 11, padding: '1px 6px', borderRadius: 4, fontWeight: 600,
-                                                background: 'rgba(234,179,8,0.15)', color: '#eab308',
-                                              }}>
-                                                {block.capped_reps != null ? `Capped @ ${block.capped_reps} reps` : 'Capped'}
-                                              </span>
-                                            ) : block.percentile != null && (
-                                              <span style={{
-                                                fontSize: 11,
-                                                padding: '1px 6px',
-                                                borderRadius: 4,
-                                                fontWeight: 600,
-                                                background: block.percentile >= 75 ? 'rgba(34,197,94,0.15)' : block.percentile >= 40 ? 'rgba(234,179,8,0.15)' : 'rgba(239,68,68,0.15)',
-                                                color: block.percentile >= 75 ? '#22c55e' : block.percentile >= 40 ? '#eab308' : '#ef4444',
-                                              }}>
-                                                {block.percentile}th %ile
-                                              </span>
-                                            )}
-                                          </div>
-                                          <div style={{ whiteSpace: 'pre-wrap', fontSize: 14, color: 'var(--text-dim)', paddingLeft: 8 }}>
-                                            {block.block_text}
-                                          </div>
-
-                                          {/* Power (P5/P5b) — metcon + cardio blocks that computed a watts figure. */}
-                                          {block.avg_power_watts != null && Number.isFinite(Number(block.avg_power_watts)) && (() => {
-                                            const w = Number(block.avg_power_watts);
-                                            const wkg = block.avg_w_per_kg != null ? Number(block.avg_w_per_kg) : null;
-                                            const j = block.joules != null ? Number(block.joules) : null;
-                                            // "vs 30d avg" — same block_type + comparable bucket; skipped when
-                                            // the bucket only contains this block (no usable baseline).
-                                            const bucketKey = block.block_type === 'metcon'
-                                              ? `metcon:${block.time_domain ?? 'unknown'}`
-                                              : block.block_type === 'cardio'
-                                              ? `cardio:${block.cardio_modality ?? 'unknown'}`
-                                              : null;
-                                            const baseline = bucketKey ? powerBaselines[bucketKey] : null;
-                                            const deltaPct = baseline && baseline.count >= 2
-                                              ? Math.round(((w - baseline.avg) / baseline.avg) * 100)
-                                              : null;
-                                            return (
-                                              <div style={{ paddingLeft: 8, marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'baseline', fontFamily: 'JetBrains Mono' }}>
-                                                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)' }}>
-                                                  {Math.round(w)} W
-                                                </span>
-                                                {wkg != null && Number.isFinite(wkg) && (
-                                                  <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{wkg.toFixed(2)} W/kg</span>
-                                                )}
-                                                {block.block_type === 'cardio' && block.work_seconds != null && (
-                                                  <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{formatDuration(Number(block.work_seconds))}</span>
-                                                )}
-                                                {j != null && Number.isFinite(j) && (
-                                                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{formatJoules(j)}</span>
-                                                )}
-                                                {deltaPct != null && deltaPct !== 0 && (
-                                                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                                                    {deltaPct > 0 ? '+' : ''}{deltaPct}% vs 30d avg
-                                                  </span>
-                                                )}
-                                              </div>
-                                            );
-                                          })()}
-
-                                          {block.block_type === 'strength' && blockEntries.length > 0 && (() => {
-                                            // One-line top-set per movement. Full per-set detail + edit
-                                            // lives on the Strength tab — strength's single home.
-                                            const lbsOf = (w: number, u: string) => u === 'kg' ? w * 2.20462 : w;
-                                            const tops = new Map<string, { weight: number; reps: number | null; unit: string }>();
-                                            for (const e of blockEntries) {
-                                              if (e.weight == null || e.weight <= 0) continue;
-                                              const cur = tops.get(e.movement);
-                                              if (!cur || lbsOf(e.weight, e.weight_unit) > lbsOf(cur.weight, cur.unit)) {
-                                                tops.set(e.movement, { weight: e.weight, reps: e.reps, unit: e.weight_unit });
-                                              }
-                                            }
-                                            if (tops.size === 0) return null;
-                                            return (
-                                              <div style={{ paddingLeft: 8, marginTop: 8, fontSize: 13, color: 'var(--text-dim)' }}>
-                                                {[...tops.entries()].map(([m, top], i) => (
-                                                  <span key={m}>
-                                                    {i > 0 && <span style={{ color: 'var(--text-muted)' }}> · </span>}
-                                                    <span style={{ fontWeight: 600, color: 'var(--text)' }}>{formatMovementName(m)}</span>
-                                                    {' '}{top.weight}{top.unit}{top.reps != null ? ` x${top.reps}` : ''}
-                                                  </span>
-                                                ))}
-                                              </div>
-                                            );
-                                          })()}
-
-                                          {isSkills && blockEntries.length > 0 && (
-                                            <div style={{ paddingLeft: 8, marginTop: 8, fontSize: 13, color: 'var(--text-dim)' }}>
-                                              {blockEntries.map((entry, ei) => {
-                                                const effReps = entry.reps_completed ?? entry.reps;
-                                                const parts: string[] = [];
-                                                if (entry.sets != null) parts.push(`${entry.sets} set${entry.sets !== 1 ? 's' : ''}`);
-                                                if (effReps != null) parts.push(`x${effReps}`);
-                                                if (entry.hold_seconds != null) parts.push(`${entry.hold_seconds}s hold`);
-                                                const detail = parts.length > 0 ? parts.join(' ') : 'practiced';
-                                                return (
-                                                  <span key={entry.id}>
-                                                    {ei > 0 && <span style={{ color: 'var(--text-muted)' }}> · </span>}
-                                                    <span style={{ fontWeight: 600, color: 'var(--text)' }}>{formatMovementName(entry.movement)}</span>
-                                                    {' '}{detail}
-                                                  </span>
-                                                );
-                                              })}
-                                            </div>
-                                          )}
-
-                                          {block.block_type === 'accessory' && blockEntries.length > 0 && (() => {
-                                            // One-line top-set per movement. Full detail + edit
-                                            // lives on the Accessory tab — accessory's single home.
-                                            const lbsOf = (w: number, u: string) => u === 'kg' ? w * 2.20462 : w;
-                                            const tops = new Map<string, { weight: number | null; reps: number | null; unit: string }>();
-                                            for (const e of blockEntries) {
-                                              const cur = tops.get(e.movement);
-                                              if (e.weight != null && e.weight > 0) {
-                                                if (!cur || cur.weight == null || lbsOf(e.weight, e.weight_unit) > lbsOf(cur.weight, cur.unit)) {
-                                                  tops.set(e.movement, { weight: e.weight, reps: e.reps, unit: e.weight_unit });
-                                                }
-                                              } else if (!cur) {
-                                                tops.set(e.movement, { weight: null, reps: e.reps, unit: '' });
-                                              }
-                                            }
-                                            if (tops.size === 0) return null;
-                                            return (
-                                              <div style={{ paddingLeft: 8, marginTop: 8, fontSize: 13, color: 'var(--text-dim)' }}>
-                                                {[...tops.entries()].map(([m, top], i) => (
-                                                  <span key={m}>
-                                                    {i > 0 && <span style={{ color: 'var(--text-muted)' }}> · </span>}
-                                                    <span style={{ fontWeight: 600, color: 'var(--text)' }}>{formatMovementName(m)}</span>
-                                                    {top.weight != null ? ` ${top.weight}${top.unit}` : ''}
-                                                    {top.reps != null ? ` x${top.reps}` : ''}
-                                                  </span>
-                                                ))}
-                                              </div>
-                                            );
-                                          })()}
-
-                                          {block.block_type === 'metcon' && blockEntries.length > 0 && (
-                                            <div style={{ paddingLeft: 8, marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                                              {blockEntries.map((entry, ei) => (
-                                                editingEntryId === entry.id ? (
-                                                  <div key={ei} style={{ display: 'flex', flexWrap: 'wrap', gap: 4, width: '100%', alignItems: 'center' }}>
-                                                    <span style={{ fontSize: 12, fontWeight: 600 }}>{formatMovementName(entry.movement)}</span>
-                                                    <input type="number" value={editFields.reps} onChange={ev => setEditFields(f => ({ ...f, reps: ev.target.value }))} placeholder="Reps" style={{ width: 50, padding: '2px 5px', fontSize: 12, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)' }} />
-                                                    <input type="number" value={editFields.weight} onChange={ev => setEditFields(f => ({ ...f, weight: ev.target.value }))} placeholder="Weight" style={{ width: 70, padding: '2px 5px', fontSize: 12, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)' }} />
-                                                    <button onClick={() => saveEdit(entry.id)} disabled={editSaving} style={{ padding: '2px 6px', fontSize: 11, background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>{editSaving ? '...' : 'Save'}</button>
-                                                    <button onClick={cancelEdit} style={{ padding: '2px 6px', fontSize: 11, background: 'var(--surface2)', color: 'var(--text-dim)', border: 'none', borderRadius: 4, cursor: 'pointer' }}>Cancel</button>
-                                                    <button onClick={() => deleteEntry(entry.id)} disabled={editSaving} style={{ padding: '2px 6px', fontSize: 11, background: 'transparent', color: 'var(--danger, #e74c3c)', border: 'none', cursor: 'pointer' }}>Delete</button>
-                                                  </div>
-                                                ) : (
-                                                <span key={ei} onClick={(ev) => { ev.stopPropagation(); startEdit(entry); }} style={{ fontSize: 12, color: 'var(--text-dim)', background: 'var(--surface2)', padding: '3px 8px', borderRadius: 4, cursor: 'pointer' }} title="Click to edit">
-                                                  {formatMovementName(entry.movement)}
-                                                  {entry.reps != null && ` x${entry.reps}`}
-                                                  {entry.weight != null && ` @${entry.weight}${entry.weight_unit}`}
-                                                  {entry.distance != null && ` ${entry.distance}${entry.distance_unit || 'm'}`}
-                                                  {entry.scaling_note && ` (${entry.scaling_note})`}
-                                                </span>
-                                                )
-                                              ))}
-                                            </div>
-                                          )}
-
-                                          {/* Faults the athlete flagged on this metcon — their qualitative limiters. */}
-                                          {block.block_type === 'metcon' && blockEntries.some(e => e.faults_observed && e.faults_observed.length > 0) && (
-                                            <div style={{ paddingLeft: 8, marginTop: 6, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                              {blockEntries.filter(e => e.faults_observed && e.faults_observed.length > 0).map((e, ei) => (
-                                                <span key={ei} style={{ fontSize: 11, color: 'var(--danger, #e74c3c)' }}>
-                                                  <span style={{ fontWeight: 600 }}>{formatMovementName(e.movement)}:</span> {e.faults_observed!.join(', ')}
-                                                </span>
-                                              ))}
-                                            </div>
-                                          )}
-
-                                          {/* Block-level note the athlete left (e.g. "New Fran PR!"). */}
-                                          {block.notes && (
-                                            <div style={{ paddingLeft: 8, marginTop: 6, fontSize: 12, color: 'var(--text-dim)', fontStyle: 'italic' }}>
-                                              {block.notes}
-                                            </div>
-                                          )}
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                ) : (
-                                  <div style={{ whiteSpace: 'pre-wrap', fontSize: 14, color: 'var(--text-dim)' }}>
-                                    {log.workout_text}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })()}
-                        </div>
-                      );
-                    })}
-                  </div>
-                  );
-                })()}
-              </>
             )}
 
             {/* Back to program link */}

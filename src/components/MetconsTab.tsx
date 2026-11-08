@@ -163,25 +163,38 @@ function MetconDetailCard({
   );
 }
 
-/** Program avg W/kg per time-domain bucket. */
+/** Program avg W/kg per time-domain bucket, as horizontal bars scaled to the
+ *  highest bucket. "N of M" = metcons with a power reading / metcons logged. */
 function TimeDomainBreakdown({ program }: { program: WkgBucketStat[] }) {
+  const max = program.reduce((m, p) => Math.max(m, p.avgWkg ?? 0), 0);
   return (
     <div style={{ marginTop: 16 }}>
       <div style={{ fontSize: 13, fontWeight: 800, letterSpacing: 0.8, color: 'var(--text)', textTransform: 'uppercase', marginBottom: 10 }}>
         Power by time domain
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '72px 1fr', gap: '6px 10px', alignItems: 'center' }}>
-        {program.flatMap((p) => [
-          <div key={`${p.bucket}-lbl`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text)' }}>
-            <span style={{ width: 8, height: 8, borderRadius: 2, background: BUCKET_COLOR[p.bucket] }} />
-            {BUCKET_LABEL[p.bucket]}
-          </div>,
-          <div key={`${p.bucket}-val`} style={{ fontSize: 13, color: 'var(--text)', fontFamily: 'JetBrains Mono' }}>
-            {p.avgWkg != null ? p.avgWkg.toFixed(2) : '—'}
-            {p.avgWkg != null && <span style={{ fontSize: 10, color: 'var(--text-muted)' }}> W/kg</span>}
-            {p.n > 0 && <span style={{ fontSize: 10, color: 'var(--text-muted)' }}> ({p.nWithPower}/{p.n})</span>}
-          </div>,
-        ])}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {program.map((p) => (
+          <div key={p.bucket} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+            <span style={{ width: 76, flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--text)' }}>
+              <span style={{ width: 8, height: 8, borderRadius: 2, background: BUCKET_COLOR[p.bucket] }} />
+              {BUCKET_LABEL[p.bucket]}
+            </span>
+            <div style={{ flex: 1, height: 8, background: 'var(--surface)', borderRadius: 4, overflow: 'hidden' }}>
+              {p.avgWkg != null && max > 0 && (
+                <div style={{ height: '100%', width: `${(p.avgWkg / max) * 100}%`, background: 'var(--accent)' }} />
+              )}
+            </div>
+            <span style={{ width: 82, flexShrink: 0, textAlign: 'right', fontFamily: 'JetBrains Mono', color: 'var(--text)' }}>
+              {p.avgWkg != null ? <>{p.avgWkg.toFixed(2)}<span style={{ fontSize: 10, color: 'var(--text-muted)' }}> W/kg</span></> : '—'}
+            </span>
+            <span style={{ width: 56, flexShrink: 0, textAlign: 'right', fontSize: 11, color: 'var(--text-muted)' }}>
+              {p.n > 0 ? `${p.nWithPower} of ${p.n}` : ''}
+            </span>
+          </div>
+        ))}
+      </div>
+      <div style={{ marginTop: 8, fontSize: 10, color: 'var(--text-muted)', fontStyle: 'italic' }}>
+        Average across metcons with a power reading — &ldquo;N of M&rdquo; means power could be calculated for N of the M metcons you logged in that time domain.
       </div>
     </div>
   );
