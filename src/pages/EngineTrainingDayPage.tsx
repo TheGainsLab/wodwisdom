@@ -33,7 +33,8 @@ import FiberSpectrum from '../components/engine/FiberSpectrum';
 import { localDateString } from '../lib/localDate';
 import EnginePaywall from '../components/engine/EnginePaywall';
 import { useEntitlements } from '../hooks/useEntitlements';
-import { ChevronLeft, ChevronDown, Play, Pause, Square, Check, RotateCcw, AlertTriangle, Share2, Lock } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronDown, Play, Pause, Square, Check, RotateCcw, AlertTriangle, Share2, Lock } from 'lucide-react';
+import { describeWorkout } from '../lib/engineStructure';
 
 // ── Types & Constants ────────────────────────────────────────────────
 
@@ -1144,6 +1145,36 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                 </div>
               )}
 
+              {/* Workout structure — what this day IS, before any equipment is
+                  picked. An athlete browsing ahead used to see only the picker
+                  and a Continue button and concluded the plan was hidden. Pace
+                  targets still wait for the modality (they need its baseline). */}
+              {workout && (() => {
+                const st = describeWorkout(workout);
+                if (!st.blocks.length) return null;
+                return (
+                  <>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 6 }}>
+                        {calculateWorkDurationMinutes(workout)} min work{st.blockCount > 1 ? ` · ${st.blockCount} blocks` : ''}
+                      </div>
+                      {st.blocks.map((b, i) => (
+                        <div key={i} style={{ fontSize: 14, color: 'var(--text-dim)', lineHeight: 1.6 }}>
+                          {st.blocks.length > 1 && <strong style={{ color: 'var(--text)', fontWeight: 600 }}>Block {i + 1}: </strong>}
+                          {b.long}
+                        </div>
+                      ))}
+                      {!isTimeTrial && (
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8 }}>
+                          Pick your equipment to see pace targets.
+                        </div>
+                      )}
+                    </div>
+                    <hr className="engine-divider" />
+                  </>
+                );
+              })()}
+
               {/* Category buttons */}
               <div>
                 <span className="engine-label">Select Modality</span>
@@ -1246,7 +1277,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                 disabled={!modality || !selectedUnit}
                 style={{ width: '100%' }}
               >
-                <Play size={18} /> Continue
+                See workout <ChevronRight size={18} />
               </button>
             </div>
           </div>
