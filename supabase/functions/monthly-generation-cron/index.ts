@@ -12,6 +12,7 @@
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { fetchWithTimeout } from "../_shared/fetch-with-timeout.ts";
+import { countPaidPeriods, ENGINE_MONTHS_CAP, entitledEngineMonths, lastUnlockIso, subscriptionCadence } from "../_shared/engine-entitlement.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -82,11 +83,7 @@ Deno.serve(async (_req) => {
       }
       if (!sub) continue;
 
-      const interval = sub.items?.data?.[0]?.price?.recurring?.interval;
-      const intervalCount = sub.items?.data?.[0]?.price?.recurring?.interval_count;
-      const isQuarterly = (interval === "month" && intervalCount === 3);
-
-      if (!isQuarterly) continue; // Only process quarterly users; monthly handled by webhook
+      if (subscriptionCadence(sub) !== "quarterly") continue; // Only process quarterly users; monthly handled by webhook
 
       // Subscription-anchored entitlement math (shared by both branches).
       // current_period_start + paid-invoice count is the source of truth — no
@@ -107,28 +104,18 @@ Deno.serve(async (_req) => {
         );
         if (invResp.ok) {
           const invData = await invResp.json();
-          // LOCKSTEP with stripe-webhook and reconcile-engine-months
-          // (2026-10-22): only invoices that billed a NEW period count —
-          // create, cycle, and updates that charged real money. Counting a
-          // $0 plan-flip invoice here over-raised quarterly users by a full
-          // quarter, which the sweep then flagged over_entitled forever.
-          paidInvoiceCount =
-            ((invData.data ?? []) as Array<{ billing_reason?: string; amount_paid?: number }>)
-              .filter((inv) =>
-                inv.billing_reason === "subscription_create" ||
-                inv.billing_reason === "subscription_cycle" ||
-                (inv.billing_reason === "subscription_update" && (inv.amount_paid ?? 0) > 0)
-              )
-              .length;
+          // LOCKSTEP with stripe-webhook and reconcile-engine-months: the
+          // shared predicate decides which invoices bought a new period.
+          paidInvoiceCount = countPaidPeriods(invData.data ?? []);
         }
       } catch {
         continue; // skip on error
       }
       if (paidInvoiceCount === 0) continue;
 
-      const daysIntoPeriod = (Date.now() - periodStartSec * 1000) / (1000 * 60 * 60 * 24);
-      const monthsIntoCurrentQuarter = Math.min(Math.floor(daysIntoPeriod / 30) + 1, 3);
-      const entitledMonths = (paidInvoiceCount - 1) * 3 + monthsIntoCurrentQuarter;
+      const ent = entitledEngineMonths("quarterly", paidInvoiceCount, periodStartSec);
+      if (!ent) continue;
+      const { entitled: entitledMonths, monthsIntoCurrentQuarter } = ent;
 
       // Programming: drip the next month when the program is behind entitlement.
       // Only ONE month per run (drip, don't catch up in a burst) — the next
@@ -192,13 +179,13 @@ Deno.serve(async (_req) => {
           .maybeSingle();
         const currentUnlocked = athleteProfile?.engine_months_unlocked ?? 0;
 
-        const entitled = Math.min(entitledMonths, 36);
+        const entitled = Math.min(entitledMonths, ENGINE_MONTHS_CAP);
 
         if (entitled > currentUnlocked) {
           // Anchor last_at to when the most recent unlock SHOULD have happened
-          // (periodStart + (months_in_quarter - 1) * 30 days) so the next drip
-          // lands on time. Diagnostic only — cron doesn't read last_at anymore.
-          const lastAtMs = periodStartSec * 1000 + (monthsIntoCurrentQuarter - 1) * 30 * 24 * 60 * 60 * 1000;
+          // so the next drip lands on time. Diagnostic only — cron doesn't
+          // read last_at anymore.
+          const lastAtIso = lastUnlockIso("quarterly", periodStartSec, monthsIntoCurrentQuarter);
           results.push(`Engine: raising user ${userId} from ${currentUnlocked} to ${entitled} (inv=${paidInvoiceCount}, into_quarter=${monthsIntoCurrentQuarter})`);
 
           await supa
@@ -207,7 +194,7 @@ Deno.serve(async (_req) => {
               {
                 user_id: userId,
                 engine_months_unlocked: entitled,
-                engine_months_unlocked_last_at: new Date(lastAtMs).toISOString(),
+                engine_months_unlocked_last_at: lastAtIso,
               },
               { onConflict: "user_id" }
             );

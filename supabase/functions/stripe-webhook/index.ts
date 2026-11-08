@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { fetchWithTimeout } from "../_shared/fetch-with-timeout.ts";
 import { raiseEngineMonthsFromGrant } from "../_shared/engine-months-drip.ts";
+import { countPaidPeriods, ENGINE_MONTHS_CAP, entitledEngineMonths, lastUnlockIso, subscriptionCadence } from "../_shared/engine-entitlement.ts";
 import { ALERT_EMAIL, buildCancelScheduledEmail, buildCancelUnscheduledEmail, buildGoodbyeEmail, buildRecoveryEmail, emailWrap, escapeHtml, logEmailSend, sendViaResend, unsubscribeUrl } from "../_shared/checkout-emails.ts";
 
 // ── Billing-events ledger (capture item A) ──────────────────────────────────
@@ -572,9 +573,19 @@ serve(async (req) => {
           const { plan, features } = await getSubscriptionEntitlements(subscriptionId);
           console.log(`Subscription updated: plan=${plan}, features=${features.join(",")}`);
 
+          // Legacy subscriptions: the Stripe account carries ~90 pre-app
+          // subscriptions (no app user, no plan metadata) whose renewals fire
+          // this event daily. They are nobody's entitlement — skip them
+          // quietly before they write a "plan_changed / unknown" ledger row
+          // and an error line (2026-11-08: ~6 false errors a day).
+          const who = await resolveByCustomer(supa, customerId);
+          if (features.length === 0 && !who.user_id) {
+            console.log(`[webhook] subscription.updated: ${subscriptionId} has no app user and no resolvable plan (legacy subscription) — ignoring`);
+            break;
+          }
+
           // Ledger: a price/items change on a live subscription = plan change.
           if (event.data.previous_attributes?.items) {
-            const who = await resolveByCustomer(supa, customerId);
             await recordBillingEvent(supa, {
               user_id: who.user_id, email: who.email,
               stripe_customer_id: customerId, stripe_subscription_id: subscriptionId,
@@ -1017,61 +1028,103 @@ serve(async (req) => {
               const nextMonth = (program.generated_months || 1) + 1;
               console.log(`[webhook] Triggering month ${nextMonth} generation for program ${program.id}`);
 
-              // Call generate-next-month using service role (no user token needed)
+              // Call generate-next-month using service role (no user token
+              // needed). Fire-and-forget: generation runs well past 30s, so
+              // awaiting it here only ever produced a timeout logged as an
+              // error while the generation itself completed (5 false alarms
+              // the week of 2026-11-03). The daily cron heals a real miss.
               const genUrl = `${SUPABASE_URL}/functions/v1/generate-next-month`;
-              try {
-                await fetchWithTimeout(genUrl, {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${SUPABASE_SERVICE_KEY}`,
-                    "x-webhook-user-id": payUserId,
-                  },
-                  body: JSON.stringify({ program_id: program.id, user_id: payUserId }),
-                }, 30_000);
-              } catch (e) {
-                console.error("[webhook] Failed to trigger program generation:", e);
-              }
+              const genPromise = fetchWithTimeout(genUrl, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${SUPABASE_SERVICE_KEY}`,
+                  "x-webhook-user-id": payUserId,
+                },
+                body: JSON.stringify({ program_id: program.id, user_id: payUserId }),
+              }, 150_000)
+                .then((r) => { if (!r.ok) console.warn(`[webhook] generate-next-month responded ${r.status} for program ${program.id}`); })
+                .catch((e) => console.warn(`[webhook] generate-next-month kickoff did not complete for program ${program.id}: ${(e as Error).message} — daily cron will heal`));
+              // deno-lint-ignore no-explicit-any
+              (globalThis as any).EdgeRuntime?.waitUntil?.(genPromise);
             }
           }
         }
 
-        // Engine users: unlock next month (capped at 36). Also creates the
-        // athlete_profiles row if it doesn't exist yet — an Engine subscriber
-        // who pays before picking a program still gets their first month.
+        // Engine users: raise engine_months_unlocked to what Stripe says has
+        // been PAID FOR — never add one. The old +1 keyed the first invoice on
+        // billing_reason=subscription_create, but Checkout's first invoice
+        // arrives as subscription_update, so the special case never matched
+        // and the checkout seed (month 1) plus this +1 double-granted every
+        // new subscriber whose checkout event landed first (2026-11-08 audit:
+        // 11 of 16 since Oct 9). Counting paid periods off Stripe's invoice
+        // list is independent of event order, retries and labels, and uses
+        // the SAME math as reconcile-engine-months and the cron. Also creates
+        // the athlete_profiles row if absent — an Engine subscriber who pays
+        // before picking a program still gets their first month.
         if (advance.has("engine")) {
           const { data: athleteProfile } = await supa
             .from("athlete_profiles")
             .select("engine_months_unlocked")
             .eq("user_id", payUserId)
             .maybeSingle();
-
           const currentUnlocked = athleteProfile?.engine_months_unlocked ?? 0;
-          // subscription_create bills the SAME month the checkout handler
-          // seeds (raise-to-1), not an additional one — the old unconditional
-          // +1 double-granted whenever checkout ran first, leaving 13 of 49
-          // subscribers one month ahead (2026-10-09 audit). Only-raise to 1
-          // makes whichever handler lands first correct and the other a no-op.
-          // (Rare edge, documented: a lapsed Engine subscriber starting a
-          // FRESH subscription keeps their old months and this no-ops; the
-          // nightly sweep flags them over_entitled for the operator to bump.)
-          const newUnlocked = invoice.billing_reason === "subscription_create"
-            ? Math.max(currentUnlocked, 1)
-            : Math.min(currentUnlocked + 1, 36);
+
+          let target: number | null = null;
+          let lastAt: string | null = null;
+          let why = "";
+          try {
+            const [subResp, invResp] = await Promise.all([
+              fetchWithTimeout(`https://api.stripe.com/v1/subscriptions/${subscriptionId}`, {
+                headers: { "Authorization": "Basic " + btoa(STRIPE_SECRET_KEY + ":") },
+              }, 15_000),
+              fetchWithTimeout(`https://api.stripe.com/v1/invoices?subscription=${subscriptionId}&status=paid&limit=100`, {
+                headers: { "Authorization": "Basic " + btoa(STRIPE_SECRET_KEY + ":") },
+              }, 15_000),
+            ]);
+            if (subResp.ok && invResp.ok) {
+              const sub = await subResp.json();
+              const paid = countPaidPeriods(((await invResp.json()).data ?? []));
+              const cadence = subscriptionCadence(sub);
+              const ent = cadence ? entitledEngineMonths(cadence, paid, sub.current_period_start) : null;
+              if (cadence && ent) {
+                target = ent.entitled;
+                lastAt = lastUnlockIso(cadence, sub.current_period_start, ent.monthsIntoCurrentQuarter);
+                why = `${cadence}:inv=${paid}:entitled=${ent.entitled}`;
+              } else {
+                why = cadence ? `no_paid_periods` : `unsupported_interval`;
+              }
+            } else {
+              why = `stripe ${subResp.status}/${invResp.status}`;
+            }
+          } catch (e) {
+            why = `stripe error: ${(e as Error).message}`;
+          }
+
+          if (target == null) {
+            // Could not compute entitlement. Never guess upward: make sure the
+            // athlete at least has month 1 (this invoice IS a paid period) and
+            // leave the exact figure to the nightly reconciler.
+            console.warn(`[webhook] invoice ${invoice.id}: engine entitlement not computable (${why}) — ensuring month 1, reconciler will true up`);
+            target = Math.max(currentUnlocked, 1);
+            lastAt = new Date().toISOString();
+          }
+
+          const newUnlocked = Math.min(target, ENGINE_MONTHS_CAP);
           if (newUnlocked > currentUnlocked) {
-            console.log(`[webhook] Unlocking engine month ${newUnlocked} for user ${payUserId}`);
+            console.log(`[webhook] Unlocking engine month ${newUnlocked} for user ${payUserId} (${why || "fallback"}, was ${currentUnlocked})`);
             await supa
               .from("athlete_profiles")
               .upsert(
                 {
                   user_id: payUserId,
                   engine_months_unlocked: newUnlocked,
-                  engine_months_unlocked_last_at: new Date().toISOString(),
+                  engine_months_unlocked_last_at: lastAt,
                 },
                 { onConflict: "user_id" }
               );
           } else {
-            console.log(`[webhook] Engine months at cap (36) for user ${payUserId} — no increment`);
+            console.log(`[webhook] Engine months already at ${currentUnlocked} for user ${payUserId} (${why || "fallback"}) — no change`);
           }
         }
 
