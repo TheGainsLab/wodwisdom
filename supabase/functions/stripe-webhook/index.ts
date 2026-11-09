@@ -994,6 +994,41 @@ serve(async (req) => {
         }
         console.log(`[webhook] invoice ${invoice.id} billing_reason=${invoice.billing_reason} advancing=[${[...advance].join(",")}]`);
 
+        // One Stripe read for both branches below: the subscription (cadence,
+        // period start) and its paid invoices (how many periods have been
+        // bought). paidPeriods === 1 is the robust "this is the subscription's
+        // first paid invoice" signal — billing_reason is NOT: Checkout labels
+        // first invoices subscription_update (2026-11-08 Engine double-grant).
+        let stripeSub: any = null;
+        let paidPeriods: number | null = null;
+        let stripeWhy = "";
+        if (advance.has("programming") || advance.has("engine")) {
+          try {
+            const [subResp, invResp] = await Promise.all([
+              fetchWithTimeout(`https://api.stripe.com/v1/subscriptions/${subscriptionId}`, {
+                headers: { "Authorization": "Basic " + btoa(STRIPE_SECRET_KEY + ":") },
+              }, 15_000),
+              fetchWithTimeout(`https://api.stripe.com/v1/invoices?subscription=${subscriptionId}&status=paid&limit=100`, {
+                headers: { "Authorization": "Basic " + btoa(STRIPE_SECRET_KEY + ":") },
+              }, 15_000),
+            ]);
+            if (subResp.ok && invResp.ok) {
+              stripeSub = await subResp.json();
+              paidPeriods = countPaidPeriods(((await invResp.json()).data ?? []));
+            } else {
+              stripeWhy = `stripe ${subResp.status}/${invResp.status}`;
+            }
+          } catch (e) {
+            stripeWhy = `stripe error: ${(e as Error).message}`;
+          }
+        }
+        // First paid period on this subscription. Falls back to the label only
+        // when Stripe could not be read (then subscription_create is at least
+        // never a false positive).
+        const isFirstPaidPeriod = paidPeriods != null
+          ? paidPeriods === 1
+          : invoice.billing_reason === "subscription_create";
+
         // Programming users: trigger next month generation
         if (advance.has("programming")) {
           // Find the user's most recent generated program
@@ -1007,17 +1042,19 @@ serve(async (req) => {
 
           if (programs && programs.length > 0) {
             const program = programs[0];
-            // RETURNER PAUSE: the first invoice of a NEW subscription
-            // (billing_reason=subscription_create) from a user who already has a
-            // generated program is a re-subscriber. Their next month must not be
-            // built from a profile they haven't looked at since they left — so
-            // instead of generating, flag resume-pending. The Athlete page shows
-            // the welcome-back banner + "Build my next month" (which clears the
-            // flag via generate-next-month), and the daily reconciler
-            // auto-generates after 7 days of silence so a paid month never
-            // silently evaporates. Renewals (subscription_cycle) are untouched.
-            if (invoice.billing_reason === "subscription_create") {
-              console.log(`[webhook] Returner detected (subscription_create + existing program) — pausing generation for user ${payUserId}`);
+            // RETURNER PAUSE: the first paid invoice of a NEW subscription from
+            // a user who already has a generated program is a re-subscriber.
+            // Their next month must not be built from a profile they haven't
+            // looked at since they left — so instead of generating, flag
+            // resume-pending. The Athlete page shows the welcome-back banner +
+            // "Build my next month" (which clears the flag via
+            // generate-next-month), and the daily reconciler auto-generates
+            // after 7 days of silence so a paid month never silently
+            // evaporates. Renewals (2nd+ paid period) are untouched. Detected
+            // by paid-period COUNT, not billing_reason — the label check
+            // silently never fired for Checkout subscriptions (2026-11-09).
+            if (isFirstPaidPeriod) {
+              console.log(`[webhook] Returner detected (first paid period on ${subscriptionId} + existing program) — pausing generation for user ${payUserId}`);
               await supa
                 .from("athlete_profiles")
                 .upsert(
@@ -1072,33 +1109,17 @@ serve(async (req) => {
 
           let target: number | null = null;
           let lastAt: string | null = null;
-          let why = "";
-          try {
-            const [subResp, invResp] = await Promise.all([
-              fetchWithTimeout(`https://api.stripe.com/v1/subscriptions/${subscriptionId}`, {
-                headers: { "Authorization": "Basic " + btoa(STRIPE_SECRET_KEY + ":") },
-              }, 15_000),
-              fetchWithTimeout(`https://api.stripe.com/v1/invoices?subscription=${subscriptionId}&status=paid&limit=100`, {
-                headers: { "Authorization": "Basic " + btoa(STRIPE_SECRET_KEY + ":") },
-              }, 15_000),
-            ]);
-            if (subResp.ok && invResp.ok) {
-              const sub = await subResp.json();
-              const paid = countPaidPeriods(((await invResp.json()).data ?? []));
-              const cadence = subscriptionCadence(sub);
-              const ent = cadence ? entitledEngineMonths(cadence, paid, sub.current_period_start) : null;
-              if (cadence && ent) {
-                target = ent.entitled;
-                lastAt = lastUnlockIso(cadence, sub.current_period_start, ent.monthsIntoCurrentQuarter);
-                why = `${cadence}:inv=${paid}:entitled=${ent.entitled}`;
-              } else {
-                why = cadence ? `no_paid_periods` : `unsupported_interval`;
-              }
+          let why = stripeWhy;
+          if (stripeSub && paidPeriods != null) {
+            const cadence = subscriptionCadence(stripeSub);
+            const ent = cadence ? entitledEngineMonths(cadence, paidPeriods, stripeSub.current_period_start) : null;
+            if (cadence && ent) {
+              target = ent.entitled;
+              lastAt = lastUnlockIso(cadence, stripeSub.current_period_start, ent.monthsIntoCurrentQuarter);
+              why = `${cadence}:inv=${paidPeriods}:entitled=${ent.entitled}`;
             } else {
-              why = `stripe ${subResp.status}/${invResp.status}`;
+              why = cadence ? `no_paid_periods` : `unsupported_interval`;
             }
-          } catch (e) {
-            why = `stripe error: ${(e as Error).message}`;
           }
 
           if (target == null) {
