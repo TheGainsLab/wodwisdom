@@ -31,7 +31,7 @@ Review notes on the existing `coaching_intent` text:
   recovery | Primary Adaptations: None (consistency check) | System Role:
   Readout of pacing repeatability."
 - Everything else reads correctly against its envelope. No other edits proposed.
-- `is_support_day` is set only on `ascending`; its meaning is undocumented.
+- `is_support_day` was set only on `ascending`, undocumented — dropped (decided).
 
 | Type | Tier | Class | Trains | Prerequisites | Recovery | Sequencer guidance (one line) |
 |---|---|---|---|---|---|---|
@@ -83,7 +83,8 @@ introduced. Columns to add: `class`, `trains`, `prerequisites`
 Open questions for the founder:
 1. Approve class / trains / prerequisites as above, or mark corrections.
 2. Include `recovery_cost`? If yes, approve the values.
-3. What does `is_support_day` mean, and should it stay?
 
 Decided: readiness = completed twice at any ratio; `rocket_races_b` intent
-rewrite (above); the A/B pairing rule.
+rewrite (above); the A/B pairing rule; time trial pinned to day one of
+every month; tier not stored; `is_support_day` DROPPED in the migration
+(a relic: set true on `ascending` by hand, undefined, nothing depends on it).
