@@ -18,10 +18,11 @@ Proposed fifth column, optional: `recovery_cost` (low / moderate / high) —
 the sequencer is told to manage the hard/easy mix and currently infers cost
 from the envelope; stating it removes a guess.
 
-Readiness definition (to decide): a prerequisite is demonstrated when the
-athlete has ≥2 scored sessions of that type, rolled up across modalities,
-with rolling ratio ≥ 0.90 of target. Tier-1 types have no prerequisites, so
-month one is unaffected.
+Readiness definition (DECIDED 2026-11-10): a prerequisite is demonstrated
+when the athlete has completed ≥2 scored sessions of that type, rolled up
+across modalities, at ANY ratio. Quality is not gated for now; the ratio
+threshold (e.g. ≥ 0.90) is a later tightening if the data warrants. Tier-1
+types have no prerequisites, so month one is unaffected.
 
 Review notes on the existing `coaching_intent` text:
 - `rocket_races_b` carried a verbatim copy of A's intent. APPROVED rewrite
@@ -65,8 +66,8 @@ work / pace differ from its A) and a line in the sequencer prompt.
 
 Open questions for the founder:
 1. Approve tier / class / trains / prerequisites as above, or mark corrections.
-2. Approve the readiness definition (≥2 sessions, ratio ≥ 0.90, rolled up across modalities).
-3. Include `recovery_cost`? If yes, approve the values.
-4. What does `is_support_day` mean, and should it stay?
+2. Include `recovery_cost`? If yes, approve the values.
+3. What does `is_support_day` mean, and should it stay?
 
-Decided: `rocket_races_b` intent rewrite (above); the A/B pairing rule.
+Decided: readiness = completed twice at any ratio; `rocket_races_b` intent
+rewrite (above); the A/B pairing rule.
