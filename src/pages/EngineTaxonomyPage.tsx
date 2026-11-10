@@ -153,9 +153,14 @@ export default function EngineTaxonomyPage({ session }: { session: Session }) {
                         <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px' }}>
                           {cat}
                         </span>
-                        {dt.is_support_day && (
+                        {dt.class === 'assess' && (
                           <span style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                            Support day
+                            Assessment
+                          </span>
+                        )}
+                        {dt.prerequisites?.length > 0 && (
+                          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                            builds on {dt.prerequisites.join(', ')}
                           </span>
                         )}
                       </div>

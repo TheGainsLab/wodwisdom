@@ -42,7 +42,9 @@ export interface EngineDayType {
   block_3_params: Record<string, unknown> | null;
   block_4_params: Record<string, unknown> | null;
   max_duration_minutes: number | null;
-  is_support_day: boolean;
+  class: 'develop' | 'assess';
+  trains: string[];
+  prerequisites: string[];
 }
 
 export interface EngineProgramMapping {

@@ -1,4 +1,4 @@
-# Engine day types — structured guidance (DRAFT for review, 2026-11-10)
+# Engine day types — structured guidance (APPROVED 2026-11-10)
 
 Purpose: give the sequencer structured facts per day type so readiness, the
 novelty budget and the hard/easy mix read data, not prose. The existing
@@ -40,15 +40,15 @@ Review notes on the existing `coaching_intent` text:
 | threshold | develop | LT | — | Bridge from base to intensity; the fix for a lagging LT before any bridge type. |
 | anaerobic | develop | GL | — | Use sparingly; long rests; never on consecutive days or the day after a max effort. |
 | interval | develop | AP, LT, GL | — | Generalist; the default when no system is clearly behind. |
-| polarized | develop | AB, PH | endurance | Base maintenance with neural sharpness during high-volume phases. |
+| polarized | develop | AB, PH | — | Base maintenance with neural sharpness during high-volume phases. |
 | flux | develop | LT, AB→DEN | endurance, threshold | Clearance work; more surges = more LT dose without a harder day. |
 | flux_stages | develop | LT→DUR, PSY | flux, threshold | Threshold durability under rising stress; progression of flux. |
-| ascending | develop | AP→GL, PAC | interval, threshold, anaerobic | Anti-overpacing tool; prescribe when early-round fade is the pattern. |
+| ascending | develop | AP→GL, PAC | anaerobic | Anti-overpacing tool; prescribe when early-round fade is the pattern. |
 | rocket_races_a | develop | PAC | max_aerobic_power | PAIRING RULE (founder, 2026-11-10): any week containing Rocket Races A must also contain Rocket Races B, same intervals, only the rest adjusted. A without B in the week is invalid. |
 | rocket_races_b | assess | PAC | rocket_races_a | The B of the pair: inherits A's rounds, work and pace; only rest changes (tighter). Never scheduled without A in the same week. |
 | hybrid_aerobic | develop | AP→DUR, DEN | max_aerobic_power, flux | Core mixed-modal builder; aerobic power under density. |
-| hybrid_anaerobic | develop | GL→DUR | anaerobic, threshold | Glycolytic repeatability; sharp and costly; space from anaerobic days. |
-| devour | develop | AB, LT→DUR | endurance, threshold | Quiet durability builder; good weekly anchor once ready. |
+| hybrid_anaerobic | develop | GL→DUR | anaerobic | Glycolytic repeatability; sharp and costly; space from anaerobic days. |
+| devour | develop | AB, LT→DUR | anaerobic, max_aerobic_power | Quiet durability builder; good weekly anchor once ready. |
 | ascending_devour | develop | AB+LT→DUR | devour, ascending | Pace and duration both climb; advanced durability. |
 | descending_devour | develop | AB→DEN | devour | Shrinking rest; density tolerance. |
 | towers | develop | AB→AP→DUR | devour, max_aerobic_power | Durability into power under fatigue; late builder. |
@@ -79,8 +79,9 @@ Integration, Expression) are not athlete-facing vocabulary and are not
 introduced. Columns to add: `class`, `trains`, `prerequisites`
 — three columns, final.
 
-Open question for the founder:
-1. Approve class / trains / prerequisites as above, or mark corrections.
+Table APPROVED 2026-11-10 with four prerequisite changes (ascending →
+anaerobic; polarized → none; hybrid_anaerobic → anaerobic; devour →
+anaerobic, max_aerobic_power). This document is now the spec for the migration.
 
 Decided: readiness = completed twice at any ratio; `rocket_races_b` intent
 rewrite (above); the A/B pairing rule; time trial pinned to day one of
