@@ -24,8 +24,11 @@ with rolling ratio ≥ 0.90 of target. Tier-1 types have no prerequisites, so
 month one is unaffected.
 
 Review notes on the existing `coaching_intent` text:
-- `rocket_races_b` carries a verbatim copy of A's intent. It should say what
-  B is: the same intervals re-raced at tighter rest, a consistency check.
+- `rocket_races_b` carried a verbatim copy of A's intent. APPROVED rewrite
+  (goes in the migration): "Structure: the same intervals as Rocket Races A,
+  re-raced at tighter rest | Primary Stimulus: Pacing control with less
+  recovery | Primary Adaptations: None (consistency check) | System Role:
+  Readout of pacing repeatability."
 - Everything else reads correctly against its envelope. No other edits proposed.
 - `is_support_day` is set only on `ascending`; its meaning is undocumented.
 
@@ -41,8 +44,8 @@ Review notes on the existing `coaching_intent` text:
 | flux | 2 | develop | LT, AB→DEN | endurance, threshold | moderate | Clearance work; more surges = more LT dose without a harder day. |
 | flux_stages | 2 | develop | LT→DUR, PSY | flux, threshold | moderate–high | Threshold durability under rising stress; progression of flux. |
 | ascending | 2 | develop | AP→GL, PAC | interval, threshold, anaerobic | moderate–high | Anti-overpacing tool; prescribe when early-round fade is the pattern. |
-| rocket_races_a | 2 | develop | PAC | max_aerobic_power | moderate | Always paired: B must follow within a few days (B inherits A's intervals). |
-| rocket_races_b | 2 | assess | PAC | rocket_races_a | moderate | Re-race A at tighter rest; consistency readout; never scheduled without A. |
+| rocket_races_a | 2 | develop | PAC | max_aerobic_power | moderate | PAIRING RULE (founder, 2026-11-10): any week containing Rocket Races A must also contain Rocket Races B, same intervals, only the rest adjusted. A without B in the week is invalid. |
+| rocket_races_b | 2 | assess | PAC | rocket_races_a | moderate | The B of the pair: inherits A's rounds, work and pace; only rest changes (tighter). Never scheduled without A in the same week. |
 | hybrid_aerobic | 3 | develop | AP→DUR, DEN | max_aerobic_power, flux | high | Core mixed-modal builder; aerobic power under density. |
 | hybrid_anaerobic | 3 | develop | GL→DUR | anaerobic, threshold | high | Glycolytic repeatability; sharp and costly; space from anaerobic days. |
 | devour | 3 | develop | AB, LT→DUR | endurance, threshold | moderate | Quiet durability builder; good weekly anchor once ready. |
@@ -54,12 +57,16 @@ Review notes on the existing `coaching_intent` text:
 | afterburner | 4 | assess | GL+AP→INT, PSY | anaerobic, towers | high | "Who has energy left"; expression readout; rare. |
 | synthesis | 4 | assess | INT (all) | all develop types | high | Final audit; verification only; never prescribed to develop anything. |
 
+Pairing rule (decided 2026-11-10): in any week where Rocket Races A appears,
+Rocket Races B must appear in the same week with the same intervals and only
+the rest time adjusted. This becomes a validator rule in `validateProposal`
+(reject a block that schedules A without B in the week, or B whose rounds /
+work / pace differ from its A) and a line in the sequencer prompt.
+
 Open questions for the founder:
 1. Approve tier / class / trains / prerequisites as above, or mark corrections.
 2. Approve the readiness definition (≥2 sessions, ratio ≥ 0.90, rolled up across modalities).
 3. Include `recovery_cost`? If yes, approve the values.
-4. Rewrite `rocket_races_b` intent (proposed: "Structure: the same intervals as
-   Rocket Races A, re-raced at tighter rest | Primary Stimulus: Pacing control
-   with less recovery | Primary Adaptations: None (consistency check) |
-   System Role: Readout of pacing repeatability").
-5. What does `is_support_day` mean, and should it stay?
+4. What does `is_support_day` mean, and should it stay?
+
+Decided: `rocket_races_b` intent rewrite (above); the A/B pairing rule.
