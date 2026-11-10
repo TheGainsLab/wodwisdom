@@ -24,8 +24,10 @@ export interface EngineDayTypeRow {
   block_3_params: Record<string, unknown> | null;
   block_4_params: Record<string, unknown> | null;
   max_duration_minutes: number | null;
-  is_support_day: boolean;
   coaching_intent: string | null;
+  class: 'develop' | 'assess';
+  trains: string[];
+  prerequisites: string[];
 }
 
 /**
@@ -58,7 +60,7 @@ export async function loadDayTypeCatalogue(supa: SupabaseClient): Promise<Engine
   const { data } = await supa
     .from("engine_day_types")
     .select(
-      "id, name, phase_requirement, block_count, set_rest_seconds, block_1_params, block_2_params, block_3_params, block_4_params, max_duration_minutes, is_support_day, coaching_intent",
+      "id, name, phase_requirement, block_count, set_rest_seconds, block_1_params, block_2_params, block_3_params, block_4_params, max_duration_minutes, coaching_intent, class, trains, prerequisites",
     )
     .order("phase_requirement", { ascending: true })
     .order("name", { ascending: true });
@@ -77,7 +79,10 @@ export function formatDayTypeCatalogue(rows: EngineDayTypeRow[]): string {
       `${dt.block_count} block${dt.block_count === 1 ? "" : "s"}`,
       dt.max_duration_minutes != null ? `cap ${dt.max_duration_minutes}min` : null,
       dt.set_rest_seconds != null ? `set-rest ${dt.set_rest_seconds}s` : null,
-      dt.is_support_day ? "support-day" : null,
+      // Structured guidance (founder-approved 2026-11-10): what the day is for.
+      dt.class === "assess" ? "ASSESS (a readout — never prescribed to fix a gap, never softened)" : "develop",
+      dt.trains?.length ? `trains ${dt.trains.join("/")}` : null,
+      dt.prerequisites?.length ? `builds on ${dt.prerequisites.join(", ")}` : "no prerequisites",
     ].filter(Boolean).join(", ");
 
     parts.push("", `### ${dt.id} (${dt.name}) — ${gating}`);

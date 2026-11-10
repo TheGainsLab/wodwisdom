@@ -143,3 +143,189 @@ effectively unlimited; the validator guarantees every generated value stays insi
 - Schedule the cron via pg_cron (e.g. every 15 min).
 - Enable test athletes: `UPDATE athlete_profiles SET engine_ai_sequencing = true WHERE user_id = '…'`.
 - Widen by bulk-enabling / flipping the default once validated. The flag is also a per-user kill-switch.
+
+---
+
+## Addendum (2026-11-10): assessment month, intake, and tracks → settings
+
+Founder decisions from the retention review (the Luke Manchester case and the
+subscriber funnel: of 59 retail Engine subscribers, 21 have reached the 10-day
+sequencer gate; 8 of the 12 who cancelled had completed four days or fewer).
+The sequencer cannot help anyone who leaves before it starts, and the tracks
+were the pre-sequencer way of offering variety. With a sequencer, both give
+way to one curriculum plus a small set of athlete settings.
+
+### The thesis, stated once
+
+Give the AI the information it needs and it makes better sequencing judgments
+than a hand-authored easy-to-hard list. Every existing track is already an
+instance of that thesis done by hand (Hyrox opens with towers, VO2 opens with
+devour — month-25 and month-19 types in the main curriculum). The sequencer is
+the same act, per athlete, live.
+
+One rule stays outside the AI because it is a product decision, not a
+training judgment: **the reveal rate** — how fast new stimulus types are
+introduced over the life of the subscription (the "novelty budget"). The AI
+has full freedom inside it.
+
+### Intake (new subscribers)
+
+Two required choices and two context questions. No track picker.
+
+1. **Days per week: 3, 4 or 5.** The one structural commitment. Sets the
+   month length (12 / 16 / 20 positions) for the program's life; the sequencer
+   never changes day count.
+2. **Goal.** Presets that carry the old track names (General engine, VO2 max,
+   Race prep / Hyrox) plus a free-text line. Writes `engine_goal`; later shapes
+   emphasis and reveal rate from month two.
+3. **What else do you train each week?** Feeds the sequencer's other-load
+   awareness (already supported).
+4. **Which machines will you use?** Steers time trials to the modalities the
+   athlete will actually rotate, and sizes expectations about per-modality
+   data (see diagnosis roll-up below).
+
+### Month one is an assessment month — the same for every goal
+
+Any serious protocol tests before it prescribes. Month one is the test, and
+the product says so ("Month one is your assessment: the Engine is learning
+how you respond to each kind of work"). Goal shaping begins in month two.
+
+| Cadence | Month-one types | Positions | Exposures per type |
+|---|---|---|---|
+| 3-day | anaerobic, max aerobic power, endurance | 12 | 4 / 4 / 3 |
+| 4-day | anaerobic, max aerobic power, threshold, endurance | 16 | 4 / 4 / 3 / 4 |
+| 5-day | the written 5-day month one | 20 | 4 / 4 / 4 / 3 / 4 |
+
+The 4-day month swaps interval (close to max aerobic power in what it
+measures) for threshold (a distinct system). Proposed layout, derived from
+the written 5-day month by dropping its four interval days and keeping the
+pinned time trial:
+
+```
+ 1 TT   2 ana   3 end   4 MAP   5 ana   6 end   7 MAP   8 thr
+ 9 end 10 MAP  11 thr  12 ana  13 MAP  14 thr  15 ana  16 end
+```
+
+**Time trials are unchanged:** day one of every month, pinned, the monthly
+recalibration. The month-two time trial is simply the first retest; the
+sequencer's first generated block follows it.
+
+### Sequencer gate: a criterion, not a day count
+
+Replace `MIN_COMPLETED_DAYS = 10` with: **at least two scored sessions in
+every stimulus type the current month uses**, capped at 10 completed days so
+nobody waits longer than today. Each assessment month above satisfies the
+criterion by its final week; it is the condition the number 10 was standing
+in for. Month-one decisions are low-stakes (which of three to five primitives,
+and dose), so an early wrong call costs one ordinary session.
+
+### Diagnosis: roll ratios up across modalities per type
+
+Ratios are tracked per (day type, modality). An athlete rotating four
+machines feeds each cell a quarter of the data and starves the diagnosis for
+months. Keep modality for **pacing** (per-modality baselines are correct);
+roll ratios up **per type** for the sequencer's judgment.
+
+### Show the judgment on every day
+
+The sequencer writes a "why today" line on generated days. Give static
+catalog days one too, from the day type's `coaching_intent`. A fixed
+assessment month then reads as authored, not arbitrary — the cheapest
+retention lever in this document.
+
+### Tracks → settings (migration)
+
+Each track is cadence + emphasis + reveal rate. Existing subscribers receive
+the settings their track implies; their position carries over; the authored
+mappings stay in the database as the fallback plan and the novelty budget.
+Track names survive as goal presets.
+
+| Track | Days/wk | Goal preset | Reveal | Subscribers (2026-11-10) |
+|---|---|---|---|---|
+| main_5day | 5 | General | 36-month | 22 |
+| main_3day | 3 | General | 36-month | 19 |
+| vo2max_4day | 4 | VO2 max | 12-month | 8 |
+| vo2max_3day | 3 | VO2 max | 12-month | 3 |
+| main_3day_varied | 3 | General | 12-month | 3 |
+| hyrox_3day | 3 | Race prep | 12-month | 2 |
+| main_5day_varied | 5 | General | 12-month | 1 |
+| hyrox_5day | 5 | Race prep | 12-month | 1 |
+
+The Mini Cycle tracks are the sequencer's job by definition (same material,
+reordered) and retire first. The VO2 tracks are the most engaged cohort
+(median 8 days done); whatever replaces them must still produce a month two
+that opens with devour and infinity for a VO2 goal — test the sequencer
+against those athletes' actual months before retiring the mapping.
+
+### Coach: tell the truth about adaptation
+
+The Coach must describe both mechanisms in one answer: pace targets adapt
+from the first sessions (rolling multiplier, live for everyone); the
+sequence of sessions adapts after the assessment month (sequencer). It must
+never deny the sequencer exists, and never pitch a paid tier to a paying
+subscriber unless asked. (Separate PR to the chat prompt.)
+
+### Metric
+
+Share of new subscribers who complete **five Engine days in their first
+three weeks**. Secondary: share reaching ten. Compare the first sequencer
+cohort against the 21 static-sequence athletes past day ten on day-five
+retention and ratio improvement.
+
+### Order of work
+
+1. Gate criterion (two scored sessions per type, cap 10) — `run-resequence.ts`.
+2. "Why today" on static days — day page + `coaching_intent`.
+3. Diagnosis roll-up across modalities — `conditioning-state.ts`.
+4. Intake questions and `engine_goal` presets — onboarding + Engine dashboard.
+5. Author the 4-day general month one (16-row mapping) once the layout above is approved.
+6. Tracks → settings migration; hide the track picker for new subscribers.
+7. Novelty budget as an explicit rule in the sequencer's pool computation.
+
+### All Access: one goal, shared plans, one leader (decided 2026-11-10)
+
+1. **One goal.** Intake asks it once. For All Access the Engine setup
+   pre-fills from the profile goal and lets the athlete refine it for
+   conditioning; both generators read the same text with the Engine addition
+   appended. Two goal boxes for one person is a latent inconsistency.
+2. **The sequencer sees Programming's upcoming week.** Today it reads
+   Programming's *logged* load (workout_log blocks/entries + external
+   activities). Add the next seven days of generated strength and metcon
+   blocks so it can place a hard anaerobic day away from a heavy squat day
+   instead of discovering the collision in the log. This mirrors what
+   Programming already receives from the Engine (trailing 28-day zone
+   minutes + projected 4 weeks).
+3. **Direction of authority unchanged.** Programming flexes around the
+   Engine's plan (the existing Engine-awareness contract). The Engine knows
+   Programming's plan and avoids collisions, but never rewrites its
+   curriculum because a strength block is heavy. Two mutually adapting
+   systems oscillate; one leads, one follows, and the Engine's deterministic
+   grammar makes it the natural leader.
+
+### New-subscriber sequence (decided 2026-11-10)
+
+Checkout complete → **Engine setup** (days per week: 3 or 5 until a 4-day
+month exists; one free-text goal/week-context box, pre-filled from the
+profile goal for All Access) → **assessment-month briefing** (Day 1 time
+trial, the month's type counts for the chosen cadence, the retest day, two
+lines on how adaptation works) → **Start Day 1**. The track picker stays
+behind Switch Program for existing subscribers until the tracks → settings
+migration. The Coach prompt carries the same assessment-month sentence.
+
+### Readiness gating decisions (2026-11-10)
+
+- **Prerequisites are the only reveal control.** The novelty budget is
+  DROPPED. Prerequisites limit depth (chains), not breadth: after the
+  assessment month roughly six types become eligible at once, and the whole
+  catalog opens over four to six months rather than thirty-six. Founder
+  ruling: that pace is fine ("if everyone stayed six months we'd be
+  thrilled"). Availability is not use — the sequencer still chooses what
+  serves the athlete.
+- **Readiness** = a prerequisite type completed twice (any ratio), rolled up
+  across modalities. Data: `engine_day_types.class / trains / prerequisites`
+  (migration 20261110000000).
+- **Time trial** pinned to day one of every month, never moved or replaced.
+- **Rocket Races A/B** pair in the same week; B inherits A's intervals, only
+  rest changes (validator rule to add).
+- Other assess types: at most one per month, only when fully ready.
+
