@@ -3,9 +3,9 @@
 Purpose: give the sequencer structured facts per day type so readiness, the
 novelty budget and the hard/easy mix read data, not prose. The existing
 `coaching_intent` text stays as authored (the sequencer quotes its spirit to
-athletes). This draft proposes FOUR new columns on `engine_day_types`:
+athletes). This draft proposes THREE new columns on `engine_day_types` (tier dropped,
+see below):
 
-- `tier` (0–4) — curriculum layer, from docs/engine_competency_graph.md
 - `class` — `develop` (training stimulus the sequencer may prescribe to move a
   weakness, repeat, and dose) or `assess` (a readout: never prescribed to fix
   a gap, never softened; passing one may count as readiness evidence)
@@ -64,8 +64,24 @@ the rest time adjusted. This becomes a validator rule in `validateProposal`
 (reject a block that schedules A without B in the week, or B whose rounds /
 work / pace differ from its A) and a line in the sequencer prompt.
 
+Apportioning develop vs assess (DECIDED 2026-11-10):
+- The time trial is ALWAYS the first day of every month. Fixed, pinned,
+  never moved or replaced by the sequencer. Additional time trials may be
+  inserted on a strong signal, but the month-opening one does not change.
+- Rocket Races B exists only as A's pair in the same week (rule above).
+- Other assess types (infinity, afterburner, synthesis): at most one per
+  month, and only once every prerequisite is demonstrated. A race-prep goal
+  may raise this to two in the final month before the event.
+- Everything else in the month is develop days chosen by the sequencer.
+
+Tier (DECIDED 2026-11-10): not stored. Tier is implied by prerequisite
+depth; the tier names in the competency graph (Foundation, Bridges,
+Integration, Expression) are not athlete-facing vocabulary and are not
+introduced. Columns to add: `class`, `trains`, `prerequisites`
+(+ `recovery_cost` if approved).
+
 Open questions for the founder:
-1. Approve tier / class / trains / prerequisites as above, or mark corrections.
+1. Approve class / trains / prerequisites as above, or mark corrections.
 2. Include `recovery_cost`? If yes, approve the values.
 3. What does `is_support_day` mean, and should it stay?
 
