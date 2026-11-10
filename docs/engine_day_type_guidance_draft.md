@@ -1,0 +1,65 @@
+# Engine day types — structured guidance (DRAFT for review, 2026-11-10)
+
+Purpose: give the sequencer structured facts per day type so readiness, the
+novelty budget and the hard/easy mix read data, not prose. The existing
+`coaching_intent` text stays as authored (the sequencer quotes its spirit to
+athletes). This draft proposes FOUR new columns on `engine_day_types`:
+
+- `tier` (0–4) — curriculum layer, from docs/engine_competency_graph.md
+- `class` — `develop` (training stimulus the sequencer may prescribe to move a
+  weakness, repeat, and dose) or `assess` (a readout: never prescribed to fix
+  a gap, never softened; passing one may count as readiness evidence)
+- `trains` — energy systems / qualities the day loads (AB aerobic base,
+  AP aerobic power, LT lactate threshold, GL glycolytic, PH phosphagen;
+  DEN density, DUR durability, PAC pacing, PSY psychological, INT integration)
+- `prerequisites` — day-type ids that must be demonstrated first (graph edges)
+
+Proposed fifth column, optional: `recovery_cost` (low / moderate / high) —
+the sequencer is told to manage the hard/easy mix and currently infers cost
+from the envelope; stating it removes a guess.
+
+Readiness definition (to decide): a prerequisite is demonstrated when the
+athlete has ≥2 scored sessions of that type, rolled up across modalities,
+with rolling ratio ≥ 0.90 of target. Tier-1 types have no prerequisites, so
+month one is unaffected.
+
+Review notes on the existing `coaching_intent` text:
+- `rocket_races_b` carries a verbatim copy of A's intent. It should say what
+  B is: the same intervals re-raced at tighter rest, a consistency check.
+- Everything else reads correctly against its envelope. No other edits proposed.
+- `is_support_day` is set only on `ascending`; its meaning is undocumented.
+
+| Type | Tier | Class | Trains | Prerequisites | Recovery | Sequencer guidance (one line) |
+|---|---|---|---|---|---|---|
+| time_trial | 0 | assess | AB/AP readout | — | high | Scheduled monthly; insert extra only on a strong signal (layoff, modality change, paces contradicting baseline). |
+| endurance | 1 | develop | AB | — | low | The root. First answer to a weak aerobic base; safe at high volume; pairs well after a hard day. |
+| max_aerobic_power | 1 | develop | AP | — | moderate | Raises the aerobic ceiling; 2–3 exposures per month in base phases. |
+| threshold | 1 | develop | LT | — | moderate | Bridge from base to intensity; the fix for a lagging LT before any bridge type. |
+| anaerobic | 1 | develop | GL | — | high | Use sparingly; long rests; never on consecutive days or the day after a max effort. |
+| interval | 1 | develop | AP, LT, GL | — | moderate | Generalist; the default when no system is clearly behind. |
+| polarized | 1 | develop | AB, PH | endurance | low | Base maintenance with neural sharpness during high-volume phases. |
+| flux | 2 | develop | LT, AB→DEN | endurance, threshold | moderate | Clearance work; more surges = more LT dose without a harder day. |
+| flux_stages | 2 | develop | LT→DUR, PSY | flux, threshold | moderate–high | Threshold durability under rising stress; progression of flux. |
+| ascending | 2 | develop | AP→GL, PAC | interval, threshold, anaerobic | moderate–high | Anti-overpacing tool; prescribe when early-round fade is the pattern. |
+| rocket_races_a | 2 | develop | PAC | max_aerobic_power | moderate | Always paired: B must follow within a few days (B inherits A's intervals). |
+| rocket_races_b | 2 | assess | PAC | rocket_races_a | moderate | Re-race A at tighter rest; consistency readout; never scheduled without A. |
+| hybrid_aerobic | 3 | develop | AP→DUR, DEN | max_aerobic_power, flux | high | Core mixed-modal builder; aerobic power under density. |
+| hybrid_anaerobic | 3 | develop | GL→DUR | anaerobic, threshold | high | Glycolytic repeatability; sharp and costly; space from anaerobic days. |
+| devour | 3 | develop | AB, LT→DUR | endurance, threshold | moderate | Quiet durability builder; good weekly anchor once ready. |
+| ascending_devour | 3 | develop | AB+LT→DUR | devour, ascending | high | Pace and duration both climb; advanced durability. |
+| descending_devour | 3 | develop | AB→DEN | devour | high | Shrinking rest; density tolerance. |
+| towers | 4 | develop | AB→AP→DUR | devour, max_aerobic_power | high | Durability into power under fatigue; late builder. |
+| atomic | 4 | develop | PH→AP | max_aerobic_power, polarized | low–moderate | High-ROI aerobic builder with low recovery cost; useful in heavy outside-load weeks. |
+| infinity | 4 | assess | INT, PAC, PSY | hybrid_aerobic, devour, flux_stages | high | Expression rehearsal; a readout, not a fix; rare. |
+| afterburner | 4 | assess | GL+AP→INT, PSY | anaerobic, towers | high | "Who has energy left"; expression readout; rare. |
+| synthesis | 4 | assess | INT (all) | all develop types | high | Final audit; verification only; never prescribed to develop anything. |
+
+Open questions for the founder:
+1. Approve tier / class / trains / prerequisites as above, or mark corrections.
+2. Approve the readiness definition (≥2 sessions, ratio ≥ 0.90, rolled up across modalities).
+3. Include `recovery_cost`? If yes, approve the values.
+4. Rewrite `rocket_races_b` intent (proposed: "Structure: the same intervals as
+   Rocket Races A, re-raced at tighter rest | Primary Stimulus: Pacing control
+   with less recovery | Primary Adaptations: None (consistency check) |
+   System Role: Readout of pacing repeatability").
+5. What does `is_support_day` mean, and should it stay?
