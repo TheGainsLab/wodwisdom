@@ -19,7 +19,8 @@ import { callClaude } from "./call-claude.ts";
 import { buildConditioningState } from "./conditioning-state.ts";
 import { buildOtherTrainingLoadBlock } from "./athlete-activities.ts";
 import { formatDayTypeCatalogue, loadDayTypeCatalogue } from "./engine-catalogue.ts";
-import { computeAllowedDayTypes, parseProposal, type ProposedDay, validateProposal } from "./engine-sequence.ts";
+import { parseProposal, type ProposedDay, validateProposal } from "./engine-sequence.ts";
+import { computeReadyDayTypes, missingPrerequisites, validateWeekRules } from "./engine-readiness.ts";
 
 export const MIN_COMPLETED_DAYS = 10; // loop starts after the athlete completes 10 Engine days
 
@@ -52,8 +53,12 @@ const SYSTEM_PROMPT =
   `holds — e.g. a long layoff, a modality change, or recent paces that clearly contradict it — not merely ` +
   `because the baseline is aging.\n\n` +
   `Rules:\n` +
-  `- Only use day_types from the catalogue below — it already contains exactly what is available at this ` +
-  `point in the athlete's program.\n` +
+  `- Only use day_types from the catalogue below — it contains exactly the types this athlete is READY ` +
+  `for: every prerequisite completed at least twice. Readiness, not the calendar, decides availability.\n` +
+  `- Rocket Races A and B are a pair: if you schedule rocket_races_a, schedule rocket_races_b later in the ` +
+  `same block (B re-races A's intervals with tighter rest; only the rest is yours to set). Never B without A.\n` +
+  `- Day-types marked ASSESS are readouts, not training: at most one per block (the time trial and rocket B ` +
+  `excepted), never to fix a weakness, never softened.\n` +
   `- Supply exactly block_count blocks per day, in order. Emit ONLY the parameters where the envelope ` +
   `offers a real choice: a [min,max] range with min < max, or an Options list. Every fixed value — fixed ` +
   `strings/numbers, rest keywords, pinned [x,x] ranges, inherit_from_part_a sentinels, lookup tables — is ` +
@@ -220,18 +225,31 @@ export async function runResequence(
     (catalogTypes ?? []).map((w) => [w.day_number as number, w.day_type as string]),
   );
 
-  // 3e) Month-availability pool — replaces phase gating. The program's own
-  // curation is the unlock curve: legal day-types are the ones this program
-  // maps at months <= the block's month (month of the furthest position being
-  // generated — position-month, never the athlete's paid months_unlocked).
-  // A mapping-less program (plain-catalog fallback above) gets the full
-  // catalogue: it has no curation to define an unlock curve.
+  // 3e) Readiness pool (founder decision 2026-11-10) — replaces the month
+  // gate. A type is available once every prerequisite has been COMPLETED
+  // twice, counted across all modalities, any ratio (engine-readiness.ts).
+  // Types without prerequisites are always available; time_trial always.
+  // Prerequisites are the only reveal control — there is no novelty budget.
+  // blockMonth is kept for the preview payload and the persisted override's
+  // `phase` column (position-month, never paid months).
   const blockMonth = mapping.length > 0
     ? Math.max(1, ...blockPairs.map((p) => mapping.find((m) => m.seq === p.seq)?.month ?? 1))
     : 1;
-  const allowedDayTypes = mapping.length > 0
-    ? computeAllowedDayTypes(mapping, typeByDay, blockMonth)
-    : new Set<string>(catalogueRows.map((r) => r.id));
+  const { data: doneTypeRows } = await supa
+    .from("engine_workout_sessions")
+    .select("day_type")
+    .eq("user_id", userId)
+    .eq("completed", true);
+  const completedByType: Record<string, number> = {};
+  for (const r of (doneTypeRows ?? []) as Array<{ day_type: string | null }>) {
+    if (r.day_type) completedByType[r.day_type] = (completedByType[r.day_type] ?? 0) + 1;
+  }
+  const readinessRows = catalogueRows.map((r) => ({ id: r.id, class: r.class, prerequisites: r.prerequisites ?? [] }));
+  const allowedDayTypes = computeReadyDayTypes(readinessRows, completedByType);
+  const notReady = readinessRows
+    .filter((r) => !allowedDayTypes.has(r.id))
+    .map((r) => `${r.id} needs ${missingPrerequisites(r, completedByType).join(", ")}`);
+  console.log(`[run-resequence] user=${userId} ready=[${[...allowedDayTypes].sort().join(",")}] not-ready: ${notReady.join(" | ") || "none"}`);
 
   // 4) Pin month-boundary time trials (left as the catalog TT; AI fills the
   // rest). Day-typing is per catalog day; pinning is per POSITION, so a
@@ -339,6 +357,13 @@ export async function runResequence(
   }
 
   const result = validateProposal(proposal, catalogueRows, { allowedDayTypes, maxDays: daysToGenerate });
+  // Block-level rules (rocket races A/B pairing; at most one assessment day).
+  // A violation rejects the WHOLE block: dropping one day would break a pair.
+  const weekErrors = validateWeekRules(result.accepted, new Map(catalogueRows.map((r) => [r.id, r.class])));
+  if (weekErrors.length > 0) {
+    result.errors.push(...weekErrors);
+    result.accepted = [];
+  }
 
   if (!dryRun && result.accepted.length === 0) {
     // Live run produced NOTHING — this must never be silent (a quiet cron
@@ -356,6 +381,8 @@ export async function runResequence(
       currentDay,
       month: blockMonth,
       allowed_day_types: Array.from(allowedDayTypes).sort(),
+      not_ready: notReady,
+      completed_by_type: completedByType,
       maxDays,
       days_to_generate: daysToGenerate,
       pinned_time_trials: ttPositions,
