@@ -85,3 +85,38 @@ export function validateWeekRules(
   }
   return errors;
 }
+
+/** The sequencer starts no later than this many completed days, whatever the mix. */
+export const GATE_CAP_DAYS = 10;
+
+export interface GateResult { ok: boolean; reason: string }
+
+/**
+ * When may the sequencer start? (founder decision 2026-11-10)
+ * Satisfied when the athlete has at least MIN_COMPLETIONS scored sessions in
+ * EVERY day type the current month uses (time trial excluded), OR has
+ * completed GATE_CAP_DAYS sessions in total — the cap guarantees nobody
+ * waits longer than before. On the 3-day assessment month this fires at
+ * day 7; on the 5-day the cap fires first (threshold's second exposure is
+ * day 14).
+ */
+export function sequencerGate(
+  completedTotal: number,
+  completedByType: Record<string, number>,
+  monthTypes: Iterable<string>,
+  minPerType: number = MIN_COMPLETIONS,
+  capDays: number = GATE_CAP_DAYS,
+): GateResult {
+  if (completedTotal >= capDays) return { ok: true, reason: `${completedTotal} completed days (cap ${capDays})` };
+  const types = [...new Set(monthTypes)].filter((t) => t !== "time_trial");
+  if (types.length === 0) return { ok: false, reason: "no stimulus types in the current month" };
+  const short = types.filter((t) => (completedByType[t] ?? 0) < minPerType);
+  if (short.length === 0) {
+    return { ok: true, reason: `${minPerType}+ sessions in every month type (${types.join(", ")})` };
+  }
+  return {
+    ok: false,
+    reason: `needs ${minPerType} sessions in each of this month's types; short: ${short.map((t) => `${t} (${completedByType[t] ?? 0}/${minPerType})`).join(", ")}; or ${capDays} days total (has ${completedTotal})`,
+  };
+}
+

@@ -1,6 +1,6 @@
 // deno test supabase/functions/_shared/engine-readiness_test.ts --no-check
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { computeReadyDayTypes, missingPrerequisites, validateWeekRules, type ReadinessTypeRow } from "./engine-readiness.ts";
+import { computeReadyDayTypes, missingPrerequisites, sequencerGate, validateWeekRules, type ReadinessTypeRow } from "./engine-readiness.ts";
 
 const T: ReadinessTypeRow[] = [
   { id: "time_trial", class: "assess", prerequisites: [] },
@@ -58,3 +58,23 @@ Deno.test("at most one assessment day per block, time trial and rocket B excepte
   assertEquals(validateWeekRules([{ day_type: "infinity" }, { day_type: "synthesis" }], classById).length, 1);
   assertEquals(validateWeekRules([{ day_type: "time_trial" }, { day_type: "infinity" }, { day_type: "endurance" }], classById), []);
 });
+
+Deno.test("gate: 3-day assessment month opens at day 7 (two of each type), not day 10", () => {
+  const month1 = ["time_trial", "anaerobic", "max_aerobic_power", "endurance"];
+  // Days 1-6: TT, ana, MAP, ana, end, MAP  -> end only once
+  assertEquals(sequencerGate(6, { anaerobic: 2, max_aerobic_power: 2, endurance: 1 }, month1).ok, false);
+  // Day 7 adds endurance -> two of each
+  assertEquals(sequencerGate(7, { anaerobic: 2, max_aerobic_power: 2, endurance: 2 }, month1).ok, true);
+});
+
+Deno.test("gate: the cap fires at 10 days regardless of the mix (5-day threshold lands late)", () => {
+  const month1 = ["time_trial", "anaerobic", "endurance", "max_aerobic_power", "interval", "threshold"];
+  const byDay9 = { anaerobic: 2, endurance: 2, max_aerobic_power: 2, interval: 2, threshold: 1 };
+  assertEquals(sequencerGate(9, byDay9, month1).ok, false);
+  assertEquals(sequencerGate(10, byDay9, month1).ok, true);
+});
+
+Deno.test("gate: the time trial never counts as a required type", () => {
+  assertEquals(sequencerGate(4, { anaerobic: 2, endurance: 2 }, ["time_trial", "anaerobic", "endurance"]).ok, true);
+});
+

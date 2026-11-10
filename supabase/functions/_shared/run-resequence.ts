@@ -5,7 +5,8 @@
  *   - engine-resequence (HTTP)        — admin dry-run preview / on-demand.
  *   - engine-resequence-cron (server) — automatic live generation, per eligible user.
  *
- * Flow: gate (>= MIN_COMPLETED_DAYS) -> diagnosis + catalogue + current phase ->
+ * Flow: pre-gate -> diagnosis + catalogue + program -> readiness gate (two sessions in
+ * every type the current month uses, or GATE_CAP_DAYS total) ->
  * AI generates the non-pinned days of the block within each envelope -> parse +
  * validate -> (dry run returns the preview | persist accepted days as engine_workouts
  * rows + position overrides). Month-boundary time trials are pinned (left as the
@@ -20,9 +21,12 @@ import { buildConditioningState } from "./conditioning-state.ts";
 import { buildOtherTrainingLoadBlock } from "./athlete-activities.ts";
 import { formatDayTypeCatalogue, loadDayTypeCatalogue } from "./engine-catalogue.ts";
 import { parseProposal, type ProposedDay, validateProposal } from "./engine-sequence.ts";
-import { computeReadyDayTypes, missingPrerequisites, validateWeekRules } from "./engine-readiness.ts";
+import { computeReadyDayTypes, GATE_CAP_DAYS, MIN_COMPLETIONS, missingPrerequisites, sequencerGate, validateWeekRules } from "./engine-readiness.ts";
 
-export const MIN_COMPLETED_DAYS = 10; // loop starts after the athlete completes 10 Engine days
+/** Pre-gate: below this many completed sessions the real gate (two per month
+ *  type, see engine-readiness.ts) cannot be satisfied, so skip before paying
+ *  for a diagnosis. Kept exported for the cron's eligibility query. */
+export const MIN_COMPLETED_DAYS = MIN_COMPLETIONS;
 
 const SYSTEM_PROMPT =
   `You are the Engine conditioning sequencer. You personalise an athlete's UPCOMING conditioning by ` +
@@ -112,14 +116,17 @@ export async function runResequence(
   const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
   const { dryRun, debug } = opts;
 
-  // 1) Gate: at least MIN_COMPLETED_DAYS completed Engine sessions.
+  // 1) Pre-gate: a cheap count so a brand-new athlete costs no diagnosis
+  // call. The real gate — two scored sessions in every type the current
+  // month uses, or GATE_CAP_DAYS in total — runs once the program mapping
+  // and per-type counts are known (step 3e).
   const { count: completed } = await supa
     .from("engine_workout_sessions")
     .select("id", { count: "exact", head: true })
     .eq("user_id", userId)
     .eq("completed", true);
   if ((completed ?? 0) < MIN_COMPLETED_DAYS) {
-    const reason = `needs ${MIN_COMPLETED_DAYS} completed days, has ${completed ?? 0}`;
+    const reason = `needs at least ${MIN_COMPLETED_DAYS} completed days before the gate can be met, has ${completed ?? 0}`;
     console.log(`[run-resequence] user=${userId} skip: ${reason}`);
     return { status: "skipped", reason };
   }
@@ -211,7 +218,7 @@ export async function runResequence(
   // Fallback for a program with no mapping rows: consecutive positions
   // (identity assumption — only plain-catalog setups reach this).
   if (blockPairs.length === 0) {
-    blockPairs = Array.from({ length: maxDays }, (_, i) => ({ seq: currentDay + i, day: currentDay + i }));
+    blockPairs = Array.from({ length: maxDays }, (_, i) => ({ seq: currentDay + i, day: currentDay + i, month: 1 }));
   }
 
   // 3d) Catalog day -> day_type for the whole authored catalog (720 rows,
@@ -250,6 +257,24 @@ export async function runResequence(
     .filter((r) => !allowedDayTypes.has(r.id))
     .map((r) => `${r.id} needs ${missingPrerequisites(r, completedByType).join(", ")}`);
   console.log(`[run-resequence] user=${userId} ready=[${[...allowedDayTypes].sort().join(",")}] not-ready: ${notReady.join(" | ") || "none"}`);
+
+  // 3f) The gate (founder decision 2026-11-10): the sequencer starts once the
+  // athlete has MIN_COMPLETIONS scored sessions in every stimulus type the
+  // current month uses, or GATE_CAP_DAYS sessions in total — never later than
+  // before. "Current month" = the month of the first position to generate.
+  const gateMonth = mapping.length > 0
+    ? (mapping.find((m) => m.seq === blockPairs[0]?.seq)?.month ?? blockMonth)
+    : blockMonth;
+  const monthTypes = mapping.length > 0
+    ? mapping.filter((m) => m.month === gateMonth).map((m) => typeByDay.get(m.day) ?? "").filter(Boolean)
+    : Object.keys(completedByType);
+  const completedTotal = Object.values(completedByType).reduce((a, b) => a + b, 0);
+  const gate = sequencerGate(completedTotal, completedByType, monthTypes);
+  if (!gate.ok) {
+    console.log(`[run-resequence] user=${userId} skip (gate): ${gate.reason}`);
+    return { status: "skipped", reason: gate.reason, currentDay, completed_by_type: completedByType, gate_cap_days: GATE_CAP_DAYS };
+  }
+  console.log(`[run-resequence] user=${userId} gate open: ${gate.reason}`);
 
   // 4) Pin month-boundary time trials (left as the catalog TT; AI fills the
   // rest). Day-typing is per catalog day; pinning is per POSITION, so a
