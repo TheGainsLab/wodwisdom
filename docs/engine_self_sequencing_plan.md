@@ -311,3 +311,21 @@ trial, the month's type counts for the chosen cadence, the retest day, two
 lines on how adaptation works) → **Start Day 1**. The track picker stays
 behind Switch Program for existing subscribers until the tracks → settings
 migration. The Coach prompt carries the same assessment-month sentence.
+
+### Readiness gating decisions (2026-11-10)
+
+- **Prerequisites are the only reveal control.** The novelty budget is
+  DROPPED. Prerequisites limit depth (chains), not breadth: after the
+  assessment month roughly six types become eligible at once, and the whole
+  catalog opens over four to six months rather than thirty-six. Founder
+  ruling: that pace is fine ("if everyone stayed six months we'd be
+  thrilled"). Availability is not use — the sequencer still chooses what
+  serves the athlete.
+- **Readiness** = a prerequisite type completed twice (any ratio), rolled up
+  across modalities. Data: `engine_day_types.class / trains / prerequisites`
+  (migration 20261110000000).
+- **Time trial** pinned to day one of every month, never moved or replaced.
+- **Rocket Races A/B** pair in the same week; B inherits A's intervals, only
+  rest changes (validator rule to add).
+- Other assess types: at most one per month, only when fully ready.
+
