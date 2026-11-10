@@ -281,3 +281,33 @@ retention and ratio improvement.
 5. Author the 4-day general month one (16-row mapping) once the layout above is approved.
 6. Tracks → settings migration; hide the track picker for new subscribers.
 7. Novelty budget as an explicit rule in the sequencer's pool computation.
+
+### All Access: one goal, shared plans, one leader (decided 2026-11-10)
+
+1. **One goal.** Intake asks it once. For All Access the Engine setup
+   pre-fills from the profile goal and lets the athlete refine it for
+   conditioning; both generators read the same text with the Engine addition
+   appended. Two goal boxes for one person is a latent inconsistency.
+2. **The sequencer sees Programming's upcoming week.** Today it reads
+   Programming's *logged* load (workout_log blocks/entries + external
+   activities). Add the next seven days of generated strength and metcon
+   blocks so it can place a hard anaerobic day away from a heavy squat day
+   instead of discovering the collision in the log. This mirrors what
+   Programming already receives from the Engine (trailing 28-day zone
+   minutes + projected 4 weeks).
+3. **Direction of authority unchanged.** Programming flexes around the
+   Engine's plan (the existing Engine-awareness contract). The Engine knows
+   Programming's plan and avoids collisions, but never rewrites its
+   curriculum because a strength block is heavy. Two mutually adapting
+   systems oscillate; one leads, one follows, and the Engine's deterministic
+   grammar makes it the natural leader.
+
+### New-subscriber sequence (decided 2026-11-10)
+
+Checkout complete → **Engine setup** (days per week: 3 or 5 until a 4-day
+month exists; one free-text goal/week-context box, pre-filled from the
+profile goal for All Access) → **assessment-month briefing** (Day 1 time
+trial, the month's type counts for the chosen cadence, the retest day, two
+lines on how adaptation works) → **Start Day 1**. The track picker stays
+behind Switch Program for existing subscribers until the tracks → settings
+migration. The Coach prompt carries the same assessment-month sentence.
