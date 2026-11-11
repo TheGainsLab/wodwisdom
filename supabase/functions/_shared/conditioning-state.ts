@@ -16,6 +16,7 @@
  */
 
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { type AnalyticsSession, type AnalyticsTrial, computeEngineAnalytics, formatEngineAnalytics } from "./engine-analytics.ts";
 
 // ─── Competency-graph metadata (taxonomy, not judgment) ──────────────────────
 
@@ -27,6 +28,9 @@ export interface DayTypeMeta {
   systems: EnergySystem[]; // energy systems trained (phosphagen PH is primer-only → excluded)
   cls: DayClass;
   isRoot: boolean;
+  /** No pace target (max effort): the session ratio is actual pace ÷ the
+   *  modality's time-trial baseline pace, not ÷ a target (2026-11-11). */
+  maxEffort?: boolean;
 }
 
 /** Per day-type tags. PH is intentionally absent: phosphagen is primer-only. */
@@ -35,7 +39,7 @@ export const DAY_TYPE_META: Record<string, DayTypeMeta> = {
   endurance: { tier: 1, systems: ["AB"], cls: "DEV", isRoot: true },
   max_aerobic_power: { tier: 1, systems: ["AP"], cls: "DEV", isRoot: true },
   threshold: { tier: 1, systems: ["LT"], cls: "DEV", isRoot: true },
-  anaerobic: { tier: 1, systems: ["GL"], cls: "DEV", isRoot: true },
+  anaerobic: { tier: 1, systems: ["GL"], cls: "DEV", isRoot: true, maxEffort: true },
   interval: { tier: 1, systems: ["AP", "LT", "GL"], cls: "DEV", isRoot: false },
   polarized: { tier: 1, systems: ["AB"], cls: "DEV", isRoot: false },
   flux: { tier: 2, systems: ["LT", "AB"], cls: "DEV", isRoot: false },
@@ -83,6 +87,9 @@ export interface ConditioningInputs {
   timeTrials: TimeTrialRow[];
   sessions: SessionRow[];
   now?: Date;
+  /** The program's cadence, for the adherence line (sessions done vs the
+   *  cadence implies). Omitted → the count is reported without an expectation. */
+  daysPerWeek?: number | null;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -122,11 +129,22 @@ export interface ModalityCalibration {
   units: string | null;
   time_trial_age_days: number | null; // null = no current time trial
   baseline_rpm: number | null;
+  /** The last up-to-3 trials for this (modality, units), oldest→newest —
+   *  whether the ruler itself has moved (founder, 2026-11-11). */
+  history: { date: string; rpm: number }[];
+}
+
+export interface Adherence {
+  sessions_last_28_days: number;
+  sessions_last_90_days: number;
+  /** cadence × 4, when the cadence is known */
+  expected_last_28_days: number | null;
 }
 
 export interface ConditioningDiagnosis {
   hasData: boolean;
   daysSinceLastSession: number | null;
+  adherence: Adherence;
   competencies: CompetencySignal[];
   calibration: ModalityCalibration[];
 }
@@ -158,18 +176,23 @@ function computeCalibration(
     // (loadTimeTrialBaselines) ignores it, so the diagnosis must too. No fallback:
     // if nothing is current for this (modality, units), report no baseline.
     const current = sorted.filter((t) => t.is_current).at(-1);
+    const history = sorted
+      .filter((t) => num(t.calculated_rpm) != null && (num(t.calculated_rpm) as number) > 0)
+      .slice(-3)
+      .map((t) => ({ date: t.date, rpm: num(t.calculated_rpm) as number }));
     out.push({
       modality,
       units: units || null,
       time_trial_age_days: current ? daysBetween(current.date, now) : null,
       baseline_rpm: num(current?.calculated_rpm),
+      history,
     });
   }
 
   // Modalities trained (have metrics) but with no time trial at all → uncalibrated.
   for (const m of metricModalities) {
     if (!modalitiesWithTrials.has(m)) {
-      out.push({ modality: m, units: null, time_trial_age_days: null, baseline_rpm: null });
+      out.push({ modality: m, units: null, time_trial_age_days: null, baseline_rpm: null, history: [] });
     }
   }
   return out;
@@ -184,6 +207,15 @@ export function computeConditioningDiagnosis(inputs: ConditioningInputs): Condit
   let daysSinceLastSession: number | null = null;
   const dates = inputs.sessions.map((s) => s.date).filter(Boolean).sort();
   if (dates.length) daysSinceLastSession = daysBetween(dates[dates.length - 1], now);
+
+  // Adherence (founder, 2026-11-11): sessions actually done vs what the
+  // cadence implies. Raw counts; the model decides what eight-of-twelve means.
+  const within = (days: number) => dates.filter((d) => daysBetween(d, now) <= days && daysBetween(d, now) >= 0).length;
+  const adherence: Adherence = {
+    sessions_last_28_days: within(28),
+    sessions_last_90_days: within(90),
+    expected_last_28_days: inputs.daysPerWeek && inputs.daysPerWeek > 0 ? inputs.daysPerWeek * 4 : null,
+  };
 
   const competencies: CompetencySignal[] = inputs.metrics.map((m) => {
     const meta = DAY_TYPE_META[m.day_type];
@@ -207,6 +239,7 @@ export function computeConditioningDiagnosis(inputs: ConditioningInputs): Condit
   return {
     hasData,
     daysSinceLastSession,
+    adherence,
     competencies,
     calibration: computeCalibration(metricModalities, inputs.timeTrials, now),
   };
@@ -218,6 +251,11 @@ const METRIC_EXPLAINER =
   "rolling_avg_ratio = mean of the athlete's last up-to-5 (actual_pace ÷ target_pace) for that day_type+modality; " +
   "1.0 = exactly on their adaptive target, >1.0 beating it, <1.0 under it. recent is the raw sequence " +
   "(oldest→newest). n = sessions in the window (confidence). max = best pace ever logged (units vary by modality). " +
+  "MAX-EFFORT day types (marked 'vs baseline') have no target: their ratio is actual_pace ÷ the modality's " +
+  "time-trial baseline pace — the athlete's all-out output relative to their own aerobic baseline (a trained athlete " +
+  "sits well above 1.0; the trend across sessions is the signal). Each session's ratio uses the baseline in force " +
+  "when it was logged, so a retest moves the scale and the series steps at that date — read the trend BETWEEN " +
+  "retests, and use the trial history dates to place the steps. " +
   "No labels are applied — judge each system's state, its trend, recovery, and any need to recalibrate from the numbers yourself.";
 
 export function formatConditioningState(inputs: ConditioningInputs): string {
@@ -227,7 +265,13 @@ export function formatConditioningState(inputs: ConditioningInputs): string {
   const parts: string[] = ["\n\nENGINE CONDITIONING SIGNALS (raw — interpret yourself)", METRIC_EXPLAINER];
 
   parts.push(
-    `\nDays since last completed session: ${diag.daysSinceLastSession ?? "unknown"}`,
+    `\nDays since last completed session: ${diag.daysSinceLastSession ?? "none in the lookback window (90 days)"}`,
+  );
+  const a = diag.adherence;
+  parts.push(
+    `Adherence: ${a.sessions_last_28_days} sessions in the last 28 days` +
+      (a.expected_last_28_days != null ? ` (the program's cadence implies ${a.expected_last_28_days})` : "") +
+      `; ${a.sessions_last_90_days} in the last 90.`,
   );
 
   if (diag.competencies.length) {
@@ -237,7 +281,8 @@ export function formatConditioningState(inputs: ConditioningInputs): string {
       const mod = c.modality.replace(/_/g, " ");
       const sys = c.systems.length ? c.systems.join(",") : "—";
       const root = c.is_root ? " root" : "";
-      const ratio = c.rolling_avg_ratio != null ? c.rolling_avg_ratio.toFixed(2) : "—";
+      const vsBase = DAY_TYPE_META[c.day_type]?.maxEffort ? " vs baseline" : "";
+      const ratio = (c.rolling_avg_ratio != null ? c.rolling_avg_ratio.toFixed(2) : "—") + vsBase;
       const recent = c.last_5_ratios.length ? `[${c.last_5_ratios.map((x) => x.toFixed(2)).join(",")}]` : "[]";
       const max = c.learned_max_pace != null ? ` max ${c.learned_max_pace}` : "";
       parts.push(`- ${dt} / ${mod}  trains[${sys}]${root}  ratio ${ratio}  n${c.rolling_count}  recent ${recent}${max}`);
@@ -245,13 +290,16 @@ export function formatConditioningState(inputs: ConditioningInputs): string {
   }
 
   if (diag.calibration.length) {
-    parts.push("\nCalibration (time-trial age per modality+units; all targets derive from it):");
+    parts.push("\nCalibration (time-trial age per modality+units; all targets derive from it; 'trials' = the ruler's own history, oldest→newest):");
     for (const c of diag.calibration) {
       const mod = c.modality.replace(/_/g, " ") + (c.units ? ` (${c.units})` : "");
       if (c.time_trial_age_days == null) {
         parts.push(`- ${mod}: no current time trial — its targets are uncalibrated`);
       } else {
-        parts.push(`- ${mod}: ${c.time_trial_age_days}d old, baseline ${c.baseline_rpm ?? "?"}`);
+        const hist = c.history.length > 1
+          ? ` · trials ${c.history.map((h) => `${h.rpm} (${h.date})`).join(" → ")}`
+          : "";
+        parts.push(`- ${mod}: ${c.time_trial_age_days}d old, baseline ${c.baseline_rpm ?? "?"}${hist}`);
       }
     }
   }
@@ -270,8 +318,11 @@ export function formatConditioningState(inputs: ConditioningInputs): string {
 export async function buildConditioningState(
   supa: SupabaseClient,
   userId: string,
-  opts?: { recentDays?: number },
+  opts?: { recentDays?: number; daysPerWeek?: number | null },
 ): Promise<string> {
+  // recentDays bounds the days-since / adherence windows only; the analytics
+  // block (below) and the session list use every completed session, as the
+  // athlete's Analytics page does.
   const recentDays = opts?.recentDays ?? 90;
   const cutoff = new Date(Date.now() - recentDays * 86400000).toISOString().slice(0, 10);
 
@@ -287,10 +338,9 @@ export async function buildConditioningState(
       .order("date", { ascending: true }),
     supa
       .from("engine_workout_sessions")
-      .select("date")
+      .select("date, day_type, modality, units, actual_pace, target_pace, total_output, performance_ratio, perceived_exertion, average_heart_rate, peak_heart_rate, workout_data")
       .eq("user_id", userId)
       .eq("completed", true)
-      .gte("date", cutoff)
       .order("date", { ascending: false }),
   ]);
 
@@ -309,9 +359,18 @@ export async function buildConditioningState(
   const timeTrials = ttRes.data;
   const sessions = sessRes.data;
 
-  return formatConditioningState({
+  const allSessions = (sessions as AnalyticsSession[]) ?? [];
+  const signals = formatConditioningState({
     metrics: (metrics as PerfMetricRow[]) ?? [],
     timeTrials: (timeTrials as TimeTrialRow[]) ?? [],
-    sessions: (sessions as SessionRow[]) ?? [],
+    sessions: allSessions.filter((s) => s.date >= cutoff),
+    daysPerWeek: opts?.daysPerWeek ?? null,
   });
+  // ONE CALCULATION (founder, 2026-11-11): the sequencer and the Coach see
+  // exactly the analytics the athlete sees, computed by the same module as
+  // the Analytics page (engine-analytics.ts).
+  const analytics = formatEngineAnalytics(
+    computeEngineAnalytics(allSessions, ((timeTrials as AnalyticsTrial[]) ?? [])),
+  );
+  return signals + analytics;
 }

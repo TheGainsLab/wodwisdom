@@ -142,3 +142,46 @@ Deno.test("drift guard: no reader references the retired last_4_ratios column", 
     assert(src.includes("last_5_ratios"), `${rel} must read the production column last_5_ratios`);
   }
 });
+
+Deno.test("max-effort types (anaerobic) render their ratio as 'vs baseline' and the explainer says why", () => {
+  const text = formatConditioningState({
+    metrics: [
+      { day_type: "anaerobic", modality: "echo_bike", rolling_avg_ratio: 1.42, rolling_count: 3, last_5_ratios: [1.38, 1.4, 1.48], learned_max_pace: 22 },
+      { day_type: "max_aerobic_power", modality: "echo_bike", rolling_avg_ratio: 1.03, rolling_count: 3, last_5_ratios: [1.0, 1.04, 1.05], learned_max_pace: 16 },
+    ],
+    timeTrials: [],
+    sessions: [],
+    now: new Date("2026-11-11T00:00:00Z"),
+  });
+  if (!text.includes("anaerobic / echo bike  trains[GL] root  ratio 1.42 vs baseline")) throw new Error(text);
+  if (text.includes("max aerobic power / echo bike  trains[AP] root  ratio 1.03 vs baseline")) throw new Error("MAP must not be vs baseline");
+  if (!text.includes("MAX-EFFORT day types")) throw new Error("explainer missing");
+});
+
+Deno.test("time-trial history: the last three trials per modality+units, oldest→newest, on the calibration line", () => {
+  const text = formatConditioningState({
+    metrics: [],
+    timeTrials: [
+      { modality: "echo_bike", units: "cal", calculated_rpm: 14, date: "2026-07-01", is_current: false },
+      { modality: "echo_bike", units: "cal", calculated_rpm: 15, date: "2026-08-01", is_current: false },
+      { modality: "echo_bike", units: "cal", calculated_rpm: 15.8, date: "2026-09-01", is_current: false },
+      { modality: "echo_bike", units: "cal", calculated_rpm: 16.2, date: "2026-10-01", is_current: true },
+    ],
+    sessions: [],
+    now: new Date("2026-10-15T00:00:00Z"),
+  });
+  if (!text.includes("baseline 16.2 · trials 15 (2026-08-01) → 15.8 (2026-09-01) → 16.2 (2026-10-01)")) throw new Error(text);
+});
+
+Deno.test("adherence: sessions in the last 28 and 90 days, with the cadence's expectation when known", () => {
+  const now = new Date("2026-11-11T00:00:00Z");
+  const day = (n: number) => ({ date: new Date(now.getTime() - n * 86400000).toISOString().slice(0, 10) });
+  const sessions = [day(2), day(5), day(9), day(13), day(20), day(27), day(40), day(60)];
+  const withCadence = computeConditioningDiagnosis({ metrics: [], timeTrials: [], sessions, now, daysPerWeek: 3 });
+  assertEquals(withCadence.adherence, { sessions_last_28_days: 6, sessions_last_90_days: 8, expected_last_28_days: 12 });
+  const text = formatConditioningState({ metrics: [], timeTrials: [], sessions, now, daysPerWeek: 3 });
+  if (!text.includes("Adherence: 6 sessions in the last 28 days (the program's cadence implies 12); 8 in the last 90.")) throw new Error(text);
+  const noCadence = formatConditioningState({ metrics: [], timeTrials: [], sessions, now });
+  if (!noCadence.includes("Adherence: 6 sessions in the last 28 days; 8 in the last 90.")) throw new Error(noCadence);
+});
+

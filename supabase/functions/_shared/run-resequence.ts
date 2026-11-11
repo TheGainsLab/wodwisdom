@@ -19,6 +19,7 @@
 
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { callClaude } from "./call-claude.ts";
+import { MODELS } from "./model-profiles.ts";
 import { buildConditioningState } from "./conditioning-state.ts";
 import { buildOtherTrainingLoadBlock } from "./athlete-activities.ts";
 import { formatDayTypeCatalogue, loadDayTypeCatalogue } from "./engine-catalogue.ts";
@@ -244,7 +245,7 @@ export async function runResequence(
   // 4c) Diagnosis + catalogue rows. The catalogue TEXT is formatted later,
   // after the readiness pool is known.
   const [diagnosis, catalogueRows] = await Promise.all([
-    buildConditioningState(supa, userId),
+    buildConditioningState(supa, userId, { daysPerWeek: maxDays }),
     loadDayTypeCatalogue(supa),
   ]);
   if (!diagnosis) {
@@ -355,8 +356,12 @@ export async function runResequence(
   // worthless here. 2 × 150s + 3s backoff ≈ 303s, inside the ~400s edge wall.
   // No Haiku fallback: sequencing is a judgment seat — on failure we change
   // nothing (athlete keeps the curated day) and the next cron tick retries.
+  // Sonnet 5.5 (founder decision 2026-11-11): the current Sonnet for the one
+  // Engine seat that weighs the whole conditioning picture. Plain
+  // system+messages, so none of the 5.x request restrictions apply here.
   const raw = await callClaude({
     apiKey: apiKey!,
+    model: MODELS.sonnet5,
     system: SYSTEM_PROMPT,
     userContent,
     maxTokens: 4096,

@@ -340,3 +340,62 @@ migration. The Coach prompt carries the same assessment-month sentence.
   rest changes (validator rule to add).
 - Other assess types: at most one per month, only when fully ready.
 
+### Sequencer default (decided 2026-11-11)
+
+- **New subscribers: ON.** Engine setup writes `engine_ai_sequencing = true`
+  with the program choice. The assessment month is fixed regardless; the
+  sequencer begins with month two.
+- **Opt-out exists:** the Settings page "AI sequencing" toggle writes the
+  flag directly (finish-your-block semantics).
+- **Existing subscribers:** flipped by the admin in cohorts via SQL (no admin
+  UI control yet): main-track athletes past month one first, then Mini Cycle
+  (moved to the main program at their cadence), then VO2 / Hyrox once the
+  readiness clause below is in.
+- **Readiness clause (to add):** a type the athlete has already completed
+  twice is ready whatever its prerequisites — demonstrated directly beats
+  demonstrated by proxy. Without it a VO2 athlete who has done devour five
+  times is "not ready" for devour because they never did anaerobic twice.
+
+### Sequencer signals — decisions (2026-11-11)
+
+- **Everything is relative to the athlete.** Ratios are against their own
+  targets, anaerobic against their own time-trial baseline, trend against
+  their own last five. Population norms are deliberately OUT OF SCOPE for
+  sequencing: a 40-year-old woman is compared to her own data, not to a
+  24-year-old man. "Is she fit" is not the sequencer's question.
+- **Anaerobic (max-effort) days now write metrics**: output ÷ time-trial
+  baseline pace, marked "vs baseline" in the diagnosis. Before this the
+  glycolytic root was invisible to the sequencer.
+- **Added: time-trial history** (last three trials per modality+units) —
+  whether the ruler itself moved — and **adherence** (sessions in the last
+  28 / 90 days vs the cadence's expectation).
+- **Not added, by decision:** per-interval fade (few athletes log intervals
+  mid-session; with pacing coaching they rarely collapse, so it carries
+  little signal); threshold in the 3-day assessment month (anaerobic / max
+  aerobic power / endurance is the best 3-day mix; adding threshold would
+  degrade the stimulus — the gap closes at month two's first threshold day).
+- Still on the list: roll ratios up across modalities per type; Programming's
+  upcoming week as other load; work:rest tolerance; HR when logged.
+
+### One calculation: analytics = what the sequencer sees (decided 2026-11-11)
+
+The Analytics page's formulas moved verbatim into
+`supabase/functions/_shared/engine-analytics.ts` (pure, no I/O). The page
+imports it; `conditioning-state.ts` computes the same summary and appends it
+to the diagnosis as an ENGINE ANALYTICS block. Overview, sessions by type and
+equipment, energy-system paces (anaerobic÷trial, max aerobic÷trial,
+anaerobic÷max aerobic, peak/avg), per-type averages, all-time targets vs
+actual, personal records, pace by work:rest bucket, and heart-rate stats when
+logged — per machine. Change a formula once and both consumers change.
+
+
+### Sequencer model: Sonnet 5.5 (decided 2026-11-11)
+
+The sequencer runs on the current Sonnet (`MODELS.sonnet5`, default
+`claude-sonnet-5-5`, env `MODEL_SONNET5`), no Haiku fallback. The rest of the
+app keeps its tiering by design: Fable 5 for the CoachState eval, the
+Programming skeleton and the v3 composer; Opus for paper ingestion; Sonnet 4.6
+for the week fill, adjustments, safety review, chat and the parse family;
+Haiku 4.5 for routing and as the fallback. `MODELS.sonnet` was NOT moved:
+Sonnet 5.5 rejects forced `tool_choice` and non-default `temperature`, which
+thirteen Sonnet seats still send. Moving those is its own migration.

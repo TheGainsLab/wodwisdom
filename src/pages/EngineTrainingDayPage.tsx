@@ -1072,9 +1072,21 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
         });
       }
 
-      // Update performance metrics
+      // Update performance metrics.
+      // Max-effort days (anaerobic) have no target, so until 2026-11-11 they
+      // wrote no metrics at all and the sequencer never saw the glycolytic
+      // root. They now record output relative to the modality's time-trial
+      // baseline pace (the athlete's all-out output vs their aerobic
+      // baseline), through the same rolling path — so they get a rolling
+      // average, a trend, a count and a best pace like every other type.
+      // Time trials stay excluded: they recalibrate rather than train.
       if (perfRatio != null && rpm > 0) {
         await updatePerformanceMetrics(workout.day_type, modality, perfRatio, rpm).catch(() => {});
+      } else if (rpm > 0 && workout.day_type !== 'time_trial' && hasMatchingBaseline && baseline) {
+        const basePace = isRateUnit(selectedUnit) ? (baseline.total_output ?? 0) : (baseline.calculated_rpm ?? 0);
+        if (basePace > 0) {
+          await updatePerformanceMetrics(workout.day_type, modality, rpm / basePace, rpm).catch(() => {});
+        }
       }
 
       // Advance the pointer if the athlete trained at or past it. Sequence

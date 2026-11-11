@@ -12,6 +12,19 @@ import {
 import EnginePaywall from '../components/engine/EnginePaywall';
 import { useEntitlements } from '../hooks/useEntitlements';
 import { ChevronLeft, Clock, Activity, ArrowLeft } from 'lucide-react';
+// ONE CALCULATION (founder, 2026-11-11): the formulas live in the shared
+// module the sequencer's diagnosis also uses, so what the athlete sees here
+// is exactly what the AI is given.
+import {
+  availableWorkRestRatios,
+  calculatePace,
+  comparisons as computeComparisons,
+  energySystemPaces,
+  heartRate as computeHeartRate,
+  overview as computeOverview,
+  personalRecords,
+  workRest as computeWorkRest,
+} from '../../supabase/functions/_shared/engine-analytics.ts';
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -86,25 +99,6 @@ function formatModality(mod: string): string {
 
 function formatDayType(dt: string): string {
   return dt.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-}
-
-function calculatePace(s: EngineWorkoutSession): number | null {
-  if (s.actual_pace) return s.actual_pace;
-  const wd = s.workout_data as Record<string, unknown> | null;
-  if (s.total_output && wd?.total_work_seconds) {
-    return s.total_output / ((wd.total_work_seconds as number) / 60);
-  }
-  return null;
-}
-
-function formatWorkRestRatio(decimal: number): string {
-  if (decimal >= 2.7) return '3:1';
-  if (decimal >= 1.7) return '2:1';
-  if (decimal >= 1.3) return '3:2';
-  if (decimal >= 0.9) return '1:1';
-  if (decimal >= 0.6) return '2:3';
-  if (decimal >= 0.4) return '1:2';
-  return '1:3';
 }
 
 // ── Shared components ────────────────────────────────────────────────
@@ -246,14 +240,9 @@ export default function EngineAnalyticsPage({ session }: { session: Session }) {
   const totalSessions = sessions.length;
   const regularSessions = useMemo(() => sessions.filter(s => s.day_type !== 'time_trial'), [sessions]);
 
-  const sessionsWithRatio = regularSessions.filter(s => s.performance_ratio != null && s.performance_ratio > 0);
-  const avgRatio = sessionsWithRatio.length > 0
-    ? sessionsWithRatio.reduce((sum, s) => sum + (s.performance_ratio ?? 0), 0) / sessionsWithRatio.length
-    : 0;
-  const avgRPE = regularSessions.length > 0
-    ? regularSessions.filter(s => s.perceived_exertion != null && s.perceived_exertion > 0).reduce((sum, s) => sum + (s.perceived_exertion ?? 0), 0) /
-      regularSessions.filter(s => s.perceived_exertion != null && s.perceived_exertion > 0).length
-    : 0;
+  const ov = useMemo(() => computeOverview(sessions, allTrials), [sessions, allTrials]);
+  const avgRatio = ov.avg_performance ?? 0;
+  const avgRPE = ov.avg_rpe ?? 0;
 
   // Unique modalities/day types from sessions
   const availableModalities = useMemo(() => {
@@ -296,42 +285,20 @@ export default function EngineAnalyticsPage({ session }: { session: Session }) {
 
   // ── Summary: Energy System Ratios ──
 
-  const summaryRatios = useMemo(() => {
-    if (!selModality) return { glycolytic: null as number | null, aerobic: null as number | null, systems: null as number | null };
-
-    const anaerobicSessions = regularSessions.filter(s => s.day_type === 'anaerobic' && s.modality === selModality && s.actual_pace && s.actual_pace > 0);
-    const anaerobicAvg = anaerobicSessions.length > 0 ? anaerobicSessions.reduce((sum, s) => sum + (s.actual_pace ?? 0), 0) / anaerobicSessions.length : null;
-
-    const maxAerobicSessions = regularSessions.filter(s => s.day_type === 'max_aerobic_power' && s.modality === selModality && s.actual_pace && s.actual_pace > 0);
-    const maxAerobicAvg = maxAerobicSessions.length > 0 ? maxAerobicSessions.reduce((sum, s) => sum + (s.actual_pace ?? 0), 0) / maxAerobicSessions.length : null;
-
-    const modalTrials = allTrials.filter(t => t.modality === selModality && t.calculated_rpm && t.calculated_rpm > 0).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    const ttPace = modalTrials.length > 0 ? modalTrials[0].calculated_rpm : null;
-
-    return {
-      glycolytic: anaerobicAvg && ttPace ? anaerobicAvg / ttPace : null,
-      aerobic: maxAerobicAvg && ttPace ? maxAerobicAvg / ttPace : null,
-      systems: anaerobicAvg && maxAerobicAvg ? anaerobicAvg / maxAerobicAvg : null,
-    };
-  }, [regularSessions, allTrials, selModality]);
-
-  // ── Summary: Pace Stats ──
-
-  const paceStats = useMemo(() => {
-    if (!selModality) return { peak: null as number | null, average: null as number | null, units: '' };
-    const modSessions = regularSessions.filter(s => s.modality === selModality && s.actual_pace && s.actual_pace > 0);
-    const modTrials = allTrials.filter(t => t.modality === selModality && t.calculated_rpm && t.calculated_rpm > 0);
-    const allPaces = [
-      ...modSessions.map(s => s.actual_pace ?? 0),
-      ...modTrials.map(t => t.calculated_rpm ?? 0),
-    ].filter(p => p > 0);
-    if (allPaces.length === 0) return { peak: null, average: null, units: '' };
-    return {
-      peak: Math.max(...allPaces),
-      average: allPaces.reduce((a, b) => a + b, 0) / allPaces.length,
-      units: modSessions[0]?.units ?? modTrials[0]?.units ?? 'cal',
-    };
-  }, [regularSessions, allTrials, selModality]);
+  const energy = useMemo(
+    () => (selModality ? energySystemPaces(regularSessions, allTrials, selModality) : null),
+    [regularSessions, allTrials, selModality],
+  );
+  const summaryRatios = {
+    glycolytic: energy?.glycolytic ?? null,
+    aerobic: energy?.aerobic ?? null,
+    systems: energy?.systems ?? null,
+  };
+  const paceStats = {
+    peak: energy?.peak ?? null,
+    average: energy?.average ?? null,
+    units: energy?.units ?? '',
+  };
 
   // ── Render: Menu (landing) ──
 
@@ -644,14 +611,8 @@ export default function EngineAnalyticsPage({ session }: { session: Session }) {
 
   function renderComparisons() {
     const comparisonData = (!selModality || selDayTypes.length === 0) ? [] :
-      (selDayTypes.map(dt => {
-        const dtSessions = regularSessions.filter(s => s.modality === selModality && s.day_type === dt && s.total_output);
-        if (dtSessions.length === 0) return null;
-        const avgOutput = dtSessions.reduce((sum, s) => sum + (s.total_output ?? 0), 0) / dtSessions.length;
-        const withPace = dtSessions.filter(s => s.actual_pace && s.actual_pace > 0);
-        const avgPace = withPace.length > 0 ? withPace.reduce((sum, s) => sum + (s.actual_pace ?? 0), 0) / withPace.length : 0;
-        return { dayType: dt, count: dtSessions.length, avgOutput, avgPace, units: dtSessions[0].units ?? '' };
-      }).filter(Boolean) as { dayType: string; count: number; avgOutput: number; avgPace: number; units: string }[]);
+      computeComparisons(regularSessions, selModality, selDayTypes)
+        .map(c => ({ dayType: c.day_type, count: c.count, avgOutput: c.avg_output, avgPace: c.avg_pace, units: c.units }));
 
     const sorted = [...comparisonData].sort((a, b) => {
       const aVal = selMetric === 'output' ? a.avgOutput : a.avgPace;
@@ -831,20 +792,7 @@ export default function EngineAnalyticsPage({ session }: { session: Session }) {
   // ── Render: Personal Records ──
 
   function renderRecords() {
-    const records = (() => {
-      if (!selModality) return [];
-      const best: Record<string, EngineWorkoutSession> = {};
-      regularSessions.forEach(s => {
-        if (s.modality !== selModality || !s.day_type || !s.total_output) return;
-        const dt = s.day_type;
-        if (!best[dt] || (s.total_output ?? 0) > (best[dt].total_output ?? 0)) {
-          best[dt] = s;
-        }
-      });
-      return Object.values(best)
-        .map(r => ({ ...r, pace: calculatePace(r) ?? 0 }))
-        .sort((a, b) => b.pace - a.pace);
-    })();
+    const records = selModality ? personalRecords(regularSessions, selModality) : [];
 
     return (
       <div className="engine-section">
@@ -895,72 +843,20 @@ export default function EngineAnalyticsPage({ session }: { session: Session }) {
       { id: 'training_load', label: 'Load', unit: '' },
     ];
 
-    // Get latest baseline pace per modality (for training load calc)
-    const baselinePaces = (() => {
-      const map: Record<string, number> = {};
-      const byMod: Record<string, EngineTimeTrial[]> = {};
-      allTrials.forEach(t => {
-        if (!byMod[t.modality]) byMod[t.modality] = [];
-        byMod[t.modality].push(t);
-      });
-      Object.entries(byMod).forEach(([mod, trials]) => {
-        const latest = [...trials].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
-        if (latest?.calculated_rpm) map[mod] = latest.calculated_rpm;
-      });
-      return map;
-    })();
-
-    const hrDayTypes = (() => {
-      const set = new Set<string>();
-      regularSessions.forEach(s => {
-        if (s.day_type && (!selModality || s.modality === selModality) && (s.average_heart_rate || s.peak_heart_rate)) {
-          set.add(s.day_type);
-        }
-      });
-      return Array.from(set).sort();
-    })();
-
-    const chartData = (() => {
-      const items = hrDayTypes.map(dt => {
-        const dtSessions = regularSessions.filter(s =>
-          s.day_type === dt && (!selModality || s.modality === selModality) && (s.average_heart_rate || s.peak_heart_rate)
-        );
-        if (dtSessions.length === 0) return null;
-
-        const avgHRs = dtSessions.filter(s => s.average_heart_rate).map(s => s.average_heart_rate!);
-        const peakHRs = dtSessions.filter(s => s.peak_heart_rate).map(s => s.peak_heart_rate!);
-        const efficiencies: number[] = [];
-        const loads: number[] = [];
-
-        dtSessions.forEach(s => {
-          const pace = calculatePace(s);
-          const avgHR = s.average_heart_rate;
-          const wd = s.workout_data as Record<string, unknown> | null;
-          const durMin = wd?.total_work_seconds ? (wd.total_work_seconds as number) / 60 : 0;
-          const baseline = baselinePaces[s.modality ?? ''];
-
-          if (pace && avgHR && avgHR > 0) {
-            efficiencies.push((pace / avgHR) * 1000);
-            const intensity = baseline && baseline > 0 ? pace / baseline : 1;
-            loads.push(Math.pow(intensity, 3) * avgHR * Math.sqrt(durMin || 1));
-          }
-        });
-
+    const chartData = computeHeartRate(regularSessions, allTrials, selModality || null)
+      .map(h => {
         const stats: Record<string, number> = {
-          sessions: dtSessions.length,
-          avg_hr: avgHRs.length > 0 ? avgHRs.reduce((a, b) => a + b, 0) / avgHRs.length : 0,
-          avg_peak_hr: peakHRs.length > 0 ? peakHRs.reduce((a, b) => a + b, 0) / peakHRs.length : 0,
-          max_peak_hr: peakHRs.length > 0 ? Math.max(...peakHRs) : 0,
-          efficiency: efficiencies.length > 0 ? efficiencies.reduce((a, b) => a + b, 0) / efficiencies.length : 0,
-          training_load: loads.length > 0 ? loads.reduce((a, b) => a + b, 0) / loads.length : 0,
+          sessions: h.sessions,
+          avg_hr: h.avg_hr ?? 0,
+          avg_peak_hr: h.avg_peak_hr ?? 0,
+          max_peak_hr: h.max_peak_hr ?? 0,
+          efficiency: h.efficiency ?? 0,
+          training_load: h.training_load ?? 0,
         };
-
-        return { dayType: dt, value: stats[selMetric] || 0 };
-      }).filter(Boolean) as { dayType: string; value: number }[];
-
-      return items.filter(i => i.value > 0).sort((a, b) => b.value - a.value);
-    })();
-
+        return { dayType: h.day_type, value: stats[selMetric] || 0 };
+      })
+      .filter(i => i.value > 0)
+      .sort((a, b) => b.value - a.value);
     const currentMetric = hrMetrics.find(m => m.id === selMetric);
 
     return (
@@ -1023,42 +919,11 @@ export default function EngineAnalyticsPage({ session }: { session: Session }) {
       return Array.from(set).sort();
     })();
 
-    const availableRatios = (() => {
-      if (!selModality) return [];
-      const set = new Set<string>();
-      regularSessions.forEach(s => {
-        const wd = s.workout_data as Record<string, unknown> | null;
-        if (s.modality === selModality && wd?.avg_work_rest_ratio) {
-          set.add(formatWorkRestRatio(wd.avg_work_rest_ratio as number));
-        }
-      });
-      return Array.from(set).sort();
-    })();
-
-    const chartData = (() => {
-      if (!selModality || selRatios.length === 0) return null;
-      const groups: Record<string, EngineWorkoutSession[]> = {};
-      regularSessions.forEach(s => {
-        const wd = s.workout_data as Record<string, unknown> | null;
-        if (s.modality === selModality && wd?.avg_work_rest_ratio && s.actual_pace) {
-          const label = formatWorkRestRatio(wd.avg_work_rest_ratio as number);
-          if (selRatios.includes(label)) {
-            if (!groups[label]) groups[label] = [];
-            groups[label].push(s);
-          }
-        }
-      });
-
-      const stats = Object.entries(groups).map(([ratio, sesList]) => ({
-        ratio,
-        count: sesList.length,
-        avgPace: sesList.reduce((sum, s) => sum + (s.actual_pace ?? 0), 0) / sesList.length,
-        units: sesList[0].units ?? '',
-      })).sort((a, b) => b.avgPace - a.avgPace);
-
-      return stats;
-    })();
-
+    const availableRatios = selModality ? availableWorkRestRatios(regularSessions, selModality) : [];
+    const chartData = (!selModality || selRatios.length === 0)
+      ? null
+      : computeWorkRest(regularSessions, selModality, selRatios)
+          .map(w => ({ ratio: w.ratio, count: w.count, avgPace: w.avg_pace, units: w.units }));
     return (
       <div className="engine-section">
         <ViewHeader title="Work:Rest Ratio" onBack={() => goTo('menu')} />

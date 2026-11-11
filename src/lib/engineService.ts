@@ -123,6 +123,7 @@ export interface EngineProgram {
   description: string | null;
   days_per_week: number;
   total_days: number;
+  total_months: number | null;
   sort_order: number;
   is_active: boolean;
 }
@@ -822,23 +823,54 @@ export async function loadUserProgress(): Promise<EngineUserProgress | null> {
   return data;
 }
 
-/** Save the athlete's Engine goal (blank clears it). Upsert so an engine-only
- *  athlete with no profile row yet still gets one. */
+/** Save the athlete's goal. ONE GOAL (founder decision 2026-11-10): the text
+ *  is shared by the Engine sequencer and AI Programming, so this writes both
+ *  `engine_goal` and the profile `goal`; the Athlete page writes both too, and
+ *  the latest edit anywhere prevails. Upsert so an engine-only athlete with no
+ *  profile row yet still gets one.
+ *  BLANK IS A NO-OP (review fix 2026-11-11): the Engine setup and the program
+ *  switcher pre-fill this field from the profile; a failed load or an untouched
+ *  field must never null a goal the athlete typed elsewhere. Clearing a goal on
+ *  purpose is the Athlete page's job. */
 export async function saveEngineGoal(goal: string): Promise<void> {
+  const text = goal.trim();
+  if (!text) return;
+
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
   const { error } = await supabase
     .from('athlete_profiles')
     .upsert(
-      { user_id: user.id, engine_goal: goal.trim() || null },
+      { user_id: user.id, engine_goal: text, goal: text },
       { onConflict: 'user_id' }
     );
 
   if (error) throw error;
 }
 
-/** Save the user's chosen program version (initial selection). engine_months_unlocked is owned by the payment path (stripe-webhook) — never set here. */
+/** Turn the AI sequencer on. Called ONLY by the Engine setup for a new
+ *  subscriber (founder decision 2026-11-11: new subscribers get the sequencer
+ *  on; Settings is the opt-out). Deliberately separate from
+ *  saveProgramVersion so no other program write — the switcher, an admin
+ *  tool, a future caller — can flip an athlete who opted out. */
+export async function enableAiSequencing(): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const { error } = await supabase
+    .from('athlete_profiles')
+    .upsert(
+      { user_id: user.id, engine_ai_sequencing: true },
+      { onConflict: 'user_id' }
+    );
+
+  if (error) throw error;
+}
+
+/** Save the user's chosen program version (initial selection). engine_months_unlocked is owned by the payment path (stripe-webhook) — never set here.
+ *  Does NOT touch engine_ai_sequencing: the Engine setup calls
+ *  enableAiSequencing() explicitly for a new subscriber. */
 export async function saveProgramVersion(version: string): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
@@ -853,6 +885,44 @@ export async function saveProgramVersion(version: string): Promise<void> {
     );
 
   if (error) throw error;
+}
+
+/** The shared goal text for pre-filling the Engine setup: the Engine goal if
+ *  set, else the AI Programming profile goal (an All Access athlete who set
+ *  up Programming first). */
+export async function loadSharedGoal(): Promise<string> {
+  const { data } = await supabase
+    .from('athlete_profiles')
+    .select('engine_goal, goal')
+    .maybeSingle();
+  return (data?.engine_goal as string | null) || (data?.goal as string | null) || '';
+}
+
+export interface MonthOneSummary {
+  /** positions in month one, time trial included */
+  days: number;
+  /** stimulus types in month one (time trial excluded), with session counts, in first-appearance order */
+  types: { day_type: string; count: number }[];
+  /** the position of the month-two time trial */
+  retestDay: number;
+}
+
+/** What the assessment month contains for a program — read from the mapping,
+ *  so the briefing stays true if the catalog is edited. */
+export async function loadMonthOneSummary(version: string): Promise<MonthOneSummary | null> {
+  const workouts = await getWorkoutsForProgram(version);
+  const monthOne = workouts.filter((w) => w.month === 1);
+  if (monthOne.length === 0) return null;
+  const counts = new Map<string, number>();
+  for (const w of monthOne) {
+    if (w.day_type === 'time_trial') continue;
+    counts.set(w.day_type, (counts.get(w.day_type) ?? 0) + 1);
+  }
+  return {
+    days: monthOne.length,
+    types: [...counts.entries()].map(([day_type, count]) => ({ day_type, count })),
+    retestDay: monthOne.length + 1,
+  };
 }
 
 /** Load the user's current program version. */

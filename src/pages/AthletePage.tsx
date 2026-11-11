@@ -1407,6 +1407,9 @@ export default function AthletePage({ session }: { session: Session }) {
       session_length_minutes: sessionLengthNum && !isNaN(sessionLengthNum) ? sessionLengthNum : null,
       injuries_constraints: injuriesVal,
       goal: goal.trim() || null,
+      // ONE GOAL (2026-11-10): the Engine sequencer reads engine_goal; keep it
+      // identical to the profile goal so the latest edit anywhere prevails.
+      engine_goal: goal.trim() || null,
       ...levels,
       updated_at: new Date().toISOString(),
     };
