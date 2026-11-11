@@ -356,3 +356,24 @@ migration. The Coach prompt carries the same assessment-month sentence.
   demonstrated by proxy. Without it a VO2 athlete who has done devour five
   times is "not ready" for devour because they never did anaerobic twice.
 
+### Sequencer signals — decisions (2026-11-11)
+
+- **Everything is relative to the athlete.** Ratios are against their own
+  targets, anaerobic against their own time-trial baseline, trend against
+  their own last five. Population norms are deliberately OUT OF SCOPE for
+  sequencing: a 40-year-old woman is compared to her own data, not to a
+  24-year-old man. "Is she fit" is not the sequencer's question.
+- **Anaerobic (max-effort) days now write metrics**: output ÷ time-trial
+  baseline pace, marked "vs baseline" in the diagnosis. Before this the
+  glycolytic root was invisible to the sequencer.
+- **Added: time-trial history** (last three trials per modality+units) —
+  whether the ruler itself moved — and **adherence** (sessions in the last
+  28 / 90 days vs the cadence's expectation).
+- **Not added, by decision:** per-interval fade (few athletes log intervals
+  mid-session; with pacing coaching they rarely collapse, so it carries
+  little signal); threshold in the 3-day assessment month (anaerobic / max
+  aerobic power / endurance is the best 3-day mix; adding threshold would
+  degrade the stimulus — the gap closes at month two's first threshold day).
+- Still on the list: roll ratios up across modalities per type; Programming's
+  upcoming week as other load; work:rest tolerance; HR when logged.
+

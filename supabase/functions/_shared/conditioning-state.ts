@@ -86,6 +86,9 @@ export interface ConditioningInputs {
   timeTrials: TimeTrialRow[];
   sessions: SessionRow[];
   now?: Date;
+  /** The program's cadence, for the adherence line (sessions done vs the
+   *  cadence implies). Omitted → the count is reported without an expectation. */
+  daysPerWeek?: number | null;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -125,11 +128,22 @@ export interface ModalityCalibration {
   units: string | null;
   time_trial_age_days: number | null; // null = no current time trial
   baseline_rpm: number | null;
+  /** The last up-to-3 trials for this (modality, units), oldest→newest —
+   *  whether the ruler itself has moved (founder, 2026-11-11). */
+  history: { date: string; rpm: number }[];
+}
+
+export interface Adherence {
+  sessions_last_28_days: number;
+  sessions_last_90_days: number;
+  /** cadence × 4, when the cadence is known */
+  expected_last_28_days: number | null;
 }
 
 export interface ConditioningDiagnosis {
   hasData: boolean;
   daysSinceLastSession: number | null;
+  adherence: Adherence;
   competencies: CompetencySignal[];
   calibration: ModalityCalibration[];
 }
@@ -161,18 +175,23 @@ function computeCalibration(
     // (loadTimeTrialBaselines) ignores it, so the diagnosis must too. No fallback:
     // if nothing is current for this (modality, units), report no baseline.
     const current = sorted.filter((t) => t.is_current).at(-1);
+    const history = sorted
+      .filter((t) => num(t.calculated_rpm) != null && (num(t.calculated_rpm) as number) > 0)
+      .slice(-3)
+      .map((t) => ({ date: t.date, rpm: num(t.calculated_rpm) as number }));
     out.push({
       modality,
       units: units || null,
       time_trial_age_days: current ? daysBetween(current.date, now) : null,
       baseline_rpm: num(current?.calculated_rpm),
+      history,
     });
   }
 
   // Modalities trained (have metrics) but with no time trial at all → uncalibrated.
   for (const m of metricModalities) {
     if (!modalitiesWithTrials.has(m)) {
-      out.push({ modality: m, units: null, time_trial_age_days: null, baseline_rpm: null });
+      out.push({ modality: m, units: null, time_trial_age_days: null, baseline_rpm: null, history: [] });
     }
   }
   return out;
@@ -187,6 +206,15 @@ export function computeConditioningDiagnosis(inputs: ConditioningInputs): Condit
   let daysSinceLastSession: number | null = null;
   const dates = inputs.sessions.map((s) => s.date).filter(Boolean).sort();
   if (dates.length) daysSinceLastSession = daysBetween(dates[dates.length - 1], now);
+
+  // Adherence (founder, 2026-11-11): sessions actually done vs what the
+  // cadence implies. Raw counts; the model decides what eight-of-twelve means.
+  const within = (days: number) => dates.filter((d) => daysBetween(d, now) <= days && daysBetween(d, now) >= 0).length;
+  const adherence: Adherence = {
+    sessions_last_28_days: within(28),
+    sessions_last_90_days: within(90),
+    expected_last_28_days: inputs.daysPerWeek && inputs.daysPerWeek > 0 ? inputs.daysPerWeek * 4 : null,
+  };
 
   const competencies: CompetencySignal[] = inputs.metrics.map((m) => {
     const meta = DAY_TYPE_META[m.day_type];
@@ -210,6 +238,7 @@ export function computeConditioningDiagnosis(inputs: ConditioningInputs): Condit
   return {
     hasData,
     daysSinceLastSession,
+    adherence,
     competencies,
     calibration: computeCalibration(metricModalities, inputs.timeTrials, now),
   };
@@ -235,6 +264,12 @@ export function formatConditioningState(inputs: ConditioningInputs): string {
   parts.push(
     `\nDays since last completed session: ${diag.daysSinceLastSession ?? "none in the lookback window (90 days)"}`,
   );
+  const a = diag.adherence;
+  parts.push(
+    `Adherence: ${a.sessions_last_28_days} sessions in the last 28 days` +
+      (a.expected_last_28_days != null ? ` (the program's cadence implies ${a.expected_last_28_days})` : "") +
+      `; ${a.sessions_last_90_days} in the last 90.`,
+  );
 
   if (diag.competencies.length) {
     parts.push("\nCompetencies (day_type / modality — trains[systems], root?):");
@@ -252,13 +287,16 @@ export function formatConditioningState(inputs: ConditioningInputs): string {
   }
 
   if (diag.calibration.length) {
-    parts.push("\nCalibration (time-trial age per modality+units; all targets derive from it):");
+    parts.push("\nCalibration (time-trial age per modality+units; all targets derive from it; 'trials' = the ruler's own history, oldest→newest):");
     for (const c of diag.calibration) {
       const mod = c.modality.replace(/_/g, " ") + (c.units ? ` (${c.units})` : "");
       if (c.time_trial_age_days == null) {
         parts.push(`- ${mod}: no current time trial — its targets are uncalibrated`);
       } else {
-        parts.push(`- ${mod}: ${c.time_trial_age_days}d old, baseline ${c.baseline_rpm ?? "?"}`);
+        const hist = c.history.length > 1
+          ? ` · trials ${c.history.map((h) => `${h.rpm} (${h.date})`).join(" → ")}`
+          : "";
+        parts.push(`- ${mod}: ${c.time_trial_age_days}d old, baseline ${c.baseline_rpm ?? "?"}${hist}`);
       }
     }
   }
@@ -277,7 +315,7 @@ export function formatConditioningState(inputs: ConditioningInputs): string {
 export async function buildConditioningState(
   supa: SupabaseClient,
   userId: string,
-  opts?: { recentDays?: number },
+  opts?: { recentDays?: number; daysPerWeek?: number | null },
 ): Promise<string> {
   const recentDays = opts?.recentDays ?? 90;
   const cutoff = new Date(Date.now() - recentDays * 86400000).toISOString().slice(0, 10);
@@ -320,5 +358,6 @@ export async function buildConditioningState(
     metrics: (metrics as PerfMetricRow[]) ?? [],
     timeTrials: (timeTrials as TimeTrialRow[]) ?? [],
     sessions: (sessions as SessionRow[]) ?? [],
+    daysPerWeek: opts?.daysPerWeek ?? null,
   });
 }

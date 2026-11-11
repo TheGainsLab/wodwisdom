@@ -244,7 +244,7 @@ export async function runResequence(
   // 4c) Diagnosis + catalogue rows. The catalogue TEXT is formatted later,
   // after the readiness pool is known.
   const [diagnosis, catalogueRows] = await Promise.all([
-    buildConditioningState(supa, userId),
+    buildConditioningState(supa, userId, { daysPerWeek: maxDays }),
     loadDayTypeCatalogue(supa),
   ]);
   if (!diagnosis) {
