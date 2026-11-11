@@ -210,14 +210,25 @@ pinned time trial:
 recalibration. The month-two time trial is simply the first retest; the
 sequencer's first generated block follows it.
 
-### Sequencer gate: a criterion, not a day count
+### Sequencer gate: the assessment month is complete
 
-Replace `MIN_COMPLETED_DAYS = 10` with: **at least two scored sessions in
-every stimulus type the current month uses**, capped at 10 completed days so
-nobody waits longer than today. Each assessment month above satisfies the
-criterion by its final week; it is the condition the number 10 was standing
-in for. Month-one decisions are low-stakes (which of three to five primitives,
-and dose), so an early wrong call costs one ordinary session.
+(Corrected — an earlier draft of this section proposed "two scored sessions
+per type, capped at 10 days", which would have started the sequencer inside
+month one and contradicted the assessment-month decision.)
+
+The sequencer's first generated block is the **first block of month two**,
+right after the month-two time trial. The gate is positional: the next
+position to generate lies in month 2 or later. Nothing is generated inside
+month one, for anyone, whatever their data looks like. By construction every
+assessment month yields two or more scored sessions of each of its types,
+which is what readiness needs; the per-type counts are logged as an
+informational thin-data note after the gate, never as a condition of it.
+
+The gate runs after four cheap reads (profile, program, sessions, mapping)
+and before the diagnosis, so a month-one athlete costs nothing more per cron
+tick. A profile whose program has no mapping rows is a data error (every
+athlete starts on month 1 of a mapped program, founder ruling 2026-11-11):
+the gate closes and says so rather than guessing.
 
 ### Diagnosis: roll ratios up across modalities per type
 
@@ -274,7 +285,7 @@ retention and ratio improvement.
 
 ### Order of work
 
-1. Gate criterion (two scored sessions per type, cap 10) — `run-resequence.ts`.
+1. Gate: assessment month complete (next block in month 2+) — `run-resequence.ts`. ✅
 2. "Why today" on static days — day page + `coaching_intent`.
 3. Diagnosis roll-up across modalities — `conditioning-state.ts`.
 4. Intake questions and `engine_goal` presets — onboarding + Engine dashboard.

@@ -5,7 +5,10 @@
  *   - engine-resequence (HTTP)        — admin dry-run preview / on-demand.
  *   - engine-resequence-cron (server) — automatic live generation, per eligible user.
  *
- * Flow: gate (>= MIN_COMPLETED_DAYS) -> diagnosis + catalogue + current phase ->
+ * Flow: program + positions (four cheap reads) -> gate (assessment month
+ * complete: the next block lies in month 2 or later; a program with no mapping
+ * is a data error and skips) -> catalog types + per-type counts + diagnosis +
+ * catalogue -> readiness pool ->
  * AI generates the non-pinned days of the block within each envelope -> parse +
  * validate -> (dry run returns the preview | persist accepted days as engine_workouts
  * rows + position overrides). Month-boundary time trials are pinned (left as the
@@ -20,9 +23,8 @@ import { buildConditioningState } from "./conditioning-state.ts";
 import { buildOtherTrainingLoadBlock } from "./athlete-activities.ts";
 import { formatDayTypeCatalogue, loadDayTypeCatalogue } from "./engine-catalogue.ts";
 import { parseProposal, type ProposedDay, validateProposal } from "./engine-sequence.ts";
-import { computeReadyDayTypes, missingPrerequisites, validateWeekRules } from "./engine-readiness.ts";
+import { computeReadyDayTypes, missingPrerequisites, sequencerGate, thinDataNote, validateWeekRules } from "./engine-readiness.ts";
 
-export const MIN_COMPLETED_DAYS = 10; // loop starts after the athlete completes 10 Engine days
 
 const SYSTEM_PROMPT =
   `You are the Engine conditioning sequencer. You personalise an athlete's UPCOMING conditioning by ` +
@@ -112,30 +114,6 @@ export async function runResequence(
   const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
   const { dryRun, debug } = opts;
 
-  // 1) Gate: at least MIN_COMPLETED_DAYS completed Engine sessions.
-  const { count: completed } = await supa
-    .from("engine_workout_sessions")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", userId)
-    .eq("completed", true);
-  if ((completed ?? 0) < MIN_COMPLETED_DAYS) {
-    const reason = `needs ${MIN_COMPLETED_DAYS} completed days, has ${completed ?? 0}`;
-    console.log(`[run-resequence] user=${userId} skip: ${reason}`);
-    return { status: "skipped", reason };
-  }
-
-  // 2) Diagnosis + catalogue rows. The prompt's catalogue TEXT is formatted
-  // later, after the month-availability pool is known — the model only ever
-  // sees the day-types the program has unlocked.
-  const [diagnosis, catalogueRows] = await Promise.all([
-    buildConditioningState(supa, userId),
-    loadDayTypeCatalogue(supa),
-  ]);
-  if (!diagnosis) {
-    console.log(`[run-resequence] user=${userId} skip: no conditioning diagnosis available`);
-    return { status: "skipped", reason: "no conditioning diagnosis available" };
-  }
-
   // 3) Program + cadence. The athlete's program defines the position space:
   // specialty programs curate NON-consecutive catalog days via engine_program_mapping,
   // so "the next N positions" must come from the mapping, not currentDay+i.
@@ -211,12 +189,35 @@ export async function runResequence(
   // Fallback for a program with no mapping rows: consecutive positions
   // (identity assumption — only plain-catalog setups reach this).
   if (blockPairs.length === 0) {
-    blockPairs = Array.from({ length: maxDays }, (_, i) => ({ seq: currentDay + i, day: currentDay + i }));
+    blockPairs = Array.from({ length: maxDays }, (_, i) => ({ seq: currentDay + i, day: currentDay + i, month: 1 }));
   }
 
-  // 3d) Catalog day -> day_type for the whole authored catalog (720 rows,
-  // two columns): one query serves TT pinning, the prescribed-slot baseline,
-  // and the month-availability pool.
+  // 3d) Position-month of the block (for the gate, the preview payload and
+  // the persisted override's `phase` column — position-month, never paid
+  // months). A program with no mapping rows yields null.
+  const blockMonth = mapping.length > 0
+    ? Math.max(1, ...blockPairs.map((p) => mapping.find((m) => m.seq === p.seq)?.month ?? 1))
+    : 1;
+  const gateMonth: number | null = mapping.length > 0
+    ? (mapping.find((m) => m.seq === blockPairs[0]?.seq)?.month ?? blockMonth)
+    : null;
+
+  // 3e) THE GATE (founder decision 2026-11-10): month one is the fixed
+  // assessment month for everyone; the sequencer's first block is the first
+  // block of month two. Positional: the first position to generate must lie
+  // in month 2+. Runs after four cheap reads (profile, program, sessions,
+  // mapping) and BEFORE anything else, so an athlete who cannot open costs
+  // nothing more. A program with no mapping rows is a data error → skip.
+  const gate = sequencerGate(gateMonth);
+  if (!gate.ok) {
+    console.log(`[run-resequence] user=${userId} skip (gate): ${gate.reason}`);
+    return { status: "skipped", reason: gate.reason, currentDay, next_block_month: gateMonth };
+  }
+  console.log(`[run-resequence] user=${userId} gate open: ${gate.reason}`);
+
+  // 4a) Catalog day -> day_type for the whole authored catalog (720 rows,
+  // two columns): serves TT pinning, the prescribed-slot baseline, and the
+  // thin-data note.
   const { data: catalogTypes } = await supa
     .from("engine_workouts")
     .select("day_number, day_type")
@@ -225,16 +226,8 @@ export async function runResequence(
     (catalogTypes ?? []).map((w) => [w.day_number as number, w.day_type as string]),
   );
 
-  // 3e) Readiness pool (founder decision 2026-11-10) — replaces the month
-  // gate. A type is available once every prerequisite has been COMPLETED
-  // twice, counted across all modalities, any ratio (engine-readiness.ts).
-  // Types without prerequisites are always available; time_trial always.
-  // Prerequisites are the only reveal control — there is no novelty budget.
-  // blockMonth is kept for the preview payload and the persisted override's
-  // `phase` column (position-month, never paid months).
-  const blockMonth = mapping.length > 0
-    ? Math.max(1, ...blockPairs.map((p) => mapping.find((m) => m.seq === p.seq)?.month ?? 1))
-    : 1;
+  // 4b) Completed sessions per type, all modalities together — feeds the
+  // readiness pool and the informational thin-data note (never the gate).
   const { data: doneTypeRows } = await supa
     .from("engine_workout_sessions")
     .select("day_type")
@@ -244,6 +237,26 @@ export async function runResequence(
   for (const r of (doneTypeRows ?? []) as Array<{ day_type: string | null }>) {
     if (r.day_type) completedByType[r.day_type] = (completedByType[r.day_type] ?? 0) + 1;
   }
+  const monthOneTypes = mapping.filter((m) => m.month === 1).map((m) => typeByDay.get(m.day) ?? "").filter(Boolean);
+  const thin = thinDataNote(completedByType, monthOneTypes);
+  if (thin) console.log(`[run-resequence] user=${userId} ${thin}`);
+
+  // 4c) Diagnosis + catalogue rows. The catalogue TEXT is formatted later,
+  // after the readiness pool is known.
+  const [diagnosis, catalogueRows] = await Promise.all([
+    buildConditioningState(supa, userId),
+    loadDayTypeCatalogue(supa),
+  ]);
+  if (!diagnosis) {
+    console.log(`[run-resequence] user=${userId} skip: no conditioning diagnosis available`);
+    return { status: "skipped", reason: "no conditioning diagnosis available" };
+  }
+
+  // 5) Readiness pool — replaces the month gate. A type is available once
+  // every prerequisite has been COMPLETED twice, counted across all
+  // modalities, any ratio (engine-readiness.ts). Types without prerequisites
+  // are always available; time_trial always. Prerequisites are the only
+  // reveal control — there is no novelty budget.
   const readinessRows = catalogueRows.map((r) => ({ id: r.id, class: r.class, prerequisites: r.prerequisites ?? [] }));
   const allowedDayTypes = computeReadyDayTypes(readinessRows, completedByType);
   const notReady = readinessRows
@@ -251,7 +264,8 @@ export async function runResequence(
     .map((r) => `${r.id} needs ${missingPrerequisites(r, completedByType).join(", ")}`);
   console.log(`[run-resequence] user=${userId} ready=[${[...allowedDayTypes].sort().join(",")}] not-ready: ${notReady.join(" | ") || "none"}`);
 
-  // 4) Pin month-boundary time trials (left as the catalog TT; AI fills the
+
+  // 6) Pin month-boundary time trials (left as the catalog TT; AI fills the
   // rest). Day-typing is per catalog day; pinning is per POSITION, so a
   // repeated TT catalog day pins every position it occupies in the window.
   const ttPositions = blockPairs.filter((p) => typeByDay.get(p.day) === "time_trial").map((p) => p.seq);

@@ -85,3 +85,40 @@ export function validateWeekRules(
   }
   return errors;
 }
+
+export interface GateResult { ok: boolean; reason: string }
+
+/**
+ * When may the sequencer start? (founder decision 2026-11-10): only after the
+ * ASSESSMENT MONTH. Month one is fixed and identical for every goal; the
+ * sequencer's first generated block is the first block of month two, right
+ * after the month-two time trial. So the gate is positional: the first
+ * position to generate must lie in month 2 or later.
+ *
+ * `null` = the athlete's program has no mapping rows. Every user starts on
+ * month 1 of a mapped program (founder ruling 2026-11-11), so this is a data
+ * error, not an exemption: the gate closes and says so.
+ */
+export function sequencerGate(firstPositionMonth: number | null): GateResult {
+  if (firstPositionMonth == null) {
+    return { ok: false, reason: "program has no mapping rows (data error) — every athlete starts on month 1 of a mapped program; nothing to sequence" };
+  }
+  if (Number.isFinite(firstPositionMonth) && firstPositionMonth >= 2) {
+    return { ok: true, reason: `assessment month complete; next block is month ${firstPositionMonth}` };
+  }
+  return { ok: false, reason: `assessment month in progress (next block is month ${firstPositionMonth}); the sequencer starts with month 2` };
+}
+
+/**
+ * Informational only — never affects the gate. Names the month-one types the
+ * athlete has fewer than `minPerType` scored sessions of, for the logs.
+ */
+export function thinDataNote(
+  completedByType: Record<string, number>,
+  monthOneTypes: Iterable<string>,
+  minPerType: number = MIN_COMPLETIONS,
+): string | null {
+  const types = [...new Set(monthOneTypes)].filter((t) => t !== "time_trial");
+  const short = types.filter((t) => (completedByType[t] ?? 0) < minPerType);
+  return short.length ? `thin data: ${short.map((t) => `${t} ${completedByType[t] ?? 0}/${minPerType}`).join(", ")}` : null;
+}
