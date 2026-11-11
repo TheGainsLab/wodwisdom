@@ -843,7 +843,10 @@ export async function saveEngineGoal(goal: string): Promise<void> {
   if (error) throw error;
 }
 
-/** Save the user's chosen program version (initial selection). engine_months_unlocked is owned by the payment path (stripe-webhook) — never set here. */
+/** Save the user's chosen program version (initial selection). engine_months_unlocked is owned by the payment path (stripe-webhook) — never set here.
+ *  NEW SUBSCRIBERS GET THE SEQUENCER ON (founder decision 2026-11-11): the
+ *  assessment month is fixed regardless, and from month two the AI sequences
+ *  their weeks. Athletes can turn it off in Settings. */
 export async function saveProgramVersion(version: string): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
@@ -853,7 +856,7 @@ export async function saveProgramVersion(version: string): Promise<void> {
   const { error } = await supabase
     .from('athlete_profiles')
     .upsert(
-      { user_id: user.id, engine_program_version: version, engine_current_day: 1 },
+      { user_id: user.id, engine_program_version: version, engine_current_day: 1, engine_ai_sequencing: true },
       { onConflict: 'user_id' }
     );
 

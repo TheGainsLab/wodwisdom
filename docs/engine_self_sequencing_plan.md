@@ -340,3 +340,19 @@ migration. The Coach prompt carries the same assessment-month sentence.
   rest changes (validator rule to add).
 - Other assess types: at most one per month, only when fully ready.
 
+### Sequencer default (decided 2026-11-11)
+
+- **New subscribers: ON.** Engine setup writes `engine_ai_sequencing = true`
+  with the program choice. The assessment month is fixed regardless; the
+  sequencer begins with month two.
+- **Opt-out exists:** the Settings page "AI sequencing" toggle writes the
+  flag directly (finish-your-block semantics).
+- **Existing subscribers:** flipped by the admin in cohorts via SQL (no admin
+  UI control yet): main-track athletes past month one first, then Mini Cycle
+  (moved to the main program at their cadence), then VO2 / Hyrox once the
+  readiness clause below is in.
+- **Readiness clause (to add):** a type the athlete has already completed
+  twice is ready whatever its prerequisites — demonstrated directly beats
+  demonstrated by proxy. Without it a VO2 athlete who has done devour five
+  times is "not ready" for devour because they never did anaerobic twice.
+

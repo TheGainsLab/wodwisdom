@@ -28,9 +28,11 @@ export default function SettingsPage({ session }: { session: Session }) {
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
 
-  // AI sequencing opt-out (athlete_profiles.engine_ai_sequencing — on by
-  // default; the flag gates generation only, so turning it off lets any
-  // already-generated block finish before the fixed sequence resumes).
+  // AI sequencing opt-out (athlete_profiles.engine_ai_sequencing). The column
+  // defaults to false; Engine setup turns it ON for every new subscriber
+  // (2026-11-11), and existing subscribers are flipped by the admin in
+  // cohorts. The flag gates generation only, so turning it off lets any
+  // already-generated block finish before the fixed sequence resumes.
   // null = no athlete_profiles row yet; the toggle upserts one on first use.
   const [aiSequencing, setAiSequencing] = useState<boolean | null>(null);
 
