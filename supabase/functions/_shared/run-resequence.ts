@@ -5,8 +5,8 @@
  *   - engine-resequence (HTTP)        — admin dry-run preview / on-demand.
  *   - engine-resequence-cron (server) — automatic live generation, per eligible user.
  *
- * Flow: pre-gate -> diagnosis + catalogue + program -> readiness gate (two sessions in
- * every type the current month uses, or GATE_CAP_DAYS total) ->
+ * Flow: pre-gate -> diagnosis + catalogue + program -> gate (assessment month
+ * complete: the next block lies in month 2 or later) ->
  * AI generates the non-pinned days of the block within each envelope -> parse +
  * validate -> (dry run returns the preview | persist accepted days as engine_workouts
  * rows + position overrides). Month-boundary time trials are pinned (left as the
@@ -21,7 +21,7 @@ import { buildConditioningState } from "./conditioning-state.ts";
 import { buildOtherTrainingLoadBlock } from "./athlete-activities.ts";
 import { formatDayTypeCatalogue, loadDayTypeCatalogue } from "./engine-catalogue.ts";
 import { parseProposal, type ProposedDay, validateProposal } from "./engine-sequence.ts";
-import { computeReadyDayTypes, GATE_CAP_DAYS, MIN_COMPLETIONS, missingPrerequisites, sequencerGate, validateWeekRules } from "./engine-readiness.ts";
+import { computeReadyDayTypes, MIN_COMPLETIONS, missingPrerequisites, sequencerGate, validateWeekRules } from "./engine-readiness.ts";
 
 /** Pre-gate: below this many completed sessions the real gate (two per month
  *  type, see engine-readiness.ts) cannot be satisfied, so skip before paying
@@ -117,9 +117,9 @@ export async function runResequence(
   const { dryRun, debug } = opts;
 
   // 1) Pre-gate: a cheap count so a brand-new athlete costs no diagnosis
-  // call. The real gate — two scored sessions in every type the current
-  // month uses, or GATE_CAP_DAYS in total — runs once the program mapping
-  // and per-type counts are known (step 3e).
+  // read. The real gate — the assessment month is complete, i.e. the next
+  // block lies in month 2 or later — runs once the program mapping is known
+  // (step 3f).
   const { count: completed } = await supa
     .from("engine_workout_sessions")
     .select("id", { count: "exact", head: true })
@@ -258,21 +258,21 @@ export async function runResequence(
     .map((r) => `${r.id} needs ${missingPrerequisites(r, completedByType).join(", ")}`);
   console.log(`[run-resequence] user=${userId} ready=[${[...allowedDayTypes].sort().join(",")}] not-ready: ${notReady.join(" | ") || "none"}`);
 
-  // 3f) The gate (founder decision 2026-11-10): the sequencer starts once the
-  // athlete has MIN_COMPLETIONS scored sessions in every stimulus type the
-  // current month uses, or GATE_CAP_DAYS sessions in total — never later than
-  // before. "Current month" = the month of the first position to generate.
+  // 3f) The gate (founder decision 2026-11-10, corrected 2026-11-11): month
+  // one is the fixed assessment month for everyone; the sequencer's first
+  // block is the first block of month two. Positional: the first position
+  // to generate must lie in month 2+. Per-type counts ride along in the
+  // reason so thin data is visible in the logs.
   const gateMonth = mapping.length > 0
     ? (mapping.find((m) => m.seq === blockPairs[0]?.seq)?.month ?? blockMonth)
     : blockMonth;
-  const monthTypes = mapping.length > 0
-    ? mapping.filter((m) => m.month === gateMonth).map((m) => typeByDay.get(m.day) ?? "").filter(Boolean)
+  const monthOneTypes = mapping.length > 0
+    ? mapping.filter((m) => m.month === 1).map((m) => typeByDay.get(m.day) ?? "").filter(Boolean)
     : Object.keys(completedByType);
-  const completedTotal = Object.values(completedByType).reduce((a, b) => a + b, 0);
-  const gate = sequencerGate(completedTotal, completedByType, monthTypes);
+  const gate = sequencerGate(gateMonth, completedByType, monthOneTypes);
   if (!gate.ok) {
     console.log(`[run-resequence] user=${userId} skip (gate): ${gate.reason}`);
-    return { status: "skipped", reason: gate.reason, currentDay, completed_by_type: completedByType, gate_cap_days: GATE_CAP_DAYS };
+    return { status: "skipped", reason: gate.reason, currentDay, next_block_month: gateMonth, completed_by_type: completedByType };
   }
   console.log(`[run-resequence] user=${userId} gate open: ${gate.reason}`);
 
