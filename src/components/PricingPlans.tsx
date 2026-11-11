@@ -1,20 +1,11 @@
 import { useState } from 'react';
+import { PLANS, type PricingPlan, type PricingInterval } from '../lib/pricingPlans';
+export type { PricingPlan, PricingInterval } from '../lib/pricingPlans';
 
-export type PricingPlan = 'programming' | 'engine' | 'all_access' | 'ai_research';
-export type PricingInterval = 'monthly' | 'quarterly';
-
-/** The single source of truth for public plan copy and prices — rendered on
- *  the landing page's pricing section and the standalone /pricing chooser,
- *  so the two can never drift apart. Styles come from landing.css
+/** Plan copy and prices live in lib/pricingPlans.ts — one source for the
+ *  landing page's pricing section, the standalone /pricing chooser and the
+ *  welcome intake, so none can drift apart. Styles come from landing.css
  *  (.lp-plans / .lp-plan / .landing-cta), which the host page imports. */
-const PLANS: {
-  plan: PricingPlan; name: string; monthly: string; quarterly: string;
-  blurb: string; cta: string; feat: boolean; badge: string;
-}[] = [
-  { plan: 'programming', name: 'AI Programming', monthly: '$29.99', quarterly: '$74.99', blurb: 'Individualized training built around your evaluation, goals, and progress.', cta: 'Choose Programming', feat: false, badge: '' },
-  { plan: 'all_access', name: 'All Access', monthly: '$49.99', quarterly: '$119.99', blurb: 'AI Programming + AI Year of the Engine + AI Research.', cta: 'Get All Access', feat: true, badge: 'Best Value' },
-  { plan: 'engine', name: 'AI Year of the Engine', monthly: '$29.99', quarterly: '$74.99', blurb: 'Our conditioning system, personalized to your fitness and goals.', cta: 'Choose Engine', feat: false, badge: '' },
-];
 
 export default function PricingPlans({ onBuy, busyPlan = null }: {
   onBuy: (plan: PricingPlan, interval: PricingInterval) => void;

@@ -1,0 +1,37 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--accent:#ff3a3a;--bg:#09090b;--surface:#111114;--surface2:#18181c;--border:#27272e;--text:#f0f0f5;--text-dim:#9090a8;--text-muted:#7e7e98}
+*{box-sizing:border-box}body{margin:0;font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased}
+.wrap{width:min(480px,100%);margin:0 auto;padding:36px 18px 40px}
+.logo{text-align:center;font-weight:800;font-size:22px;letter-spacing:2px;margin-bottom:26px}.logo b{color:var(--accent)}
+.card{background:var(--surface);border:1px solid var(--accent);border-radius:14px;padding:20px 16px 18px}
+h2{margin:0 0 4px;font-size:17px}.sub{margin:0 0 16px;font-size:13px;color:var(--text-dim)}
+.kicker{font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--text-muted);margin:14px 0 8px}
+.plan{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px;color:var(--text);font-family:inherit;cursor:pointer}
+.plan.feat{border-color:var(--accent);box-shadow:0 0 14px rgba(255,58,58,.18)}
+.plan .t{flex:1}.plan .name{font-size:14.5px;font-weight:700}.plan .blurb{font-size:12.5px;color:var(--text-dim);line-height:1.45;margin-top:2px}
+.plan .price{font-size:13px;font-weight:700;white-space:nowrap}.plan .price small{display:block;font-weight:400;font-size:11px;color:var(--text-muted);text-align:right}
+.badge{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--accent);border:1px solid var(--accent);border-radius:999px;padding:1px 7px;margin-left:6px;vertical-align:middle}
+.free{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:none;border:1px solid var(--border);border-radius:10px;padding:11px 14px;margin-bottom:8px;color:var(--text);font-family:inherit;cursor:pointer}
+.free .name{font-size:14px;font-weight:700}.free .blurb{font-size:12.5px;color:var(--text-dim);line-height:1.45;margin-top:2px}
+.arrow{color:var(--text-muted);font-size:16px}
+.foot{text-align:center;font-size:11.5px;color:var(--text-muted);margin-top:12px}
+</style></head><body><div class="wrap">
+<div class="logo">G<b>AI</b>NS</div>
+<div class="card">
+<h2>Welcome — pick your path</h2>
+<p class="sub">Everything below is yours to start now. Change your mind any time.</p>
+
+<div class="kicker">Get a program</div>
+<button class="plan"><div class="t"><div class="name">AI Programming</div><div class="blurb">Individualized training built around your evaluation, goals, and progress.</div></div><div class="price">$29.99<small>/month</small></div></button>
+<button class="plan feat"><div class="t"><div class="name">All Access<span class="badge">Best value</span></div><div class="blurb">AI Programming + Year of the Engine + AI Research.</div></div><div class="price">$49.99<small>/month</small></div></button>
+<button class="plan"><div class="t"><div class="name">Year of the Engine</div><div class="blurb">Conditioning that adapts to you. Pick your days, set a goal, start with a time trial.</div></div><div class="price">$29.99<small>/month</small></div></button>
+
+<div class="kicker">Or start free</div>
+<button class="free"><div class="t"><div class="name">Free AI evaluation</div><div class="blurb">Lifts, skills, times. A candid read of your fitness, yours to keep.</div></div><span class="arrow">›</span></button>
+<button class="free"><div class="t"><div class="name">AI Coach</div><div class="blurb">Training, nutrition, recovery. Three questions free.</div></div><span class="arrow">›</span></button>
+<button class="free"><div class="t"><div class="name">Research Library</div><div class="blurb">The science of training, in plain language. Open to read.</div></div><span class="arrow">›</span></button>
+
+<div class="foot">Programs and All Access are built from your evaluation — buy now, build your profile next.</div>
+</div></div></body></html>

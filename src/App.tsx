@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabase';
-import { EntitlementsProvider } from './hooks/useEntitlements';
+import { EntitlementsProvider, useEntitlements } from './hooks/useEntitlements';
+import { markWelcomeSeen } from './lib/welcome';
 import { captureAcquisition } from './lib/acquisition';
 import { track, routePattern } from './lib/appEvents';
 import BottomTabBar from './components/BottomTabBar';
@@ -242,13 +243,22 @@ function AuthenticatedApp({ session }: { session: Session }) {
     track('page_view', { path: routePattern(location.pathname) });
   }, [location.pathname]);
 
-  // Welcome gate (2026-10-08): a brand-new account's first authenticated
-  // load routes to /welcome — once per ACCOUNT (profiles.welcome_seen_at,
-  // backfilled for everyone pre-existing), checked once per session
-  // (sessionStorage). An existing evaluation also counts as oriented, so a
-  // failed flag write can never trap a veteran. Checkout routes are left
-  // alone — never yank a user mid-payment; they land on "/" after and the
-  // gate catches them there.
+  // Welcome gate (2026-10-08; routing by entitlement 2026-11-11): a brand-new
+  // account's first authenticated load is routed once per ACCOUNT
+  // (profiles.welcome_seen_at, backfilled for everyone pre-existing), checked
+  // once per session (sessionStorage). An existing evaluation also counts as
+  // oriented, so a failed flag write can never trap a veteran. Checkout
+  // routes are left alone — never yank a user mid-payment; they land on "/"
+  // after and the gate catches them there.
+  //
+  // WHERE it routes depends on what the account holds — the signed-out buyer
+  // creates the account AFTER paying, so even a buyer arrives here:
+  //   Programming / All Access  → /profile   (evaluation required for a program;
+  //                                           the goal set there carries to Engine)
+  //   Engine                    → /engine    (the Engine setup is its intake)
+  //   nothing / Coach / Research → /welcome  (the intake screen)
+  // A paid route marks the welcome seen on arrival; the screen marks it on tap.
+  const { hasEntitlement, loading: entLoading } = useEntitlements(session.user.id);
   const welcomeCheckedFor = useRef<string | null>(null);
   useEffect(() => {
     const uid = session.user.id;
@@ -261,6 +271,7 @@ function AuthenticatedApp({ session }: { session: Session }) {
         return;
       }
     } catch { /* storage unavailable — fall through to the DB check */ }
+    if (entLoading) return; // the destination depends on entitlements — wait for them
     welcomeCheckedFor.current = uid;
     (async () => {
       try {
@@ -273,10 +284,18 @@ function AuthenticatedApp({ session }: { session: Session }) {
           try { sessionStorage.setItem(`welcome-done:${uid}`, '1'); } catch { /* ignore */ }
           return;
         }
+        const paidTo = hasEntitlement('programming') ? '/profile'
+          : hasEntitlement('engine') ? '/engine'
+          : null;
+        if (paidTo) {
+          await markWelcomeSeen(uid);
+          navigate(paidTo, { replace: true });
+          return;
+        }
         navigate('/welcome', { replace: true });
       } catch { /* soft-fail: never block the app on the gate */ }
     })();
-  }, [session.user.id, location.pathname, navigate]);
+  }, [session.user.id, location.pathname, navigate, entLoading, hasEntitlement]);
   const hideTabBar = HIDE_TAB_BAR_ROUTES.some(r => location.pathname === r) ||
     location.pathname.startsWith('/features') ||
     location.pathname.startsWith('/qa') ||

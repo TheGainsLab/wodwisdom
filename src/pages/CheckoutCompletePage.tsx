@@ -9,6 +9,13 @@ import TurnstileWidget, { TURNSTILE_ENABLED } from '../components/TurnstileWidge
 const SUPABASE_BASE = import.meta.env.VITE_SUPABASE_URL || 'https://hsiqzmbfulmfxbvbsdwz.supabase.co';
 const SESSION_INFO_ENDPOINT = SUPABASE_BASE + '/functions/v1/checkout-session-info';
 
+/** Where a buyer lands after paying — the intake for the plan they bought. */
+const PLAN_LANDING: Record<string, string> = {
+  programming: '/profile',
+  all_access: '/profile',
+  engine: '/engine',
+};
+
 export default function CheckoutCompletePage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -42,8 +49,24 @@ export default function CheckoutCompletePage() {
         // to the background revalidation: this redirect would beat it, and the
         // user would land on a locked app seconds after paying.
         await refresh();
-        // Logged-in user upgrading — redirect after a moment
-        setTimeout(() => navigate('/', { replace: true }), 3000);
+        // Land on the intake for what they just bought (founder, 2026-11-11):
+        // Programming and All Access → the profile (evaluation required for a
+        // program; the goal set there carries to Engine); Engine → the Engine
+        // setup. Plan comes from the Stripe session; unknown → home.
+        let dest = '/';
+        try {
+          if (sessionId) {
+            const resp = await fetch(SESSION_INFO_ENDPOINT, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ session_id: sessionId }),
+            });
+            const data = await resp.json();
+            if (data.plan) setPlan(data.plan);
+            dest = PLAN_LANDING[data.plan as string] ?? '/';
+          }
+        } catch { /* fall back to home */ }
+        setTimeout(() => navigate(dest, { replace: true }), 3000);
         return;
       }
 
@@ -136,6 +159,12 @@ export default function CheckoutCompletePage() {
         <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 8 }}>Account created!</h1>
         <p style={{ color: 'var(--text-dim)', fontSize: 16, marginBottom: 8 }}>Check your email to confirm your account.</p>
         <p style={{ color: 'var(--text-dim)', fontSize: 14 }}>Your {planLabel[plan] || ''} subscription is already active and waiting for you.</p>
+        {PLAN_LANDING[plan] === '/profile' && (
+          <p style={{ color: 'var(--text-dim)', fontSize: 14, marginTop: 8 }}>First stop once you&rsquo;re in: your profile and free evaluation — your program is built from it.</p>
+        )}
+        {PLAN_LANDING[plan] === '/engine' && (
+          <p style={{ color: 'var(--text-dim)', fontSize: 14, marginTop: 8 }}>First stop once you&rsquo;re in: Engine setup — pick your days, set a goal, start with a time trial.</p>
+        )}
       </div>
     );
   }
