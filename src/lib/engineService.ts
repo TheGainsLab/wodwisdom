@@ -823,16 +823,22 @@ export async function loadUserProgress(): Promise<EngineUserProgress | null> {
   return data;
 }
 
-/** Save the athlete's goal (blank clears it). ONE GOAL (founder decision
- *  2026-11-10): the text is shared by the Engine sequencer and AI Programming,
- *  so this writes both `engine_goal` and the profile `goal`; the Athlete page
- *  writes both too, and the latest edit anywhere prevails. Upsert so an
- *  engine-only athlete with no profile row yet still gets one. */
+/** Save the athlete's goal. ONE GOAL (founder decision 2026-11-10): the text
+ *  is shared by the Engine sequencer and AI Programming, so this writes both
+ *  `engine_goal` and the profile `goal`; the Athlete page writes both too, and
+ *  the latest edit anywhere prevails. Upsert so an engine-only athlete with no
+ *  profile row yet still gets one.
+ *  BLANK IS A NO-OP (review fix 2026-11-11): the Engine setup and the program
+ *  switcher pre-fill this field from the profile; a failed load or an untouched
+ *  field must never null a goal the athlete typed elsewhere. Clearing a goal on
+ *  purpose is the Athlete page's job. */
 export async function saveEngineGoal(goal: string): Promise<void> {
+  const text = goal.trim();
+  if (!text) return;
+
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
-  const text = goal.trim() || null;
   const { error } = await supabase
     .from('athlete_profiles')
     .upsert(
@@ -843,10 +849,28 @@ export async function saveEngineGoal(goal: string): Promise<void> {
   if (error) throw error;
 }
 
+/** Turn the AI sequencer on. Called ONLY by the Engine setup for a new
+ *  subscriber (founder decision 2026-11-11: new subscribers get the sequencer
+ *  on; Settings is the opt-out). Deliberately separate from
+ *  saveProgramVersion so no other program write — the switcher, an admin
+ *  tool, a future caller — can flip an athlete who opted out. */
+export async function enableAiSequencing(): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const { error } = await supabase
+    .from('athlete_profiles')
+    .upsert(
+      { user_id: user.id, engine_ai_sequencing: true },
+      { onConflict: 'user_id' }
+    );
+
+  if (error) throw error;
+}
+
 /** Save the user's chosen program version (initial selection). engine_months_unlocked is owned by the payment path (stripe-webhook) — never set here.
- *  NEW SUBSCRIBERS GET THE SEQUENCER ON (founder decision 2026-11-11): the
- *  assessment month is fixed regardless, and from month two the AI sequences
- *  their weeks. Athletes can turn it off in Settings. */
+ *  Does NOT touch engine_ai_sequencing: the Engine setup calls
+ *  enableAiSequencing() explicitly for a new subscriber. */
 export async function saveProgramVersion(version: string): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
@@ -856,7 +880,7 @@ export async function saveProgramVersion(version: string): Promise<void> {
   const { error } = await supabase
     .from('athlete_profiles')
     .upsert(
-      { user_id: user.id, engine_program_version: version, engine_current_day: 1, engine_ai_sequencing: true },
+      { user_id: user.id, engine_program_version: version, engine_current_day: 1 },
       { onConflict: 'user_id' }
     );
 

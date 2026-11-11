@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Loader2, Play, Target } from 'lucide-react';
 import {
+  enableAiSequencing,
   loadMonthOneSummary,
   loadPrograms,
   loadSharedGoal,
@@ -91,7 +92,10 @@ export default function EngineSetup({ onDone }: Props) {
     setSaving(true);
     try {
       await saveProgramVersion(chosen.id);
-      // Best-effort: the goal must never block the start.
+      // New subscribers get the sequencer on (founder decision 2026-11-11);
+      // Settings is the opt-out. Explicit here, never inside the program save.
+      await enableAiSequencing();
+      // Best-effort: the goal must never block the start (blank is a no-op).
       await saveEngineGoal(goal).catch(() => {});
       onDone(chosen.id);
     } catch {

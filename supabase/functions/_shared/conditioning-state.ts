@@ -253,7 +253,9 @@ const METRIC_EXPLAINER =
   "(oldest→newest). n = sessions in the window (confidence). max = best pace ever logged (units vary by modality). " +
   "MAX-EFFORT day types (marked 'vs baseline') have no target: their ratio is actual_pace ÷ the modality's " +
   "time-trial baseline pace — the athlete's all-out output relative to their own aerobic baseline (a trained athlete " +
-  "sits well above 1.0; the trend across sessions is the signal). " +
+  "sits well above 1.0; the trend across sessions is the signal). Each session's ratio uses the baseline in force " +
+  "when it was logged, so a retest moves the scale and the series steps at that date — read the trend BETWEEN " +
+  "retests, and use the trial history dates to place the steps. " +
   "No labels are applied — judge each system's state, its trend, recovery, and any need to recalibrate from the numbers yourself.";
 
 export function formatConditioningState(inputs: ConditioningInputs): string {
