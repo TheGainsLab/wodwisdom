@@ -364,7 +364,11 @@ export async function runResequence(
     model: MODELS.sonnet5,
     system: SYSTEM_PROMPT,
     userContent,
-    maxTokens: 4096,
+    // Sonnet 5.5 thinks before it answers and the thinking counts against
+    // max_tokens; a rich history can spend thousands before the JSON starts.
+    // 4096 risked a truncated proposal (reads as "unparseable"). The reply
+    // itself is ~1-2K; the rest is headroom for thinking.
+    maxTokens: 16000,
     timeoutMs: 150_000,
     fallbackToHaiku: false,
   });
