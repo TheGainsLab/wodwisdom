@@ -10,3 +10,13 @@
    ```
 
 4. Copy the SQL output and run it in the Supabase SQL Editor.
+
+# Engine test athlete
+
+`engine_test_athlete.sql` builds a synthetic 3-day Engine subscriber who has
+just completed the assessment month (positions 1–12 of `main_3day`, pointer at
+the month-two time trial, sequencer on). Create the auth user first, set the
+email at the top of the file, paste the whole file into the Supabase SQL editor
+and run it once. Idempotent per user. Then: Admin → Users → the athlete →
+Engine AI Preview for a dry run; the resequence cron generates the real block
+within fifteen minutes.
