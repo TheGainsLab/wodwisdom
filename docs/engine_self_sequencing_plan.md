@@ -399,3 +399,34 @@ for the week fill, adjustments, safety review, chat and the parse family;
 Haiku 4.5 for routing and as the fallback. `MODELS.sonnet` was NOT moved:
 Sonnet 5.5 rejects forced `tool_choice` and non-default `temperature`, which
 thirteen Sonnet seats still send. Moving those is its own migration.
+
+### Cron shape and the lost first tick (fixed 2026-11-11)
+
+The first real month-two athlete (the seeded test athlete) exposed three
+things in `engine-resequence-cron`, found by reading `net._http_response`:
+
+1. **The per-tick cap counted athletes looked at, not generations.** Two
+   month-one athletes ahead in the list spent both slots on gate skips every
+   tick; every eligible athlete after them was "deferred" forever. Now only a
+   run that reached the AI counts.
+2. **pg_net gives up after ~5s.** A tick that generates takes minutes. The
+   handler now acks 202 at once and runs the tick in `EdgeRuntime.waitUntil`;
+   the per-athlete outcomes are one JSON line in the function log.
+3. **The endpoint was open.** It now requires `X-Cron-Key = LIFECYCLE_CRON_KEY`
+   (the shared gate), fail-closed.
+
+pg_cron job (jobid 4, `*/15 * * * *`) must send the header. Replace its
+command with (key from the lifecycle-nudges job's command):
+
+    select net.http_post(
+      url     := 'https://hsiqzmbfulmfxbvbsdwz.supabase.co/functions/v1/engine-resequence-cron',
+      headers := jsonb_build_object('Content-Type', 'application/json', 'X-Cron-Key', '<LIFECYCLE_CRON_KEY>'),
+      body    := '{}'::jsonb,
+      timeout_milliseconds := 15000
+    );
+
+Six accounts hold the flag today (not zero as assumed): one parked on an
+August block at day 123, two in month one, one real subscriber at day 31 of
+the 5-day program (month two — the first cohort), one at day 5, and the test
+athlete. After the fix the day-31 subscriber and the test athlete generate
+on the next tick.
