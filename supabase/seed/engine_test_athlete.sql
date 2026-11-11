@@ -15,7 +15,7 @@
 -- Add user, auto-confirm). Set the email below. Paste the whole file into the
 -- SQL editor and run it ONCE as a single statement (no begin/commit).
 -- IDEMPOTENT: re-running wipes this athlete's Engine rows and rebuilds them;
--- the entitlement row is kept. Only this one user is ever touched.
+-- the entitlement rows are kept. Only this one user is ever touched.
 --
 -- Modality: echo bike, calories. Baseline 120 cal in 10:00 → 12.0 cal/min.
 -- Anaerobic ≈ 1.4× baseline and rising, max aerobic a little over target,
@@ -39,9 +39,12 @@ BEGIN
   DELETE FROM engine_workout_sessions          WHERE user_id = v_uid;
   DELETE FROM engine_time_trials               WHERE user_id = v_uid;
 
-  -- ---- entitlement: the retail `engine` feature (source → 'admin' kind) ----
+  -- ---- entitlements: what a real Engine purchase grants (stripe-webhook
+  -- PLAN_FEATURES.engine = engine + ai_chat + nutrition); source → 'admin' kind
   INSERT INTO user_entitlements (user_id, feature, source)
-  VALUES (v_uid, 'engine', 'seed:engine_test_athlete')
+  VALUES (v_uid, 'engine',    'seed:engine_test_athlete'),
+         (v_uid, 'ai_chat',   'seed:engine_test_athlete'),
+         (v_uid, 'nutrition', 'seed:engine_test_athlete')
   ON CONFLICT DO NOTHING;
 
   -- ---- profile: 3-day program, assessment month done, sequencer on ----------
