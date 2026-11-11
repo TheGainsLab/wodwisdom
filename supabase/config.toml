@@ -312,3 +312,6 @@ verify_jwt = false
 
 [functions.signature-profile-refit]
 verify_jwt = false
+
+[functions.checkout-claim-account]
+verify_jwt = false
