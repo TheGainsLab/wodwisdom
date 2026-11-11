@@ -31,6 +31,7 @@ export default function HomePage({ session }: { session: Session }) {
   const [profileReviewed, setProfileReviewed] = useState(false);
   const [hasEvaluation, setHasEvaluation] = useState(false);
   const [hasProgram, setHasProgram] = useState(false);
+  const [hasEngineProgram, setHasEngineProgram] = useState(false);
   const [hasCompetitionLink, setHasCompetitionLink] = useState(false);
   const [resumePending, setResumePending] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -49,13 +50,14 @@ export default function HomePage({ session }: { session: Session }) {
       try {
         const [progRes, profileRes, evalRes] = await Promise.all([
           supabase.from('programs').select('id').eq('user_id', session.user.id).neq('committed', false).limit(1),
-          supabase.from('athlete_profiles').select('lifts, skills, conditioning, age, gender, bodyweight, athletic_reviewed_at, competition_athlete_id, programming_resume_pending_at').eq('user_id', session.user.id).maybeSingle(),
+          supabase.from('athlete_profiles').select('lifts, skills, conditioning, age, gender, bodyweight, athletic_reviewed_at, competition_athlete_id, programming_resume_pending_at, engine_program_version').eq('user_id', session.user.id).maybeSingle(),
           supabase.from('profile_evaluations').select('id').eq('user_id', session.user.id).limit(1),
         ]);
         if (cancelled) return;
         if (profileRes.data) {
-          const d = profileRes.data as { lifts?: Record<string, unknown>; skills?: Record<string, unknown>; conditioning?: Record<string, unknown>; age?: number | null; gender?: string | null; bodyweight?: number | null; athletic_reviewed_at?: string | null; competition_athlete_id?: string | null; programming_resume_pending_at?: string | null };
+          const d = profileRes.data as { lifts?: Record<string, unknown>; skills?: Record<string, unknown>; conditioning?: Record<string, unknown>; age?: number | null; gender?: string | null; bodyweight?: number | null; athletic_reviewed_at?: string | null; competition_athlete_id?: string | null; programming_resume_pending_at?: string | null; engine_program_version?: string | null };
           setResumePending(!!d.programming_resume_pending_at);
+          setHasEngineProgram(!!d.engine_program_version);
           const hasLifts = d.lifts && Object.values(d.lifts).some((v) => typeof v === 'number' && v > 0);
           const hasSkills = d.skills && Object.values(d.skills).some((v) => v && v !== 'none');
           const hasConditioning = d.conditioning && Object.values(d.conditioning).some((v) => !!v);
@@ -79,7 +81,14 @@ export default function HomePage({ session }: { session: Session }) {
   // other setup-nudge cards (one next-action per screen) and retires the
   // moment an evaluation exists. Buyers get their purchase acknowledged in
   // the headline; the CTA tracks their actual next step.
-  const showWelcomeCard = !hasEvaluation && !resumePending;
+  // Engine-only (founder, 2026-11-11): an account that holds the Engine and
+  // not Programming paid for conditioning, and the Engine never reads the
+  // lifts profile — so the profile/evaluation story is the wrong hero for
+  // them. They get an Engine hero instead (set up → train); the profile and
+  // evaluation stay one tile away. Programming / All Access keep this card:
+  // the evaluation is required for a program.
+  const engineOnly = !isAdmin && hasEngine && !hasProgramming;
+  const showWelcomeCard = !hasEvaluation && !resumePending && !engineOnly;
 
   // ── Context card: the single most relevant next action. ──
   const primary = ((): { kicker?: string; title: string; body: string; cta: string; to: string } | null => {
@@ -97,6 +106,11 @@ export default function HomePage({ session }: { session: Session }) {
     }
     if (hasProgram) {
       return { title: "Today's training", body: 'Pick up your program — view your calendar, start a session, and log your results.', cta: 'Open My Programs', to: '/programs' };
+    }
+    if (hasEngine && !hasEngineProgram) {
+      // Paid for the Engine, never set it up — the Engine's own intake is the
+      // next action, not the lifts profile.
+      return { kicker: 'Year of the Engine', title: 'Set up your Engine', body: 'Pick your days, set a goal, and start with a time trial. Month one is your assessment — then the Engine sequences for you.', cta: 'Set up my Engine', to: '/engine' };
     }
     if (hasEngine) {
       return { title: 'Your Engine training', body: 'Jump into your Engine dashboard and log a session.', cta: 'Open Engine', to: '/engine' };
@@ -192,7 +206,7 @@ export default function HomePage({ session }: { session: Session }) {
                       [hasProgramming ? 'Train' : 'AI Coach',
                         hasProgramming
                           ? 'AI programming built around your numbers, goals, and schedule.'
-                          : 'complete your profile and the answers are personalized to you.',
+                          : 'three questions free, no profile needed. Complete your profile and the answers are about you.',
                         false],
                     ] as Array<[string, string, boolean]>).map(([t, b, done], i) => (
                       <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
