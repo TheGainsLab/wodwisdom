@@ -30,6 +30,9 @@
  * forced-tool seats (pipeline week-fill, adjust-workout, safety-review, ...)
  * and the streaming chat seats still send. Do not point MODEL_SONNET /
  * MODEL_HAIKU / MODEL_FABLE at a 5.x id without migrating those seats first.
+ * Also: those models think by default and return a `thinking` block BEFORE
+ * the text, so `content[0].text` reads as empty — read text blocks by type
+ * (call-claude's textOf). The ~12 direct call sites still index [0].
  */
 
 /** Concrete model ids, env-overridable. Change a snapshot here or via secret. */

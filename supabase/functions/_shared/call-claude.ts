@@ -19,6 +19,19 @@ const DEFAULT_PROFILE = resolveModelProfile("default");
 const SONNET_MODEL = DEFAULT_PROFILE.primary;
 const HAIKU_MODEL = DEFAULT_PROFILE.fallback ?? DEFAULT_PROFILE.primary;
 
+/** The reply's text, whatever else the model returned. Models with thinking
+ *  on by default (Sonnet 5.5, Opus 5+, Fable 5+) put a `thinking` block
+ *  BEFORE the text — `content[0].text` is then undefined and the call looks
+ *  like an empty reply (the sequencer's "UNPARSEABLE AI output" on
+ *  2026-11-11). Read every text block by type, in order. */
+function textOf(data: { content?: Array<{ type?: string; text?: string }> }): string {
+  return (data.content ?? [])
+    .filter((b) => b.type === "text" && typeof b.text === "string")
+    .map((b) => b.text as string)
+    .join("")
+    .trim();
+}
+
 const MAX_RETRIES = 2;
 const RETRY_DELAYS = [0, 3000];
 const ATTEMPT_TIMEOUT_MS = 45_000;
@@ -106,7 +119,7 @@ export async function callClaude(opts: {
 
     if (resp.ok) {
       const data = await resp.json();
-      return data.content?.[0]?.text?.trim() || "";
+      return textOf(data);
     }
 
     const err = await resp.json().catch(() => ({}));
@@ -139,7 +152,7 @@ export async function callClaude(opts: {
 
   if (resp.ok) {
     const data = await resp.json();
-    return data.content?.[0]?.text?.trim() || "";
+    return textOf(data);
   }
 
   const err = await resp.json().catch(() => ({}));
@@ -184,7 +197,7 @@ export async function callClaudeVision(opts: {
 
     if (resp.ok) {
       const data = await resp.json();
-      return data.content?.[0]?.text?.trim() || "";
+      return textOf(data);
     }
 
     const err = await resp.json().catch(() => ({}));
@@ -204,7 +217,7 @@ export async function callClaudeVision(opts: {
 
   if (resp.ok) {
     const data = await resp.json();
-    return data.content?.[0]?.text?.trim() || "";
+    return textOf(data);
   }
 
   const err = await resp.json().catch(() => ({}));
