@@ -182,9 +182,9 @@ export default function ProgramSelection({ onSelected, currentProgram }: Props) 
             })}
           </div>
 
-          {/* Optional goal — saved with the program pick. The AI sequencer
-              weighs upcoming days toward it once it engages (after 10
-              completed days); blank changes nothing. */}
+          {/* Optional goal — saved with the program pick (shared with AI
+              Programming). The AI sequencer weighs upcoming days toward it
+              once it engages (from month two); blank changes nothing. */}
           <hr className="engine-divider" />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>

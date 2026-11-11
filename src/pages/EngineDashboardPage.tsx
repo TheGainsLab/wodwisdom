@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import Nav from '../components/Nav';
 import ProgramSelection from '../components/engine/ProgramSelection';
+import EngineSetup from '../components/engine/EngineSetup';
 import EnginePaywall from '../components/engine/EnginePaywall';
 import {
   loadUserProgress,
@@ -157,7 +158,9 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
     );
   }
 
-  // ── No program version → show selection ──
+  // ── No program version → first-visit setup (days per week + goal, then
+  // the assessment-month briefing, then Day 1). The old track picker stays
+  // behind Switch Program for existing subscribers. ──
 
   if (!loading && (!progress || !progress.engine_program_version)) {
     return (
@@ -170,7 +173,7 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
             </button>
             <h1>Engine</h1>
           </header>
-          <ProgramSelection onSelected={() => load()} />
+          <EngineSetup onDone={() => navigate('/engine/training/1')} />
         </div>
       </div>
     );

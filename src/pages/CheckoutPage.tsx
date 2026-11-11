@@ -34,7 +34,7 @@ const PLAN_NAMES: Record<PlanKey, string> = {
 /** Where to send users after upgrading, based on the new features they gained */
 const FEATURE_NEXT_STEPS: { feature: string; label: string; path: string; description: string }[] = [
   { feature: 'programming', label: 'Set Up AI Programming', path: '/programs', description: 'Build your athlete profile and generate your first personalized program' },
-  { feature: 'engine', label: 'Go to Engine Dashboard', path: '/engine', description: 'Start your conditioning program with personalized pacing targets' },
+  { feature: 'engine', label: 'Set Up Your Engine', path: '/engine', description: 'Pick your days and tell the Engine your goal — month one is your assessment, then it sequences for you' },
   { feature: 'nutrition', label: 'Start Nutrition Tracking', path: '/nutrition', description: 'Log your first meal with food search, barcode scanning, or photo recognition' },
   { feature: 'ai_chat', label: 'Talk to Your AI Coach', path: '/chat', description: 'Ask your first coaching question — training, recovery, programming, anything' },
   { feature: 'research_chat', label: 'Talk to the Research', path: '/knowledge', description: 'Open the research library and ask your first question — answers cite their papers' },
