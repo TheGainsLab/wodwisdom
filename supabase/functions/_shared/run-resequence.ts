@@ -24,7 +24,7 @@ import { buildConditioningState } from "./conditioning-state.ts";
 import { buildOtherTrainingLoadBlock } from "./athlete-activities.ts";
 import { formatDayTypeCatalogue, loadDayTypeCatalogue } from "./engine-catalogue.ts";
 import { parseProposal, type ProposedDay, validateProposal } from "./engine-sequence.ts";
-import { computeReadyDayTypes, missingPrerequisites, sequencerGate, thinDataNote, validateWeekRules } from "./engine-readiness.ts";
+import { computeReadyDayTypes, missingPrerequisites, sequencerGate, thinDataNote, typeCapsForBlock, validateWeekRules, type WeekRuleDay } from "./engine-readiness.ts";
 
 
 const SYSTEM_PROMPT =
@@ -70,7 +70,14 @@ const SYSTEM_PROMPT =
   `expected (e.g. workDuration must be a number like 120, not [90,210]). Durations are SECONDS.\n` +
   `- Pace choices (paceRange/basePace/fluxPaceRange) are [lo,hi] fractions of baseline and must sit inside ` +
   `the envelope's [min,max].\n` +
-  `- Stay within max_duration_minutes.\n\n` +
+  `- Stay within max_duration_minutes.\n` +
+  `- VARIETY (the breadth of the catalogue is the product — never let one kind of work crowd the rest out):\n` +
+  `  * Every day in a block is a DIFFERENT day-type (a 5-day block: at least four distinct).\n` +
+  `  * NEVER the same prescription twice — not within the block, not repeating the PREVIOUS BLOCK shown ` +
+  `below. The type may return; the session (rounds × work / rest / pace) may not. Vary the shape.\n` +
+  `  * No type more often per block than its CAP below (its share of the curated month).\n` +
+  `  * Over a month, draw on the full breadth of what is ready. A type marked NEVER DONE that the athlete ` +
+  `is ready for should appear within the next two blocks — that is how the catalogue opens as they earn it.\n\n` +
   `The "reason" field is READ BY THE ATHLETE, on their workout screen, as their coach explaining the day. ` +
   `Write it as one or two plain sentences addressed to them ("you"/"your") in a confident coach voice. ` +
   `Ground it in their actual training — what they've been doing well, what today builds — but NEVER use ` +
@@ -317,11 +324,70 @@ export async function runResequence(
   const prescribedSlots = aiPairs
     .map((p, i) => `  day ${i + 1}: program prescribes "${typeByDay.get(p.day) ?? "unspecified"}"`)
     .join("\n");
+  // The curated plan is the program's intent and its BALANCE of types — a
+  // reference, not a lock (founder, 2026-11-11: holding the curated shape
+  // "defeats the purpose of the sequencer"). The sequencer chooses the day;
+  // the variety rules keep the balance.
   const prescribedNote = prescribedSlots
-    ? `PROGRAM-PRESCRIBED DAY-TYPES FOR THESE SLOTS (your baseline — keep each unless the ` +
-      `athlete's signals clearly call for a substitute; adapt the block parameters to their state either way):\n` +
+    ? `THE PROGRAM'S CURATED PLAN FOR THESE SLOTS (its intent and its balance of types — a reference ` +
+      `for what this month is for, not a lock; choose the types and the shape that serve your judgment, ` +
+      `within the variety rules):\n` +
       `${prescribedSlots}\n`
     : "";
+
+  // ── Variety inputs: the previous block, the per-type caps, the never-done
+  // ready types. The validator enforces the first two; the third is the
+  // model's to honour and the log shows whether it does. ─────────────────
+  const previousBlock: WeekRuleDay[] = [];
+  if (maxCompletedSeq > 0) {
+    const { data: prevOvs } = await supa
+      .from("engine_user_day_overrides")
+      .select("sequence_position, engine_workout_id")
+      .eq("user_id", userId).eq("program_version", version)
+      .lte("sequence_position", maxCompletedSeq)
+      .order("sequence_position", { ascending: false })
+      .limit(maxDays);
+    const ids = (prevOvs ?? []).map((o) => o.engine_workout_id as string).filter(Boolean);
+    if (ids.length > 0) {
+      const { data: prevDays } = await supa
+        .from("engine_workouts")
+        .select("id, day_type, block_1_params, block_2_params, block_3_params, block_4_params")
+        .in("id", ids);
+      for (const o of (prevOvs ?? []).slice().reverse()) {
+        const w = (prevDays ?? []).find((d) => d.id === o.engine_workout_id);
+        if (!w) continue;
+        const blocks = [w.block_1_params, w.block_2_params, w.block_3_params, w.block_4_params]
+          .filter((b): b is Record<string, unknown> => !!b && typeof b === "object");
+        previousBlock.push({ day_type: w.day_type as string, blocks });
+      }
+    }
+  }
+  const curatedMonthTypes = mapping.filter((m) => m.month === blockMonth).map((m) => typeByDay.get(m.day) ?? "");
+  const typeCap = typeCapsForBlock(curatedMonthTypes, daysToGenerate);
+  const neverDone = [...allowedDayTypes].filter((t) => t !== "time_trial" && (completedByType[t] ?? 0) === 0).sort();
+
+  const describeBlocks = (blocks: Record<string, unknown>[]) =>
+    blocks.map((b) => {
+      const parts: string[] = [];
+      if (b.rounds != null) parts.push(`${b.rounds}×`);
+      if (b.workDuration != null) parts.push(`${b.workDuration}s work`);
+      if (b.restDuration != null) parts.push(`${b.restDuration}${typeof b.restDuration === "number" ? "s" : ""} rest`);
+      if (b.paceRange != null) parts.push(`pace ${JSON.stringify(b.paceRange)}`);
+      return parts.join(" ") || "{}";
+    }).join(" | ");
+  const varietyNote =
+    (previousBlock.length > 0
+      ? `PREVIOUS BLOCK (do not repeat any of these prescriptions):\n` +
+        previousBlock.map((d, i) => `  ${i + 1}. ${d.day_type}: ${describeBlocks(d.blocks ?? [])}`).join("\n") + `\n`
+      : "") +
+    (typeCap.size > 0
+      ? `PER-BLOCK CAP BY TYPE (share of the curated month): ` +
+        [...typeCap.entries()].map(([t, c]) => `${t} ≤${c}`).join(", ") +
+        `; any type not listed ≤1.\n`
+      : "") +
+    (neverDone.length > 0
+      ? `READY BUT NEVER DONE: ${neverDone.join(", ")} — introduce within the next two blocks.\n`
+      : "");
 
   // Gap #5 v1: the athlete's NON-Engine training load (program strength for
   // dual-product users, logged activities for roll-your-own athletes) —
@@ -348,6 +414,7 @@ export async function runResequence(
     `made available through this month.\n` +
     `GENERATE THE NEXT ${daysToGenerate} ENGINE DAYS.\n` +
     prescribedNote +
+    varietyNote +
     ttNote + `\n` +
     `${catalogueText}`;
 
@@ -382,7 +449,11 @@ export async function runResequence(
   const result = validateProposal(proposal, catalogueRows, { allowedDayTypes, maxDays: daysToGenerate });
   // Block-level rules (rocket races A/B pairing; at most one assessment day).
   // A violation rejects the WHOLE block: dropping one day would break a pair.
-  const weekErrors = validateWeekRules(result.accepted, new Map(catalogueRows.map((r) => [r.id, r.class])));
+  const weekErrors = validateWeekRules(
+    result.accepted.map((d) => ({ day_type: d.day_type, blocks: d.blocks })),
+    new Map(catalogueRows.map((r) => [r.id, r.class])),
+    { previousBlock, typeCap },
+  );
   if (weekErrors.length > 0) {
     result.errors.push(...weekErrors);
     result.accepted = [];

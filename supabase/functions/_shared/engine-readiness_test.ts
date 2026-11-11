@@ -1,6 +1,6 @@
 // deno test supabase/functions/_shared/engine-readiness_test.ts --no-check
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { computeReadyDayTypes, missingPrerequisites, sequencerGate, thinDataNote, validateWeekRules, type ReadinessTypeRow } from "./engine-readiness.ts";
+import { computeReadyDayTypes, minDistinctTypes, missingPrerequisites, prescriptionSignature, sequencerGate, thinDataNote, typeCapsForBlock, validateWeekRules, type ReadinessTypeRow } from "./engine-readiness.ts";
 
 const T: ReadinessTypeRow[] = [
   { id: "time_trial", class: "assess", prerequisites: [] },
@@ -82,4 +82,52 @@ Deno.test("gate: month 0 / NaN close and report the value", () => {
 Deno.test("thinDataNote names short month-one types and ignores the time trial; null when nothing is short", () => {
   assertEquals(thinDataNote({ anaerobic: 4, max_aerobic_power: 4, endurance: 1 }, ["time_trial", "anaerobic", "max_aerobic_power", "endurance"]), "thin data: endurance 1/2");
   assertEquals(thinDataNote({ anaerobic: 2, endurance: 2 }, ["time_trial", "anaerobic", "endurance"]), null);
+});
+
+// ── Variety rules (2026-11-11) ───────────────────────────────────────────────
+
+const an = (rounds: number, work: number, rest: number | string) => ({ day_type: "anaerobic", blocks: [{ rounds, workDuration: work, restDuration: rest, paceRange: "max_effort" }] });
+const map = (rounds: number, work: number) => ({ day_type: "max_aerobic_power", blocks: [{ rounds, workDuration: work, restDuration: "equal_to_work", paceRange: [0.95, 1.02] }] });
+const end = (secs: number) => ({ day_type: "endurance", blocks: [{ rounds: 1, workDuration: secs, restDuration: 0, paceRange: [0.7, 0.7] }] });
+
+Deno.test("distinct types: a 3-day block needs three, a 5-day block needs four", () => {
+  assertEquals(minDistinctTypes(3), 3);
+  assertEquals(minDistinctTypes(5), 4);
+  assertEquals(minDistinctTypes(4), 3);
+  // two anaerobic + one MAP in a 3-day block → rejected
+  const errs = validateWeekRules([an(6, 30, 150), an(8, 20, 100), map(4, 240)], classById);
+  assertEquals(errs.length, 1);
+  assertEquals(errs[0].includes("distinct"), true);
+  // three different types → fine
+  assertEquals(validateWeekRules([an(6, 30, 150), end(1800), map(4, 240)], classById), []);
+  // a pinned time trial does not count toward the day total
+  assertEquals(validateWeekRules([{ day_type: "time_trial" }, an(6, 30, 150), end(1800), map(4, 240)], classById), []);
+});
+
+Deno.test("never the same prescription twice: within a block, and against the previous block", () => {
+  // the day-14/day-16 case: identical anaerobic dose in consecutive blocks
+  const prev = [an(6, 30, "five_times_work"), map(5, 210)];
+  const errs = validateWeekRules([an(6, 30, "five_times_work"), end(2700), map(4, 240)], classById, { previousBlock: prev });
+  assertEquals(errs.length, 1);
+  assertEquals(errs[0].includes("previous block"), true);
+  // same type, different dose → fine
+  assertEquals(validateWeekRules([an(8, 30, "five_times_work"), end(2700), map(4, 240)], classById, { previousBlock: prev }), []);
+  // key order does not matter for the signature
+  assertEquals(
+    prescriptionSignature({ day_type: "x", blocks: [{ a: 1, b: [1, 2] }] }),
+    prescriptionSignature({ day_type: "x", blocks: [{ b: [1, 2], a: 1 }] }),
+  );
+});
+
+Deno.test("share cap: a type may not exceed its curated share of the month, scaled to the block", () => {
+  // 3-day month two: anaerobic 4, max aerobic 4, endurance 3 of 11 training days, plus a time trial
+  const caps = typeCapsForBlock(["time_trial", ...Array(4).fill("anaerobic"), ...Array(4).fill("max_aerobic_power"), ...Array(3).fill("endurance")], 3);
+  assertEquals(caps.get("anaerobic"), 2);
+  assertEquals(caps.get("endurance"), 1);
+  assertEquals(caps.get("time_trial"), undefined);
+  // a 5-day block with three max-aerobic days when the month allows two
+  const caps5 = typeCapsForBlock([...Array(5).fill("max_aerobic_power"), ...Array(14).fill("endurance")], 5);
+  assertEquals(caps5.get("max_aerobic_power"), 2);
+  const errs = validateWeekRules([map(4, 240), map(5, 210), map(10, 90), end(1800), an(6, 30, 150)], classById, { typeCap: caps5 });
+  assertEquals(errs.some((e) => e.includes("share of the curated month")), true);
 });
