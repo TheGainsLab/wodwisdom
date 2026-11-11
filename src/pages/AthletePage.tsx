@@ -2568,6 +2568,15 @@ export default function AthletePage({ session }: { session: Session }) {
                           muscle-up by spring&rdquo; &middot; &ldquo;Sub-20 5k without losing my squat&rdquo; &middot;{' '}
                           &ldquo;Higher Olympic lifting total&rdquo; — if you&apos;re training for it, tell us!
                         </span>
+                        {/* ONE GOAL across the app (founder, 2026-11-10/11): an
+                            All Access athlete sets it here and the Engine reads
+                            the same text — say so, so they don't expect to be
+                            asked twice. */}
+                        {hasFeature('engine') && (
+                          <span style={{ display: 'block', marginTop: 6, color: 'var(--text-dim)' }}>
+                            Your goal also sets up your Engine — one goal, both programs.
+                          </span>
+                        )}
                       </div>
                       <textarea
                         className="lift-input"

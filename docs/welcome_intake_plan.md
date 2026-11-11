@@ -1,6 +1,6 @@
 # Welcome intake — plan (decided 2026-11-11)
 
-Status: AGREED, NOT BUILT. Mockup: `docs/welcome_intake_mockup.html`
+Status: BUILT 2026-11-11 (this branch). Design history below. Mockup: `docs/welcome_intake_mockup.html`
 (open in a browser at phone width; app theme, pricing copy from
 `PricingPlans.tsx`).
 

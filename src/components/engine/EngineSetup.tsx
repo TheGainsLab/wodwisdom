@@ -47,6 +47,9 @@ export default function EngineSetup({ onDone }: Props) {
   const [loading, setLoading] = useState(true);
   const [cadence, setCadence] = useState<number | null>(null);
   const [goal, setGoal] = useState('');
+  // True when the goal arrived from the profile (an All Access athlete who
+  // set it there first) — the step reads as a confirmation, not a question.
+  const [goalFromProfile, setGoalFromProfile] = useState(false);
   const [step, setStep] = useState<1 | 2>(1);
   const [summary, setSummary] = useState<MonthOneSummary | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
@@ -56,7 +59,7 @@ export default function EngineSetup({ onDone }: Props) {
   useEffect(() => {
     Promise.all([
       loadPrograms().then(setPrograms),
-      loadSharedGoal().then(setGoal).catch(() => {}),
+      loadSharedGoal().then((g) => { setGoal(g); setGoalFromProfile(g.trim().length > 0); }).catch(() => {}),
     ])
       .catch(() => setError('Could not load Engine programs. Please try again.'))
       .finally(() => setLoading(false));
@@ -209,8 +212,9 @@ export default function EngineSetup({ onDone }: Props) {
               style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit', textAlign: 'left', fontSize: 14 }}
             />
             <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.5 }}>
-              The more you tell it, the better it sequences. This is your training goal across the app — you can update it
-              anytime from your profile or the Engine dashboard.
+              {goalFromProfile
+                ? 'Set on your profile — the Engine uses the same goal. Edit it here if you like; the latest edit anywhere is the one that counts.'
+                : 'The more you tell it, the better it sequences. This is your training goal across the app — you can update it anytime from your profile or the Engine dashboard.'}
             </div>
           </div>
 
