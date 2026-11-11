@@ -388,3 +388,14 @@ anaerobic÷max aerobic, peak/avg), per-type averages, all-time targets vs
 actual, personal records, pace by work:rest bucket, and heart-rate stats when
 logged — per machine. Change a formula once and both consumers change.
 
+
+### Sequencer model: Sonnet 5.5 (decided 2026-11-11)
+
+The sequencer runs on the current Sonnet (`MODELS.sonnet5`, default
+`claude-sonnet-5-5`, env `MODEL_SONNET5`), no Haiku fallback. The rest of the
+app keeps its tiering by design: Fable 5 for the CoachState eval, the
+Programming skeleton and the v3 composer; Opus for paper ingestion; Sonnet 4.6
+for the week fill, adjustments, safety review, chat and the parse family;
+Haiku 4.5 for routing and as the fallback. `MODELS.sonnet` was NOT moved:
+Sonnet 5.5 rejects forced `tool_choice` and non-default `temperature`, which
+thirteen Sonnet seats still send. Moving those is its own migration.

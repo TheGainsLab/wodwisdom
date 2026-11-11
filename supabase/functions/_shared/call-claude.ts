@@ -73,6 +73,10 @@ export async function callClaude(opts: {
    *  worse than no result — the caller (e.g. the resequence cron) simply
    *  tries again later. */
   fallbackToHaiku?: boolean;
+  /** Primary model override. Default: the "default" profile's Sonnet. A seat
+   *  that opts into another tier (e.g. MODELS.sonnet5) passes it here; the
+   *  retry policy and the Haiku fallback are unchanged. */
+  model?: string;
 }): Promise<string> {
   const {
     apiKey,
@@ -81,6 +85,7 @@ export async function callClaude(opts: {
     maxTokens,
     timeoutMs = ATTEMPT_TIMEOUT_MS,
     fallbackToHaiku = true,
+    model: primaryModel = SONNET_MODEL,
   } = opts;
   const msgs = [{ role: "user", content: userContent }];
 
@@ -92,10 +97,10 @@ export async function callClaude(opts: {
 
     let resp: Response;
     try {
-      resp = await attempt(SONNET_MODEL, apiKey, system, msgs, maxTokens, false, timeoutMs);
+      resp = await attempt(primaryModel, apiKey, system, msgs, maxTokens, false, timeoutMs);
     } catch (e) {
       lastThrown = e instanceof Error ? e.message : String(e);
-      console.warn(`Claude Sonnet attempt ${i + 1}/${MAX_RETRIES} threw: ${lastThrown}`);
+      console.warn(`Claude ${primaryModel} attempt ${i + 1}/${MAX_RETRIES} threw: ${lastThrown}`);
       continue;
     }
 

@@ -23,6 +23,13 @@
  * MODEL_SONNET / MODEL_HAIKU / MODEL_OPUS secret and redeploy. Verify no literals
  * ever creep back in:
  *     grep -rn 'claude-sonnet-4-6\|claude-haiku-4-5' supabase/functions   # → only this file
+ *
+ * CAVEAT (2026-11): "config change" holds within a model generation. The 5.x
+ * models (Sonnet 5.5, Haiku 5.5, Fable 5.1+) return 400 on forced
+ * `tool_choice: { type: "tool" }` and on non-default `temperature`, which the
+ * forced-tool seats (pipeline week-fill, adjust-workout, safety-review, ...)
+ * and the streaming chat seats still send. Do not point MODEL_SONNET /
+ * MODEL_HAIKU / MODEL_FABLE at a 5.x id without migrating those seats first.
  */
 
 /** Concrete model ids, env-overridable. Change a snapshot here or via secret. */
@@ -30,6 +37,11 @@ export const MODELS = {
   sonnet: Deno.env.get("MODEL_SONNET") ?? "claude-sonnet-4-6",
   haiku: Deno.env.get("MODEL_HAIKU") ?? "claude-haiku-4-5-20251001",
   opus: Deno.env.get("MODEL_OPUS") ?? "claude-opus-4-8",
+  // Current-generation Sonnet. Opt-in per seat, like fable: Sonnet 5.5 rejects
+  // forced tool_choice and non-default temperature, which ~13 MODELS.sonnet
+  // seats still send — so this is NOT a drop-in for `sonnet`. Adopted first by
+  // the Engine sequencer (2026-11-11), a plain system+messages seat.
+  sonnet5: Deno.env.get("MODEL_SONNET5") ?? "claude-sonnet-5-5",
   // Frontier tier — adopted for the free eval (CoachState) after the 2026-08
   // side-by-side; call sites opt in explicitly, nothing reads this by default.
   fable: Deno.env.get("MODEL_FABLE") ?? "claude-fable-5",
