@@ -27,6 +27,9 @@ export interface DayTypeMeta {
   systems: EnergySystem[]; // energy systems trained (phosphagen PH is primer-only → excluded)
   cls: DayClass;
   isRoot: boolean;
+  /** No pace target (max effort): the session ratio is actual pace ÷ the
+   *  modality's time-trial baseline pace, not ÷ a target (2026-11-11). */
+  maxEffort?: boolean;
 }
 
 /** Per day-type tags. PH is intentionally absent: phosphagen is primer-only. */
@@ -35,7 +38,7 @@ export const DAY_TYPE_META: Record<string, DayTypeMeta> = {
   endurance: { tier: 1, systems: ["AB"], cls: "DEV", isRoot: true },
   max_aerobic_power: { tier: 1, systems: ["AP"], cls: "DEV", isRoot: true },
   threshold: { tier: 1, systems: ["LT"], cls: "DEV", isRoot: true },
-  anaerobic: { tier: 1, systems: ["GL"], cls: "DEV", isRoot: true },
+  anaerobic: { tier: 1, systems: ["GL"], cls: "DEV", isRoot: true, maxEffort: true },
   interval: { tier: 1, systems: ["AP", "LT", "GL"], cls: "DEV", isRoot: false },
   polarized: { tier: 1, systems: ["AB"], cls: "DEV", isRoot: false },
   flux: { tier: 2, systems: ["LT", "AB"], cls: "DEV", isRoot: false },
@@ -218,6 +221,9 @@ const METRIC_EXPLAINER =
   "rolling_avg_ratio = mean of the athlete's last up-to-5 (actual_pace ÷ target_pace) for that day_type+modality; " +
   "1.0 = exactly on their adaptive target, >1.0 beating it, <1.0 under it. recent is the raw sequence " +
   "(oldest→newest). n = sessions in the window (confidence). max = best pace ever logged (units vary by modality). " +
+  "MAX-EFFORT day types (marked 'vs baseline') have no target: their ratio is actual_pace ÷ the modality's " +
+  "time-trial baseline pace — the athlete's all-out output relative to their own aerobic baseline (a trained athlete " +
+  "sits well above 1.0; the trend across sessions is the signal). " +
   "No labels are applied — judge each system's state, its trend, recovery, and any need to recalibrate from the numbers yourself.";
 
 export function formatConditioningState(inputs: ConditioningInputs): string {
@@ -227,7 +233,7 @@ export function formatConditioningState(inputs: ConditioningInputs): string {
   const parts: string[] = ["\n\nENGINE CONDITIONING SIGNALS (raw — interpret yourself)", METRIC_EXPLAINER];
 
   parts.push(
-    `\nDays since last completed session: ${diag.daysSinceLastSession ?? "unknown"}`,
+    `\nDays since last completed session: ${diag.daysSinceLastSession ?? "none in the lookback window (90 days)"}`,
   );
 
   if (diag.competencies.length) {
@@ -237,7 +243,8 @@ export function formatConditioningState(inputs: ConditioningInputs): string {
       const mod = c.modality.replace(/_/g, " ");
       const sys = c.systems.length ? c.systems.join(",") : "—";
       const root = c.is_root ? " root" : "";
-      const ratio = c.rolling_avg_ratio != null ? c.rolling_avg_ratio.toFixed(2) : "—";
+      const vsBase = DAY_TYPE_META[c.day_type]?.maxEffort ? " vs baseline" : "";
+      const ratio = (c.rolling_avg_ratio != null ? c.rolling_avg_ratio.toFixed(2) : "—") + vsBase;
       const recent = c.last_5_ratios.length ? `[${c.last_5_ratios.map((x) => x.toFixed(2)).join(",")}]` : "[]";
       const max = c.learned_max_pace != null ? ` max ${c.learned_max_pace}` : "";
       parts.push(`- ${dt} / ${mod}  trains[${sys}]${root}  ratio ${ratio}  n${c.rolling_count}  recent ${recent}${max}`);

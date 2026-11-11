@@ -142,3 +142,19 @@ Deno.test("drift guard: no reader references the retired last_4_ratios column", 
     assert(src.includes("last_5_ratios"), `${rel} must read the production column last_5_ratios`);
   }
 });
+
+Deno.test("max-effort types (anaerobic) render their ratio as 'vs baseline' and the explainer says why", () => {
+  const text = formatConditioningState({
+    metrics: [
+      { day_type: "anaerobic", modality: "echo_bike", rolling_avg_ratio: 1.42, rolling_count: 3, last_5_ratios: [1.38, 1.4, 1.48], learned_max_pace: 22 },
+      { day_type: "max_aerobic_power", modality: "echo_bike", rolling_avg_ratio: 1.03, rolling_count: 3, last_5_ratios: [1.0, 1.04, 1.05], learned_max_pace: 16 },
+    ],
+    timeTrials: [],
+    sessions: [],
+    now: new Date("2026-11-11T00:00:00Z"),
+  });
+  if (!text.includes("anaerobic / echo bike  trains[GL] root  ratio 1.42 vs baseline")) throw new Error(text);
+  if (text.includes("max aerobic power / echo bike  trains[AP] root  ratio 1.03 vs baseline")) throw new Error("MAP must not be vs baseline");
+  if (!text.includes("MAX-EFFORT day types")) throw new Error("explainer missing");
+});
+
