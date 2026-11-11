@@ -70,3 +70,20 @@ Decided 2026-11-11:
 - Evidence-led exit on the evaluation: lead with Engine / All Access when
   the evaluation's top priority is aerobic or anaerobic capacity, Programming
   otherwise. Touches the evaluation prompt, output and the upgrade card.
+
+### Paid signup: no form, no confirmation email (decided 2026-11-11)
+
+A buyer who pays on the website signed out no longer "creates an account"
+and confirms an email — Stripe just billed the address. The completion page
+exchanges the Stripe session id for a signed-in account
+(`checkout-claim-account`: verifies the session is paid and recent, flips
+the `checkout_attempts` row to `claimed` so it is single-use, finds or
+creates the account with the email marked confirmed, attaches the purchase
+if the webhook has not yet, mints a one-time magic-link token). The page
+signs in, asks for a PASSWORD immediately (founder: "the user should set
+their password immediately"; name optional), marks the welcome seen, and
+lands on the plan's intake. Every plan has one: Programming / All Access →
+profile, Engine → Engine setup, AI Research → library, Coach → chat,
+Nutrition → nutrition. A signed-in buyer skips straight to the intake. An
+already-claimed session signed out shows "Welcome back — sign in". Free
+signups keep the confirmation email. The legacy form is the fallback only.
