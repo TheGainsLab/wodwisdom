@@ -75,3 +75,12 @@ Deno.test("gate: reports thin per-type data in the reason without blocking", () 
   assertEquals(r.ok, true);
   assertEquals(r.reason.includes("endurance 1/2"), true);
 });
+
+Deno.test("gate: mapping-less programs are exempt (null month opens); a bad month closes and says which", () => {
+  assertEquals(sequencerGate(null, {}, []).ok, true);
+  const r = sequencerGate(0, {}, ["anaerobic"]);
+  assertEquals(r.ok, false);
+  assertEquals(r.reason.includes("month 0"), true);
+  assertEquals(sequencerGate(Number.NaN, {}, ["anaerobic"]).ok, false);
+});
+

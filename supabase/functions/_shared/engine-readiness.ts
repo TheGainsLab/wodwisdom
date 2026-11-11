@@ -89,8 +89,8 @@ export function validateWeekRules(
 export interface GateResult { ok: boolean; reason: string }
 
 /**
- * When may the sequencer start? (founder decision 2026-11-10, corrected
- * 2026-11-11): only after the ASSESSMENT MONTH. Month one is fixed and
+ * When may the sequencer start? (founder decision 2026-11-10): only after the
+ * ASSESSMENT MONTH. Month one is fixed and
  * identical for every goal; the sequencer's first generated block is the
  * first block of month two, right after the month-two time trial. So the
  * gate is positional: the first position to generate must lie in month 2
@@ -99,12 +99,18 @@ export interface GateResult { ok: boolean; reason: string }
  * of each of its types, which is what readiness needs.
  */
 export function sequencerGate(
-  firstPositionMonth: number,
+  /** Month of the first position to generate; null = no program mapping
+   *  (plain-catalog setup), where the assessment-month concept does not
+   *  apply and the gate is open. */
+  firstPositionMonth: number | null,
   completedByType: Record<string, number>,
   monthOneTypes: Iterable<string>,
   minPerType: number = MIN_COMPLETIONS,
 ): GateResult {
-  if (firstPositionMonth >= 2) {
+  if (firstPositionMonth == null) {
+    return { ok: true, reason: "no program mapping — the assessment month does not apply; sequencer open" };
+  }
+  if (Number.isFinite(firstPositionMonth) && firstPositionMonth >= 2) {
     const types = [...new Set(monthOneTypes)].filter((t) => t !== "time_trial");
     const short = types.filter((t) => (completedByType[t] ?? 0) < minPerType);
     return {
@@ -113,5 +119,5 @@ export function sequencerGate(
         (short.length ? ` (thin data: ${short.map((t) => `${t} ${completedByType[t] ?? 0}/${minPerType}`).join(", ")})` : ""),
     };
   }
-  return { ok: false, reason: `assessment month in progress (month 1); the sequencer starts with month 2` };
+  return { ok: false, reason: `assessment month in progress (next block is month ${firstPositionMonth}); the sequencer starts with month 2` };
 }
