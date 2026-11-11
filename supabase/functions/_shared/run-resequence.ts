@@ -5,9 +5,10 @@
  *   - engine-resequence (HTTP)        — admin dry-run preview / on-demand.
  *   - engine-resequence-cron (server) — automatic live generation, per eligible user.
  *
- * Flow: program + positions (cheap reads) -> gate (assessment month complete:
- * the next block lies in month 2 or later; mapping-less programs are exempt)
- * -> diagnosis + catalogue -> readiness pool ->
+ * Flow: program + positions (four cheap reads) -> gate (assessment month
+ * complete: the next block lies in month 2 or later; a program with no mapping
+ * is a data error and skips) -> catalog types + per-type counts + diagnosis +
+ * catalogue -> readiness pool ->
  * AI generates the non-pinned days of the block within each envelope -> parse +
  * validate -> (dry run returns the preview | persist accepted days as engine_workouts
  * rows + position overrides). Month-boundary time trials are pinned (left as the
@@ -22,7 +23,7 @@ import { buildConditioningState } from "./conditioning-state.ts";
 import { buildOtherTrainingLoadBlock } from "./athlete-activities.ts";
 import { formatDayTypeCatalogue, loadDayTypeCatalogue } from "./engine-catalogue.ts";
 import { parseProposal, type ProposedDay, validateProposal } from "./engine-sequence.ts";
-import { computeReadyDayTypes, missingPrerequisites, sequencerGate, validateWeekRules } from "./engine-readiness.ts";
+import { computeReadyDayTypes, missingPrerequisites, sequencerGate, thinDataNote, validateWeekRules } from "./engine-readiness.ts";
 
 
 const SYSTEM_PROMPT =
@@ -191,9 +192,32 @@ export async function runResequence(
     blockPairs = Array.from({ length: maxDays }, (_, i) => ({ seq: currentDay + i, day: currentDay + i, month: 1 }));
   }
 
-  // 3d) Catalog day -> day_type for the whole authored catalog (720 rows,
-  // two columns): one query serves TT pinning, the prescribed-slot baseline,
-  // and the month-availability pool.
+  // 3d) Position-month of the block (for the gate, the preview payload and
+  // the persisted override's `phase` column — position-month, never paid
+  // months). A program with no mapping rows yields null.
+  const blockMonth = mapping.length > 0
+    ? Math.max(1, ...blockPairs.map((p) => mapping.find((m) => m.seq === p.seq)?.month ?? 1))
+    : 1;
+  const gateMonth: number | null = mapping.length > 0
+    ? (mapping.find((m) => m.seq === blockPairs[0]?.seq)?.month ?? blockMonth)
+    : null;
+
+  // 3e) THE GATE (founder decision 2026-11-10): month one is the fixed
+  // assessment month for everyone; the sequencer's first block is the first
+  // block of month two. Positional: the first position to generate must lie
+  // in month 2+. Runs after four cheap reads (profile, program, sessions,
+  // mapping) and BEFORE anything else, so an athlete who cannot open costs
+  // nothing more. A program with no mapping rows is a data error → skip.
+  const gate = sequencerGate(gateMonth);
+  if (!gate.ok) {
+    console.log(`[run-resequence] user=${userId} skip (gate): ${gate.reason}`);
+    return { status: "skipped", reason: gate.reason, currentDay, next_block_month: gateMonth };
+  }
+  console.log(`[run-resequence] user=${userId} gate open: ${gate.reason}`);
+
+  // 4a) Catalog day -> day_type for the whole authored catalog (720 rows,
+  // two columns): serves TT pinning, the prescribed-slot baseline, and the
+  // thin-data note.
   const { data: catalogTypes } = await supa
     .from("engine_workouts")
     .select("day_number, day_type")
@@ -202,13 +226,8 @@ export async function runResequence(
     (catalogTypes ?? []).map((w) => [w.day_number as number, w.day_type as string]),
   );
 
-  // 3e) Position-month of the block (for the gate, the preview payload and
-  // the persisted override's `phase` column — position-month, never paid
-  // months) and completed sessions per type (one cheap read; feeds the gate's
-  // thin-data note and the readiness pool).
-  const blockMonth = mapping.length > 0
-    ? Math.max(1, ...blockPairs.map((p) => mapping.find((m) => m.seq === p.seq)?.month ?? 1))
-    : 1;
+  // 4b) Completed sessions per type, all modalities together — feeds the
+  // readiness pool and the informational thin-data note (never the gate).
   const { data: doneTypeRows } = await supa
     .from("engine_workout_sessions")
     .select("day_type")
@@ -218,30 +237,12 @@ export async function runResequence(
   for (const r of (doneTypeRows ?? []) as Array<{ day_type: string | null }>) {
     if (r.day_type) completedByType[r.day_type] = (completedByType[r.day_type] ?? 0) + 1;
   }
-  // 3f) THE GATE (founder decision 2026-11-10): month one is the fixed
-  // assessment month for everyone; the sequencer's first block is the first
-  // block of month two. Positional: the first position to generate must lie
-  // in month 2+. Runs BEFORE the diagnosis read, so nothing expensive is
-  // spent on an athlete who cannot open. Per-type counts ride along in the
-  // reason so thin data is visible in the logs; they never decide.
-  // Mapping-less (plain-catalog) setups have no curated month one, so the
-  // assessment-month concept does not apply: null opens the gate.
-  const gateMonth: number | null = mapping.length > 0
-    ? (mapping.find((m) => m.seq === blockPairs[0]?.seq)?.month ?? blockMonth)
-    : null;
-  const monthOneTypes = mapping.length > 0
-    ? mapping.filter((m) => m.month === 1).map((m) => typeByDay.get(m.day) ?? "").filter(Boolean)
-    : Object.keys(completedByType);
-  const gate = sequencerGate(gateMonth, completedByType, monthOneTypes);
-  if (!gate.ok) {
-    console.log(`[run-resequence] user=${userId} skip (gate): ${gate.reason}`);
-    return { status: "skipped", reason: gate.reason, currentDay, next_block_month: gateMonth, completed_by_type: completedByType };
-  }
-  console.log(`[run-resequence] user=${userId} gate open: ${gate.reason}`);
+  const monthOneTypes = mapping.filter((m) => m.month === 1).map((m) => typeByDay.get(m.day) ?? "").filter(Boolean);
+  const thin = thinDataNote(completedByType, monthOneTypes);
+  if (thin) console.log(`[run-resequence] user=${userId} ${thin}`);
 
-  // 4) Diagnosis + catalogue rows — loaded only once the gate is open, so a
-  // month-one athlete costs two cheap reads per cron tick, never a diagnosis.
-  // The catalogue TEXT is formatted later, after the readiness pool is known.
+  // 4c) Diagnosis + catalogue rows. The catalogue TEXT is formatted later,
+  // after the readiness pool is known.
   const [diagnosis, catalogueRows] = await Promise.all([
     buildConditioningState(supa, userId),
     loadDayTypeCatalogue(supa),

@@ -212,17 +212,23 @@ sequencer's first generated block follows it.
 
 ### Sequencer gate: the assessment month is complete
 
-(Corrected 2026-11-11 — an earlier draft of this section proposed "two
-scored sessions per type, capped at 10 days", which would have started the
-sequencer inside month one and contradicted the assessment-month decision.)
+(Corrected — an earlier draft of this section proposed "two scored sessions
+per type, capped at 10 days", which would have started the sequencer inside
+month one and contradicted the assessment-month decision.)
 
 The sequencer's first generated block is the **first block of month two**,
 right after the month-two time trial. The gate is positional: the next
 position to generate lies in month 2 or later. Nothing is generated inside
 month one, for anyone, whatever their data looks like. By construction every
 assessment month yields two or more scored sessions of each of its types,
-which is what readiness needs; the per-type counts are reported in the
-skip/open reason so thin data is visible in the logs.
+which is what readiness needs; the per-type counts are logged as an
+informational thin-data note after the gate, never as a condition of it.
+
+The gate runs after four cheap reads (profile, program, sessions, mapping)
+and before the diagnosis, so a month-one athlete costs nothing more per cron
+tick. A profile whose program has no mapping rows is a data error (every
+athlete starts on month 1 of a mapped program, founder ruling 2026-11-11):
+the gate closes and says so rather than guessing.
 
 ### Diagnosis: roll ratios up across modalities per type
 

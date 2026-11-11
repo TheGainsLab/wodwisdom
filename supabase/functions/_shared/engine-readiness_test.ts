@@ -1,6 +1,6 @@
 // deno test supabase/functions/_shared/engine-readiness_test.ts --no-check
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { computeReadyDayTypes, missingPrerequisites, sequencerGate, validateWeekRules, type ReadinessTypeRow } from "./engine-readiness.ts";
+import { computeReadyDayTypes, missingPrerequisites, sequencerGate, thinDataNote, validateWeekRules, type ReadinessTypeRow } from "./engine-readiness.ts";
 
 const T: ReadinessTypeRow[] = [
   { id: "time_trial", class: "assess", prerequisites: [] },
@@ -59,28 +59,27 @@ Deno.test("at most one assessment day per block, time trial and rocket B excepte
   assertEquals(validateWeekRules([{ day_type: "time_trial" }, { day_type: "infinity" }, { day_type: "endurance" }], classById), []);
 });
 
-Deno.test("gate: closed for the whole assessment month, whatever the mix", () => {
-  const m1 = ["time_trial", "anaerobic", "max_aerobic_power", "endurance"];
-  assertEquals(sequencerGate(1, { anaerobic: 4, max_aerobic_power: 4, endurance: 3 }, m1).ok, false);
+Deno.test("gate: closed for the whole assessment month, whatever the data", () => {
+  assertEquals(sequencerGate(1).ok, false);
 });
 
-Deno.test("gate: opens when the next block lies in month 2 or later", () => {
-  const m1 = ["time_trial", "anaerobic", "max_aerobic_power", "endurance"];
-  assertEquals(sequencerGate(2, { anaerobic: 4, max_aerobic_power: 4, endurance: 3 }, m1).ok, true);
-  assertEquals(sequencerGate(7, { anaerobic: 1 }, m1).ok, true); // existing subscriber mid-program
+Deno.test("gate: opens when the next block lies in month 2 or later, including a mid-program subscriber", () => {
+  assertEquals(sequencerGate(2).ok, true);
+  assertEquals(sequencerGate(7).ok, true);
 });
 
-Deno.test("gate: reports thin per-type data in the reason without blocking", () => {
-  const r = sequencerGate(2, { anaerobic: 4, max_aerobic_power: 4, endurance: 1 }, ["anaerobic", "max_aerobic_power", "endurance"]);
-  assertEquals(r.ok, true);
-  assertEquals(r.reason.includes("endurance 1/2"), true);
-});
-
-Deno.test("gate: mapping-less programs are exempt (null month opens); a bad month closes and says which", () => {
-  assertEquals(sequencerGate(null, {}, []).ok, true);
-  const r = sequencerGate(0, {}, ["anaerobic"]);
+Deno.test("gate: a program with no mapping is a data error — closed, and the reason says so", () => {
+  const r = sequencerGate(null);
   assertEquals(r.ok, false);
-  assertEquals(r.reason.includes("month 0"), true);
-  assertEquals(sequencerGate(Number.NaN, {}, ["anaerobic"]).ok, false);
+  assertEquals(r.reason.includes("no mapping"), true);
 });
 
+Deno.test("gate: month 0 / NaN close and report the value", () => {
+  assertEquals(sequencerGate(0).reason.includes("month 0"), true);
+  assertEquals(sequencerGate(Number.NaN).ok, false);
+});
+
+Deno.test("thinDataNote names short month-one types and ignores the time trial; null when nothing is short", () => {
+  assertEquals(thinDataNote({ anaerobic: 4, max_aerobic_power: 4, endurance: 1 }, ["time_trial", "anaerobic", "max_aerobic_power", "endurance"]), "thin data: endurance 1/2");
+  assertEquals(thinDataNote({ anaerobic: 2, endurance: 2 }, ["time_trial", "anaerobic", "endurance"]), null);
+});
