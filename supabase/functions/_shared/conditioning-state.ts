@@ -16,6 +16,7 @@
  */
 
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { type AnalyticsSession, type AnalyticsTrial, computeEngineAnalytics, formatEngineAnalytics } from "./engine-analytics.ts";
 
 // ─── Competency-graph metadata (taxonomy, not judgment) ──────────────────────
 
@@ -317,6 +318,9 @@ export async function buildConditioningState(
   userId: string,
   opts?: { recentDays?: number; daysPerWeek?: number | null },
 ): Promise<string> {
+  // recentDays bounds the days-since / adherence windows only; the analytics
+  // block (below) and the session list use every completed session, as the
+  // athlete's Analytics page does.
   const recentDays = opts?.recentDays ?? 90;
   const cutoff = new Date(Date.now() - recentDays * 86400000).toISOString().slice(0, 10);
 
@@ -332,10 +336,9 @@ export async function buildConditioningState(
       .order("date", { ascending: true }),
     supa
       .from("engine_workout_sessions")
-      .select("date")
+      .select("date, day_type, modality, units, actual_pace, target_pace, total_output, performance_ratio, perceived_exertion, average_heart_rate, peak_heart_rate, workout_data")
       .eq("user_id", userId)
       .eq("completed", true)
-      .gte("date", cutoff)
       .order("date", { ascending: false }),
   ]);
 
@@ -354,10 +357,18 @@ export async function buildConditioningState(
   const timeTrials = ttRes.data;
   const sessions = sessRes.data;
 
-  return formatConditioningState({
+  const allSessions = (sessions as AnalyticsSession[]) ?? [];
+  const signals = formatConditioningState({
     metrics: (metrics as PerfMetricRow[]) ?? [],
     timeTrials: (timeTrials as TimeTrialRow[]) ?? [],
-    sessions: (sessions as SessionRow[]) ?? [],
+    sessions: allSessions.filter((s) => s.date >= cutoff),
     daysPerWeek: opts?.daysPerWeek ?? null,
   });
+  // ONE CALCULATION (founder, 2026-11-11): the sequencer and the Coach see
+  // exactly the analytics the athlete sees, computed by the same module as
+  // the Analytics page (engine-analytics.ts).
+  const analytics = formatEngineAnalytics(
+    computeEngineAnalytics(allSessions, ((timeTrials as AnalyticsTrial[]) ?? [])),
+  );
+  return signals + analytics;
 }

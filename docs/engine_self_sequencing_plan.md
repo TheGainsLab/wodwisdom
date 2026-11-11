@@ -377,3 +377,14 @@ migration. The Coach prompt carries the same assessment-month sentence.
 - Still on the list: roll ratios up across modalities per type; Programming's
   upcoming week as other load; work:rest tolerance; HR when logged.
 
+### One calculation: analytics = what the sequencer sees (decided 2026-11-11)
+
+The Analytics page's formulas moved verbatim into
+`supabase/functions/_shared/engine-analytics.ts` (pure, no I/O). The page
+imports it; `conditioning-state.ts` computes the same summary and appends it
+to the diagnosis as an ENGINE ANALYTICS block. Overview, sessions by type and
+equipment, energy-system paces (anaerobic÷trial, max aerobic÷trial,
+anaerobic÷max aerobic, peak/avg), per-type averages, all-time targets vs
+actual, personal records, pace by work:rest bucket, and heart-rate stats when
+logged — per machine. Change a formula once and both consumers change.
+
