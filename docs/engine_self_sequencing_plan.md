@@ -430,3 +430,26 @@ August block at day 123, two in month one, one real subscriber at day 31 of
 the 5-day program (month two — the first cohort), one at day 5, and the test
 athlete. After the fix the day-31 subscriber and the test athlete generate
 on the next tick.
+
+### Variety rules (decided 2026-11-11, after the first real blocks)
+
+The first two generated blocks for the test athlete repeated the same
+anaerobic prescription (6 × 30 s / 2:30) and leaned on the same two types.
+Founder: "I don't want every day to turn into VO2 max work" — the breadth of
+the catalogue is the product. Holding the curated shape was rejected as
+defeating the sequencer's purpose; the sequencer chooses the day. What keeps
+the balance is coverage, enforced in `engine-readiness.ts`:
+
+1. **Distinct types within a block** — three in a 3-day block, at least four
+   in a 5-day block (one fewer than days for 4+).
+2. **Never the same prescription twice** — type + generated blocks — within a
+   block or against the previous block (the sequencer is shown it).
+3. **Share cap** — no type more often per block than its share of the curated
+   month, scaled to the block, never below 1. time_trial and rocket_races_b
+   exempt.
+
+Plus a prompt instruction, not validated: a ready type the athlete has never
+done appears within two blocks (the prompt lists READY BUT NEVER DONE). The
+curated plan is now presented as the month's intent and balance, a
+reference, not a lock. A rejected block leaves the curated days in place and
+the next tick tries again.
