@@ -119,6 +119,13 @@ export async function callClaude(opts: {
 
     if (resp.ok) {
       const data = await resp.json();
+      // A reply that ended for any reason but "done" is suspect: max_tokens
+      // means the text was cut off (thinking-on models spend the budget
+      // thinking first), refusal means there is no text at all. Say so in
+      // the log so the caller's parse failure has a cause next to it.
+      if (data.stop_reason && data.stop_reason !== "end_turn") {
+        console.warn(`Claude ${primaryModel} stop_reason=${data.stop_reason} (max_tokens=${maxTokens})`);
+      }
       return textOf(data);
     }
 
