@@ -131,3 +131,12 @@ Deno.test("share cap: a type may not exceed its curated share of the month, scal
   const errs = validateWeekRules([map(4, 240), map(5, 210), map(10, 90), end(1800), an(6, 30, 150)], classById, { typeCap: caps5 });
   assertEquals(errs.some((e) => e.includes("share of the curated month")), true);
 });
+
+Deno.test("done it twice → ready regardless of prerequisites (VO2 / Hyrox histories)", () => {
+  // towers needs devour + max_aerobic_power; this athlete did towers twice under a curated program but never devour
+  const ready = computeReadyDayTypes(T, { towers: 2, max_aerobic_power: 3 });
+  assertEquals(ready.has("towers"), true);
+  assertEquals(ready.has("devour"), false); // devour itself still needs anaerobic twice
+  // once is not enough
+  assertEquals(computeReadyDayTypes(T, { towers: 1, max_aerobic_power: 3 }).has("towers"), false);
+});

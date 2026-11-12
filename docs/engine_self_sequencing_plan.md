@@ -489,3 +489,11 @@ the Engine cron pattern applied to Programming. The skeleton stays monthly.
 Gains: goal and cadence changes take effect the next week; Engine and
 Programming flex around each other week by week (the All Access promise).
 Not designed in detail yet; after the cadence-switch work.
+
+### Readiness clause (decided and built 2026-11-12)
+
+"If they did it they are ready." A type the athlete has completed at least
+twice is ready regardless of its prerequisites. The chain reveals new
+types; it never takes away one already trained. Unblocks the VO2 and Hyrox
+cohorts, whose curated histories include advanced days without the
+main-program chain.
