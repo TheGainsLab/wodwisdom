@@ -33,6 +33,7 @@
  *     prompt, not a parallel channel.
  */
 
+import { activeNotes, loadCoachNotes } from "./coach-notes.ts";
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   ALL_SKILL_KEYS,
@@ -120,6 +121,11 @@ export interface TrainingContextPayload {
   session_length_minutes?: number | null;
   /** Raw user free-text — NOT parsed. */
   goal_text: string | null;
+  /** "Tell your coach" notes active for Programming (founder, 2026-11-12):
+   *  what the athlete asked for, in their words, for the next generation.
+   *  Shape emphasis and movement choice within the month's structure; never
+   *  the day count, never over an injury. Empty when none. */
+  coach_notes?: string[];
   /** Raw user free-text — NOT parsed. */
   injuries_constraints_text: string | null;
   /**
@@ -977,6 +983,10 @@ export async function buildWriterPayload(
     );
   }
 
+  // "Tell your coach" notes active for Programming — best-effort, never blocks.
+  const coachNoteTexts: string[] = await loadCoachNotes(supa, userId)
+    .then((ns) => activeNotes(ns, "programming").map((n) => n.text))
+    .catch(() => []);
   return {
     basics: {
       age: asNumber(profile.age),
@@ -993,6 +1003,7 @@ export async function buildWriterPayload(
       days_per_week: clampDaysPerWeek(profile.days_per_week),
       session_length_minutes: asNumber(profile.session_length_minutes),
       goal_text: asString(profile.goal),
+      coach_notes: coachNoteTexts,
       injuries_constraints_text: asString(profile.injuries_constraints),
       injuries_structured: mergedInjuriesStructured,
       self_perception_level: asString(profile.self_perception_level),

@@ -231,6 +231,9 @@ export async function callWeekFill(
     priorWeeks.length > 0
       ? `- PROGRESS from the prior weeks below per the month_plan's arc (add load/volume, advance schemes) — do NOT copy them verbatim.`
       : `- This is week 1 — set the cycle's opening baseline.`,
+    ...((payload.training_context.coach_notes ?? []).length > 0
+      ? [`- ATHLETE'S NOTES FOR THEIR COACH (honour within the skeleton's day types and the composed metcons — emphasis, volume and movement choice, never day count, never over an injury): ${(payload.training_context.coach_notes ?? []).map((n) => `"${n}"`).join("; ")}`]
+      : []),
   ].join("\n");
 
   const composedBlock = hasComposed

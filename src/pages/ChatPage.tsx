@@ -13,6 +13,8 @@ import { cacheGet, cacheSet, chatHistoryKey } from '../lib/offlineCache';
 import { pickNudgeTemplate, type ProfileSection } from '../lib/chatNudgeTemplates';
 import CoachContactModal from '../components/CoachContactModal';
 import ProfileUpdateCard, { type ProfileProposalData, type ProfileCardStatus } from '../components/ProfileUpdateCard';
+import CoachNoteCard, { type NoteProposalData, type NoteCardStatus } from '../components/CoachNoteCard';
+import { addCoachNote } from '../lib/coachNotes';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -20,6 +22,9 @@ interface Message {
   /** When set, this message renders as a profile-update card, not a bubble. */
   profileProposal?: ProfileProposalData;
   proposalStatus?: ProfileCardStatus;
+  /** When set, this message renders as a "note for your coach" card. */
+  noteProposal?: NoteProposalData;
+  noteStatus?: NoteCardStatus;
   sources?: { title: string; author: string; source: string }[];
   message_id?: string;
   bookmarked?: boolean;
@@ -258,6 +263,26 @@ export default function ChatPage({ session }: { session: Session }) {
                 });
               }
 
+              if (event.type === 'note_proposal' && event.proposal_id) {
+                const card: Message = {
+                  role: 'assistant',
+                  content: '',
+                  noteProposal: { proposal_id: event.proposal_id, text: event.text || '', horizon: event.horizon === 'until_removed' ? 'until_removed' : 'next_week', rationale: event.rationale || '' },
+                  noteStatus: 'pending',
+                };
+                const closedContent = accumulatedContent;
+                accumulatedContent = '';
+                setMessages(prev => {
+                  const updated = prev.map((m, i) =>
+                    i === currentIdx ? { ...m, content: closedContent, streaming: false } : m
+                  ).filter((_m, i) => !(i === currentIdx && !closedContent.trim()));
+                  updated.push(card);
+                  updated.push({ role: 'assistant', content: '', streaming: true });
+                  currentIdx = updated.length - 1;
+                  return updated;
+                });
+              }
+
               if (event.type === 'done') {
                 setMessages(prev => prev.map((m, i) =>
                   i === currentIdx
@@ -411,7 +436,26 @@ export default function ChatPage({ session }: { session: Session }) {
           </div>
         ) : (
           <div className="messages" ref={messagesRef}>
-            {messages.map((m, i) => m.profileProposal ? (
+            {messages.map((m, i) => m.noteProposal ? (
+              <CoachNoteCard
+                key={i}
+                data={m.noteProposal}
+                status={m.noteStatus ?? 'pending'}
+                onResolve={async (action) => {
+                  const pid = m.noteProposal!.proposal_id;
+                  const set = (noteStatus: NoteCardStatus) => setMessages(prev => prev.map(msg =>
+                    msg.noteProposal?.proposal_id === pid ? { ...msg, noteStatus } : msg));
+                  if (action === 'decline') { set('declined'); return; }
+                  set('saving');
+                  try {
+                    await addCoachNote({ text: m.noteProposal!.text, horizon: m.noteProposal!.horizon, source: 'coach' });
+                    set('saved');
+                  } catch {
+                    set('error');
+                  }
+                }}
+              />
+            ) : m.profileProposal ? (
               <ProfileUpdateCard
                 key={i}
                 data={m.profileProposal}

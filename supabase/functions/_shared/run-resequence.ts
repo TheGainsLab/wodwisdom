@@ -23,6 +23,7 @@ import { MODELS } from "./model-profiles.ts";
 import { buildConditioningState } from "./conditioning-state.ts";
 import { buildOtherTrainingLoadBlock } from "./athlete-activities.ts";
 import { loadUpcomingProgrammingWeek } from "./programming-week.ts";
+import { buildCoachNotesBlock, markNotesConsumed } from "./coach-notes.ts";
 import { formatDayTypeCatalogue, loadDayTypeCatalogue } from "./engine-catalogue.ts";
 import { parseProposal, type ProposedDay, validateProposal } from "./engine-sequence.ts";
 import { computeReadyDayTypes, missingPrerequisites, sequencerGate, thinDataNote, typeCapsForBlock, validateWeekRules, type WeekRuleDay } from "./engine-readiness.ts";
@@ -44,7 +45,8 @@ const SYSTEM_PROMPT =
   `but never into day count — the program's length and cadence are fixed. (6) When present, their UPCOMING ` +
   `AI-PROGRAMMING WEEK: strength and metcon days they will train alongside this block, in their own order. ` +
   `Balance this block against that week as a whole — its total load, its hard days, the systems it already ` +
-  `taxes — never day by day, since neither side owns dates.\n\n` +
+  `taxes — never day by day, since neither side owns dates. (7) When present, the ATHLETE'S NOTES FOR THEIR ` +
+  `COACH: what they asked for this week, in their words — honour them within the rules below.\n\n` +
   `Read the signals and form your own judgment: which energy systems are behind, what's trending down, ` +
   `whether a layoff warrants re-baselining, which prerequisites are met. Then choose day-types that ` +
   `serve that judgment. For each chosen day, GENERATE concrete block ` +
@@ -414,6 +416,10 @@ export async function runResequence(
     console.warn(`[run-resequence] programming-week fetch failed for ${userId}:`, err);
     return "";
   });
+  // "Tell your coach" notes (founder, 2026-11-12): what the athlete asked
+  // for, in their words. Shapes type choice, dose and intensity within the
+  // readiness pool; never the day count. Spent after this block is applied.
+  const coachNotes = await buildCoachNotesBlock(supa, userId, "engine");
 
   // The catalogue the model sees is pre-filtered to the availability pool —
   // it cannot propose a day-type it was never shown (the validator enforces
@@ -426,6 +432,7 @@ export async function runResequence(
     `${diagnosis}\n\n` +
     (otherLoad ? `${otherLoad}\n\n` : "") +
     (programmingWeek ? `${programmingWeek}\n` : "") +
+    (coachNotes.text ? `${coachNotes.text}\n` : "") +
     programGoal +
     athleteContext +
     `PROGRAM MONTH: ${blockMonth} — the catalogue below contains exactly the day-types the program has ` +
@@ -562,6 +569,10 @@ export async function runResequence(
   }
 
   console.log(`[run-resequence] user=${userId} currentDay=${currentDay} month=${blockMonth} placed=${placed.length} errors=${result.errors.length + persistErrors.length}`);
+
+  // The block is written with the athlete's notes in view: spend the
+  // one-week ones for the Engine (standing notes stay).
+  if (placed.length > 0 && coachNotes.ids.length > 0) await markNotesConsumed(supa, coachNotes.ids, "engine");
 
   return {
     status: "applied",

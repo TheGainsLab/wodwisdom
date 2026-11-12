@@ -1,5 +1,6 @@
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { MODELS } from "../_shared/model-profiles.ts";
+import { buildCoachNotesBlock, buildProposeCoachNoteTool, COACH_NOTE_PROMPT, loadCoachNotes, recurringNotes } from "../_shared/coach-notes.ts";
 import { renderCoachStateForChat, type CoachState } from "../_shared/coach-state.ts";
 import {
   type BlockEditContext,
@@ -1396,6 +1397,17 @@ Deno.serve(async (req) => {
       injuries_constraints: (athleteProfile?.injuries_constraints as string | null) ?? null,
     };
     const profileTool = buildProposeProfileUpdateTool(profileCurrent);
+    // "Tell your coach" notes (founder, 2026-11-12): the Coach is the second
+    // front door — it drafts a note card; the athlete saves it.
+    const noteTool = buildProposeCoachNoteTool();
+    const [coachNotesBlock, recurring] = await Promise.all([
+      buildCoachNotesBlock(supa, user.id, "coach").then((b) => b.text).catch(() => ""),
+      loadCoachNotes(supa, user.id).then((ns) => recurringNotes(ns)).catch(() => []),
+    ]);
+    const coachNotesContext = (coachNotesBlock ? "\n\n" + coachNotesBlock : "") +
+      (recurring.length > 0
+        ? `\nRECURRING NOTE: ${recurring.map((r) => `"${r.text}" (${r.times} weeks)`).join("; ")} — a standing preference; offer once to make it part of their goal.`
+        : "");
 
     // Prompt caching (2026-10-25): the system prompt is split into blocks so
     // Anthropic can cache the repeated prefix. One TURN spans multiple legs
@@ -1457,8 +1469,11 @@ Deno.serve(async (req) => {
           workoutContext +
           // Edit-proposal behavior (day-scoped programming chat only)
           editPromptAddendum +
+          // The athlete's notes for their coach + the note-card behavior
+          coachNotesContext +
           // Profile-update behavior — mounted in every signed-in chat
-          PROFILE_UPDATE_PROMPT;
+          PROFILE_UPDATE_PROMPT +
+          COACH_NOTE_PROMPT;
 
     // Request body shared by every leg of the turn; `messages` grows when the
     // coach proposes an edit (tool_use → tool_result → continuation leg).
@@ -1470,7 +1485,7 @@ Deno.serve(async (req) => {
       max_tokens: editTool ? 2048 : 1536,
       temperature: 0.3,
       stream: true,
-      tools: [...(editTool ? [editTool] : []), profileTool],
+      tools: [...(editTool ? [editTool] : []), profileTool, noteTool],
       system: [
         { type: "text", text: systemShared, cache_control: { type: "ephemeral" } },
         { type: "text", text: systemAthlete, cache_control: { type: "ephemeral" } },
@@ -1630,6 +1645,33 @@ Deno.serve(async (req) => {
                   content,
                   ...(isError ? { is_error: true } : {}),
                 });
+              // ── Note-for-the-coach card (any chat surface) ─────────────
+              if (tu.name === "propose_coach_note" && !tu.parse_failed) {
+                if (proposalsEmitted > 0) {
+                  answer("One card per message — the athlete already has one. Wrap up in text.", true);
+                  continue;
+                }
+                const nIn = tu.input as { text?: string; horizon?: string; rationale?: string };
+                const text = (nIn.text ?? "").trim().slice(0, 200);
+                if (!text) { answer("The note needs text.", true); continue; }
+                const horizon = nIn.horizon === "until_removed" ? "until_removed" : "next_week";
+                proposalsEmitted++;
+                controller.enqueue(
+                  encoder.encode(`data: ${JSON.stringify({
+                    type: "note_proposal",
+                    proposal_id: crypto.randomUUID(),
+                    text,
+                    horizon,
+                    rationale: (nIn.rationale ?? "").slice(0, 200),
+                  })}\n\n`)
+                );
+                answer(
+                  "The note card is on the athlete's screen with Save / Not now. Conclude in one or two sentences: " +
+                  "if they save it, it is read before the Engine's next block (within days) and AI Programming's next generation.",
+                );
+                continue;
+              }
+
               // ── Profile-update proposal (any chat surface) ──────────────
               if (tu.name === "propose_profile_update" && !tu.parse_failed) {
                 if (proposalsEmitted > 0) {

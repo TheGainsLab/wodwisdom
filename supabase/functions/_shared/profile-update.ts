@@ -32,7 +32,8 @@ export const PROFILE_UPDATE_PROMPT =
   "circumstances or goals — training days per week, outside training load (a sport season, Hyrox, a gym program), " +
   "a goal shift, an injury or constraint to work around — propose a profile update. The athlete sees a card with " +
   "the exact diff and Apply / Not now buttons; NOTHING changes unless they tap Apply.\n" +
-  "- Durable only. 'My legs are smoked today' or 'traveling this week' is day-scale — no proposal.\n" +
+  "- Durable only. 'My legs are smoked today' is day-scale — no proposal. 'Traveling next week', 'more pull-ups' " +
+  "is week-scale — that is a propose_coach_note, not a profile update.\n" +
   "- goal_append is ADDED to their goal text (date it, keep their phrasing: e.g. \"Oct 2026 update: ...\"); " +
   "days_per_week replaces the number; injuries_replace replaces the injuries text entirely, so restate anything " +
   "that still applies.\n" +
