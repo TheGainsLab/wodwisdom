@@ -546,9 +546,12 @@ Coach) touch it. Levers on unwritten weeks:
   this week?"): read by the fill, the Coach, shown on the filled week.
   Handles "hotel gym next week", "more gymnastics", "longer metcons".
 - GOAL (profile): emphasis across weeks within the month's arc.
-- DAYS PER WEEK (profile): the next fill at the new count. ONE number for
-  Engine and Programming — Engine setup reads/writes the profile field;
-  the gear menu points at the profile or goes. Settle when building.
+- DAYS PER WEEK: TWO numbers, both on the profile — Programming days and
+  Engine days (founder, 2026-11-12: "a person can do 4 days programming
+  and 3 days engine, that is how a lot of people train"). Each product
+  reads its own; the next fill / next block at the new count. Engine setup
+  keeps its cadence question and the gear menu keeps 3/4/5; the profile
+  shows both for All Access so the weekly total is visible.
 - Loads: logging handles it ("lift heavier" = log honestly).
 - Anything that changes the month's shape: re-plan.
 
