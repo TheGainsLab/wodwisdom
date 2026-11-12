@@ -118,6 +118,9 @@ export interface EngineUserProgress {
   /** Athlete-stated conditioning objective (optional). The sequencer and the
    *  chat athlete card read it; null means unset and changes nothing. */
   engine_goal: string | null;
+  /** AI sequencing on (the default for new subscribers; Settings is the
+   *  opt-out). On: the gear menu offers days per week only. Off: tracks. */
+  engine_ai_sequencing?: boolean | null;
 }
 
 export interface EngineProgram {
@@ -819,7 +822,7 @@ export async function updatePerformanceMetrics(
 export async function loadUserProgress(): Promise<EngineUserProgress | null> {
   const { data, error } = await supabase
     .from('athlete_profiles')
-    .select('engine_program_version, engine_current_day, engine_months_unlocked, engine_goal')
+    .select('engine_program_version, engine_current_day, engine_months_unlocked, engine_goal, engine_ai_sequencing')
     .maybeSingle();
 
   if (error) throw error;

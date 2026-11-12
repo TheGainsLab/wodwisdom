@@ -282,11 +282,12 @@ export default function SettingsPage({ session }: { session: Session }) {
                   <h2 className="settings-card-title">AI Sequencing</h2>
                   <div className="settings-row" style={{ alignItems: 'flex-start', gap: 12 }}>
                     <div style={{ flex: 1 }}>
-                      <div className="settings-label">Compose my next Engine days for me</div>
+                      <div className="settings-label">Let the Engine choose my days</div>
                       <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-                        Your upcoming training days are built from your results and goal.
-                        Turn off to follow the fixed program sequence — any days already
-                        composed for you finish first.
+                        On: your upcoming days are built from your results and goal, and your
+                        only choice is how many a week — 3, 4 or 5. Off: pick a fixed track
+                        yourself from the Engine menu; any days already composed for you
+                        finish first.
                       </div>
                     </div>
                     <input
