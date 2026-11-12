@@ -30,6 +30,8 @@ export interface EngineWorkout {
   // engine_program_mapping.program_sequence_order. day_number is the CATALOG
   // content reference only.
   sequence_position?: number;
+  /** Program-wide week from the mapping; null when the mapping has none. Set by getWorkoutsForProgram. */
+  week_number?: number | null;
 }
 
 export interface EngineDayType {
@@ -376,7 +378,7 @@ export async function getWorkoutsForProgram(
   for (const m of mapping) {
     const w = byDay.get(m.engine_workout_day_number);
     if (!w) continue;
-    result.push({ ...w, month: m.month, sequence_position: m.program_sequence_order });
+    result.push({ ...w, month: m.month, sequence_position: m.program_sequence_order, week_number: m.week_number ?? null });
   }
 
   // AI self-sequencer overrides: swap generated workout content in at any

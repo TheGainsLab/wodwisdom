@@ -78,6 +78,9 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
   const [progress, setProgress] = useState<EngineUserProgress | null>(null);
   const [workouts, setWorkouts] = useState<EngineWorkout[]>([]);
   const [completedDays, setCompletedDays] = useState<Set<number>>(new Set());
+  // Sessions logged across EVERY program — the athlete's real count, which a
+  // cadence switch must not reset to zero (founder, 2026-11-12).
+  const [sessionsAllPrograms, setSessionsAllPrograms] = useState(0);
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [showSwitcher, setShowSwitcher] = useState(false);
   // Goal row: one quiet line between the stat tiles and Start. Tap to edit
@@ -94,11 +97,13 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
       const p = await loadUserProgress();
       setProgress(p);
       if (p?.engine_program_version) {
-        const [wk, sessions] = await Promise.all([
+        const [wk, sessions, allSessions] = await Promise.all([
           getWorkoutsForProgram(p.engine_program_version),
           loadCompletedSessions(p.engine_program_version),
+          loadCompletedSessions().catch(() => []),
         ]);
         setWorkouts(wk);
+        setSessionsAllPrograms(allSessions.length);
         // Sequence identity: completion is tracked by SEQUENCE position.
         // Fallback for sessions without one (written by pre-refactor bundles
         // in the deploy window): earliest position matching their catalog day.
@@ -210,8 +215,16 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
 
   // Use engine_months_unlocked from the database — incremented by payment webhooks
   const monthsUnlocked = progress?.engine_months_unlocked ?? 1;
-  const completedCount = completedDays.size;
-  const pct = totalDays > 0 ? Math.round((completedCount / totalDays) * 100) : 0;
+  // Progress is by POSITION, and a position behind the pointer that was
+  // never trained here was credited by a cadence switch (engine-switch) —
+  // it counts as done. Weeks survive a switch, day counts don't (3s don't
+  // divide into 4s), so month cards show a percentage, not "n of 16"
+  // (founder, 2026-11-12). "Completed" is sessions across all programs.
+  const isDone = (seq: number | null | undefined) =>
+    seq != null && (completedDays.has(seq) || seq < currentDay);
+  const completedCount = Math.max(sessionsAllPrograms, completedDays.size);
+  const donePositions = workouts.filter((w) => isDone(w.sequence_position)).length;
+  const pct = totalDays > 0 ? Math.round((donePositions / totalDays) * 100) : 0;
   const monthMap = groupByMonth(workouts);
   const months = Array.from(monthMap.keys()).sort((a, b) => a - b).filter(m => m <= monthsUnlocked);
 
@@ -223,9 +236,8 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
   // Month-level data (when drilled in)
   const monthDays = selectedMonth != null ? (monthMap.get(selectedMonth) ?? []) : [];
   const monthCompletedCount =
-    selectedMonth != null
-      ? monthDays.filter((d) => d.sequence_position != null && completedDays.has(d.sequence_position)).length
-      : 0;
+    selectedMonth != null ? monthDays.filter((d) => isDone(d.sequence_position)).length : 0;
+  const monthDetailPct = monthDays.length > 0 ? Math.round((monthCompletedCount / monthDays.length) * 100) : 0;
 
   // ── Render ──
 
@@ -263,7 +275,7 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
                 </button>
                 <h2 className="engine-header" style={{ flex: 1 }}>Month {selectedMonth}</h2>
                 <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>
-                  {monthCompletedCount}/{monthDays.length} completed
+                  {monthDetailPct}% complete
                 </span>
               </div>
 
@@ -352,7 +364,7 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
               <div className="engine-progress">
                 <div className="engine-progress-header">
                   <span className="engine-progress-label">Overall Progress</span>
-                  <span className="engine-progress-count">{completedCount}/{totalDays} days ({pct}%)</span>
+                  <span className="engine-progress-count">{pct}% · {totalDays} days</span>
                 </div>
                 <div className="engine-progress-bar">
                   <div className="engine-progress-fill" style={{ width: `${pct}%` }} />
@@ -489,15 +501,17 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10 }}>
                 {months.map((m) => {
                   const days = monthMap.get(m) ?? [];
-                  const done = days.filter((d) => d.sequence_position != null && completedDays.has(d.sequence_position)).length;
+                  const logged = days.filter((d) => d.sequence_position != null && completedDays.has(d.sequence_position)).length;
+                  const done = days.filter((d) => isDone(d.sequence_position)).length;
+                  const monthPct = days.length > 0 ? Math.round((done / days.length) * 100) : 0;
                   const isLocked = m > monthsUnlocked;
                   const isCurrent = days.some((d) => d.sequence_position === currentDay);
                   const isComplete = done === days.length && days.length > 0;
-                  // A month wholly behind the pointer that was never trained
-                  // here was credited by a cadence switch (engine-switch):
-                  // show it as carried over, not as unfinished.
-                  const isCarried = !isComplete && days.length > 0 && done === 0 &&
-                    days.every((d) => d.sequence_position != null && d.sequence_position < currentDay);
+                  // Credited by a cadence switch and never trained here.
+                  const isCarried = isComplete && logged === 0;
+                  // Weeks are the unit that survives a switch.
+                  const weeks = Array.from(new Set(days.map((d) => d.week_number).filter((w): w is number => w != null))).sort((a, b) => a - b);
+                  const weeksDone = weeks.filter((w) => days.filter((d) => d.week_number === w).every((d) => isDone(d.sequence_position))).length;
 
                   return (
                     <button
@@ -513,7 +527,7 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
                         background: isLocked ? 'var(--bg)' : undefined,
                         borderColor: isCurrent
                           ? 'var(--accent)'
-                          : isComplete || isCarried
+                          : isComplete
                             ? 'rgba(34,197,94,.3)'
                             : isLocked
                               ? 'var(--border)'
@@ -532,12 +546,16 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
                           Month {m}
                         </span>
                         {isLocked && <Lock size={14} color="var(--text-dim)" />}
-                        {(isComplete || isCarried) && <Check size={14} color="#4ade80" />}
+                        {isComplete && <Check size={14} color="#4ade80" />}
                       </div>
                       {!isLocked && (
                         <>
                           <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 6 }}>
-                            {isCarried ? 'Carried over from your previous schedule' : `${done}/${days.length} days`}
+                            {isCarried
+                              ? 'Carried over from your previous schedule'
+                              : weeks.length > 0
+                                ? `${monthPct}% · week ${Math.min(weeksDone + 1, weeks.length)} of ${weeks.length}`
+                                : `${monthPct}%`}
                           </div>
                           <div className="engine-progress-bar" style={{ height: 4 }}>
                             <div
