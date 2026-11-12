@@ -511,3 +511,56 @@ month 1 and then they see month 2 — this is just confusion." Setup is one
 screen: days per week, goal, Start Day 1. Pace targets adapt from day one;
 the curated-vs-sequenced distinction is internal. The Coach explains the
 assessment month if asked.
+
+### Programming week by week — design (decided 2026-11-12, NOT BUILT)
+
+Both products work the same way: an ordered sequence consumed by LOGGING.
+The calendar is a reference some athletes use and others ignore; nothing
+is keyed to dates ("users will do the workouts when they want").
+
+Cycle: Build → skeleton for the month (intent, arc, each week's focus and
+day types) → metcons COMPOSED FOR THE MONTH (variety audit stays monthly;
+movements and schemes fixed, loads not) → week 1 filled, audited, saved →
+weeks 2–4 shown as the skeleton's OUTLINE (day types + focus, no loads, no
+Start, "written when you finish week 1, from what you lift this week").
+
+Weekly fill: when a week is consumed (its last day logged, or logged past),
+the cron fills the next week from the skeleton's focus, the composed
+metcons, the ACTUAL logs of prior weeks (loads from what was lifted,
+skipped days not progressed from), the current goal, the week note, and
+for All Access the Engine's current block. Audits + safety, append. A
+failed fill leaves the outline; next tick retries. Month end as today.
+
+The skeleton never changes within the month (first version). Escape hatch
+to build: an explicit "re-plan the rest of this month" that rewrites the
+outline for the remaining weeks from new facts. Letting the skeleton
+writer revisit its plan each week: decide after real months of fills.
+
+What changes week to week: loads, volume, metcon loads/targets, skill
+progressions, skipped-day handling, Engine-aware placement, goal emphasis.
+What doesn't: day types, metcon movements/schemes, the month's arc.
+
+A filled week is DONE: only the existing day tools (AI edit, swap, scale,
+Coach) touch it. Levers on unwritten weeks:
+- WEEK NOTE on each outline page ("Anything the coach should know about
+  this week?"): read by the fill, the Coach, shown on the filled week.
+  Handles "hotel gym next week", "more gymnastics", "longer metcons".
+- GOAL (profile): emphasis across weeks within the month's arc.
+- DAYS PER WEEK (profile): the next fill at the new count. ONE number for
+  Engine and Programming — Engine setup reads/writes the profile field;
+  the gear menu points at the profile or goes. Settle when building.
+- Loads: logging handles it ("lift heavier" = log honestly).
+- Anything that changes the month's shape: re-plan.
+
+All Access order within a week: Programming's week FIRST (carries the
+skeleton's intent), then the Engine block around it. Each side balances its
+next block against the other's as a WHOLE (load, hard days, systems) — no
+day-by-day interleaving, since neither side owns dates.
+
+Also: Programming's projection of the Engine (upcoming_4_weeks from the
+fixed catalog) is wrong for sequenced athletes past the current block —
+replace with the current AI block + "sequenced from here".
+
+Order of work: (1) Engine sees Programming's next unlogged week + fix the
+projection (own PR, ~a day); (2) weekly Programming cron, outline UI, week
+note, profile days-per-week unification, re-plan action.
