@@ -568,7 +568,7 @@ Order of work: (1) Engine sees Programming's next unlogged week + fix the
 projection (own PR, ~a day); (2) weekly Programming cron, outline UI, week
 note, profile days-per-week unification, re-plan action.
 
-### "Tell your coach" notes — low-friction adjustments (decided 2026-11-12, NOT BUILT)
+### "Tell your coach" notes — low-friction adjustments (decided and built 2026-11-12)
 
 Founder: modifying the profile for every change is not user-friendly, and
 AI interaction is still high friction; athletes reach for the lowest-
@@ -591,6 +591,17 @@ there is a note.
   recognises a profile update today and offers a card ("Note for your
   coach: … Save"), plus "Add to this week's days". One list behind both.
 - Read by: every weekly fill (Programming), every Engine block, the Coach.
+
+Built: `coach_notes` table (RLS, per-product consumption, 21-day expiry
+for next_week); `_shared/coach-notes.ts` (active/format/recurring, tested);
+the sequencer reads and spends them; `build-writer-payload` carries them as
+`training_context.coach_notes` (coach-state prompt + week fill honour
+them; generate-program-v3 spends them on save); the Coach sees them, gets
+RECURRING NOTE context, and drafts one with `propose_coach_note` → a Save /
+Not now card; the program page has the box under each expanded week, a
+"n notes" marker on the collapsed row, and a summary line up top. Final
+placement (founder): under the week's days, not a box at the top, not on
+the Engine dashboard.
 
 ### Built 2026-11-12: Engine sees Programming's next week; Programming's view of the Engine corrected
 

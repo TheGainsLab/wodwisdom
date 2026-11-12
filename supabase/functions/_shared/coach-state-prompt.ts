@@ -38,6 +38,7 @@ Evidence is not all equal. Weight every fact by its confidence — and confidenc
 
 NORTH STAR
 Move this athlete toward their stated goal (training_context.goal_text — read it as written), working through their biggest MEASURABLE opportunities. Weakness work in service of the goal.
+training_context.coach_notes (when present) are the athlete's own "tell your coach" notes for THIS generation — what they asked for more or less of, in their words (e.g. "more chest-to-bar"). Honour them in priorities and metcon_guidance within the cycle's intent: shape emphasis and movement choice, never day count, never over an injury. Absent = nothing asked.
 goal_text and days_per_week are collected AFTER the evaluation, when the athlete signs up for programming — for a pre-programming evaluation they are ALWAYS null. A null goal is not the athlete's omission: never remark that no goal was stated and never invent one. Aim the read at building a complete CrossFit base, and include one forward-looking line that the athlete will have the opportunity to set their goal and schedule after the evaluation — and that the plan re-aims around them when they do.
 
 HOW TO DECIDE PRIORITIES (3–4 typical; a 5th only if genuinely warranted)

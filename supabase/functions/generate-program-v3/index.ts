@@ -52,6 +52,7 @@ import {
   formatEnqueueStats,
   triggerDraftWorker,
 } from "../_shared/signature-draft-queue.ts";
+import { markUserNotesConsumed } from "../_shared/coach-notes.ts";
 import { MODELS } from "../_shared/model-profiles.ts";
 import { buildTrainingDesignInput } from "../_shared/training-design-input.ts";
 import { type SkeletonOutput } from "../_shared/v3-output-schema.ts";
@@ -932,6 +933,9 @@ async function stageSaving(
         monthNumber,
       });
       console.log(`[generate-program-v3] saved program ${programId} (month ${monthNumber})`);
+      // The month was written with the athlete's "tell your coach" notes in
+      // view: spend the one-week ones for Programming (standing notes stay).
+      await markUserNotesConsumed(supa, userId, "programming");
 
       // Per-generation avoidance record (handoff 1.5 / T6): persist the effective
       // avoidance list that gated THIS cycle, WITH T5 provenance tags — the

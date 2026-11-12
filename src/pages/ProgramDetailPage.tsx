@@ -6,6 +6,8 @@ import { useEntitlements } from '../hooks/useEntitlements';
 import { useMovementVocab, matchMovements } from '../lib/movementVocab';
 import { GainsName } from '../components/GainsLogo';
 import Nav from '../components/Nav';
+import CoachNotesBox from '../components/CoachNotesBox';
+import { loadCoachNotes, type CoachNote } from '../lib/coachNotes';
 import WorkoutBlocksDisplay, { BlockContent } from '../components/WorkoutBlocksDisplay';
 import { BlockCoachingBody, coachingForBlockType, formatReviewMarkdown, CHEVRON_DOWN, type ReviewBlock } from '../components/reviewCoaching';
 import { useWorkoutReview } from '../lib/useWorkoutReview';
@@ -202,6 +204,13 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
   const [searchParams] = useSearchParams();
   const monthFilter = searchParams.get('month') ? parseInt(searchParams.get('month')!, 10) : null;
   const { isAdmin } = useEntitlements(session.user.id);
+  // "Tell your coach" notes (founder, 2026-11-12): written under a week's
+  // days, surfaced in the collapsed row and a one-line summary up top.
+  const [coachNotes, setCoachNotes] = useState<CoachNote[]>([]);
+  const [notesOpen, setNotesOpen] = useState(false);
+  useEffect(() => {
+    loadCoachNotes().then(setCoachNotes).catch(() => {});
+  }, [session.user.id]);
   const [program, setProgram] = useState<{
     id: string;
     name: string;
@@ -807,6 +816,19 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                     </div>
                   </div>
                 )}
+                {/* "Tell your coach" notes live under each week's days; this is
+                    only the reminder that some exist, with the list behind it. */}
+                {coachNotes.length > 0 && (
+                  <div style={{ margin: '10px 0 4px' }}>
+                    <button type="button" onClick={() => setNotesOpen((o) => !o)}
+                      style={{ background: 'none', border: 'none', padding: 0, fontFamily: 'inherit', fontSize: 13, color: 'var(--text-dim)', cursor: 'pointer' }}>
+                      {coachNotes.length} note{coachNotes.length === 1 ? '' : 's'} for your coach {notesOpen ? '▴' : '›'}
+                    </button>
+                    {notesOpen && (
+                      <CoachNotesBox compact notes={coachNotes} programId={id ?? null} weekNum={null} onChange={setCoachNotes} />
+                    )}
+                  </div>
+                )}
                 {scheduleError && (
                   <div className="schedule-error-banner" onClick={() => setScheduleError(null)}>
                     {scheduleError} <span className="schedule-error-dismiss">✕</span>
@@ -957,6 +979,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                         >
                           <span>Week {week.weekNum}</span>
                           <span style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 600 }}>
+                            {(() => { const c = coachNotes.filter((n) => n.week_num === week.weekNum).length; return c > 0 ? `${c} note${c === 1 ? '' : 's'} · ` : ''; })()}
                             {doneCount}/{week.days.length} logged {weekOpen ? '▲' : '▼'}
                           </span>
                         </button>
@@ -1160,6 +1183,17 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                             </div>
                           );
                         })}
+                        {weekOpen && (
+                          <CoachNotesBox
+                            notes={coachNotes.filter((n) => n.week_num === week.weekNum && (n.program_id == null || n.program_id === id))}
+                            programId={id ?? null}
+                            weekNum={week.weekNum}
+                            onChange={(next) => setCoachNotes((prev) => [
+                              ...next,
+                              ...prev.filter((n) => !(n.week_num === week.weekNum && (n.program_id == null || n.program_id === id))),
+                            ])}
+                          />
+                        )}
                       </div>
                             );
                           })}
