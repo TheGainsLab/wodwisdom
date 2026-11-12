@@ -454,7 +454,7 @@ curated plan is now presented as the month's intent and balance, a
 reference, not a lock. A rejected block leaves the curated days in place and
 the next tick tries again.
 
-### Changing days per week mid-program (decided 2026-11-12, NOT BUILT)
+### Changing days per week mid-program (decided and built 2026-11-12)
 
 The three cadences are separate programs, so Switch Program today lands a
 3-day athlete who wants 4 days at day 1 of the 4-day program — back into
@@ -478,6 +478,12 @@ Build:
 3. Month view shows carried-over months as credited rather than unfinished.
 4. Switching down (5 → 3) works the same; extra days done stay as history.
 5. Tests for the week-boundary translation across all six direction pairs.
+
+Built: `engine-switch.ts` (pure `translateSwitchPosition`, 7 tests),
+`switchProgram` translates by week, `run-resequence` uses the pointer as a
+floor, the dashboard marks carried-over months, the switch confirmation
+says what happens. Migration `20261112000000_main_4day_week_numbers.sql`
+gives the 4-day mapping the week numbers it was created without.
 
 ### Longer term: Programming generates a week at a time (direction, 2026-11-12)
 

@@ -493,6 +493,11 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
                   const isLocked = m > monthsUnlocked;
                   const isCurrent = days.some((d) => d.sequence_position === currentDay);
                   const isComplete = done === days.length && days.length > 0;
+                  // A month wholly behind the pointer that was never trained
+                  // here was credited by a cadence switch (engine-switch):
+                  // show it as carried over, not as unfinished.
+                  const isCarried = !isComplete && days.length > 0 && done === 0 &&
+                    days.every((d) => d.sequence_position != null && d.sequence_position < currentDay);
 
                   return (
                     <button
@@ -508,7 +513,7 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
                         background: isLocked ? 'var(--bg)' : undefined,
                         borderColor: isCurrent
                           ? 'var(--accent)'
-                          : isComplete
+                          : isComplete || isCarried
                             ? 'rgba(34,197,94,.3)'
                             : isLocked
                               ? 'var(--border)'
@@ -527,12 +532,12 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
                           Month {m}
                         </span>
                         {isLocked && <Lock size={14} color="var(--text-dim)" />}
-                        {isComplete && <Check size={14} color="#4ade80" />}
+                        {(isComplete || isCarried) && <Check size={14} color="#4ade80" />}
                       </div>
                       {!isLocked && (
                         <>
                           <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 6 }}>
-                            {done}/{days.length} days
+                            {isCarried ? 'Carried over from your previous schedule' : `${done}/${days.length} days`}
                           </div>
                           <div className="engine-progress-bar" style={{ height: 4 }}>
                             <div

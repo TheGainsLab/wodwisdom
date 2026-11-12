@@ -4,6 +4,7 @@
  */
 
 import { supabase } from './supabase';
+import { translateSwitchPosition, type SwitchMappingRow } from '../../supabase/functions/_shared/engine-switch.ts';
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -932,20 +933,16 @@ export async function loadProgramVersion(): Promise<string> {
 }
 
 /**
- * Switch the user to a different program variant.
+ * Switch the user to a different program variant (days per week).
  *
- * engine_current_day is set to 1 + the user's highest completed
- * sequence_position within the new program, defaulting to 1 if they
- * have no completions in that program yet. This mirrors how current_day
- * advances during normal training (via advanceCurrentDay at workout
- * completion) and gives sensible behavior in three cases:
- *
- *   - Brand-new program (no prior training in it): starts at Day 1.
- *   - Returning to a program with existing completions: picks up at the
- *     day right after the furthest day they've completed.
- *   - Switching to a program where the highest completion happens to
- *     equal the program's total_days: clamps to total_days so the
- *     "Start Day N" button doesn't point past the end.
+ * Founder decision 2026-11-12: the switch takes effect at the NEXT WEEK
+ * BOUNDARY — an athlete in month two, week two of the 3-day program who
+ * switches to 4 days picks up at month two, week three of the 4-day
+ * program (translateSwitchPosition, shared with the sequencer's tests).
+ * Earlier months are credited, never redone. Without progress in the old
+ * program, or where a mapping has no week numbers, the old rule applies:
+ * pick up after the furthest completed position in the new program, Day 1
+ * when there is none; never move backwards in a program already trained.
  *
  * What this does NOT touch:
  *   - engine_months_unlocked (paid access persists across switches)
@@ -956,26 +953,47 @@ export async function switchProgram(newProgramId: string): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
-  // Highest completed program_day_number in the new program, if any —
-  // ignoring sessions archived by a restart of that program, so switching
-  // away and back doesn't resurrect the pre-restart position.
-  const restartAt = await getProgramRestartAt(newProgramId);
-  // Sequence identity: pick up right after the furthest sequence position
-  // completed in the new program (restart-aware); position 1 with no
-  // completions; clamped to the program's length when fully completed.
-  let doneQuery = supabase
-    .from('engine_workout_sessions')
-    .select('sequence_position')
+  const { data: prof } = await supabase
+    .from('athlete_profiles')
+    .select('engine_program_version')
     .eq('user_id', user.id)
-    .eq('program_version', newProgramId)
-    .eq('completed', true)
-    .not('sequence_position', 'is', null);
-  if (restartAt) doneQuery = doneQuery.gt('created_at', restartAt);
-  const { data: doneRows } = await doneQuery;
-  const maxSeq = (doneRows ?? []).reduce(
-    (mx, r) => Math.max(mx, (r.sequence_position as number) ?? 0), 0);
-  const programLength = await getProgramLength(newProgramId).catch(() => 0);
-  const newCurrentDay = programLength > 0 ? Math.min(maxSeq + 1, programLength) : maxSeq + 1;
+    .maybeSingle();
+  const oldProgramId = (prof?.engine_program_version as string | null) ?? null;
+
+  // Furthest completed sequence position in a program, restart-aware (a
+  // restart archives earlier sessions so they don't resurrect a position).
+  const maxCompletedIn = async (programId: string): Promise<number> => {
+    const restartAt = await getProgramRestartAt(programId);
+    let q = supabase
+      .from('engine_workout_sessions')
+      .select('sequence_position')
+      .eq('user_id', user.id)
+      .eq('program_version', programId)
+      .eq('completed', true)
+      .not('sequence_position', 'is', null);
+    if (restartAt) q = q.gt('created_at', restartAt);
+    const { data } = await q;
+    return (data ?? []).reduce((mx, r) => Math.max(mx, (r.sequence_position as number) ?? 0), 0);
+  };
+  const mappingOf = async (programId: string): Promise<SwitchMappingRow[]> => {
+    const { data } = await supabase
+      .from('engine_program_mapping')
+      .select('program_sequence_order, month, week_number')
+      .eq('engine_program_id', programId);
+    return (data ?? []).map((r) => ({
+      seq: r.program_sequence_order as number,
+      month: (r.month as number) ?? 1,
+      week: (r.week_number as number | null) ?? null,
+    }));
+  };
+
+  const [newMax, newMapping] = await Promise.all([maxCompletedIn(newProgramId), mappingOf(newProgramId)]);
+  const [oldMax, oldMapping] = oldProgramId && oldProgramId !== newProgramId
+    ? await Promise.all([maxCompletedIn(oldProgramId), mappingOf(oldProgramId)])
+    : [0, [] as SwitchMappingRow[]];
+
+  const landing = translateSwitchPosition(oldMapping, oldMax, newMapping, newMax);
+  const newCurrentDay = landing.position;
 
   const { error } = await supabase
     .from('athlete_profiles')
