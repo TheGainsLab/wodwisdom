@@ -591,3 +591,18 @@ there is a note.
   recognises a profile update today and offers a card ("Note for your
   coach: … Save"), plus "Add to this week's days". One list behind both.
 - Read by: every weekly fill (Programming), every Engine block, the Coach.
+
+### Built 2026-11-12: Engine sees Programming's next week; Programming's view of the Engine corrected
+
+`programming-week.ts`: the athlete's next unlogged week of AI Programming
+(week containing the first day after the furthest logged one), each day
+summarised to its strength prescription and metcon header, injected into
+the sequencer prompt as UPCOMING AI-PROGRAMMING WEEK with the rule:
+balance the block against it as a whole, never day by day, never the day
+count. Engine-only athletes: nothing added.
+
+`build-writer-payload.ts`: for a sequenced athlete `upcoming_4_weeks` is
+now ONLY the current generated block, flagged `sequenced: true`; the
+coach-state prompt and the metcon composer read the flag and assume the
+observed cadence and mix continue, planning this program on its own merits
+and treating the known block as load. Fixed-catalog athletes unchanged.
