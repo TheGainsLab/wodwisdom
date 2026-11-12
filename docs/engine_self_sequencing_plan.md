@@ -478,3 +478,14 @@ Build:
 3. Month view shows carried-over months as credited rather than unfinished.
 4. Switching down (5 → 3) works the same; extra days done stay as history.
 5. Tests for the week-boundary translation across all six direction pairs.
+
+### Longer term: Programming generates a week at a time (direction, 2026-11-12)
+
+Founder: the same weekly change should come to the program generator. The
+v3 pipeline already separates the monthly skeleton (intent) from the week
+fill; the change is to run the fill one week at a time, when the previous
+week is consumed, with the athlete's logs and their Engine week in view —
+the Engine cron pattern applied to Programming. The skeleton stays monthly.
+Gains: goal and cadence changes take effect the next week; Engine and
+Programming flex around each other week by week (the All Access promise).
+Not designed in detail yet; after the cadence-switch work.
