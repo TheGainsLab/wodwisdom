@@ -22,6 +22,7 @@ import { callClaude } from "./call-claude.ts";
 import { MODELS } from "./model-profiles.ts";
 import { buildConditioningState } from "./conditioning-state.ts";
 import { buildOtherTrainingLoadBlock } from "./athlete-activities.ts";
+import { loadUpcomingProgrammingWeek } from "./programming-week.ts";
 import { formatDayTypeCatalogue, loadDayTypeCatalogue } from "./engine-catalogue.ts";
 import { parseProposal, type ProposedDay, validateProposal } from "./engine-sequence.ts";
 import { computeReadyDayTypes, missingPrerequisites, sequencerGate, thinDataNote, typeCapsForBlock, validateWeekRules, type WeekRuleDay } from "./engine-readiness.ts";
@@ -40,7 +41,10 @@ const SYSTEM_PROMPT =
   `their OTHER TRAINING LOAD — ` +
   `real recent training Engine did not prescribe (program strength days, self-logged activities). ` +
   `That load draws on the same recovery budget: factor it into intensity and day-type placement, ` +
-  `but never into day count — the program's length and cadence are fixed.\n\n` +
+  `but never into day count — the program's length and cadence are fixed. (6) When present, their UPCOMING ` +
+  `AI-PROGRAMMING WEEK: strength and metcon days they will train alongside this block, in their own order. ` +
+  `Balance this block against that week as a whole — its total load, its hard days, the systems it already ` +
+  `taxes — never day by day, since neither side owns dates.\n\n` +
   `Read the signals and form your own judgment: which energy systems are behind, what's trending down, ` +
   `whether a layoff warrants re-baselining, which prerequisites are met. Then choose day-types that ` +
   `serve that judgment. For each chosen day, GENERATE concrete block ` +
@@ -403,6 +407,13 @@ export async function runResequence(
     console.warn(`[run-resequence] other-load fetch failed for ${userId}:`, err);
     return "";
   });
+  // All Access (founder, 2026-11-12): the athlete's NEXT UNLOGGED week of AI
+  // Programming, as load to balance this block against as a whole. "" for
+  // Engine-only athletes. Best-effort, never blocks generation.
+  const programmingWeek = await loadUpcomingProgrammingWeek(supa, userId).catch((err) => {
+    console.warn(`[run-resequence] programming-week fetch failed for ${userId}:`, err);
+    return "";
+  });
 
   // The catalogue the model sees is pre-filtered to the availability pool —
   // it cannot propose a day-type it was never shown (the validator enforces
@@ -414,6 +425,7 @@ export async function runResequence(
   const userContent =
     `${diagnosis}\n\n` +
     (otherLoad ? `${otherLoad}\n\n` : "") +
+    (programmingWeek ? `${programmingWeek}\n` : "") +
     programGoal +
     athleteContext +
     `PROGRAM MONTH: ${blockMonth} — the catalogue below contains exactly the day-types the program has ` +

@@ -238,6 +238,11 @@ export interface EngineTrainingPayload {
     projected_sessions: number;
     days: Array<{ day_type: string; minutes: number | null; zones: string[] }>;
     time_in_zone_minutes: ZoneMinutes;
+    /** True when the Engine's AI sequencer is on for this athlete: `days` is
+     *  then ONLY the current generated block (the only Engine days that are
+     *  actually known); beyond it the Engine sequences from the athlete's
+     *  results, week by week, and will fit around this program. */
+    sequenced?: boolean;
   };
 }
 
@@ -630,6 +635,7 @@ interface AthleteProfileRow {
   updated_at: string | null;
   engine_program_version: string | null;
   engine_current_day: number | null;
+  engine_ai_sequencing?: boolean | null;
   engine_goal: string | null;
 }
 
@@ -640,7 +646,7 @@ const PROFILE_COLS =
   "goal, injuries_constraints, injuries_structured, " +
   "injuries_constraints_hash, injuries_avoidance_confirmed, self_perception_level, " +
   "competition_athlete_id, coaching_intake, updated_at, " +
-  "engine_program_version, engine_current_day, engine_goal";
+  "engine_program_version, engine_current_day, engine_goal, engine_ai_sequencing";
 
 // ============================================================
 // Main entry point.
@@ -1102,14 +1108,50 @@ async function fetchEngineTraining(
     typeof profile.engine_current_day === "number" && profile.engine_current_day >= 1
       ? profile.engine_current_day
       : 1;
-  const { data: mapRows } = await supa
-    .from("engine_program_mapping")
-    .select("program_sequence_order, engine_workout_day_number")
-    .eq("engine_program_id", track)
-    .gte("program_sequence_order", startPos)
-    .order("program_sequence_order")
-    .limit(projected);
-  const mapping = (mapRows ?? []) as Array<{ program_sequence_order: number; engine_workout_day_number: number }>;
+  // SEQUENCED athlete (2026-11-12): the fixed-catalog projection is wrong past
+  // the current AI block — those catalog days will never be trained. The only
+  // Engine days actually known are the generated block ahead of the pointer;
+  // report exactly those and flag it, so the skeleton plans around the block
+  // and assumes the observed cadence and mix continue beyond it.
+  const sequenced = profile.engine_ai_sequencing === true;
+  let mapping: Array<{ program_sequence_order: number; engine_workout_day_number: number }> = [];
+  let generatedDays: Array<{ day_type: string; minutes: number | null; zones: string[] }> | null = null;
+  if (sequenced) {
+    const { data: ovs } = await supa
+      .from("engine_user_day_overrides")
+      .select("sequence_position, engine_workout_id")
+      .eq("user_id", userId)
+      .eq("program_version", track)
+      .gte("sequence_position", startPos)
+      .order("sequence_position");
+    const ids = (ovs ?? []).map((o) => o.engine_workout_id as string).filter(Boolean);
+    if (ids.length > 0) {
+      const { data: gen } = await supa
+        .from("engine_workouts")
+        .select("id, day_type, total_duration_minutes")
+        .in("id", ids);
+      const byId = new Map((gen ?? []).map((g) => [g.id as string, g as CatalogRow & { id: string }]));
+      generatedDays = (ovs ?? [])
+        .map((o) => byId.get(o.engine_workout_id as string))
+        .filter((g): g is CatalogRow & { id: string } => g != null && g.day_type != null)
+        .map((g) => ({
+          day_type: g.day_type as string,
+          minutes: minutesFor(g.day_type, g),
+          zones: zonesTouched(g.day_type as string) as string[],
+        }));
+    } else {
+      generatedDays = [];
+    }
+  } else {
+    const { data: mapRows } = await supa
+      .from("engine_program_mapping")
+      .select("program_sequence_order, engine_workout_day_number")
+      .eq("engine_program_id", track)
+      .gte("program_sequence_order", startPos)
+      .order("program_sequence_order")
+      .limit(projected);
+    mapping = (mapRows ?? []) as Array<{ program_sequence_order: number; engine_workout_day_number: number }>;
+  }
 
   const upcomingDayNums = [...new Set(mapping.map((m) => m.engine_workout_day_number))]
     .filter((n) => !catalogByDay.has(n));
@@ -1121,7 +1163,7 @@ async function fetchEngineTraining(
       .in("day_number", upcomingDayNums);
     for (const w of (cat ?? []) as CatalogRow[]) catalogByDay.set(w.day_number, w);
   }
-  const upcomingDays = mapping
+  const upcomingDays = generatedDays ?? mapping
     .map((m) => catalogByDay.get(m.engine_workout_day_number))
     .filter((w): w is CatalogRow => w != null && w.day_type != null)
     .map((w) => ({
@@ -1143,9 +1185,10 @@ async function fetchEngineTraining(
       time_in_zone_minutes: trailing.zones,
     },
     upcoming_4_weeks: {
-      projected_sessions: projected,
+      projected_sessions: sequenced ? upcomingDays.length : projected,
       days: upcomingDays,
       time_in_zone_minutes: upcoming.zones,
+      ...(sequenced ? { sequenced: true } : {}),
     },
   };
 }

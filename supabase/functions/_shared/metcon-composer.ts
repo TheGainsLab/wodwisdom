@@ -351,7 +351,9 @@ export function buildComposerUserMessage(inputs: MetconComposerInputs): string {
       [
         `ENGINE WEEK CONTEXT (completed-session evidence from the athlete's separate daily conditioning program — see ENGINE-AWARE COMPOSITION in the system prompt):`,
         `  trailing 28 days: ${et.trailing_28_days.sessions} completed sessions (~${et.trailing_28_days.cadence_per_week}/week, ${et.trailing_28_days.minutes_counted} min counted) — minutes in zone: ${z(et.trailing_28_days.time_in_zone_minutes)}`,
-        `  upcoming 4 weeks (fixed catalog at observed cadence, ${et.upcoming_4_weeks.projected_sessions} sessions) — planned minutes in zone: ${z(et.upcoming_4_weeks.time_in_zone_minutes)}`,
+        et.upcoming_4_weeks.sequenced
+          ? `  upcoming: the Engine is SEQUENCED — only its current generated block is known (${et.upcoming_4_weeks.projected_sessions} sessions; it fits around this program's week from there) — known minutes in zone: ${z(et.upcoming_4_weeks.time_in_zone_minutes)}`
+          : `  upcoming 4 weeks (fixed catalog at observed cadence, ${et.upcoming_4_weeks.projected_sessions} sessions) — planned minutes in zone: ${z(et.upcoming_4_weeks.time_in_zone_minutes)}`,
         `  upcoming day types: ${
           et.upcoming_4_weeks.days.length
             ? et.upcoming_4_weeks.days.map((d) => `${d.day_type} (${d.zones.join("/") || "?"})`).join(", ")
