@@ -144,12 +144,15 @@ export default function HomePage({ session }: { session: Session }) {
     // dot covers the explorer who scrolled straight to the grid.
     {
       key: 'profile', label: 'Profile',
-      sub: hasEvaluation
+      // Engine-only accounts (founder, 2026-11-12): resting copy, no dot —
+      // the Engine never reads the lifts profile, so there is nothing
+      // "unfinished" to nag about.
+      sub: hasEvaluation || engineOnly
         ? 'Your lifts, benchmarks, and goals.'
         : profileReviewed
           ? 'Ready — run your evaluation.'
           : 'Not finished — pick up where you left off.',
-      to: '/profile', icon: <User size={20} />, locked: false, plan: '', badge: !hasEvaluation,
+      to: '/profile', icon: <User size={20} />, locked: false, plan: '', badge: !hasEvaluation && !engineOnly,
     },
     { key: 'settings', label: 'Settings', sub: 'Billing, account & sign out.', to: '/settings', icon: <Settings size={20} />, locked: false, plan: '' },
     // Admin-only: the sidebar menu is awkward on mobile, so admins get a tile.
