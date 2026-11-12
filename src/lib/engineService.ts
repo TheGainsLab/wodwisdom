@@ -420,7 +420,7 @@ async function applyDayOverrides(result: EngineWorkout[], version: string): Prom
     const gid = pos != null ? ovByPos.get(pos) : undefined;
     const g = gid ? genById.get(gid) : undefined;
     if (g) {
-      result[i] = { ...g, day_number: result[i].day_number, month: result[i].month, sequence_position: pos };
+      result[i] = { ...g, day_number: result[i].day_number, month: result[i].month, sequence_position: pos, week_number: result[i].week_number ?? null };
     }
   }
 }
