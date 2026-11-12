@@ -606,3 +606,13 @@ now ONLY the current generated block, flagged `sequenced: true`; the
 coach-state prompt and the metcon composer read the flag and assume the
 observed cadence and mix continue, planning this program on its own merits
 and treating the known block as load. Fixed-catalog athletes unchanged.
+
+### Track switches keep month and week (decided 2026-11-12)
+
+"If a user is in month 3, week 2, and they switch off into a regular
+track, they should want to stay in month 3, week 2." Migration
+`20261112100000_track_week_numbers.sql` gives every track mapping (Mini
+Cycle, VO2, Hyrox) week numbers — four weeks a month at the program's own
+cadence — so the existing week-boundary translation applies to every
+switch, sequencer on or off. A 12-month track has 48 weeks; from beyond
+that the athlete lands on its last day.
