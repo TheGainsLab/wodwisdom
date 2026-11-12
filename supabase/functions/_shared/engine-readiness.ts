@@ -9,6 +9,9 @@
  *    across all modalities, at any ratio. Types with no prerequisites are
  *    always ready. time_trial is always in the pool.
  *  - No novelty budget: prerequisites are the only reveal control.
+ *  - Done it twice → ready regardless of prerequisites (2026-11-12): the
+ *    chain reveals new types; it never takes away one the athlete has
+ *    already trained (VO2 / Hyrox histories).
  *  - Rocket Races A and B are a pair: any block containing A must contain B
  *    after it; B never appears without A before it in the same block. B's
  *    rounds/work/pace inherit from A via the envelope sentinels — only rest
@@ -52,6 +55,12 @@ export function computeReadyDayTypes(
 ): Set<string> {
   const ready = new Set<string>(["time_trial"]);
   for (const t of types) {
+    // Done it twice → ready, whatever the chain says (founder, 2026-11-12:
+    // "if they did it they are ready"). VO2 and Hyrox athletes trained
+    // advanced days under the curated programs without the main-program
+    // prerequisite chain; the chain is a reveal control, not a retroactive
+    // disqualification.
+    if ((completedByType[t.id] ?? 0) >= minCompletions) { ready.add(t.id); continue; }
     const ok = (t.prerequisites ?? []).every((p) => (completedByType[p] ?? 0) >= minCompletions);
     if (ok) ready.add(t.id);
   }

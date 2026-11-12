@@ -154,10 +154,10 @@ export default function ProgramSelection({ onSelected, currentProgram }: Props) 
                       lineHeight: 1.5,
                       color: 'var(--text)',
                     }}>
-                      You'll pick up the day after your furthest completed
-                      workout in this program (Day 1 if you've never trained
-                      in it). Unlocked months and completed workouts are
-                      preserved — switch back anytime to resume.
+                      Your current week ends here. Next week you pick up where
+                      you are — same month, same week — on the new schedule.
+                      Earlier months are credited, not repeated. Completed
+                      workouts and unlocked months are kept; switch back anytime.
                       <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
                         <button
                           className="engine-btn engine-btn-primary engine-btn-sm"

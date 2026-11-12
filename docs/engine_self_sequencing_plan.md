@@ -453,3 +453,53 @@ done appears within two blocks (the prompt lists READY BUT NEVER DONE). The
 curated plan is now presented as the month's intent and balance, a
 reference, not a lock. A rejected block leaves the curated days in place and
 the next tick tries again.
+
+### Changing days per week mid-program (decided and built 2026-11-12)
+
+The three cadences are separate programs, so Switch Program today lands a
+3-day athlete who wants 4 days at day 1 of the 4-day program — back into
+the assessment month. Founder: a user should be able to switch within a
+week and "pick up on week three of month two, and it would be four days."
+
+Rule: the switch takes effect at the NEXT WEEK BOUNDARY. The current week
+finishes at the old cadence. The following week starts at the new
+program's same month and week (`engine_program_mapping.month` /
+`week_number` → first position of week+1, or next month's week 1 at a
+month end), and the sequencer's next block is at the new cadence.
+
+Build:
+1. `switchProgram` translates (month, week) from the furthest completed
+   position in the old program to the new program's first position of the
+   following week; sets `engine_current_day` there; earlier months are
+   credited, not redone.
+2. `run-resequence` and the cron start from max(furthest completed
+   position + 1, `engine_current_day`) so a switched athlete is not sent
+   back to the gate by having no sessions in the new program.
+3. Month view shows carried-over months as credited rather than unfinished.
+4. Switching down (5 → 3) works the same; extra days done stay as history.
+5. Tests for the week-boundary translation across all six direction pairs.
+
+Built: `engine-switch.ts` (pure `translateSwitchPosition`, 7 tests),
+`switchProgram` translates by week, `run-resequence` uses the pointer as a
+floor, the dashboard marks carried-over months, the switch confirmation
+says what happens. Migration `20261112000000_main_4day_week_numbers.sql`
+gives the 4-day mapping the week numbers it was created without.
+
+### Longer term: Programming generates a week at a time (direction, 2026-11-12)
+
+Founder: the same weekly change should come to the program generator. The
+v3 pipeline already separates the monthly skeleton (intent) from the week
+fill; the change is to run the fill one week at a time, when the previous
+week is consumed, with the athlete's logs and their Engine week in view —
+the Engine cron pattern applied to Programming. The skeleton stays monthly.
+Gains: goal and cadence changes take effect the next week; Engine and
+Programming flex around each other week by week (the All Access promise).
+Not designed in detail yet; after the cadence-switch work.
+
+### Readiness clause (decided and built 2026-11-12)
+
+"If they did it they are ready." A type the athlete has completed at least
+twice is ready regardless of its prerequisites. The chain reveals new
+types; it never takes away one already trained. Unblocks the VO2 and Hyrox
+cohorts, whose curated histories include advanced days without the
+main-program chain.

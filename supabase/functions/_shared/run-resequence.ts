@@ -127,7 +127,7 @@ export async function runResequence(
   // so "the next N positions" must come from the mapping, not currentDay+i.
   const { data: prof } = await supa
     .from("athlete_profiles")
-    .select("engine_program_version, age, engine_goal")
+    .select("engine_program_version, age, engine_goal, engine_current_day")
     .eq("user_id", userId)
     .maybeSingle();
   const version = (prof?.engine_program_version as string) ?? "main_5day";
@@ -193,7 +193,13 @@ export async function runResequence(
   // position, in sequence order — kept as {seq, day} pairs: seq is the
   // position identity (what overrides key on), day is the catalog content
   // reference (what TT pinning and phase read).
-  let blockPairs = mapping.filter((m) => m.seq > maxCompletedSeq).slice(0, maxDays);
+  // The athlete's pointer is a FLOOR: after a cadence switch (engine-switch)
+  // they land mid-program with no sessions in the new program, and the next
+  // block must start where they landed, not at position 1 (which the gate
+  // would then hold in month one).
+  const pointer = typeof prof?.engine_current_day === "number" ? prof.engine_current_day : 0;
+  const floorSeq = Math.max(maxCompletedSeq, pointer - 1);
+  let blockPairs = mapping.filter((m) => m.seq > floorSeq).slice(0, maxDays);
   // Fallback for a program with no mapping rows: consecutive positions
   // (identity assumption — only plain-catalog setups reach this).
   if (blockPairs.length === 0) {
