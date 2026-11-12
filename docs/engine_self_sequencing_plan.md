@@ -503,3 +503,11 @@ twice is ready regardless of its prerequisites. The chain reveals new
 types; it never takes away one already trained. Unblocks the VO2 and Hyrox
 cohorts, whose curated histories include advanced days without the
 main-program chain.
+
+### Setup: no briefing screen (decided 2026-11-12)
+
+The assessment-month briefing (step two of setup) is removed. "They see
+month 1 and then they see month 2 — this is just confusion." Setup is one
+screen: days per week, goal, Start Day 1. Pace targets adapt from day one;
+the curated-vs-sequenced distinction is internal. The Coach explains the
+assessment month if asked.
