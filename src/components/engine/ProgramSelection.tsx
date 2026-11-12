@@ -23,6 +23,9 @@ function programIcon(id: string) {
   return <Activity size={20} color="var(--text-dim)" />;
 }
 
+/** The three main cadences — the only choices while the sequencer is on. */
+const CADENCE_IDS = new Set(['main_3day', 'main_4day', 'main_5day']);
+
 export default function ProgramSelection({ onSelected, currentProgram }: Props) {
   const [programs, setPrograms] = useState<EngineProgram[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,6 +35,11 @@ export default function ProgramSelection({ onSelected, currentProgram }: Props) 
   // Optional conditioning goal, saved alongside the program pick. Pre-filled
   // in switcher mode — a program change is the natural goal-review moment.
   const [goal, setGoal] = useState('');
+  // Founder rule (2026-11-12): tracks give way to sequencing. With the
+  // sequencer ON (the default for every new subscriber) the only choice is
+  // days per week — 3, 4 or 5 — and a switch keeps the athlete's month and
+  // week. With it OFF (Settings opt-out) the full track list shows.
+  const [sequencing, setSequencing] = useState(false);
   const isSwitching = currentProgram != null;
 
   const restart = async () => {
@@ -50,7 +58,7 @@ export default function ProgramSelection({ onSelected, currentProgram }: Props) 
   useEffect(() => {
     Promise.all([
       loadPrograms().then(setPrograms),
-      loadUserProgress().then((p) => setGoal(p?.engine_goal ?? '')).catch(() => {}),
+      loadUserProgress().then((p) => { setGoal(p?.engine_goal ?? ''); setSequencing(!!p?.engine_ai_sequencing); }).catch(() => {}),
     ])
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -93,16 +101,21 @@ export default function ProgramSelection({ onSelected, currentProgram }: Props) 
       <div className="engine-card" style={{ maxWidth: 560, width: '100%' }}>
         <div className="engine-section">
           <h2 className="engine-header">
-            {isSwitching ? 'Switch Program' : 'Choose Your Program'}
+            {sequencing ? 'Days per week' : isSwitching ? 'Switch Program' : 'Choose Your Program'}
           </h2>
           <p className="engine-subheader">
-            {isSwitching
-              ? 'Select a new program variant. You\'ll pick up where you left off — completed workouts and unlocked months carry over.'
-              : 'Select the training program that fits your schedule. You can change this later.'}
+            {sequencing
+              ? 'The Engine chooses your days; you choose how many. Change it any time — you keep your month and week.'
+              : isSwitching
+                ? 'Select a new program variant. You\'ll pick up where you left off — completed workouts and unlocked months carry over.'
+                : 'Select the training program that fits your schedule. You can change this later.'}
           </p>
           <hr className="engine-divider" />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {programs.map((prog) => {
+            {(sequencing
+              ? programs.filter((p) => CADENCE_IDS.has(p.id)).sort((a, b) => a.days_per_week - b.days_per_week)
+              : programs
+            ).map((prog) => {
               const isCurrent = prog.id === currentProgram;
               const isConfirming = confirmId === prog.id;
 
@@ -122,9 +135,11 @@ export default function ProgramSelection({ onSelected, currentProgram }: Props) 
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
                     {programIcon(prog.id)}
-                    <span style={{ fontSize: 16, fontWeight: 700, flex: 1, color: '#ffffff' }}>{prog.name}</span>
+                    <span style={{ fontSize: 16, fontWeight: 700, flex: 1, color: '#ffffff' }}>
+                      {sequencing ? `${prog.days_per_week} days a week` : prog.name}
+                    </span>
                     <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>
-                      {prog.days_per_week}x/week
+                      {sequencing ? prog.name : `${prog.days_per_week}x/week`}
                     </span>
                   </div>
                   <p style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.6, marginBottom: 8 }}>
@@ -181,6 +196,11 @@ export default function ProgramSelection({ onSelected, currentProgram }: Props) 
               );
             })}
           </div>
+          {sequencing && (
+            <p style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 10, lineHeight: 1.5 }}>
+              Want a specific track instead? Turn off &ldquo;Let the Engine choose my days&rdquo; in Settings and the track list appears here.
+            </p>
+          )}
 
           {/* Optional goal — saved with the program pick (shared with AI
               Programming). The AI sequencer weighs upcoming days toward it
