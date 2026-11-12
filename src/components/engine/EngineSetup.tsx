@@ -1,14 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Loader2, Play, Target } from 'lucide-react';
+import { Loader2, Play, Target } from 'lucide-react';
 import {
   enableAiSequencing,
-  loadMonthOneSummary,
   loadPrograms,
   loadSharedGoal,
   saveEngineGoal,
   saveProgramVersion,
   type EngineProgram,
-  type MonthOneSummary,
 } from '../../lib/engineService';
 
 /**
@@ -16,26 +14,23 @@ import {
  * the eight-track picker (founder decisions, 2026-11-10; see
  * docs/engine_self_sequencing_plan.md "New-subscriber sequence").
  *
- *  Step 1 — two answers: days per week (3 / 4 / 5 → the main_* program of
- *           that cadence) and ONE free-text goal. The goal is shared with AI
- *           Programming (saveEngineGoal writes both columns); for an All
- *           Access athlete who set up Programming first it is pre-filled.
- *  Step 2 — the briefing: month one is the assessment month, identical for
- *           every goal. Computed from the chosen program's month-one mapping
- *           (never hard-coded), so it stays true if the catalog is edited.
- *           Nothing on it is a choice; to change cadence, go back.
- *  Start Day 1 persists the program (position 1) and the goal, then hands
- *  off to the Day 1 screen.
+ *  ONE screen, two answers: days per week (3 / 4 / 5 → the main_* program
+ *  of that cadence) and ONE free-text goal. The goal is shared with AI
+ *  Programming (saveEngineGoal writes both columns); for an All Access
+ *  athlete who set up Programming first it is pre-filled. Start Day 1
+ *  persists the program (position 1), turns the sequencer on, saves the
+ *  goal, and hands off to the Day 1 screen.
+ *
+ *  There is deliberately NO briefing about the assessment month (founder,
+ *  2026-11-12: "they see month 1 and then they see month 2 — this is just
+ *  confusion"). Pace targets adapt from day one; the curated-vs-sequenced
+ *  distinction is ours, not theirs. The Coach explains it if asked.
  *
  * Existing subscribers keep the old picker behind Switch Program until the
  * tracks → settings migration.
  */
 
 const MAIN_BY_CADENCE: Record<number, string> = { 3: 'main_3day', 4: 'main_4day', 5: 'main_5day' };
-
-function typeLabel(dayType: string): string {
-  return dayType.replace(/_/g, ' ');
-}
 
 interface Props {
   /** Called after the program + goal are saved; receives the program id. */
@@ -50,9 +45,6 @@ export default function EngineSetup({ onDone }: Props) {
   // True when the goal arrived from the profile (an All Access athlete who
   // set it there first) — the step reads as a confirmation, not a question.
   const [goalFromProfile, setGoalFromProfile] = useState(false);
-  const [step, setStep] = useState<1 | 2>(1);
-  const [summary, setSummary] = useState<MonthOneSummary | null>(null);
-  const [summaryLoading, setSummaryLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -74,20 +66,6 @@ export default function EngineSetup({ onDone }: Props) {
   }, [programs]);
 
   const chosen = cadence != null ? cadenceOptions.find((o) => o.days === cadence)?.program ?? null : null;
-
-  const goToBriefing = async () => {
-    if (!chosen) return;
-    setError('');
-    setSummaryLoading(true);
-    try {
-      const s = await loadMonthOneSummary(chosen.id);
-      setSummary(s);
-      setStep(2);
-    } catch {
-      setError('Could not load the first month. Please try again.');
-    }
-    setSummaryLoading(false);
-  };
 
   const start = async () => {
     if (!chosen) return;
@@ -115,68 +93,12 @@ export default function EngineSetup({ onDone }: Props) {
     );
   }
 
-  // ── Step 2: the briefing ──
-  if (step === 2 && chosen) {
-    const perWeek = chosen.days_per_week;
-    const kinds = summary?.types.length ?? 0;
-    const goalText = goal.trim();
-    return (
-      <div className="engine-page" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}>
-        <div className="engine-card" style={{ maxWidth: 560, width: '100%' }}>
-          <div className="engine-section">
-            <button className="engine-btn engine-btn-secondary engine-btn-sm" onClick={() => setStep(1)} style={{ alignSelf: 'flex-start' }}>
-              <ChevronLeft size={16} /> Back
-            </button>
-            <h2 className="engine-header">Month one is your assessment</h2>
-            <p className="engine-subheader">
-              {perWeek} days a week, {kinds} kind{kinds === 1 ? '' : 's'} of work. We measure how you respond to each
-              before the Engine starts choosing for you.
-            </p>
-
-            {summary ? (
-              <div style={{ background: 'var(--surface2)', border: '1px dashed var(--border-light)', borderRadius: 10, padding: '12px 14px', fontSize: 13.5, color: 'var(--text-dim)', lineHeight: 1.6 }}>
-                <div>
-                  <strong style={{ color: 'var(--text)' }}>Day 1</strong> · 10-minute time trial on your machine. It sets your pace targets.
-                </div>
-                <div style={{ marginTop: 10 }}>
-                  <strong style={{ color: 'var(--text)' }}>Days 2–{summary.days}</strong>{' · '}
-                  <span style={{ fontFamily: "'JetBrains Mono', monospace", color: 'var(--text)', fontSize: 12.5 }}>
-                    {summary.types.map((t) => `${typeLabel(t.day_type)} × ${t.count}`).join(' · ')}
-                  </span>
-                </div>
-                <div style={{ marginTop: 10 }}>
-                  <strong style={{ color: 'var(--text)' }}>Day {summary.retestDay}</strong> · retest. From here the Engine
-                  sequences your weeks{goalText ? <> toward <strong style={{ color: 'var(--text)' }}>{goalText}</strong></> : ''}.
-                </div>
-              </div>
-            ) : (
-              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-                Day 1 is a 10-minute time trial; the rest of the month measures how you respond to each kind of work.
-              </div>
-            )}
-
-            <div style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 14px', fontSize: 13.5, color: 'var(--text-dim)', lineHeight: 1.6 }}>
-              Pace targets adapt from your very first sessions. New kinds of training arrive as you show you're ready for them.
-            </div>
-
-            {error && <div style={{ fontSize: 13, color: 'var(--accent)' }}>{error}</div>}
-
-            <button className="engine-btn engine-btn-primary" onClick={start} disabled={saving} style={{ width: '100%' }}>
-              {saving ? <Loader2 size={18} className="spin" /> : <><Play size={18} /> Start Day 1</>}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Step 1: two answers ──
   return (
     <div className="engine-page" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}>
       <div className="engine-card" style={{ maxWidth: 560, width: '100%' }}>
         <div className="engine-section">
           <h2 className="engine-header">Set up your Engine</h2>
-          <p className="engine-subheader">Two answers. The Engine learns the rest from your first month.</p>
+          <p className="engine-subheader">Two answers, then Day 1.</p>
 
           <div>
             <span className="engine-label">How many days a week?</span>
@@ -222,11 +144,11 @@ export default function EngineSetup({ onDone }: Props) {
 
           <button
             className="engine-btn engine-btn-primary"
-            onClick={goToBriefing}
-            disabled={!chosen || summaryLoading}
+            onClick={start}
+            disabled={!chosen || saving}
             style={{ width: '100%' }}
           >
-            {summaryLoading ? <Loader2 size={18} className="spin" /> : <>Continue <ChevronRight size={18} /></>}
+            {saving ? <Loader2 size={18} className="spin" /> : <><Play size={18} /> Start Day 1</>}
           </button>
         </div>
       </div>
