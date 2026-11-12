@@ -564,3 +564,27 @@ replace with the current AI block + "sequenced from here".
 Order of work: (1) Engine sees Programming's next unlogged week + fix the
 projection (own PR, ~a day); (2) weekly Programming cron, outline UI, week
 note, profile days-per-week unification, re-plan action.
+
+### "Tell your coach" notes — low-friction adjustments (decided 2026-11-12, NOT BUILT)
+
+Founder: modifying the profile for every change is not user-friendly, and
+AI interaction is still high friction; athletes reach for the lowest-
+friction tool. The profile is for STRUCTURAL facts (gym/equipment,
+injuries, numbers, goal, days per week). For "I want more chest-to-bar"
+there is a note.
+
+- ONE box on the program page, between the week tabs and the days (and
+  the Engine dashboard for All Access): "Tell your coach — what you want
+  more or less of. Read before every week is written." Plain text, Save.
+  Saved notes listed under it, each with its horizon and a delete.
+- Horizon: ONE WEEK by default (the next fill), then expires. Words set it
+  ("next week", "for two weeks"); "until removed" is one tap away. A
+  standing preference belongs in the GOAL on the profile (permanent). The
+  Coach offers the promotion when a note recurs ("three weeks running —
+  make it part of your goal?").
+- A filled week is done: the box offers "Add it to this week's days",
+  which opens the existing day AI-edit on the days where it fits.
+- The Coach is the second front door: it recognises a note the way it
+  recognises a profile update today and offers a card ("Note for your
+  coach: … Save"), plus "Add to this week's days". One list behind both.
+- Read by: every weekly fill (Programming), every Engine block, the Coach.
