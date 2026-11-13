@@ -146,6 +146,14 @@ export interface MetconComposerInputs {
   athlete_context: string;
   /** Last cycle's metcons as one-line summaries — never re-serve these. */
   previous_cycle_metcons: string[];
+  /** WEEKLY MODE (2026-11-13): the pieces already composed EARLIER THIS
+   *  MONTH, one line each — this call composes one more week that must stay
+   *  distinct from them (the variety audit checks the month as a whole). */
+  already_composed_this_month?: string[];
+  /** WEEKLY MODE: the athlete's notes for their coach, in their words —
+   *  honour them in the pieces for this week ("longer metcons", "more
+   *  rowing"), within the slots' time domains. */
+  coach_notes?: string[];
   /** Stratified example block from metcon-examples.ts. Empty string = none. */
   examples: string;
   /** TYPED coaching decisions (athlete-match package) — the authoritative
@@ -373,6 +381,20 @@ export function buildComposerUserMessage(inputs: MetconComposerInputs): string {
         ? inputs.previous_cycle_metcons.map((m) => `  - ${m}`).join("\n")
         : "  (first cycle — none)"),
   );
+  if ((inputs.already_composed_this_month ?? []).length > 0) {
+    parts.push(
+      `ALREADY COMPOSED THIS MONTH (earlier weeks, written and some already trained — you are composing the NEXT week; ` +
+        `every new piece must be a DISTINCT workout from these; vary movements and shapes across the month):\n` +
+        (inputs.already_composed_this_month ?? []).map((m) => `  - ${m}`).join("\n"),
+    );
+  }
+  if ((inputs.coach_notes ?? []).length > 0) {
+    parts.push(
+      `ATHLETE'S NOTES FOR THEIR COACH (what they asked for, in their words — honour them in this week's pieces within ` +
+        `each slot's time domain; never over an injury or outside the allowed movements):\n` +
+        (inputs.coach_notes ?? []).map((n) => `  - "${n}"`).join("\n"),
+    );
+  }
   if (inputs.examples.trim()) parts.push(inputs.examples.trim());
   parts.push(`ALLOWED MOVEMENTS (compose ONLY from these display names):\n${inputs.vocabulary.join(" · ")}`);
   return parts.join("\n\n");

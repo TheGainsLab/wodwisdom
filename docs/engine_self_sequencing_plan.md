@@ -694,3 +694,14 @@ you finish week N-1", a "This is a starting point" line sits above the
 weeks, and the notes box is under every week, outline weeks included. The
 skip-reason list gains "Too tired" and "Didn't want to". Audits and safety
 run on the one written week unchanged.
+
+### PR 3 built (2026-11-13): metcons composed per week
+
+`_shared/compose-metcons.ts`: the metcons stage's compose → audit → retry →
+repair → drop-illegal loop, extracted so the weekly cron composes each week
+the same way. Takes the slots to compose plus the month's earlier pieces;
+the composer sees them as ALREADY COMPOSED THIS MONTH and the variety audit
+checks the month as a whole, so distinctness is a running check against what
+is written. Only the new pieces are returned. The composer also takes the
+athlete's notes (`coach_notes`) for the week. In weekly mode the metcons
+stage composes week 1 only; monthly mode is unchanged.
