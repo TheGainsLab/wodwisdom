@@ -705,3 +705,28 @@ checks the month as a whole, so distinctness is a running check against what
 is written. Only the new pieces are returned. The composer also takes the
 athlete's notes (`coach_notes`) for the week. In weekly mode the metcons
 stage composes week 1 only; monthly mode is unchanged.
+
+### PR 4 built (2026-11-13): the weekly cron and the re-plan
+
+- `weekly-programming-cron` (hourly, X-Cron-Key, ack-then-work): for every
+  weekly program with an outline week, the lowest outline week W is due when
+  the LAST DAY of week W-1 is logged (or anything beyond). Kicks a WEEK JOB on
+  generate-program-v3 (`{ program_id, fill_week: W }`, service call), capped
+  per tick, skipped while a generation is already running for the athlete.
+  A failed job leaves the outline; the next tick tries again.
+- WEEK JOB (`resume_state.weeklyFill`): payload rebuilt (notes, profile);
+  skeleton LOADED from `program_month_skeletons`; a Haiku verdict on the
+  notes (`classifyNotesForReplan`) decides RE-PLAN (skeleton writer re-runs
+  with the stored skeleton + the notes; weeks < W kept exactly; store
+  updated, replan_count++) or fill; metcons composed for week W only against
+  the month so far, with the notes; the fill progresses from the stored
+  written weeks + the evidence (PR 1); audits + safety on week W only; the
+  save replaces week W's outline rows, refreshes later weeks' outline rows
+  from the (possibly re-planned) skeleton, appends `written_weeks`, spends
+  the notes, no month bump.
+- `athlete_profiles.programming_weekly` DEFAULT TRUE and existing rows set
+  true: weekly is the default for everyone; a program already generated
+  monthly finishes as written (`programs.weekly_mode` is per program) and
+  the athlete's next month is weekly.
+- Not built: filling the moment the last day is logged (the cron's hourly
+  tick is the only trigger for now).

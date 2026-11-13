@@ -33,6 +33,7 @@ import { isBarbellMetconMovement } from "../_shared/metcon-variety-audits.ts";
 import { trimWriterMovementAnnotations } from "../_shared/movement-name-repair.ts";
 import { buildStratifiedMetconExamples } from "../_shared/metcon-examples.ts";
 import { composeMetconsForSlots } from "../_shared/compose-metcons.ts";
+import { classifyNotesForReplan, loadMonthStore, type MonthStore } from "../_shared/weekly-fill.ts";
 import { formatAuditFailuresForLog, logGenerationAudit } from "../_shared/generation-audit-log.ts";
 import {
   enqueueSignatureDraftsForWeeks,
@@ -232,7 +233,7 @@ async function stagePayloadBuilding(
   // the weekly cron fills the rest. Per-athlete while it rolls out.
   const { data: weeklyRow } = await supa
     .from("athlete_profiles").select("programming_weekly").eq("user_id", userId).maybeSingle();
-  const weekly = weeklyRow?.programming_weekly === true;
+  const weekly = rs.weeklyFill != null || weeklyRow?.programming_weekly === true;
   if (weekly) console.log(`[generate-program-v3] weekly mode for ${userId}`);
 
   return {
@@ -357,6 +358,55 @@ async function stageSkeleton(
   // execution; the audit loop enforces the boundary.
   const tdi = rs.trainingDesignInput!;
   const intentDocument = rs.coachState ? buildCoachStateDocumentBlock(rs.coachState) : "";
+
+  // WEEK JOB (PR 4): the month's skeleton already exists. Load it; if the
+  // athlete's notes touch what the skeleton owns (which lifts, how much
+  // lifting, the metcon focus), RE-PLAN the weeks from this one on — written
+  // weeks are kept exactly — otherwise keep it as is. The fill then writes
+  // this week from the (possibly new) skeleton.
+  if (rs.weeklyFill) {
+    const weekNum = rs.weeklyFill.weekNum;
+    const store: MonthStore | null = await loadMonthStore(supa, rs.continuation.programId!, rs.continuation.monthNumber);
+    if (!store) throw new Error(`[generate-program-v3] week job: no stored skeleton for program ${rs.continuation.programId} month ${rs.continuation.monthNumber}`);
+    const notes = rs.payload?.training_context.coach_notes ?? [];
+    const verdict = notes.length ? await classifyNotesForReplan(notes) : "fill";
+    let skeleton = store.skeleton;
+    let replanned = false;
+    if (verdict === "replan") {
+      const replanDoc =
+        intentDocument +
+        `\n\nRE-PLAN (weekly Programming): this month's skeleton is below. Weeks 1-${weekNum - 1} are WRITTEN and ` +
+        `already trained — reproduce them EXACTLY as given (same days, block types, lifts, schemes, focus). Rewrite weeks ` +
+        `${weekNum}-4 so the athlete's notes are honoured as priorities while the month's arc still holds: ` +
+        notes.map((n) => `"${n}"`).join("; ") +
+        `\nCURRENT SKELETON:\n${JSON.stringify(store.skeleton)}`;
+      try {
+        const fresh = await generateSkeletonWithAudits(tdi, PACK, undefined, replanDoc);
+        // Keep written weeks from the stored skeleton whatever the writer did.
+        skeleton = {
+          ...fresh,
+          weeks: [
+            ...store.skeleton.weeks.filter((w) => w.week_num < weekNum),
+            ...fresh.weeks.filter((w) => w.week_num >= weekNum),
+          ].sort((a, b) => a.week_num - b.week_num),
+        };
+        replanned = true;
+        console.log(`[generate-program-v3] week ${weekNum}: skeleton RE-PLANNED on notes: ${notes.join(" | ")}`);
+        await supa.from("program_month_skeletons")
+          .update({ skeleton, replanned_at: new Date().toISOString(), replan_count: (store.replan_count ?? 0) + 1 })
+          .eq("id", store.id);
+      } catch (e) {
+        console.warn(`[generate-program-v3] week ${weekNum}: re-plan failed, filling from the stored skeleton:`, e instanceof Error ? e.message : String(e));
+      }
+    }
+    return {
+      next: "metcons",
+      resumeState: { ...rs, skeleton, weeks: [], priorWrittenWeeks: store.written_weeks, composedMetcons: store.composed_metcons ?? [] },
+      displayStage: "skeleton_done",
+      extraPatch: { skeleton_json: skeleton, ...(replanned ? { replanned: true } : {}) },
+    };
+  }
+
   let skeleton = await generateSkeletonWithAudits(tdi, PACK, undefined, intentDocument);
   console.log("[generate-program-v3] skeleton passed audits");
 
@@ -555,19 +605,24 @@ async function stageMetcons(
   // WEEKLY MODE (PR 3, 2026-11-13): compose week 1 only; the weekly cron
   // composes each later week against what is already written, with the
   // athlete's notes in view. Monthly mode composes the whole month as before.
-  const slotsToCompose = rs.weekly ? slots.filter((sl) => sl.week_num === 1) : slots;
+  const targetWeek = rs.weeklyFill?.weekNum ?? 1;
+  const slotsToCompose = rs.weekly ? slots.filter((sl) => sl.week_num === targetWeek) : slots;
+  const priorPieces = rs.weeklyFill ? ((rs.composedMetcons ?? []).filter((m) => m.week_num < targetWeek)) : [];
+  const priorSlots = rs.weeklyFill ? slots.filter((sl) => sl.week_num < targetWeek) : [];
   const { slots: _unusedSlots, ...inputsSansSlots } = inputs;
   const { slots: _unusedAuditSlots, ...auditOptsSansSlots } = auditOpts;
   const composed = await composeMetconsForSlots({
-    inputs: inputsSansSlots,
+    inputs: { ...inputsSansSlots, coach_notes: payload.training_context.coach_notes ?? [] },
     slots: slotsToCompose,
+    priorSlots,
+    priorPieces,
     auditOpts: auditOptsSansSlots,
     vocabulary: tdi.vocabulary,
     doNotProgram: tdi.do_not_program,
     equipment: tdi.equipment,
     logPrefix: "[generate-program-v3]",
   });
-  const output = { metcons: composed.pieces };
+  const output = { metcons: [...priorPieces, ...composed.pieces] };
   const audit = { violations: composed.violations, warnings: composed.warnings };
   const retried = composed.retried;
   const firstPassViolations = composed.firstPassViolations;
@@ -588,7 +643,7 @@ async function stageMetcons(
   });
   console.log(`[generate-program-v3] composed ${output.metcons.length} metcons for ${slots.length} slots`);
   return {
-    next: "fill_week_1",
+    next: `fill_week_${targetWeek}` as Stage,
     resumeState: { ...rs, composedMetcons: output.metcons },
     displayStage: "metcons_done",
   };
@@ -602,7 +657,7 @@ async function stageFillWeek(
 ): Promise<StageOutcome> {
   const payload = rs.payload!;
   const skeleton = rs.skeleton!;
-  const priorWeeks = rs.weeks ?? [];
+  const priorWeeks = rs.weeklyFill ? (rs.priorWrittenWeeks ?? []) : (rs.weeks ?? []);
   const weekMetcons = (rs.composedMetcons ?? []).filter((m) => m.week_num === weekNum);
   // What the athlete actually did in the prior weeks of THIS program (weekly
   // model, PR 1): lifted loads, results, skipped blocks with reasons, days
@@ -876,10 +931,10 @@ async function stageSaving(
   // prior attempt (or a concurrent worker) already saved this month — treat as
   // an idempotent success and skip the write. This is what stops the automated
   // continuation paths (webhook + cron) silently appending two month-2s.
-  const { error: markerErr } = await supa
-    .from("program_months")
-    .insert({ program_id: programId, month_number: monthNumber });
-  const alreadySaved = markerErr != null &&
+  const { error: markerErr } = rs.weeklyFill
+    ? { error: null }
+    : await supa.from("program_months").insert({ program_id: programId, month_number: monthNumber });
+  const alreadySaved = !rs.weeklyFill && markerErr != null &&
     (markerErr.code === "23505" || /duplicate key|already exists/i.test(markerErr.message ?? ""));
   if (markerErr && !alreadySaved) {
     // Don't orphan a just-created shell behind this throw — without the delete
@@ -897,7 +952,9 @@ async function stageSaving(
         skeleton,
         programId, // always append mode in the dispatcher (shell pre-created for first-cycle)
         monthNumber,
-        ...(rs.weekly ? { weekly: { composedMetcons: rs.composedMetcons ?? null } } : {}),
+        ...(rs.weekly
+          ? { weekly: { composedMetcons: rs.composedMetcons ?? null, ...(rs.weeklyFill ? { weekAppend: true, skeletonToStore: skeleton } : {}) } }
+          : {}),
       });
       console.log(`[generate-program-v3] saved program ${programId} (month ${monthNumber})`);
       // The month was written with the athlete's "tell your coach" notes in
@@ -1142,6 +1199,37 @@ Deno.serve(async (req) => {
     //     explicitly; user callers get the derived value and CANNOT override it.
     //   - New program (no program_id): users ALWAYS start at month 1. Only a
     //     trusted service caller may seed a new program at month > 1 (migration).
+    // WEEK JOB (PR 4): the weekly cron asks for one later week of a weekly
+    // program. Service-only. Seeds weeklyFill; the stages branch on it.
+    const reqFillWeek: number | null = typeof body?.fill_week === "number" ? body.fill_week : null;
+    if (reqFillWeek != null) {
+      if (!isServiceCall || !reqProgramId) return jsonErr(400, "Bad Request", "fill_week needs a service call with program_id.");
+      const { data: prog } = await supa
+        .from("programs").select("id, generated_months, weekly_mode, program_version")
+        .eq("id", reqProgramId).eq("user_id", userId).maybeSingle();
+      if (!prog) return jsonErr(404, "Program not found");
+      if (prog.program_version !== "v3" || !prog.weekly_mode) return jsonErr(400, "Bad Request", "Not a weekly v3 program.");
+      const monthNumber = reqMonthNumber ?? (prog.generated_months || 1);
+      const { data: activeJob } = await supa
+        .from("program_jobs").select("id").eq("user_id", userId).eq("status", "processing")
+        .gte("updated_at", new Date(Date.now() - 30 * 60 * 1000).toISOString()).limit(1).maybeSingle();
+      if (activeJob) return jsonErr(409, "GENERATION_IN_PROGRESS");
+      const initialResume: ResumeState = {
+        continuation: { programId: reqProgramId, monthNumber },
+        weekly: true,
+        weeklyFill: { weekNum: reqFillWeek },
+      };
+      const { data: job, error: jobErr } = await supa
+        .from("program_jobs")
+        .insert({ user_id: userId, status: "processing", stage: "payload_building", next_stage: "payload_building", program_id: reqProgramId, resume_state: initialResume })
+        .select("id").single();
+      if (jobErr || !job) return jsonErr(500, "Failed to start week fill");
+      (globalThis as any).EdgeRuntime?.waitUntil?.(runStage(job.id));
+      return new Response(JSON.stringify({ ok: true, job_id: job.id, fill_week: reqFillWeek }), {
+        status: 202, headers: { ...cors, "Content-Type": "application/json" },
+      });
+    }
+
     let monthNumber: number;
     if (reqProgramId) {
       const { data: prog } = await supa

@@ -138,6 +138,16 @@ export interface ResumeState {
    *  the weekly cron fills the rest. Read from athlete_profiles.programming_weekly
    *  in payload_building. */
   weekly?: boolean;
+  /** A WEEK JOB (PR 4): fill one later week of an existing weekly program.
+   *  Seeded at kickoff by the weekly cron. The skeleton stage loads (and may
+   *  re-plan) the stored skeleton instead of writing one; metcons compose
+   *  this week only; the fill progresses from priorWrittenWeeks; saving
+   *  replaces this week's outline rows. rs.weeks holds ONLY this week so the
+   *  audits and the save touch nothing already written. */
+  weeklyFill?: { weekNum: number };
+  /** The month's weeks already written (from program_month_skeletons), for a
+   *  week job's fill to progress from. Never audited or saved again. */
+  priorWrittenWeeks?: WeekPrescription[];
   /** Built once in payload_building — rebuilding re-fires parse-injuries +
    *  re-hits the DB and can drift. */
   payload?: WriterPayload;
