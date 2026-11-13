@@ -28,24 +28,11 @@ import { getCorsHeaders } from "../_shared/cors.ts";
 import { buildWriterPayload, type WriterPayload } from "../_shared/build-writer-payload.ts";
 import { generateAndPersistCoachState } from "../_shared/generate-coach-state.ts";
 import { buildCoachStateDocumentBlock } from "../_shared/coach-state.ts";
-import {
-  callMetconComposer,
-  deriveMetconSlots,
-  type MetconComposerInputs,
-} from "../_shared/metcon-composer.ts";
-import {
-  auditMetconVariety,
-  dropIllegalComposedPieces,
-  formatMetconVarietyViolationsForRetry,
-  isBarbellMetconMovement,
-  repairComposerEmission,
-  stripStructuralRestRows,
-} from "../_shared/metcon-variety-audits.ts";
-import {
-  trimComposedMovementAnnotations,
-  trimWriterMovementAnnotations,
-} from "../_shared/movement-name-repair.ts";
+import { deriveMetconSlots, type MetconComposerInputs } from "../_shared/metcon-composer.ts";
+import { isBarbellMetconMovement } from "../_shared/metcon-variety-audits.ts";
+import { trimWriterMovementAnnotations } from "../_shared/movement-name-repair.ts";
 import { buildStratifiedMetconExamples } from "../_shared/metcon-examples.ts";
+import { composeMetconsForSlots } from "../_shared/compose-metcons.ts";
 import { formatAuditFailuresForLog, logGenerationAudit } from "../_shared/generation-audit-log.ts";
 import {
   enqueueSignatureDraftsForWeeks,
@@ -54,7 +41,6 @@ import {
 } from "../_shared/signature-draft-queue.ts";
 import { markUserNotesConsumed } from "../_shared/coach-notes.ts";
 import { buildProgramEvidenceContext } from "../_shared/program-evidence.ts";
-import { MODELS } from "../_shared/model-profiles.ts";
 import { buildTrainingDesignInput } from "../_shared/training-design-input.ts";
 import { type SkeletonOutput } from "../_shared/v3-output-schema.ts";
 import {
@@ -566,64 +552,26 @@ async function stageMetcons(
     engineActive: payload.engine_training != null,
   };
 
-  // Every composer emission is repaired at the boundary BEFORE any code reads
-  // into it: malformed shapes (missing movements array, junk rows — observed
-  // 2026-08-31 crashing this stage) become dropped pieces that the slot-
-  // coverage audit flags, never a stage crash. Then the Rest-row fact patch.
-  const composeRepaired = async (retryViolations?: string) => {
-    const raw = await callMetconComposer(inputs, {
-      model: MODELS.fable,
-      ...(retryViolations ? { retryViolations } : {}),
-    });
-    const { output, repairs } = repairComposerEmission(raw);
-    if (repairs.length) console.warn(`[generate-program-v3] composer emission repaired: ${repairs.join(" | ")}`);
-    const strippedRest = stripStructuralRestRows(output);
-    if (strippedRest > 0) console.log(`[generate-program-v3] stripped ${strippedRest} structural Rest row(s) from composed metcons`);
-    // Annotation-in-name repair (the Ashley failure, 2026-09-01): "Ring Row
-    // (Pull Up scaled)" is Ring Row wearing a label — trim to the legal name,
-    // keep the label in the stimulus note. Runs before the audit so a label
-    // never reaches the legality hard-fail.
-    const nameRepairs = trimComposedMovementAnnotations(output.metcons, tdi.vocabulary);
-    if (nameRepairs.length) console.warn(`[generate-program-v3] movement names repaired: ${nameRepairs.join(" | ")}`);
-    return { output, repairs: [...repairs, ...nameRepairs] };
-  };
-
-  let { output, repairs } = await composeRepaired();
-  let audit = auditMetconVariety(output, auditOpts);
-  let retried = false;
-  let firstPassViolations: string[] = [];
-  if (!audit.passed) {
-    retried = true;
-    firstPassViolations = audit.violations;
-    console.warn(`[generate-program-v3] metcon variety violations (retrying once): ${audit.violations.join(" | ")}`);
-    const retry = await composeRepaired(formatMetconVarietyViolationsForRetry(audit.violations));
-    output = retry.output;
-    repairs = [...repairs, ...retry.repairs];
-    audit = auditMetconVariety(output, auditOpts);
-    if (!audit.passed) {
-      // 2026-09-01 founder ruling — NOTHING content-shaped fails a job. A
-      // piece still illegal after the retry (banned / unknown / no-equipment
-      // movement) is DROPPED: its slot is rebuilt by the fill's own metcon
-      // fallback, the athlete gets a complete month, and the log names the
-      // movement. The old throw here killed three paid runs over "Ring Row".
-      const droppedPieces = dropIllegalComposedPieces(output, {
-        vocabulary: tdi.vocabulary,
-        doNotProgram: tdi.do_not_program,
-        equipment: tdi.equipment,
-      });
-      if (droppedPieces.length) {
-        console.warn(`[generate-program-v3] illegal composed pieces dropped (fill will rebuild their slots): ${droppedPieces.join(" | ")}`);
-        repairs = [...repairs, ...droppedPieces];
-        audit = auditMetconVariety(output, auditOpts);
-      }
-      if (!audit.passed) {
-        console.warn(`[generate-program-v3] metcon variety violations persist (accepting): ${audit.violations.join(" | ")}`);
-      }
-    }
-  }
-  if (audit.warnings.length) {
-    console.log(`[generate-program-v3] metcon variety warnings: ${audit.warnings.join(" | ")}`);
-  }
+  // WEEKLY MODE (PR 3, 2026-11-13): compose week 1 only; the weekly cron
+  // composes each later week against what is already written, with the
+  // athlete's notes in view. Monthly mode composes the whole month as before.
+  const slotsToCompose = rs.weekly ? slots.filter((sl) => sl.week_num === 1) : slots;
+  const { slots: _unusedSlots, ...inputsSansSlots } = inputs;
+  const { slots: _unusedAuditSlots, ...auditOptsSansSlots } = auditOpts;
+  const composed = await composeMetconsForSlots({
+    inputs: inputsSansSlots,
+    slots: slotsToCompose,
+    auditOpts: auditOptsSansSlots,
+    vocabulary: tdi.vocabulary,
+    doNotProgram: tdi.do_not_program,
+    equipment: tdi.equipment,
+    logPrefix: "[generate-program-v3]",
+  });
+  const output = { metcons: composed.pieces };
+  const audit = { violations: composed.violations, warnings: composed.warnings };
+  const retried = composed.retried;
+  const firstPassViolations = composed.firstPassViolations;
+  const repairs = composed.repairs;
   // Persist the outcome (findings-only: clean unretried months write nothing).
   await logGenerationAudit(supa, {
     user_id: job.user_id,
