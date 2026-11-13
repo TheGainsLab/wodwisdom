@@ -668,3 +668,15 @@ Cycle, VO2, Hyrox) week numbers — four weeks a month at the program's own
 cadence — so the existing week-boundary translation applies to every
 switch, sequencer on or off. A 12-month track has 48 weeks; from beyond
 that the athlete lands on its last day.
+
+### PR 1 built (2026-11-13): the fill reads the evidence
+
+`_shared/program-evidence.ts` (3 tests): the athlete's logs for the prior
+weeks of THIS program — per day, per block: movements with lifted vs
+prescribed load and RPE, metcon result and domain, skipped blocks with
+their reason, days not done, and a layoff line — summarised into the week
+fill's extra context with the rule: progress from what was lifted, not
+what was planned; not-done is not progressed from; skip reasons are data.
+Under monthly generation nothing is logged when the weeks are written, so
+the prompt is byte-identical today; the weekly cron (PR 4) is where it
+pays off. Notes were already in the payload (the notes build).
