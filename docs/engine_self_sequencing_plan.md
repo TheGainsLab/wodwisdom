@@ -680,3 +680,17 @@ what was planned; not-done is not progressed from; skip reasons are data.
 Under monthly generation nothing is logged when the weeks are written, so
 the prompt is byte-identical today; the weekly cron (PR 4) is where it
 pays off. Notes were already in the payload (the notes build).
+
+### PR 2 built (2026-11-13): one week at a time
+
+Behind `athlete_profiles.programming_weekly` (per-athlete opt-in; PR 5
+flips the default). Generation fills week 1 only; the skeleton's weeks 2-4
+are saved as OUTLINE rows (`program_workouts.status='outline'`, no blocks)
+and the month's skeleton + composed metcons are kept in
+`program_month_skeletons` for the weekly cron. `programs.weekly_mode`
+marks the program. The page renders outline weeks as rows (every block by
+rule, the primary lift, the metcon focus), the week row reads "written when
+you finish week N-1", a "This is a starting point" line sits above the
+weeks, and the notes box is under every week, outline weeks included. The
+skip-reason list gains "Too tired" and "Didn't want to". Audits and safety
+run on the one written week unchanged.

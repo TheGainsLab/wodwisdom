@@ -151,6 +151,12 @@ export interface SaveProgramV3Opts {
    *  month_number + a month-offset sort_order so multiple cycles coexist in one
    *  program and render under their own "Month N" section. Defaults to 1. */
   monthNumber?: number;
+  /** WEEKLY MODE (2026-11-13): `output` holds only the written week(s); every
+   *  skeleton week not in `output` is saved as an OUTLINE (program_workouts
+   *  status='outline', no blocks) so the page can show the shape, and the
+   *  skeleton + composed metcons are kept in program_month_skeletons so the
+   *  weekly cron can fill the later weeks. Sets programs.weekly_mode. */
+  weekly?: { composedMetcons?: unknown[] | null };
 }
 
 /**
@@ -220,9 +226,28 @@ export async function saveProgramV3(
         });
       }
     }
+    // Weekly mode: the skeleton's remaining weeks become outline rows.
+    const writtenWeeks = new Set(output.weeks.map((w) => w.week_num));
+    const outlineInserts: Array<Record<string, unknown>> = [];
+    if (opts.weekly && opts.skeleton) {
+      for (const skWeek of opts.skeleton.weeks) {
+        if (writtenWeeks.has(skWeek.week_num)) continue;
+        for (const skDay of skWeek.days) {
+          outlineInserts.push({
+            program_id: programId,
+            week_num: skWeek.week_num,
+            day_num: skDay.day_num,
+            month_number: monthNumber,
+            workout_text: null,
+            status: "outline",
+            sort_order: (monthNumber - 1) * 100 + (skWeek.week_num - 1) * 10 + skDay.day_num,
+          });
+        }
+      }
+    }
     const { data: workouts, error: wkErr } = await supa
       .from("program_workouts")
-      .insert(workoutInserts)
+      .insert([...workoutInserts, ...outlineInserts])
       .select("id, week_num, day_num");
     if (wkErr || !workouts) {
       throw new Error(`[save-v3] program_workouts insert failed: ${wkErr?.message ?? "unknown"}`);
@@ -352,6 +377,21 @@ export async function saveProgramV3(
       // append mode a failure here means continuation math would stall — surface it.
       if (appendMode) throw new Error(`[save-v3] generated_months bump failed: ${bumpErr.message}`);
       console.warn(`[save-v3] generated_months bump warning: ${bumpErr.message}`);
+    }
+
+    // Weekly mode: keep the month's skeleton + composed metcons for the later
+    // weeks' fills (and re-plans), and mark the program.
+    if (opts.weekly && opts.skeleton) {
+      const { error: skErr } = await supa
+        .from("program_month_skeletons")
+        .upsert({
+          program_id: programId,
+          month_number: monthNumber,
+          skeleton: opts.skeleton,
+          composed_metcons: opts.weekly.composedMetcons ?? null,
+        }, { onConflict: "program_id,month_number" });
+      if (skErr) throw new Error(`[save-v3] program_month_skeletons upsert failed: ${skErr.message}`);
+      await supa.from("programs").update({ weekly_mode: true }).eq("id", programId);
     }
 
     return programId;

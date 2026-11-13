@@ -1110,6 +1110,8 @@ export default function StartWorkoutPage({ session, sourceStateProp, onExit, onD
           <option value="crowded gym">Crowded gym</option>
           <option value="injury">Injury / pain</option>
           <option value="felt off">Felt off</option>
+          <option value="too tired">Too tired</option>
+          <option value="didn't want to">Didn&rsquo;t want to</option>
           <option value="substituted">Substituted</option>
           <option value="equipment">No equipment</option>
         </select>
