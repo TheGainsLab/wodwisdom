@@ -49,11 +49,33 @@ const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY_PIPELINE") ?? Deno.env
 // calibration, and causal reasoning; ~25¢/eval). The free eval is the
 // conversion artifact — pay for judgment here. Skeleton/week-fill unaffected.
 const MODEL = MODELS.fable;
+// 2026-11-13: the letters (summary, metcon_guidance, month_in_review) have
+// grown since 8000 was set; a cut-off tool call arrives as a partial input
+// whose lists are missing, which the audit crashed on ("cs.priorities.map
+// is not a function", 4 evals since 2026-09). Doubled, and the shape is
+// checked before the audit (see assertCoachStateShape).
+const MAX_TOKENS = 16000;
 
 interface ClaudeResponse {
   content?: Array<{ type?: string; name?: string; input?: unknown }>;
   stop_reason?: string;
   usage?: { input_tokens?: number; output_tokens?: number };
+}
+
+/** Lists the audit maps over. A cut-off or malformed tool input leaves one
+ *  undefined (or a non-array) and the audit threw a TypeError before the
+ *  violation-retry path could help. Returns the names of the broken fields;
+ *  empty = shape is sound. The audit still judges the CONTENT. */
+export function coachStateShapeProblems(input: Record<string, unknown>): string[] {
+  const problems: string[] = [];
+  for (const k of ["priorities", "maintain", "deprioritize"]) {
+    if (!Array.isArray(input[k])) problems.push(`${k} must be a list`);
+  }
+  for (const k of ["recovery_posture", "strength_emphasis"]) {
+    const v = input[k] as { reasons?: unknown } | undefined;
+    if (!v || typeof v !== "object" || !Array.isArray(v.reasons)) problems.push(`${k}.reasons must be a list`);
+  }
+  return problems;
 }
 
 /** One CoachState LLM call. Consumes payload.athlete_model (Step-1 facts) +
@@ -89,7 +111,7 @@ async function callCoachState(
       },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 8000,
+        max_tokens: MAX_TOKENS,
         stream: false,
         // Scoped addenda, composable: ENGINE rides only with completed-
         // session Engine evidence; TWO-DAY rides only at days_per_week = 2
@@ -123,16 +145,46 @@ async function callCoachState(
     throw new Error(`Claude HTTP ${resp.status}: ${body.slice(0, 500)}`);
   }
   const data = (await resp.json()) as ClaudeResponse;
+  console.log(
+    `[generate-coach-state] Claude stop_reason=${data.stop_reason} usage: input=${data.usage?.input_tokens} output=${data.usage?.output_tokens} (max_tokens=${MAX_TOKENS})`,
+  );
   const toolUse = (data.content ?? []).find(
     (b) => b.type === "tool_use" && b.name === "emit_coach_state",
   );
   if (!toolUse || typeof toolUse.input !== "object" || toolUse.input == null) {
     throw new Error(`Claude response missing emit_coach_state tool_use. stop_reason=${data.stop_reason}`);
   }
-  console.log(
-    `[generate-coach-state] Claude usage: input=${data.usage?.input_tokens} output=${data.usage?.output_tokens}`,
-  );
+  const problems = coachStateShapeProblems(toolUse.input as Record<string, unknown>);
+  if (data.stop_reason === "max_tokens" || problems.length) {
+    throw new CoachStateShapeError(
+      `coach_state tool input unusable (stop_reason=${data.stop_reason}): ${problems.join("; ") || "cut off"}`,
+      problems,
+    );
+  }
   return { ...(toolUse.input as CoachStateContent), coach_state_builder_version: COACH_STATE_BUILDER_VERSION };
+}
+
+/** A reply whose tool input cannot even be audited (cut off at max_tokens,
+ *  or a required list missing). Retried once with the problems named. */
+class CoachStateShapeError extends Error {
+  constructor(message: string, public readonly problems: string[]) {
+    super(message);
+  }
+}
+
+/** One call, retried once on an unusable shape. The retry tells the model
+ *  which fields were missing; a cut-off reply gets a "be concise" note. */
+async function callCoachStateChecked(payload: WriterPayload, retryViolations = ""): Promise<CoachStateContent> {
+  try {
+    return await callCoachState(payload, retryViolations);
+  } catch (e) {
+    if (!(e instanceof CoachStateShapeError)) throw e;
+    console.warn(`[generate-coach-state] ${e.message} — retrying once`);
+    const note = e.problems.length
+      ? `YOUR PREVIOUS REPLY WAS REJECTED — required fields were missing or malformed: ${e.problems.join("; ")}. Emit the complete emit_coach_state input with every required list present.`
+      : "YOUR PREVIOUS REPLY WAS CUT OFF before the tool input completed. Emit the complete emit_coach_state input; keep the summary, metcon_guidance and month_in_review within their stated lengths.";
+    return await callCoachState(payload, retryViolations ? `${note}\n\n${retryViolations}` : note);
+  }
 }
 
 export interface GenerateCoachStateResult {
@@ -183,13 +235,13 @@ export async function generateAndPersistCoachState(
   // Generate + audit, one retry on violations. Violations are quality defects,
   // not fatal: a second-attempt failure is logged and accepted (evals must
   // ship; the audit trail is the fix signal).
-  let content = await callCoachState(payload);
+  let content = await callCoachStateChecked(payload);
   const audit = auditCoachState(content, payload);
   if (!audit.passed) {
     console.warn(
       `[generate-coach-state] audit violations (retrying once): ${audit.violations.join(" | ")}`,
     );
-    content = await callCoachState(payload, formatCoachStateViolationsForRetry(audit.violations));
+    content = await callCoachStateChecked(payload, formatCoachStateViolationsForRetry(audit.violations));
     const retryAudit = auditCoachState(content, payload);
     if (!retryAudit.passed) {
       console.warn(
