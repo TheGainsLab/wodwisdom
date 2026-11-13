@@ -536,15 +536,25 @@ they find out; each later week is written from their reaction. So:
 - The goal stays the long-term signal; the recurring-note promotion feeds
   it from what people actually ask for.
 
-Writer's weekly allowance (the remit, enforced by audits):
+Writer's weekly allowance (the remit, enforced by audits) — founder,
+2026-11-13: EVERY BLOCK, EVERY DAY, BY RULE. "If we leave something out,
+the user will say you left out a thing I wanted and cancel. If we put it
+there and they chose not to do it, that's not as bad." The skeleton's
+block set is both floor and ceiling; a note changes what is INSIDE a
+block, never whether it exists.
 - On its own, from logs: loads, volume, which lifts/skills fill a block,
   metcon length within the week's domain mix, movement families,
   intensity placement across the week.
-- On a note: add or drop one block per week, swap a day's emphasis, shift
-  one metcon a domain longer/shorter, choose metcon movements toward the
-  note.
-- Never: the day count, the week's primary focus, the month's priorities,
-  the avoid list.
+- On a note: the emphasis inside a block (more lifting in strength, snatch
+  technique in skills), metcon movements and a domain shift for one
+  piece, within the day's block set.
+- Never: block presence, the day count, the week's primary focus, the
+  month's priorities, the avoid list.
+- SKIP THIS BLOCK (to build with the weekly UI): one tap on a block with an
+  optional reason ("too tired", "no time", "didn't want to"); the day
+  still logs. Skips are data: the fill reads them (no time → session
+  length; too tired → load; didn't want to → a note by another name) and
+  the Coach can raise the pattern.
 
 Both products work the same way: an ordered sequence consumed by LOGGING.
 The calendar is a reference some athletes use and others ignore; nothing
