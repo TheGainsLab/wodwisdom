@@ -562,6 +562,7 @@ function TierCard({
   lockPitch,
   onUpgrade,
   highlight = false,
+  held,
   children,
 }: {
   tierNumber: 1 | 2 | 3;
@@ -590,17 +591,23 @@ function TierCard({
   /** "You are here" — accent border on the current (incomplete, unlocked)
    *  step. Sections arrive collapsed; this marks where to dig in. */
   highlight?: boolean;
+  /** Held = entitled but not yet in order (founder, 2026-11-13: step 3
+   *  waits for the evaluation). Muted like `locked`, cannot be opened, and
+   *  the message replaces the preview line — but no pitch and no upgrade
+   *  button: the user already pays, they just have a step to run first. */
+  held?: string;
   children: React.ReactNode;
 }) {
-  const [internalExpanded, setInternalExpanded] = useState(defaultExpanded && !locked);
+  const [internalExpanded, setInternalExpanded] = useState(defaultExpanded && !locked && !held);
   const isControlled = controlledExpanded !== undefined;
-  const expanded = isControlled ? controlledExpanded : internalExpanded;
+  const expanded = (isControlled ? controlledExpanded : internalExpanded) && !held;
   const setExpanded = (updater: (prev: boolean) => boolean) => {
+    if (held) return;
     const next = updater(expanded);
     if (!isControlled) setInternalExpanded(next);
     onToggle?.(next);
   };
-  const accent = locked
+  const accent = locked || held
     ? 'var(--text-muted)'
     : status.complete
       ? '#2ec486'
@@ -610,8 +617,8 @@ function TierCard({
       className="settings-card"
       ref={cardRef}
       style={{
-        borderColor: locked ? 'var(--border)' : status.complete ? '#2ec486' : highlight ? 'var(--accent)' : undefined,
-        opacity: locked ? 0.75 : 1,
+        borderColor: locked || held ? 'var(--border)' : status.complete ? '#2ec486' : highlight ? 'var(--accent)' : undefined,
+        opacity: locked || held ? 0.75 : 1,
       }}
     >
       <button
@@ -627,7 +634,7 @@ function TierCard({
           background: 'none',
           border: 'none',
           color: 'inherit',
-          cursor: 'pointer',
+          cursor: held ? 'default' : 'pointer',
           fontFamily: 'inherit',
           textAlign: 'left',
         }}
@@ -650,10 +657,12 @@ function TierCard({
           </div>
           <h2 className="settings-card-title" style={{ marginBottom: 2 }}>{title}</h2>
           <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
-            {locked && lockMessage ? lockMessage : unlocks}
+            {held ? held : locked && lockMessage ? lockMessage : unlocks}
           </div>
         </div>
-        <span style={{ fontSize: 14, color: 'var(--text-dim)', flexShrink: 0, marginLeft: 12 }}>{expanded ? '▲' : '▼'}</span>
+        {!held && (
+          <span style={{ fontSize: 14, color: 'var(--text-dim)', flexShrink: 0, marginLeft: 12 }}>{expanded ? '▲' : '▼'}</span>
+        )}
       </button>
       {expanded && (
         <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -2285,6 +2294,15 @@ export default function AthletePage({ session }: { session: Session }) {
                   expanded={t3Expanded}
                   onToggle={setT3Expanded}
                   locked={!isAdmin && !hasFeature('programming')}
+                  // Entitled, no evaluation yet, step 3 never filled: hold it.
+                  // The program is built from the evaluation, so the order is
+                  // eval → step 3 → Generate; before this the card stayed open
+                  // and the Generate line sent people to step 3 first.
+                  held={
+                    !isAdmin && hasFeature('programming') && evaluations.length === 0 && !savedStatus.tier3.complete
+                      ? 'Run your evaluation first — Step 3 opens after it.'
+                      : undefined
+                  }
                   lockMessage="Requires AI Programming or All Access subscription"
                   lockPitch={
                     <div style={{ marginBottom: 12 }}>
@@ -2795,10 +2813,12 @@ export default function AthletePage({ session }: { session: Session }) {
                   // are spent. Client-side only; admins bypass for test flows.
                   const evalMissing = !isAdmin && evaluations.length === 0;
                   const disabled = generateLoading || tierBlocked || evalMissing;
-                  const genTitle = tierBlocked
-                    ? 'Complete Step 3 to Generate.'
-                    : evalMissing
-                      ? 'Run your free evaluation first — your program is built from it.'
+                  // Evaluation first, then step 3 — the same order the cards
+                  // enforce (step 3 is held until an evaluation exists).
+                  const genTitle = evalMissing
+                    ? 'Run your evaluation first — your program is built from it.'
+                    : tierBlocked
+                      ? 'Complete Step 3 to Generate.'
                       : undefined;
                   // Ready = entitled, tier-complete, evaluated, not generating.
                   // The old surface2 styling made an ARMED button look dormant —
