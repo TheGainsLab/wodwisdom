@@ -229,7 +229,9 @@ export async function callWeekFill(
       ? "- Metcons for days listed in COMPOSED METCONS are PRE-COMPOSED: emit each EXACTLY — same movements, same scheme, same format, same duration. Your job on those is exact loads from the athlete's 1RMs, calories/distances from their pacing, and the typed per-movement fields. NEVER redesign, swap, add, or drop a composed movement. If a metcon day is NOT in the list (its piece was removed), compose that day's metcon YOURSELF from the skeleton's metcon_focus and the athlete's allowed movements — distinct from the composed pieces, expected time inside the focus window."
       : "- The metcon's EXPECTED completion time must land inside the skeleton's stated metcon_focus window; a time cap may sit above it as a ceiling, never below.",
     priorWeeks.length > 0
-      ? `- PROGRESS from the prior weeks below per the month_plan's arc (add load/volume, advance schemes) — do NOT copy them verbatim.`
+      ? `- PROGRESS from the prior weeks below per the month_plan's arc (add load/volume, advance schemes) — do NOT copy them verbatim. ` +
+        `When a WHAT THE ATHLETE ACTUALLY DID block is present above, it OUTRANKS the prior weeks as written: progress from the loads ` +
+        `that were lifted and the results that were logged; do not progress from a day or block that was not done.`
       : `- This is week 1 — set the cycle's opening baseline.`,
     ...((payload.training_context.coach_notes ?? []).length > 0
       ? [`- ATHLETE'S NOTES FOR THEIR COACH (honour within the skeleton's day types and the composed metcons — emphasis, volume and movement choice, never day count, never over an injury): ${(payload.training_context.coach_notes ?? []).map((n) => `"${n}"`).join("; ")}`]

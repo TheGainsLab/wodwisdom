@@ -514,13 +514,54 @@ assessment month if asked.
 
 ### Programming week by week — design (decided 2026-11-12, NOT BUILT)
 
+THE PRINCIPLE (founder, 2026-11-13): users don't always know what they
+want. They state goals, get a program, and it's not what they thought they
+wanted, so they complain ("I need more weightlifting", "more long
+metcons"). Weekly generation is the way to deal with that tension. The
+skeleton is a HYPOTHESIS about what the athlete wants; week one is where
+they find out; each later week is written from their reaction. So:
+- The writer's remit is generous. On a note the next week must move
+  VISIBLY: add/drop a block, swap a day's emphasis, shift a metcon a
+  domain, choose the lifts and skills, lengthen or shorten. Audits protect
+  the month's arc and the day count; within them the writer moves.
+- Metcons are COMPOSED PER WEEK (reversing the monthly-composition call),
+  so metcon notes land the next week too; the variety audit becomes a
+  running check against the weeks already written (no movement look-ahead
+  — the only thing given up).
+- The product expects disagreement: week one lands with "This is a
+  starting point — tell your coach what you'd change and next week is
+  written from it."
+- The re-plan ("re-plan the rest of this month") is the normal answer when
+  the hypothesis was wrong, not an edge case: it ships with the cron.
+- The goal stays the long-term signal; the recurring-note promotion feeds
+  it from what people actually ask for.
+
+Writer's weekly allowance (the remit, enforced by audits) — founder,
+2026-11-13: EVERY BLOCK, EVERY DAY, BY RULE. "If we leave something out,
+the user will say you left out a thing I wanted and cancel. If we put it
+there and they chose not to do it, that's not as bad." The skeleton's
+block set is both floor and ceiling; a note changes what is INSIDE a
+block, never whether it exists.
+- On its own, from logs: loads, volume, which lifts/skills fill a block,
+  metcon length within the week's domain mix, movement families,
+  intensity placement across the week.
+- On a note: the emphasis inside a block (more lifting in strength, snatch
+  technique in skills), metcon movements and a domain shift for one
+  piece, within the day's block set.
+- Never: block presence, the day count, the week's primary focus, the
+  month's priorities, the avoid list.
+- SKIP THIS BLOCK (to build with the weekly UI): one tap on a block with an
+  optional reason ("too tired", "no time", "didn't want to"); the day
+  still logs. Skips are data: the fill reads them (no time → session
+  length; too tired → load; didn't want to → a note by another name) and
+  the Coach can raise the pattern.
+
 Both products work the same way: an ordered sequence consumed by LOGGING.
 The calendar is a reference some athletes use and others ignore; nothing
 is keyed to dates ("users will do the workouts when they want").
 
 Cycle: Build → skeleton for the month (intent, arc, each week's focus and
-day types) → metcons COMPOSED FOR THE MONTH (variety audit stays monthly;
-movements and schemes fixed, loads not) → week 1 filled, audited, saved →
+day types) → week 1's metcons composed and week 1 filled, audited, saved →
 weeks 2–4 shown as the skeleton's OUTLINE (day types + focus, no loads, no
 Start, "written when you finish week 1, from what you lift this week").
 
@@ -627,3 +668,15 @@ Cycle, VO2, Hyrox) week numbers — four weeks a month at the program's own
 cadence — so the existing week-boundary translation applies to every
 switch, sequencer on or off. A 12-month track has 48 weeks; from beyond
 that the athlete lands on its last day.
+
+### PR 1 built (2026-11-13): the fill reads the evidence
+
+`_shared/program-evidence.ts` (3 tests): the athlete's logs for the prior
+weeks of THIS program — per day, per block: movements with lifted vs
+prescribed load and RPE, metcon result and domain, skipped blocks with
+their reason, days not done, and a layoff line — summarised into the week
+fill's extra context with the rule: progress from what was lifted, not
+what was planned; not-done is not progressed from; skip reasons are data.
+Under monthly generation nothing is logged when the weeks are written, so
+the prompt is byte-identical today; the weekly cron (PR 4) is where it
+pays off. Notes were already in the payload (the notes build).

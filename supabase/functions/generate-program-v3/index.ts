@@ -53,6 +53,7 @@ import {
   triggerDraftWorker,
 } from "../_shared/signature-draft-queue.ts";
 import { markUserNotesConsumed } from "../_shared/coach-notes.ts";
+import { buildProgramEvidenceContext } from "../_shared/program-evidence.ts";
 import { MODELS } from "../_shared/model-profiles.ts";
 import { buildTrainingDesignInput } from "../_shared/training-design-input.ts";
 import { type SkeletonOutput } from "../_shared/v3-output-schema.ts";
@@ -648,7 +649,15 @@ async function stageFillWeek(
   const skeleton = rs.skeleton!;
   const priorWeeks = rs.weeks ?? [];
   const weekMetcons = (rs.composedMetcons ?? []).filter((m) => m.week_num === weekNum);
-  const wk = await callWeekFill(payload, skeleton, weekNum, priorWeeks, "", PACK, weekMetcons);
+  // What the athlete actually did in the prior weeks of THIS program (weekly
+  // model, PR 1): lifted loads, results, skipped blocks with reasons, days
+  // not done, layoffs. "" when nothing is logged yet — which is every week
+  // under monthly generation, so today's prompt is byte-identical. The
+  // weekly cron is where this pays off.
+  const evidence = await buildProgramEvidenceContext(
+    supa, job.user_id, rs.continuation.programId ?? null, weekNum,
+  );
+  const wk = await callWeekFill(payload, skeleton, weekNum, priorWeeks, evidence, PACK, weekMetcons);
   // Render every header from scheme_format + rows BEFORE audits/benchmarks —
   // downstream stages read block_scheme text and must see the final strings.
   renderWeekSchemesInPlace(wk);
