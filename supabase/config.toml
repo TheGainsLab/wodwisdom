@@ -315,3 +315,6 @@ verify_jwt = false
 
 [functions.checkout-claim-account]
 verify_jwt = false
+
+[functions.weekly-programming-cron]
+verify_jwt = false

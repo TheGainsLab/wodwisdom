@@ -156,7 +156,17 @@ export interface SaveProgramV3Opts {
    *  status='outline', no blocks) so the page can show the shape, and the
    *  skeleton + composed metcons are kept in program_month_skeletons so the
    *  weekly cron can fill the later weeks. Sets programs.weekly_mode. */
-  weekly?: { composedMetcons?: unknown[] | null };
+  weekly?: {
+    composedMetcons?: unknown[] | null;
+    /** A WEEK JOB (PR 4): `output` holds ONE later week. Its outline rows are
+     *  replaced by written rows; generated_months is not bumped; no outline
+     *  rows are created for weeks already present; the store's written_weeks
+     *  and composed_metcons are updated; outline rows for weeks AFTER this
+     *  one are refreshed from `skeleton` (a re-plan may have changed them). */
+    weekAppend?: boolean;
+    /** The skeleton to store (a re-plan replaces the stored one). */
+    skeletonToStore?: SkeletonOutput | null;
+  };
 }
 
 /**
@@ -226,12 +236,31 @@ export async function saveProgramV3(
         });
       }
     }
-    // Weekly mode: the skeleton's remaining weeks become outline rows.
+    // Weekly mode: the skeleton's remaining weeks become outline rows. A week
+    // job first clears this week's outline rows (replaced by written ones) and
+    // every LATER week's outline rows (a re-plan may have reshaped them), then
+    // re-creates the later ones from the skeleton it is storing.
     const writtenWeeks = new Set(output.weeks.map((w) => w.week_num));
     const outlineInserts: Array<Record<string, unknown>> = [];
-    if (opts.weekly && opts.skeleton) {
-      for (const skWeek of opts.skeleton.weeks) {
-        if (writtenWeeks.has(skWeek.week_num)) continue;
+    const outlineSkeleton = opts.weekly?.weekAppend ? (opts.weekly.skeletonToStore ?? opts.skeleton) : opts.skeleton;
+    if (opts.weekly?.weekAppend) {
+      const minWeek = Math.min(...output.weeks.map((w) => w.week_num));
+      const { error: delErr } = await supa
+        .from("program_workouts")
+        .delete()
+        .eq("program_id", programId)
+        .eq("month_number", monthNumber)
+        .eq("status", "outline")
+        .gte("week_num", minWeek);
+      if (delErr) throw new Error(`[save-v3] outline rows delete failed: ${delErr.message}`);
+    }
+    if (opts.weekly && outlineSkeleton) {
+      const { data: existingRows } = opts.weekly.weekAppend
+        ? await supa.from("program_workouts").select("week_num").eq("program_id", programId).eq("month_number", monthNumber)
+        : { data: [] as Array<{ week_num: number }> };
+      const alreadyPresent = new Set((existingRows ?? []).map((r) => r.week_num as number));
+      for (const skWeek of outlineSkeleton.weeks) {
+        if (writtenWeeks.has(skWeek.week_num) || alreadyPresent.has(skWeek.week_num)) continue;
         for (const skDay of skWeek.days) {
           outlineInserts.push({
             program_id: programId,
@@ -367,7 +396,7 @@ export async function saveProgramV3(
     // Record how many cycles this program now has. Set for BOTH paths: first
     // cycle → 1 (so continuation math nextMonth = generated_months + 1 works),
     // append → the new month number. Only ever raises.
-    const { error: bumpErr } = await supa
+    const { error: bumpErr } = opts.weekly?.weekAppend ? { error: null } : await supa
       .from("programs")
       .update({ generated_months: monthNumber }) // NB: programs has no updated_at column
       .eq("id", programId)
@@ -381,14 +410,28 @@ export async function saveProgramV3(
 
     // Weekly mode: keep the month's skeleton + composed metcons for the later
     // weeks' fills (and re-plans), and mark the program.
-    if (opts.weekly && opts.skeleton) {
+    if (opts.weekly && (opts.weekly.skeletonToStore ?? opts.skeleton)) {
+      let writtenWeeksToStore: unknown[] = output.weeks;
+      if (opts.weekly.weekAppend) {
+        const { data: prev } = await supa
+          .from("program_month_skeletons").select("written_weeks")
+          .eq("program_id", programId).eq("month_number", monthNumber).maybeSingle();
+        const prior = (prev?.written_weeks as unknown[] | null) ?? [];
+        const newNums = new Set(output.weeks.map((w) => w.week_num));
+        writtenWeeksToStore = [
+          ...prior.filter((w) => !newNums.has((w as { week_num: number }).week_num)),
+          ...output.weeks,
+        ].sort((a, b) => (a as { week_num: number }).week_num - (b as { week_num: number }).week_num);
+      }
       const { error: skErr } = await supa
         .from("program_month_skeletons")
         .upsert({
           program_id: programId,
           month_number: monthNumber,
-          skeleton: opts.skeleton,
+          skeleton: opts.weekly.skeletonToStore ?? opts.skeleton,
           composed_metcons: opts.weekly.composedMetcons ?? null,
+          written_weeks: writtenWeeksToStore,
+          last_fill_error: null,
         }, { onConflict: "program_id,month_number" });
       if (skErr) throw new Error(`[save-v3] program_month_skeletons upsert failed: ${skErr.message}`);
       await supa.from("programs").update({ weekly_mode: true }).eq("id", programId);
