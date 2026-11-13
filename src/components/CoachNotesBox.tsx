@@ -66,7 +66,7 @@ export default function CoachNotesBox({ notes, programId, weekNum, onChange, com
       <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>Tell your coach about this week</div>
       <div style={{ fontSize: 12, color: 'var(--text-muted)', margin: '2px 0 8px', lineHeight: 1.5 }}>
         More or less of anything. Read before your next days are written — the Engine&rsquo;s next block within days,
-        your next AI Programming month when it&rsquo;s built. Written days don&rsquo;t change; to adjust one now, open it and ask the coach.
+        your next Programming week after this week&rsquo;s last day is logged. Written days don&rsquo;t change; to adjust one now, open it and ask the coach.
       </div>
       <div style={{ display: 'flex', gap: 8 }}>
         <input

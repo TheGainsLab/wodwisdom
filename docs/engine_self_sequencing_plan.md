@@ -730,3 +730,11 @@ stage composes week 1 only; monthly mode is unchanged.
   the athlete's next month is weekly.
 - Not built: filling the moment the last day is logged (the cron's hourly
   tick is the only trigger for now).
+
+### PR 5 built (2026-11-13): rollout and the Coach
+
+Weekly is the default (PR 4's migration); existing programs finish their
+month as written and the next month is weekly (per-program `weekly_mode`).
+The Coach's product knowledge now describes the weekly model: outline
+weeks, the last-day gate, notes vs re-plan, written weeks don't change. The
+notes box and card say "next week" rather than "next month".

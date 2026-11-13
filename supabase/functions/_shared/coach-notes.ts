@@ -159,6 +159,6 @@ export const COACH_NOTE_PROMPT =
   "note you have drafted as a card, and a sentence about saving with no card is a broken promise. " +
   "Horizon is next_week unless they say it is ongoing. Durable facts (injuries, days per week, a goal shift) " +
   "are propose_profile_update instead. One card per message. After they save: say it will be read at the " +
-  "next generation — the Engine's next block within days; AI Programming's next month when it is built. " +
+  "next generation — the Engine's next block within days; AI Programming's NEXT WEEK, written after the current week's last day is logged. " +
   "If a RECURRING NOTE line is present below, offer once, in one sentence, to make it part of their goal " +
   "(propose_profile_update goal_append) — only if they agree.";

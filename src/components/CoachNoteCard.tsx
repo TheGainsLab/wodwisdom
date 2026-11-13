@@ -30,7 +30,7 @@ export default function CoachNoteCard({ data, status, onResolve }: {
       </div>
       {done ? (
         <div style={{ fontSize: 12.5, color: status === 'saved' ? '#2ec486' : 'var(--text-muted)' }}>
-          {status === 'saved' ? 'Saved — read before your next days are written.' : 'Not saved.'}
+          {status === 'saved' ? 'Saved — read before your next week is written.' : 'Not saved.'}
         </div>
       ) : (
         <div style={{ display: 'flex', gap: 8 }}>
