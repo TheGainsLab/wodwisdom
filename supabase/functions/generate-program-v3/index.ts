@@ -242,9 +242,16 @@ async function stagePayloadBuilding(
     `[generate-program-v3] payload built (days_per_week=${payload.training_context.days_per_week} competition_linked=${payload.competition != null} vocabulary_size=${payload.vocabulary.length} engine_evidence=${payload.engine_training != null})`,
   );
 
+  // WEEKLY MODE opt-in (2026-11-13): week 1 filled, weeks 2-4 as outline,
+  // the weekly cron fills the rest. Per-athlete while it rolls out.
+  const { data: weeklyRow } = await supa
+    .from("athlete_profiles").select("programming_weekly").eq("user_id", userId).maybeSingle();
+  const weekly = weeklyRow?.programming_weekly === true;
+  if (weekly) console.log(`[generate-program-v3] weekly mode for ${userId}`);
+
   return {
     next: "coach_state",
-    resumeState: { ...rs, payload, startedAtMs: rs.startedAtMs ?? Date.now() },
+    resumeState: { ...rs, payload, weekly, startedAtMs: rs.startedAtMs ?? Date.now() },
     displayStage: "payload_built",
   };
 }
@@ -696,7 +703,9 @@ async function stageFillWeek(
     }
   }
   const weeks = [...priorWeeks, wk];
-  const next: Stage = weekNum < 4 ? (`fill_week_${weekNum + 1}` as Stage) : "benchmark_audit";
+  // Weekly mode: only week 1 is written now; the rest are outline until the
+  // athlete trains it (weekly cron).
+  const next: Stage = (rs.weekly || weekNum >= 4) ? "benchmark_audit" : (`fill_week_${weekNum + 1}` as Stage);
   return { next, resumeState: { ...rs, weeks }, displayStage: next };
 }
 
@@ -940,6 +949,7 @@ async function stageSaving(
         skeleton,
         programId, // always append mode in the dispatcher (shell pre-created for first-cycle)
         monthNumber,
+        ...(rs.weekly ? { weekly: { composedMetcons: rs.composedMetcons ?? null } } : {}),
       });
       console.log(`[generate-program-v3] saved program ${programId} (month ${monthNumber})`);
       // The month was written with the athlete's "tell your coach" notes in

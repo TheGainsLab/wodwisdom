@@ -134,6 +134,10 @@ export interface ResumeState {
   /** Append-vs-create + which month. Seeded at kickoff BEFORE stage 1, because
    *  payload_building needs monthNumber for buildWriterPayload. */
   continuation: { programId: string | null; monthNumber: number };
+  /** WEEKLY MODE (2026-11-13): fill week 1 only; save weeks 2-4 as outline;
+   *  the weekly cron fills the rest. Read from athlete_profiles.programming_weekly
+   *  in payload_building. */
+  weekly?: boolean;
   /** Built once in payload_building — rebuilding re-fires parse-injuries +
    *  re-hits the DB and can drift. */
   payload?: WriterPayload;

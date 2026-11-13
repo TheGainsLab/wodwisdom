@@ -29,6 +29,23 @@ interface ProgramWorkout {
   workout_text: string;
   sort_order: number;
   day_type?: string | null;
+  month_number?: number | null;
+  /** 'outline' = the skeleton's shape only, written when the previous week is
+   *  consumed (weekly Programming); 'written' = blocks exist. */
+  status?: 'written' | 'outline' | null;
+}
+
+/** One skeleton day, for rendering an outline row (weekly Programming). */
+interface SkeletonDayOutline {
+  block_types?: string[];
+  primary_lift?: string;
+  metcon_focus?: string;
+  skill_focus?: string;
+  day_intent?: string;
+}
+interface MonthSkeletonRow {
+  month_number: number;
+  skeleton: { weeks?: Array<{ week_num: number; focus?: string; days?: Array<SkeletonDayOutline & { day_num: number }> }> };
 }
 
 // v3 structured data shapes — fetched from program_blocks_v2 +
@@ -207,6 +224,14 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
   // "Tell your coach" notes (founder, 2026-11-12): written under a week's
   // days, surfaced in the collapsed row and a one-line summary up top.
   const [coachNotes, setCoachNotes] = useState<CoachNote[]>([]);
+  const [monthSkeletons, setMonthSkeletons] = useState<MonthSkeletonRow[]>([]);
+  const skeletonDay = (w: ProgramWorkout): (SkeletonDayOutline & { weekFocus?: string }) | null => {
+    const m = monthSkeletons.find((r) => r.month_number === (w.month_number ?? 1));
+    const wk = m?.skeleton?.weeks?.find((x) => x.week_num === w.week_num);
+    const d = wk?.days?.find((x) => x.day_num === w.day_num);
+    return d ? { ...d, weekFocus: wk?.focus } : null;
+  };
+  const OUTLINE_LABEL: Record<string, string> = { strength: 'Strength', skills: 'Skills', accessory: 'Accessory', metcon: 'Metcon', cardio: 'Cardio', warmup: 'Warm-up', cooldown: 'Cool-down', other: 'Other' };
   const [notesOpen, setNotesOpen] = useState(false);
   useEffect(() => {
     loadCoachNotes().then(setCoachNotes).catch(() => {});
@@ -218,6 +243,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
     generated_months?: number;
     program_version?: string;
     month_plan?: unknown;
+    weekly_mode?: boolean | null;
   } | null>(null);
   const [allWorkouts, setAllWorkouts] = useState<ProgramWorkout[]>([]);
   const [completedWorkoutIds, setCompletedWorkoutIds] = useState<Set<string>>(new Set());
@@ -489,7 +515,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
     setLoading(true);
     const { data: prog, error: progErr } = await supabase
       .from('programs')
-      .select('id, name, source, generated_months, program_version, month_plan')
+      .select('id, name, source, generated_months, program_version, month_plan, weekly_mode')
       .eq('id', id)
       .eq('user_id', session.user.id)
       .single();
@@ -502,10 +528,18 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
     setProgram(prog);
     const { data: wk } = await supabase
       .from('program_workouts')
-      .select('id, week_num, day_num, workout_text, sort_order, month_number, day_type')
+      .select('id, week_num, day_num, workout_text, sort_order, month_number, day_type, status')
       .eq('program_id', id)
       .order('sort_order');
     setAllWorkouts(wk || []);
+    // Weekly Programming: the month's skeleton renders the outline weeks.
+    if ((wk ?? []).some((w) => w.status === 'outline')) {
+      const { data: sk } = await supabase
+        .from('program_month_skeletons')
+        .select('month_number, skeleton')
+        .eq('program_id', id);
+      setMonthSkeletons((sk ?? []) as MonthSkeletonRow[]);
+    }
 
     if (!wk?.length) {
       setCompletedWorkoutIds(new Set());
@@ -816,6 +850,11 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                     </div>
                   </div>
                 )}
+                {program?.weekly_mode && (
+                  <div style={{ margin: '10px 0 2px', padding: '10px 14px', border: '1px dashed var(--border)', borderRadius: 10, fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.5 }}>
+                    <strong style={{ color: 'var(--text)' }}>This is a starting point.</strong> Week 1 is written; the weeks after it are written one at a time from how you train and what you tell your coach. Tell your coach what you&rsquo;d change and next week is written from it.
+                  </div>
+                )}
                 {/* "Tell your coach" notes live under each week's days; this is
                     only the reminder that some exist, with the list behind it. */}
                 {coachNotes.length > 0 && (
@@ -980,10 +1019,50 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                           <span>Week {week.weekNum}</span>
                           <span style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 600 }}>
                             {(() => { const c = coachNotes.filter((n) => n.week_num === week.weekNum).length; return c > 0 ? `${c} note${c === 1 ? '' : 's'} · ` : ''; })()}
-                            {doneCount}/{week.days.length} logged {weekOpen ? '▲' : '▼'}
+                            {week.days.every((d) => d.status === 'outline')
+                              ? `written when you finish week ${week.weekNum - 1} ${weekOpen ? '▲' : '▼'}`
+                              : `${doneCount}/${week.days.length} logged ${weekOpen ? '▲' : '▼'}`}
                           </span>
                         </button>
+                        {weekOpen && week.days.every((d) => d.status === 'outline') && (() => {
+                          const first = skeletonDay(week.days[0]);
+                          return (
+                            <div style={{ padding: '10px 14px 2px', fontSize: 12.5, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                              {first?.weekFocus ? <span style={{ color: 'var(--text-dim)' }}>{first.weekFocus}. </span> : null}
+                              Every block is here by rule. Loads, movements and metcons are written from how week {week.weekNum - 1} goes — and from any note you leave below.
+                            </div>
+                          );
+                        })()}
                         {weekOpen && week.days.map((w) => {
+                          if (w.status === 'outline') {
+                            const sk = skeletonDay(w);
+                            const parts = (sk?.block_types ?? []).map((bt) => {
+                              const label = OUTLINE_LABEL[bt] ?? bt;
+                              if (bt === 'strength' && sk?.primary_lift) return `${label}: ${sk.primary_lift}`;
+                              if (bt === 'metcon' && sk?.metcon_focus) return `${label}: ${sk.metcon_focus.split(/[.;—]/)[0].trim().toLowerCase()}`;
+                              return label;
+                            });
+                            return (
+                              <div key={w.id} className="program-day-row" style={{ opacity: 0.8 }}>
+                                <div className="program-day-headrow">
+                                  <div className="program-day-header" style={{ cursor: 'default' }}>
+                                    <div className="program-day-left">
+                                      <div className="program-day-top-row">
+                                        <span className="program-day-dot" />
+                                        <span className="program-day-label">Day {w.day_num}</span>
+                                        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', color: 'var(--text-muted)', border: '1px solid var(--border)', borderRadius: 999, padding: '1px 7px' }}>outline</span>
+                                      </div>
+                                      <div className="program-day-summary-lines">
+                                        <div className="program-day-summary-line">
+                                          <span className="program-day-summary-text">{parts.length ? parts.join(' · ') : (sk?.day_intent ?? 'Written when the previous week is finished.')}</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          }
                           const rawIp = inProgressWorkouts.get(w.id);
                           // Treat an in-progress log whose savedCount has reached
                           // totalBlocks as completed in the UI, even if the server
