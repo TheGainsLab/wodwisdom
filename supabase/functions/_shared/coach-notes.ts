@@ -155,6 +155,8 @@ export const COACH_NOTE_PROMPT =
   "equipment for a while — draft a note with propose_coach_note. The athlete sees a card with the note and " +
   "Save / Not now; NOTHING is saved unless they tap Save. A saved note is read before every Engine block and " +
   "every AI-Programming generation; it shapes emphasis, dose and movement choice, never the day count. " +
+  "ALWAYS call the tool — never write 'save that note' or 'I'll note that' in text: the athlete can only save a " +
+  "note you have drafted as a card, and a sentence about saving with no card is a broken promise. " +
   "Horizon is next_week unless they say it is ongoing. Durable facts (injuries, days per week, a goal shift) " +
   "are propose_profile_update instead. One card per message. After they save: say it will be read at the " +
   "next generation — the Engine's next block within days; AI Programming's next month when it is built. " +
