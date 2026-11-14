@@ -1122,11 +1122,17 @@ Deno.serve(async (req) => {
           .maybeSingle();
 
         if (program) {
-          const { data: programWorkouts } = await supa
+          // Weekly Programming: outline rows (status='outline') are the
+          // month's shape, not days the athlete can do — they would count
+          // in "x of y days" and become "Current" once week 1 is logged.
+          // Read written days only; name the outline weeks separately.
+          const { data: allRows } = await supa
             .from("program_workouts")
-            .select("id, week_num, day_num, sort_order")
+            .select("id, week_num, day_num, sort_order, status")
             .eq("program_id", program.id)
             .order("sort_order");
+          const programWorkouts = (allRows ?? []).filter((w: { status?: string | null }) => w.status !== "outline");
+          const outlineWeeks = [...new Set((allRows ?? []).filter((w: { status?: string | null }) => w.status === "outline").map((w: { week_num: number }) => w.week_num))].sort((a, b) => a - b);
 
           if (programWorkouts && programWorkouts.length > 0) {
             const workoutIds = programWorkouts.map((w: { id: string }) => w.id);
@@ -1147,6 +1153,9 @@ Deno.serve(async (req) => {
             parts.push(`Progress: ${completedDays} of ${totalDays} days completed`);
             if (currentWorkout) {
               parts.push(`Current: Week ${currentWorkout.week_num}, Day ${currentWorkout.day_num}`);
+            }
+            if (outlineWeeks.length) {
+              parts.push(`Not yet written (weekly Programming — each week is written after the previous week's last day is logged): week${outlineWeeks.length === 1 ? "" : "s"} ${outlineWeeks.join(", ")}`);
             }
             aiProgramContext = "\n\nAI PROGRAM:\n" + parts.join("\n");
           }

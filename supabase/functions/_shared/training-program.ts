@@ -96,27 +96,35 @@ export async function fetchAndFormatProgramContext(
 
   if (!program) return "";
 
-  const { data: workouts } = await supa
+  // Written days only: weekly Programming keeps the unwritten weeks as
+  // outline rows (status='outline', no blocks), which would render here
+  // as empty days. The count of outline weeks is appended instead.
+  const { data: allRows } = await supa
     .from("program_workouts")
-    .select("id, week_num, day_num, workout_text, sort_order")
+    .select("id, week_num, day_num, workout_text, sort_order, status")
     .eq("program_id", program.id)
     .order("sort_order");
+  const workouts = (allRows ?? []).filter((w) => (w as { status?: string | null }).status !== "outline");
+  const outlineWeeks = [...new Set((allRows ?? []).filter((w) => (w as { status?: string | null }).status === "outline").map((w) => w.week_num as number))].sort((a, b) => a - b);
+  const outlineNote = outlineWeeks.length
+    ? `\nWeek${outlineWeeks.length === 1 ? "" : "s"} ${outlineWeeks.join(", ")}: not yet written — each week is written after the previous week's last day is logged.`
+    : "";
 
   if (!workouts || workouts.length === 0) return "";
 
   // v3 programs leave workout_text NULL — summarize from the structured rows.
   if ((program as { program_version?: string }).program_version === "v3") {
-    return await formatV3ProgramContext(
+    return (await formatV3ProgramContext(
       supa,
       program as ProgramRow,
       workouts as Array<ProgramWorkoutRow & { id: string }>,
-    );
+    )) + outlineNote;
   }
 
   return formatProgramContext(
     program as ProgramRow,
     workouts as ProgramWorkoutRow[]
-  );
+  ) + outlineNote;
 }
 
 /**

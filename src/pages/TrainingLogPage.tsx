@@ -787,10 +787,13 @@ export default function TrainingLogPage({ session }: { session: Session }) {
           .order('created_at', { ascending: false });
         const programList = ((progs as { id: string; name: string }[]) || []);
         if (programList.length) {
+          // Written days only: weekly Programming's outline rows (the
+          // unwritten weeks) are not days that can be put on the calendar.
           const { data: wks } = await supabase
             .from('program_workouts')
             .select('id, program_id, week_num, day_num')
             .in('program_id', programList.map((p) => p.id))
+            .neq('status', 'outline')
             .order('sort_order');
           const wkRows = ((wks as { id: string; program_id: string; week_num: number; day_num: number }[]) || []);
           const ids = wkRows.map((w) => w.id);
