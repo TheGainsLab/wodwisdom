@@ -1036,8 +1036,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                           const first = skeletonDay(week.days[0]);
                           return (
                             <div style={{ padding: '10px 14px 2px', fontSize: 12.5, color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                              {first?.weekFocus ? <span style={{ color: 'var(--text-dim)' }}>{first.weekFocus}. </span> : null}
-                              Every block is here by rule. Loads, movements and metcons are written from how week {week.weekNum - 1} goes — and from any note you leave below.
+                              Tentative.{first?.weekFocus ? <span style={{ color: 'var(--text-dim)' }}> {first.weekFocus}.</span> : null}
                             </div>
                           );
                         })()}
