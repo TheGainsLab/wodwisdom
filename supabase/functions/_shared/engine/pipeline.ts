@@ -36,6 +36,17 @@ type AuditFailures = ReturnType<typeof runAudits>["failures"];
 // falls back to the shared key so a missing secret never breaks generation.
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY_PIPELINE") ?? Deno.env.get("ANTHROPIC_API_KEY");
 const MODEL = MODELS.sonnet;
+// Week-fill seat (2026-11-14): gated move to Sonnet 5.5. Set the WEEK_FILL_MODEL
+// function secret to MODELS.sonnet5's id to run the fill there; unset, the fill
+// stays on MODELS.sonnet. Sonnet 5.5 rejects forced tool_choice (probe
+// 2026-11-14: `tool` and `any` both 400; `auto` works and calls the tool when
+// told to), so the 5.x path sends `auto` plus an instruction, and a reply with
+// no tool call is retried once with a nudge. Flip the default here once the
+// weekly fills on the test athlete read well; then drop the secret.
+const WEEK_FILL_MODEL = Deno.env.get("WEEK_FILL_MODEL") || MODEL;
+const WEEK_FILL_FORCED_TOOL_OK = WEEK_FILL_MODEL === MODEL; // 4.x accepts forced tool_choice
+const WEEK_FILL_TOOL_INSTRUCTION =
+  "\n\nREPLY FORMAT: your ONLY valid reply is a single call to the emit_week tool with the complete week. Never answer in prose.";
 // 2026-08 adoption: the skeleton is the judgment-translation layer — it reads
 // the full CoachState document and structures the cycle. Frontier model per the
 // shadow-test series (clean sweeps on rules + letter fidelity); the week-fill
@@ -189,6 +200,21 @@ const WEEK_FILL_TIMEOUT_MS = 330_000;
 /** Fill ONE week of the program. Reuses the pack's week-fill prompt + emit_week
  *  tool, with the full skeleton as context, the specific week to fill, and the
  *  already-generated prior weeks (so loads/volume progress across the cycle). */
+/** Structural problems in an emit_week input that the audits would otherwise
+ *  trip over (a cut-off or prose-shaped reply): the days list, its length,
+ *  and that every day has a blocks list. Content is the audits' job. */
+export function weekShapeProblems(week: unknown, daysPerWeek: number): string[] {
+  const problems: string[] = [];
+  const w = week as { days?: unknown } | null;
+  if (!w || !Array.isArray(w.days)) return ["days must be a list"];
+  if (w.days.length !== daysPerWeek) problems.push(`expected ${daysPerWeek} days, got ${w.days.length}`);
+  w.days.forEach((d, i) => {
+    const day = d as { blocks?: unknown } | null;
+    if (!day || !Array.isArray(day.blocks) || day.blocks.length === 0) problems.push(`day ${i + 1} has no blocks`);
+  });
+  return problems;
+}
+
 export async function callWeekFill(
   payload: WriterPayload,
   skeleton: SkeletonOutput,
@@ -260,7 +286,20 @@ export async function callWeekFill(
     .filter(Boolean).join("\n\n");
   const userMessage = extraContext ? `${extraContext}\n\n---\n\n${baseMessage}` : baseMessage;
 
+  // 2-day athletes get the scoped addendum; 3-6 day prompts are
+  // byte-identical to before two-day support. The 5.x path appends the
+  // reply-format instruction that replaces the forced tool_choice.
+  const systemPrompt = (daysPerWeek === 2
+    ? pack.writer.weekFillSystemPrompt + TWO_DAY_FILL_ADDENDUM
+    : pack.writer.weekFillSystemPrompt) + (WEEK_FILL_FORCED_TOOL_OK ? "" : WEEK_FILL_TOOL_INSTRUCTION);
+  const weekTool = pack.writer.buildWeekTool(daysPerWeek, units, payload.training_context.session_length_minutes ?? null);
+  // Thinking-on models spend part of the budget before the tool call; a full
+  // 5-day week is ~10-12K tokens of JSON on its own.
+  const maxTokens = WEEK_FILL_FORCED_TOOL_OK ? 16000 : 32000;
+
   let lastErr: unknown = null;
+  // One nudge when a non-forced reply carries no tool call (text instead).
+  let nudge = "";
   for (let attempt = 1; attempt <= MAX_WEEK_FILL_ATTEMPTS; attempt++) {
     const t0 = Date.now();
     try {
@@ -272,17 +311,13 @@ export async function callWeekFill(
           "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify({
-          model: MODEL,
-          max_tokens: 16000,
+          model: WEEK_FILL_MODEL,
+          max_tokens: maxTokens,
           stream: false,
-          // 2-day athletes get the scoped addendum; 3-6 day prompts are
-          // byte-identical to before two-day support.
-          system: daysPerWeek === 2
-            ? pack.writer.weekFillSystemPrompt + TWO_DAY_FILL_ADDENDUM
-            : pack.writer.weekFillSystemPrompt,
-          tools: [pack.writer.buildWeekTool(daysPerWeek, units, payload.training_context.session_length_minutes ?? null)],
-          tool_choice: { type: "tool", name: "emit_week" },
-          messages: [{ role: "user", content: userMessage }],
+          system: systemPrompt,
+          tools: [weekTool],
+          tool_choice: WEEK_FILL_FORCED_TOOL_OK ? { type: "tool", name: "emit_week" } : { type: "auto" },
+          messages: [{ role: "user", content: nudge ? `${nudge}\n\n---\n\n${userMessage}` : userMessage }],
         }),
         signal: AbortSignal.timeout(WEEK_FILL_TIMEOUT_MS),
       });
@@ -298,18 +333,29 @@ export async function callWeekFill(
       }
 
       const data = (await resp.json()) as ClaudeResponse;
+      console.log(
+        `[engine fill week ${weekNum}] model=${WEEK_FILL_MODEL} usage: input=${data.usage?.input_tokens} output=${data.usage?.output_tokens} stop_reason=${data.stop_reason} fetch_ms=${Date.now() - t0}`,
+      );
       const toolUse = (data.content ?? []).find(
         (b) => b.type === "tool_use" && b.name === "emit_week",
       );
       if (!toolUse || typeof toolUse.input !== "object" || toolUse.input == null) {
+        // Non-forced model answered in prose (or was cut off): nudge once.
+        if (!WEEK_FILL_FORCED_TOOL_OK && !nudge && data.stop_reason !== "max_tokens") {
+          nudge = "YOUR PREVIOUS REPLY DID NOT CALL emit_week. Reply ONLY with one emit_week tool call carrying the complete week.";
+          console.warn(`[engine fill week ${weekNum}] no tool call in reply (stop_reason=${data.stop_reason}); nudging once`);
+          attempt--; // the nudge does not spend an attempt
+          continue;
+        }
         throw new Error(
           `week ${weekNum}: missing emit_week tool_use. stop_reason=${data.stop_reason} content=${JSON.stringify(data.content).slice(0, 300)}`,
         );
       }
-      console.log(
-        `[engine fill week ${weekNum}] usage: input=${data.usage?.input_tokens} output=${data.usage?.output_tokens} stop_reason=${data.stop_reason} fetch_ms=${Date.now() - t0}`,
-      );
       const week = toolUse.input as WeekPrescription;
+      const shape = weekShapeProblems(week, daysPerWeek);
+      if (shape.length) {
+        throw new Error(`week ${weekNum}: emit_week input malformed (stop_reason=${data.stop_reason}): ${shape.join("; ")}`);
+      }
       week.week_num = weekNum; // enforce regardless of what the model emitted
       return week;
     } catch (err) {
