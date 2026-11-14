@@ -229,6 +229,11 @@ export async function saveProgramV3(
           day_num: day.day_num,
           month_number: monthNumber,
           workout_text: null,
+          // Explicit, not left to the column default: the outline rows below
+          // carry `status`, and a PostgREST bulk insert of mixed shapes sends
+          // null for the keys a row lacks — which the NOT NULL constraint
+          // rejected on the first weekly build (2026-11-13).
+          status: "written",
           // Month-offset so cycles sort sequentially (month 2 after month 1)
           // within the program; ProgramDetailPage orders by sort_order and
           // groups by month_number. Month 1 → (0)+..., matching prior rows.
