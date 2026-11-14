@@ -92,10 +92,13 @@ export async function loadUpcomingProgrammingWeek(supa: SupabaseClient, userId: 
     .maybeSingle();
   if (!prog?.id) return "";
 
+  // Written days only — an outline week (weekly Programming, not yet
+  // filled) has nothing to show the Engine; better no block than blanks.
   const { data: days } = await supa
     .from("program_workouts")
     .select("id, week_num, day_num, day_type, classified_archetype, workout_text")
-    .eq("program_id", prog.id);
+    .eq("program_id", prog.id)
+    .neq("status", "outline");
   const rows = (days ?? []) as ProgramDayRow[];
   if (rows.length === 0) return "";
 
