@@ -762,7 +762,18 @@ outline rows as days (#961); the free evaluation's coach-state call could
 return a cut-off tool input (#959); step 3 is held until the evaluation
 exists (#958).
 
-Still planned, not built: a profile change (days, goal, session length)
-during the month triggers the re-plan the way a note does; the notes box
-lives once under the week in progress, outline weeks carry no box, finished
-weeks show their notes read-only.
+### Built the same day (2026-11-14): profile changes re-plan; one notes box
+
+- `program_month_skeletons.built_from` records the days, goal and session
+  length the skeleton was built from (stored on every save, so a re-plan
+  records what it re-planned to). The week job compares the live profile
+  against it; any difference is a re-plan trigger alongside the notes. A
+  re-plan that fails on a days change fails the job (the fill tool is sized
+  to the new days, the stored skeleton to the old) and the cron retries.
+  Months stored before the column existed can only re-plan on notes.
+- The note classifier names day count as a structure change, so "3 days
+  from now on" also re-plans; the skeleton writes to the PROFILE's number.
+- One "Tell your coach" box, under the week in progress (the latest written
+  week); it takes anything and says so. Finished weeks show "What you told
+  your coach" read-only with the date and "read for week N+1". Outline weeks
+  carry nothing.

@@ -9,13 +9,16 @@ import { addCoachNote, deleteCoachNote, describeNote, setCoachNoteHorizon, type 
  * AI Programming's next generation). Not on the Engine dashboard — the goal
  * line there is its box.
  */
-export default function CoachNotesBox({ notes, programId, weekNum, onChange, compact = false }: {
+export default function CoachNotesBox({ notes, programId, weekNum, onChange, compact = false, readOnly = false }: {
   notes: CoachNote[];
   programId: string | null;
   weekNum: number | null;
   onChange: (notes: CoachNote[]) => void;
   /** Just the list with deletes (the top-of-page summary). */
   compact?: boolean;
+  /** A finished week: what was said, with when it was read. No field, no
+   *  edits. Renders nothing when there were no notes. */
+  readOnly?: boolean;
 }) {
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
@@ -61,12 +64,32 @@ export default function CoachNotesBox({ notes, programId, weekNum, onChange, com
 
   if (compact) return <div>{list}</div>;
 
+  if (readOnly) {
+    if (notes.length === 0) return null;
+    const when = (iso: string) => new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    return (
+      <div style={{ padding: '12px 14px', borderTop: '1px dashed var(--border)' }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>What you told your coach</div>
+        <ul style={{ listStyle: 'none', margin: '6px 0 0', padding: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {notes.map((n) => (
+            <li key={n.id} style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 13, color: 'var(--text)' }}>
+              <span style={{ flex: 1 }}>{n.text}</span>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                {when(n.created_at)}{n.consumed_programming_at ? ` · read for week ${(weekNum ?? 0) + 1}` : ''}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
+
   return (
     <div style={{ padding: '12px 14px', borderTop: '1px dashed var(--border)' }}>
-      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>Tell your coach about this week</div>
+      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>Tell your coach</div>
       <div style={{ fontSize: 12, color: 'var(--text-muted)', margin: '2px 0 8px', lineHeight: 1.5 }}>
-        More or less of anything. Read before your next days are written — the Engine&rsquo;s next block within days,
-        your next Programming week after this week&rsquo;s last day is logged. Written days don&rsquo;t change; to adjust one now, open it and ask the coach.
+        Anything: how this week went, what you want next week, a thought about a later week. Read when your next
+        week is written, and by the Engine for its next block. Written days don&rsquo;t change; to adjust one now, open it and ask the coach.
       </div>
       <div style={{ display: 'flex', gap: 8 }}>
         <input

@@ -246,6 +246,14 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
     weekly_mode?: boolean | null;
   } | null>(null);
   const [allWorkouts, setAllWorkouts] = useState<ProgramWorkout[]>([]);
+  // The week in progress = the latest WRITTEN week of the program (outline
+  // weeks don't count). Only this week carries the "tell your coach" box;
+  // it stays here through the hour between the last log and the next fill.
+  const currentNotesWeek = allWorkouts.reduce((best, w) => {
+    if (w.status === 'outline') return best;
+    const n = ((w.month_number ?? 1) - 1) * 4 + (w.week_num || 1);
+    return n > best ? n : best;
+  }, 0);
   const [completedWorkoutIds, setCompletedWorkoutIds] = useState<Set<string>>(new Set());
   const [inProgressWorkouts, setInProgressWorkouts] = useState<Map<string, { logId: string; savedCount: number; totalBlocks: number }>>(new Map());
   const [workoutBlocks, setWorkoutBlocks] = useState<Map<string, ProgramBlock[]>>(new Map());
@@ -1262,17 +1270,31 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                             </div>
                           );
                         })}
-                        {weekOpen && (
-                          <CoachNotesBox
-                            notes={coachNotes.filter((n) => n.week_num === week.weekNum && (n.program_id == null || n.program_id === id))}
-                            programId={id ?? null}
-                            weekNum={week.weekNum}
-                            onChange={(next) => setCoachNotes((prev) => [
-                              ...next,
-                              ...prev.filter((n) => !(n.week_num === week.weekNum && (n.program_id == null || n.program_id === id))),
-                            ])}
-                          />
-                        )}
+                        {/* One notes box, under the week in progress (founder,
+                            2026-11-14: everything goes in the current week's
+                            box — feedback on this week, wishes for next, a
+                            thought about a later week; it is all read at the
+                            next fill). Finished weeks show what was said,
+                            read-only; outline weeks carry nothing. */}
+                        {weekOpen && (() => {
+                          const isOutlineWeek = week.days.every((d) => d.status === 'outline');
+                          if (isOutlineWeek) return null;
+                          const weekNotes = coachNotes.filter((n) => n.week_num === week.weekNum && (n.program_id == null || n.program_id === id));
+                          if (week.weekNum !== currentNotesWeek) {
+                            return <CoachNotesBox readOnly notes={weekNotes} programId={id ?? null} weekNum={week.weekNum} onChange={() => {}} />;
+                          }
+                          return (
+                            <CoachNotesBox
+                              notes={weekNotes}
+                              programId={id ?? null}
+                              weekNum={week.weekNum}
+                              onChange={(next) => setCoachNotes((prev) => [
+                                ...next,
+                                ...prev.filter((n) => !(n.week_num === week.weekNum && (n.program_id == null || n.program_id === id))),
+                              ])}
+                            />
+                          );
+                        })()}
                       </div>
                             );
                           })}

@@ -33,7 +33,7 @@ import { isBarbellMetconMovement } from "../_shared/metcon-variety-audits.ts";
 import { trimWriterMovementAnnotations } from "../_shared/movement-name-repair.ts";
 import { buildStratifiedMetconExamples } from "../_shared/metcon-examples.ts";
 import { composeMetconsForSlots } from "../_shared/compose-metcons.ts";
-import { classifyNotesForReplan, loadMonthStore, type MonthStore } from "../_shared/weekly-fill.ts";
+import { builtFromOf, classifyNotesForReplan, loadMonthStore, profileDrift, type MonthStore } from "../_shared/weekly-fill.ts";
 import { formatAuditFailuresForLog, logGenerationAudit } from "../_shared/generation-audit-log.ts";
 import {
   enqueueSignatureDraftsForWeeks,
@@ -369,16 +369,25 @@ async function stageSkeleton(
     const store: MonthStore | null = await loadMonthStore(supa, rs.continuation.programId!, rs.continuation.monthNumber);
     if (!store) throw new Error(`[generate-program-v3] week job: no stored skeleton for program ${rs.continuation.programId} month ${rs.continuation.monthNumber}`);
     const notes = rs.payload?.training_context.coach_notes ?? [];
-    const verdict = notes.length ? await classifyNotesForReplan(notes) : "fill";
+    // Two triggers for a re-plan: notes that touch what the skeleton owns,
+    // and a profile change since the skeleton was built (days, goal, session
+    // length — founder, 2026-11-14). Months stored before built_from existed
+    // can only re-plan on notes.
+    const drift = profileDrift(store.built_from, builtFromOf(rs.payload!.training_context));
+    const daysChanged = drift.some((d) => d.startsWith("training days"));
+    const verdict = drift.length ? "replan" : notes.length ? await classifyNotesForReplan(notes) : "fill";
     let skeleton = store.skeleton;
     let replanned = false;
     if (verdict === "replan") {
+      const reasons = [
+        ...(drift.length ? [`The athlete's PROFILE CHANGED since this skeleton was built: ${drift.join("; ")}. The remaining weeks must match the CURRENT profile (days per week above all).`] : []),
+        ...(notes.length ? [`The athlete's notes: ${notes.map((n) => `"${n}"`).join("; ")}.`] : []),
+      ].join(" ");
       const replanDoc =
         intentDocument +
         `\n\nRE-PLAN (weekly Programming): this month's skeleton is below. Weeks 1-${weekNum - 1} are WRITTEN and ` +
         `already trained — reproduce them EXACTLY as given (same days, block types, lifts, schemes, focus). Rewrite weeks ` +
-        `${weekNum}-4 so the athlete's notes are honoured as priorities while the month's arc still holds: ` +
-        notes.map((n) => `"${n}"`).join("; ") +
+        `${weekNum}-4 so the following is honoured while the month's arc still holds. ${reasons}` +
         `\nCURRENT SKELETON:\n${JSON.stringify(store.skeleton)}`;
       try {
         const fresh = await generateSkeletonWithAudits(tdi, PACK, undefined, replanDoc);
@@ -391,11 +400,15 @@ async function stageSkeleton(
           ].sort((a, b) => a.week_num - b.week_num),
         };
         replanned = true;
-        console.log(`[generate-program-v3] week ${weekNum}: skeleton RE-PLANNED on notes: ${notes.join(" | ")}`);
+        console.log(`[generate-program-v3] week ${weekNum}: skeleton RE-PLANNED on ${drift.length ? `profile (${drift.join("; ")})` : ""}${drift.length && notes.length ? " + " : ""}${notes.length ? `notes (${notes.join(" | ")})` : ""}`);
         await supa.from("program_month_skeletons")
-          .update({ skeleton, replanned_at: new Date().toISOString(), replan_count: (store.replan_count ?? 0) + 1 })
+          .update({ skeleton, replanned_at: new Date().toISOString(), replan_count: (store.replan_count ?? 0) + 1, built_from: builtFromOf(rs.payload!.training_context) })
           .eq("id", store.id);
       } catch (e) {
+        // A days change cannot fall back: the fill tool is sized to the NEW
+        // day count and the stored skeleton has the old one. Fail the job;
+        // the cron tries again next tick.
+        if (daysChanged) throw new Error(`[generate-program-v3] week ${weekNum}: re-plan on a days-per-week change failed: ${e instanceof Error ? e.message : String(e)}`);
         console.warn(`[generate-program-v3] week ${weekNum}: re-plan failed, filling from the stored skeleton:`, e instanceof Error ? e.message : String(e));
       }
     }
@@ -953,7 +966,7 @@ async function stageSaving(
         programId, // always append mode in the dispatcher (shell pre-created for first-cycle)
         monthNumber,
         ...(rs.weekly
-          ? { weekly: { composedMetcons: rs.composedMetcons ?? null, ...(rs.weeklyFill ? { weekAppend: true, skeletonToStore: skeleton } : {}) } }
+          ? { weekly: { composedMetcons: rs.composedMetcons ?? null, builtFrom: builtFromOf(rs.payload!.training_context), ...(rs.weeklyFill ? { weekAppend: true, skeletonToStore: skeleton } : {}) } }
           : {}),
       });
       console.log(`[generate-program-v3] saved program ${programId} (month ${monthNumber})`);
