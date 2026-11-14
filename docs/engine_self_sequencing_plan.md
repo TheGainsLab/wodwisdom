@@ -738,3 +738,31 @@ month as written and the next month is weekly (per-program `weekly_mode`).
 The Coach's product knowledge now describes the weekly model: outline
 weeks, the last-day gate, notes vs re-plan, written weeks don't change. The
 notes box and card say "next week" rather than "next month".
+
+### Week fill on Sonnet 5.5, gated (2026-11-14)
+
+The week fill carries the most judgment in the weekly model (it reads what
+the athlete did and decides how to progress) and ran on the oldest model in
+the chain. Probe 2026-11-14 on `claude-sonnet-5-5`: `tool_choice` `tool`
+and `any` both 400 ("not supported for this model"); `auto` runs and calls
+the tool when told to. So the move keeps the tool and the prompt and only
+changes the forcing: `auto` plus a REPLY FORMAT line, one nudge when a reply
+carries no tool call, a 32K budget (thinking spends part of it), and a
+shape check (day count, blocks per day) before the audits.
+
+Gated on the `WEEK_FILL_MODEL` function secret: set it to the Sonnet 5.5 id
+and the next week fill runs there (weekly jobs AND monthly builds, same
+seat); unset, nothing changes. First run: the All Access test athlete's
+week 2. Read it next to week 1; if it holds, flip the default in
+`engine/pipeline.ts` and drop the secret.
+
+Found on the same walk-through, fixed the same day: the first weekly build
+failed at save (written rows lacked `status`, #960); four readers treated
+outline rows as days (#961); the free evaluation's coach-state call could
+return a cut-off tool input (#959); step 3 is held until the evaluation
+exists (#958).
+
+Still planned, not built: a profile change (days, goal, session length)
+during the month triggers the re-plan the way a note does; the notes box
+lives once under the week in progress, outline weeks carry no box, finished
+weeks show their notes read-only.
