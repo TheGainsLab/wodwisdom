@@ -166,6 +166,10 @@ export interface SaveProgramV3Opts {
     weekAppend?: boolean;
     /** The skeleton to store (a re-plan replaces the stored one). */
     skeletonToStore?: SkeletonOutput | null;
+    /** What the skeleton was built from (days, goal, session length); the
+     *  week job compares the live profile against it. Stored on every save,
+     *  so a re-plan records the values it re-planned to. */
+    builtFrom?: Record<string, unknown> | null;
   };
 }
 
@@ -437,6 +441,7 @@ export async function saveProgramV3(
           composed_metcons: opts.weekly.composedMetcons ?? null,
           written_weeks: writtenWeeksToStore,
           last_fill_error: null,
+          ...(opts.weekly.builtFrom ? { built_from: opts.weekly.builtFrom } : {}),
         }, { onConflict: "program_id,month_number" });
       if (skErr) throw new Error(`[save-v3] program_month_skeletons upsert failed: ${skErr.message}`);
       await supa.from("programs").update({ weekly_mode: true }).eq("id", programId);

@@ -17,18 +17,55 @@ import type { ComposedMetcon } from "./metcon-composer.ts";
 import { MODELS } from "./model-profiles.ts";
 import { fetchWithTimeout } from "./fetch-with-timeout.ts";
 
+/** What the skeleton was built from — the profile fields the skeleton's
+ *  shape depends on. A change to any of them during the month re-plans the
+ *  remaining weeks (founder, 2026-11-14: "if a user changes their profile
+ *  days, the skeleton won't change until the next month" was the gap). */
+export interface BuiltFrom {
+  days_per_week: number;
+  goal: string | null;
+  session_length_minutes: number | null;
+}
+
+export function builtFromOf(tc: { days_per_week: number; goal_text?: string | null; session_length_minutes?: number | null }): BuiltFrom {
+  return {
+    days_per_week: tc.days_per_week,
+    goal: (tc.goal_text ?? "").trim() || null,
+    session_length_minutes: tc.session_length_minutes ?? null,
+  };
+}
+
+/** Pure: the profile changes since the skeleton was built, as lines for the
+ *  re-plan prompt. Empty = nothing drifted. `days` first: it is the one the
+ *  fill cannot absorb (the fill tool is sized to the CURRENT days). */
+export function profileDrift(built: BuiltFrom | null | undefined, now: BuiltFrom): string[] {
+  if (!built) return [];
+  const out: string[] = [];
+  if (built.days_per_week !== now.days_per_week) {
+    out.push(`training days per week changed from ${built.days_per_week} to ${now.days_per_week}`);
+  }
+  if ((built.goal ?? "") !== (now.goal ?? "")) {
+    out.push(`goal changed from "${built.goal ?? "none"}" to "${now.goal ?? "none"}"`);
+  }
+  if ((built.session_length_minutes ?? null) !== (now.session_length_minutes ?? null)) {
+    out.push(`session length changed from ${built.session_length_minutes ?? "unset"} to ${now.session_length_minutes ?? "unset"} minutes`);
+  }
+  return out;
+}
+
 export interface MonthStore {
   id: string;
   skeleton: SkeletonOutput;
   composed_metcons: ComposedMetcon[] | null;
   written_weeks: WeekPrescription[];
   replan_count: number | null;
+  built_from: BuiltFrom | null;
 }
 
 export async function loadMonthStore(supa: SupabaseClient, programId: string, monthNumber: number): Promise<MonthStore | null> {
   const { data } = await supa
     .from("program_month_skeletons")
-    .select("id, skeleton, composed_metcons, written_weeks, replan_count")
+    .select("id, skeleton, composed_metcons, written_weeks, replan_count, built_from")
     .eq("program_id", programId)
     .eq("month_number", monthNumber)
     .maybeSingle();
@@ -39,14 +76,16 @@ export async function loadMonthStore(supa: SupabaseClient, programId: string, mo
     composed_metcons: (data.composed_metcons as ComposedMetcon[] | null) ?? null,
     written_weeks: ((data.written_weeks as WeekPrescription[] | null) ?? []),
     replan_count: (data.replan_count as number | null) ?? 0,
+    built_from: (data.built_from as BuiltFrom | null) ?? null,
   };
 }
 
 /** Pure: the question we ask about the notes. Exported for the test. */
 export const REPLAN_SYSTEM =
   "You read an athlete's notes to their coach and answer ONE word. Answer 'replan' if ANY note asks to change the " +
-  "STRUCTURE of the month: which lifts are trained (e.g. snatch/clean & jerk instead of presses), how much lifting " +
-  "or gymnastics or conditioning there is overall, which kind of training is emphasised, or the metcon focus " +
+  "STRUCTURE of the month: how many days a week they train (e.g. '3 days from now on', 'drop to 4 days'), which lifts " +
+  "are trained (e.g. snatch/clean & jerk instead of presses), how much lifting or gymnastics or conditioning there is " +
+  "overall, which kind of training is emphasised, or the metcon focus " +
   "(e.g. 'more long metcons', 'less conditioning', 'more Olympic lifting', 'more gymnastics days'). Answer 'fill' if " +
   "every note is about what goes INSIDE the existing days: loads (heavier/easier), a specific movement to include " +
   "or avoid for a week, equipment for a week (hotel gym), a tired week, a travel week, one metcon longer or shorter. " +
