@@ -130,7 +130,14 @@ Deno.serve(async (req) => {
     // A null program_id to generate-program-v3 makes a NEW v3 program at the
     // requested month; a non-null program_id appends.
     const isV3 = program?.program_version === "v3";
-    const targetMonth = program ? (program.generated_months || 1) + 1 : 1;
+    // A service caller (admin-rebuild-month) may name the month explicitly.
+    // Without it, rebuilding month 1 landed as month 2: the rebuild rolls
+    // generated_months back to max(month-1, 1) = 1 and this +1 made 2
+    // (Karter, 2026-11-15 — the athlete saw "Month 2, weeks 5-8").
+    const requestedMonth = serviceMode && Number.isInteger(body?.month_number) && body.month_number >= 1
+      ? (body.month_number as number)
+      : null;
+    const targetMonth = requestedMonth ?? (program ? (program.generated_months || 1) + 1 : 1);
     const appendToProgramId = isV3 ? reqProgramId : null;
     const mode = !program ? "firstgen" : isV3 ? "append" : "migrate";
     console.log(`[generate-next-month] user=${userId} mode=${mode} targetMonth=${targetMonth} latestVersion=${program?.program_version ?? "none"}`);

@@ -306,6 +306,18 @@ Deno.serve(async (req) => {
         console.error("log-workout blocks insert error:", blocksErr);
       }
       insertedBlocks = (blockData as { id: string }[]) || [];
+
+      // The log's date follows its latest block (same rule as
+      // save-workout-block): a session finished on a later day than the log
+      // was opened is filed under the day it was finished.
+      const latestPerformed = blockRows
+        .map((r) => (r as { performed_date?: string | null }).performed_date ?? null)
+        .filter((d): d is string => !!d)
+        .sort()
+        .pop();
+      if (latestPerformed && latestPerformed > dateStr) {
+        await supa.from("workout_logs").update({ workout_date: latestPerformed }).eq("id", log.id);
+      }
     }
 
     // 3. Insert workout_log_entries rows with block_id FK

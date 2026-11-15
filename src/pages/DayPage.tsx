@@ -85,13 +85,17 @@ export default function DayPage(_props: { session: Session }) {
   const [snapshots, setSnapshots] = useState<Record<number, SavedBlockSnapshot>>({});
   const [savingSort, setSavingSort] = useState<number | null>(null);
 
-  // Resume any in-progress log for this workout + the user's unit preference.
+  // Resume the day's log (in progress OR completed) + the user's unit
+  // preference. Completed too: once the last block auto-completes the log,
+  // reopening the day used to find nothing and start a SECOND log — the
+  // athlete saved the same session twice (2026-11-15). Saving into a
+  // completed log is the edit path save-workout-block already supports.
   useEffect(() => {
     if (!workoutId) return;
     let active = true;
     (async () => {
       const [{ data: ipLog }, { data: prof }] = await Promise.all([
-        supabase.from('workout_logs').select('id').eq('source_id', workoutId).eq('status', 'in_progress').order('created_at', { ascending: false }).limit(1).maybeSingle(),
+        supabase.from('workout_logs').select('id').eq('source_id', workoutId).in('status', ['in_progress', 'completed']).order('created_at', { ascending: false }).limit(1).maybeSingle(),
         supabase.from('athlete_profiles').select('units').eq('user_id', _props.session.user.id).maybeSingle(),
       ]);
       if (!active) return;

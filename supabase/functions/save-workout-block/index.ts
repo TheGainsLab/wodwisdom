@@ -302,6 +302,34 @@ Deno.serve(async (req) => {
       );
     }
 
+    // ── 2b. The log's date follows its latest block ─────────────────
+    // A log is created on the first save (an accidental tap days early
+    // included) and its workout_date never moved: a session trained on the
+    // 10th sat under the 9th, and the athlete re-logged it, making a
+    // duplicate (2026-11-15). Each block keeps its own performed_date; the
+    // log is filed under the latest of them — the day the session was
+    // actually finished.
+    try {
+      const { data: perf } = await supa
+        .from("workout_log_blocks")
+        .select("performed_date")
+        .eq("log_id", logId);
+      const latest = ((perf as { performed_date: string | null }[] | null) ?? [])
+        .map((r) => r.performed_date)
+        .filter((d): d is string => !!d)
+        .sort()
+        .pop();
+      if (latest) {
+        const { data: logRow } = await supa.from("workout_logs").select("workout_date").eq("id", logId).maybeSingle();
+        const current = (logRow as { workout_date?: string | null } | null)?.workout_date ?? null;
+        if (!current || latest > current) {
+          await supa.from("workout_logs").update({ workout_date: latest }).eq("id", logId);
+        }
+      }
+    } catch (e) {
+      console.warn("save-workout-block: workout_date reconcile skipped:", e instanceof Error ? e.message : String(e));
+    }
+
     // ── 3. Delete old entries for this block, insert new ones ─────
     // First delete any entries that had the old block at this sort_order
     // We need to delete by block_id if the old block existed

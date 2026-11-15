@@ -946,11 +946,31 @@ serve(async (req) => {
                 // Case-insensitive for the same reason as the checkout
                 // handler's lookup (Carlos incident).
                 const custPattern = String(cust.email).replace(/[%_\\]/g, "\\$&");
-                const { data: byEmail } = await supa.from("profiles").select("id").ilike("email", custPattern).limit(1);
+                const { data: byEmail } = await supa.from("profiles").select("id, email, stripe_customer_id").ilike("email", custPattern).limit(1);
                 if (byEmail && byEmail.length > 0) {
                   payUserId = byEmail[0].id;
-                  await supa.from("profiles").update({ stripe_customer_id: customerId }).eq("id", payUserId);
-                  console.log(`[webhook] invoice ${invoice.id}: matched user by email fallback, backfilled stripe_customer_id`);
+                  const storedCustomer = (byEmail[0] as { stripe_customer_id?: string | null }).stripe_customer_id ?? null;
+                  if (!storedCustomer) {
+                    // Only FILL a missing id — never replace one. Replacing it
+                    // re-pointed three profiles at legacy Stripe customers
+                    // (Ron, 2026-11-15): a payment from a SECOND customer with
+                    // the same email overwrote the id the app's own checkout
+                    // stored, so a later cancellation of the real subscription
+                    // could no longer find the profile and would leave
+                    // entitlements in place.
+                    await supa.from("profiles").update({ stripe_customer_id: customerId }).eq("id", payUserId);
+                    console.log(`[webhook] invoice ${invoice.id}: matched user by email fallback, backfilled stripe_customer_id`);
+                  } else {
+                    console.warn(`[webhook] invoice ${invoice.id}: customer ${customerId} matched ${byEmail[0].email} by email but the profile already holds ${storedCustomer} — kept; this is a SECOND Stripe customer for the same person`);
+                    await alertFounder(
+                      `Second Stripe customer for an app account: ${byEmail[0].email}`,
+                      [
+                        `Invoice <strong>${escapeHtml(String(invoice.id))}</strong> (${invoice.billing_reason ?? "?"}, ${((invoice.amount_paid ?? 0) / 100).toFixed(2)} ${String(invoice.currency ?? "").toUpperCase()}) was paid by Stripe customer <strong>${escapeHtml(String(customerId))}</strong>, subscription <strong>${escapeHtml(String(subscriptionId))}</strong>.`,
+                        `The profile for ${escapeHtml(String(byEmail[0].email))} is linked to a different customer, <strong>${escapeHtml(String(storedCustomer))}</strong>, which was kept.`,
+                        `This usually means a subscription bought outside the app's checkout (an old payment link or a Dashboard subscription). Check both customers in Stripe; the app grants nothing for a subscription with no plan metadata, so the person may be paying for nothing.`,
+                      ],
+                    );
+                  }
                 }
               }
             }
