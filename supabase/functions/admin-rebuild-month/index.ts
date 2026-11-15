@@ -80,7 +80,9 @@ Deno.serve(async (req) => {
             "Authorization": `Bearer ${SERVICE_KEY}`,
             "x-webhook-user-id": targetUserId,
           },
-          body: JSON.stringify({ program_id: program.id, user_id: targetUserId }),
+          // month_number: the month we just cleared — without it generate-next-month
+        // computes generated_months + 1, which for month 1 is month 2.
+        body: JSON.stringify({ program_id: program.id, user_id: targetUserId, month_number: month }),
         }, 60_000);
         if (!genResp.ok) {
           const errBody = await genResp.text().catch(() => "");
@@ -122,7 +124,9 @@ Deno.serve(async (req) => {
           "Authorization": `Bearer ${SERVICE_KEY}`,
           "x-webhook-user-id": targetUserId,
         },
-        body: JSON.stringify({ program_id: program.id, user_id: targetUserId }),
+        // month_number: the month we just cleared — without it generate-next-month
+        // computes generated_months + 1, which for month 1 is month 2.
+        body: JSON.stringify({ program_id: program.id, user_id: targetUserId, month_number: month }),
       }, 60_000);
       if (!genResp.ok) {
         const errBody = await genResp.text().catch(() => "");

@@ -793,11 +793,14 @@ export default function StartWorkoutPage({ session, sourceStateProp, onExit, onD
         if (sourceState.edit_log_id) {
           logToRestore = { id: sourceState.edit_log_id };
         } else {
+          // In progress OR completed (2026-11-15): a day whose log was
+          // auto-completed on its last block save must reopen that log, not
+          // start a second one.
           const { data: ipLog } = await supabase
             .from('workout_logs')
             .select('id')
             .eq('source_id', localSourceId!)
-            .eq('status', 'in_progress')
+            .in('status', ['in_progress', 'completed'])
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle();
