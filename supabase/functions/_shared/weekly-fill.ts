@@ -115,23 +115,50 @@ export async function classifyNotesForReplan(notes: string[]): Promise<"replan" 
   }
 }
 
-/** Pure: which week a weekly program should fill next, and whether it may.
+export const WEEK_CLOCK_DAYS = 7;
+
+export type WeekGateReason = "trained" | "clock";
+
+/** Pure: which week a weekly program should fill next, and why it is due.
  *  `outlineWeeks` are the weeks still outline; `loggedDays` the (week, day)
- *  pairs logged; `daysInWeek` the day count per week. The gate is the LAST
- *  DAY of the week before (founder: "to get the next work, they have to do
- *  the work they have" — the week's last day is the gate; earlier days are
- *  theirs to do or not). Null when nothing is due. */
+ *  pairs with ANY workout log (in progress counts — saving one block is
+ *  interacting with the day, and for the generator an interaction is a
+ *  completion); `daysInWeek` the day count per week; `monthStartedAt` when
+ *  the month was built.
+ *
+ *  Founder decisions 2026-11-15 — two gates, either opens the week:
+ *   - trained: every day of the week before has a log. The athlete did
+ *     something on each day — a metcon score alone is enough.
+ *   - clock:   7 × (week − 1) days have passed since the month was built.
+ *     Week 2 at day 7, week 3 at day 14, week 4 at day 21, whatever the
+ *     athlete has done: the whole month is delivered inside the payment
+ *     window, with no responsibility beyond payment.
+ *  Interaction can only bring a week forward; the clock is the floor.
+ *  Null when nothing is due. */
 export function nextWeekToFill(
   outlineWeeks: number[],
   loggedDays: Array<{ week: number; day: number }>,
   daysInWeek: (week: number) => number,
-): number | null {
+  monthStartedAt: Date | string | null | undefined,
+  now: Date = new Date(),
+): { week: number; reason: WeekGateReason } | null {
   if (outlineWeeks.length === 0) return null;
   const target = Math.min(...outlineWeeks);
   const prev = target - 1;
-  if (prev < 1) return target; // week 1 outline (shouldn't happen) — fill it
-  const lastDay = daysInWeek(prev);
-  const gateLogged = loggedDays.some((d) => d.week === prev && d.day >= lastDay) ||
-    loggedDays.some((d) => d.week > prev);
-  return gateLogged ? target : null;
+  if (prev < 1) return { week: target, reason: "clock" }; // week 1 outline (shouldn't happen) — fill it
+
+  const startMs = monthStartedAt ? new Date(monthStartedAt).getTime() : NaN;
+  if (Number.isFinite(startMs)) {
+    const dueMs = startMs + prev * WEEK_CLOCK_DAYS * 24 * 60 * 60 * 1000;
+    if (now.getTime() >= dueMs) return { week: target, reason: "clock" };
+  }
+
+  const n = daysInWeek(prev);
+  if (n > 0) {
+    const logged = new Set(loggedDays.filter((d) => d.week === prev).map((d) => d.day));
+    let all = true;
+    for (let day = 1; day <= n; day++) if (!logged.has(day)) { all = false; break; }
+    if (all) return { week: target, reason: "trained" };
+  }
+  return null;
 }

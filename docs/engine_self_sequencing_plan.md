@@ -563,10 +563,10 @@ is keyed to dates ("users will do the workouts when they want").
 Cycle: Build → skeleton for the month (intent, arc, each week's focus and
 day types) → week 1's metcons composed and week 1 filled, audited, saved →
 weeks 2–4 shown as the skeleton's OUTLINE (day types + focus, no loads, no
-Start, "written when you finish week 1, from what you lift this week").
+Start, "written once you log each day of week 1, or 7 days in").
 
-Weekly fill: when a week is consumed (its last day logged, or logged past),
-the cron fills the next week from the skeleton's focus, the composed
+Weekly fill: when a week is consumed, the cron fills the next week from
+the skeleton's focus, the composed
 metcons, the ACTUAL logs of prior weeks (loads from what was lifted,
 skipped days not progressed from), the current goal, the week note, and
 for All Access the Engine's current block. Audits + safety, append. A
@@ -730,6 +730,30 @@ stage composes week 1 only; monthly mode is unchanged.
   the athlete's next month is weekly.
 - Not built: filling the moment the last day is logged (the cron's hourly
   tick is the only trigger for now).
+
+### The week gate (2026-11-15): trained, or the clock
+
+Founder decisions 2026-11-15, after a customer logged only the metcon of
+each day for four days (every day left "in progress") and would never have
+met the last-day-completed gate:
+
+- A day is CONSUMED when it has a workout log of any status. Saving one
+  block creates the log; an interaction is a completion as far as the
+  generator is concerned. Metcons only, strength only — it all counts.
+- Week N+1 is written when EITHER every day of week N has a log, OR
+  7 × N days have passed since the month was built (week 2 at day 7, week 3
+  at day 14, week 4 at day 21). The clock is the floor: the whole month is
+  delivered inside the payment window with no responsibility beyond
+  payment; training can only bring a week forward.
+- The clock is anchored to `program_month_skeletons.created_at`, which
+  save-v3 now stamps on every fresh month build, so an admin rebuild
+  restarts it. Week jobs leave it alone.
+- The last-day gate is retired. No manual "write my next week" button
+  (decided against: it works against the athlete and against the admin;
+  the two gates above already give two levers).
+- The monthly path (webhook / daily drip → generate-next-month) is
+  untouched; the 21-day floor guarantees month 1 is fully written before
+  any renewal lands month 2.
 
 ### PR 5 built (2026-11-13): rollout and the Coach
 

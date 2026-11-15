@@ -3,22 +3,43 @@ import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { builtFromOf, nextWeekToFill, profileDrift } from "./weekly-fill.ts";
 
 const five = () => 5;
+const three = () => 3;
+const built = "2026-11-14T12:00:00Z";
+const daysLater = (d: number) => new Date(Date.parse(built) + d * 24 * 60 * 60 * 1000);
+const w1 = (...days: number[]) => days.map((day) => ({ week: 1, day }));
 
-Deno.test("week 2 fills once week 1's last day is logged, even with earlier days skipped", () => {
-  assertEquals(nextWeekToFill([2, 3, 4], [{ week: 1, day: 1 }, { week: 1, day: 5 }], five), 2);
+Deno.test("week 2 fills once every day of week 1 has a log (any status)", () => {
+  assertEquals(nextWeekToFill([2, 3, 4], w1(1, 2, 3, 4, 5), five, built, daysLater(3)), { week: 2, reason: "trained" });
+  assertEquals(nextWeekToFill([2, 3, 4], w1(1, 2, 3), three, built, daysLater(2)), { week: 2, reason: "trained" });
 });
 
-Deno.test("not due while week 1's last day is unlogged", () => {
-  assertEquals(nextWeekToFill([2, 3, 4], [{ week: 1, day: 1 }, { week: 1, day: 4 }], five), null);
+Deno.test("not due while a day of week 1 is unlogged and the clock has not run", () => {
+  assertEquals(nextWeekToFill([2, 3, 4], w1(1, 3, 4, 5), five, built, daysLater(3)), null);
+  // the last day alone no longer opens the week
+  assertEquals(nextWeekToFill([2, 3, 4], w1(5), five, built, daysLater(3)), null);
 });
 
-Deno.test("logged past the week counts as the gate", () => {
-  assertEquals(nextWeekToFill([3, 4], [{ week: 2, day: 2 }, { week: 2, day: 3 }], five), null);
-  assertEquals(nextWeekToFill([3, 4], [{ week: 2, day: 5 }], five), 3);
+Deno.test("clock: week 2 at day 7, week 3 at day 14, week 4 at day 21, whatever was logged", () => {
+  assertEquals(nextWeekToFill([2, 3, 4], [], five, built, daysLater(6.9)), null);
+  assertEquals(nextWeekToFill([2, 3, 4], [], five, built, daysLater(7)), { week: 2, reason: "clock" });
+  assertEquals(nextWeekToFill([3, 4], [], five, built, daysLater(13.9)), null);
+  assertEquals(nextWeekToFill([3, 4], [], five, built, daysLater(14)), { week: 3, reason: "clock" });
+  assertEquals(nextWeekToFill([4], [], five, built, daysLater(21)), { week: 4, reason: "clock" });
+});
+
+Deno.test("clock is the floor: a trained week comes forward, the next clock date is unchanged", () => {
+  // week 2 was written on day 3 (trained); week 3 waits for day 14 unless week 2 is trained
+  assertEquals(nextWeekToFill([3, 4], w1(1, 2, 3, 4, 5), five, built, daysLater(9)), null);
+  assertEquals(nextWeekToFill([3, 4], [...w1(1, 2, 3, 4, 5), ...[1, 2, 3, 4, 5].map((day) => ({ week: 2, day }))], five, built, daysLater(9)), { week: 3, reason: "trained" });
+});
+
+Deno.test("no month start known → trained gate only", () => {
+  assertEquals(nextWeekToFill([2, 3, 4], [], five, null, daysLater(30)), null);
+  assertEquals(nextWeekToFill([2, 3, 4], w1(1, 2, 3, 4, 5), five, null, daysLater(1)), { week: 2, reason: "trained" });
 });
 
 Deno.test("nothing outline → nothing due", () => {
-  assertEquals(nextWeekToFill([], [{ week: 4, day: 5 }], five), null);
+  assertEquals(nextWeekToFill([], [{ week: 4, day: 5 }], five, built, daysLater(40)), null);
 });
 
 Deno.test("profile drift: nothing changed → nothing to re-plan", () => {

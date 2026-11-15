@@ -4,10 +4,15 @@
  * 2026-11-12/13).
  *
  * Each tick: for every program in weekly mode with an outline week, find the
- * lowest outline week W. It is due when the LAST DAY of week W-1 is logged
- * (or anything beyond it) — the week's last day is the gate; earlier days are
- * the athlete's to do or not. For each due program with no generation already
- * running for the athlete, kick a WEEK JOB on generate-program-v3
+ * lowest outline week W. It is due (founder decisions 2026-11-15) when EITHER
+ *  - every day of week W-1 has a workout log, in progress or completed —
+ *    saving one block is interacting with the day, and an interaction is a
+ *    completion as far as the generator is concerned; or
+ *  - 7 × (W-1) days have passed since the month was built (week 2 at day 7,
+ *    week 3 at day 14, week 4 at day 21) — the whole month is delivered
+ *    inside the payment window whatever the athlete does.
+ * For each due program with no generation already running for the athlete,
+ * kick a WEEK JOB on generate-program-v3
  * (service call, `{ program_id, fill_week: W }`). The job reads the stored
  * skeleton (re-planning it if the athlete's notes touch what it owns),
  * composes the week's metcons against the month so far, fills the week from
@@ -56,17 +61,25 @@ async function runTick(supa: SupabaseClient): Promise<void> {
         if (outlineWeeks.length === 0) { results.push({ program: pid, action: "skip", reason: "no outline weeks" }); continue; }
 
         const writtenIds = rows.filter((r) => r.status !== "outline").map((r) => r.id);
+        // Any log counts (no status filter): an in-progress day with one saved
+        // block is an interaction, and an interaction is a completion here.
         const { data: logs } = writtenIds.length
           ? await supa.from("workout_logs").select("source_id")
-            .eq("user_id", prog.user_id).eq("source_type", "program").eq("status", "completed").in("source_id", writtenIds)
+            .eq("user_id", prog.user_id).eq("source_type", "program").in("source_id", writtenIds)
           : { data: [] };
         const loggedIds = new Set((logs ?? []).map((l) => l.source_id as string));
         const loggedDays = rows.filter((r) => loggedIds.has(r.id)).map((r) => ({ week: r.week_num, day: r.day_num }));
         const daysInWeek = (w: number) => Math.max(0, ...rows.filter((r) => r.week_num === w).map((r) => r.day_num));
-        const due = nextWeekToFill(outlineWeeks, loggedDays, daysInWeek);
-        if (due == null) { results.push({ program: pid, action: "skip", reason: "previous week not consumed", next_outline: Math.min(...outlineWeeks) }); continue; }
+        // The month's clock starts when the month was built (save-v3 stamps
+        // created_at on a fresh build, so an admin rebuild restarts it).
+        const { data: store } = await supa
+          .from("program_month_skeletons").select("created_at")
+          .eq("program_id", pid).eq("month_number", month).maybeSingle();
+        const gate = nextWeekToFill(outlineWeeks, loggedDays, daysInWeek, store?.created_at ?? null);
+        if (gate == null) { results.push({ program: pid, action: "skip", reason: "previous week not trained and clock not run", next_outline: Math.min(...outlineWeeks), month_started_at: store?.created_at ?? null }); continue; }
+        const due = gate.week;
 
-        if (kicks >= MAX_KICKS_PER_TICK) { results.push({ program: pid, action: "deferred", week: due }); continue; }
+        if (kicks >= MAX_KICKS_PER_TICK) { results.push({ program: pid, action: "deferred", week: due, gate: gate.reason }); continue; }
         const { data: active } = await supa
           .from("program_jobs").select("id").eq("user_id", prog.user_id).eq("status", "processing")
           .gte("updated_at", new Date(Date.now() - 30 * 60 * 1000).toISOString()).limit(1).maybeSingle();
@@ -93,7 +106,7 @@ async function runTick(supa: SupabaseClient): Promise<void> {
           continue;
         }
         kicks += 1;
-        results.push({ program: pid, action: "kicked", week: due, job: body.job_id });
+        results.push({ program: pid, action: "kicked", week: due, gate: gate.reason, job: body.job_id });
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         console.error(`[weekly-programming-cron] program=${pid} ERROR: ${msg}`);

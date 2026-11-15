@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(scripts/db-query.sh *)",
+      "Bash(./scripts/db-query.sh *)"
+    ]
+  }
+}
