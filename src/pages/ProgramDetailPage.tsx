@@ -31,7 +31,8 @@ interface ProgramWorkout {
   day_type?: string | null;
   month_number?: number | null;
   /** 'outline' = the skeleton's shape only, written when the previous week is
-   *  consumed (weekly Programming); 'written' = blocks exist. */
+   *  trained (a log on every day) or 7 days per week have passed since the
+   *  month was built (weekly Programming); 'written' = blocks exist. */
   status?: 'written' | 'outline' | null;
 }
 
@@ -860,7 +861,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                 )}
                 {program?.weekly_mode && (
                   <div style={{ margin: '10px 0 2px', padding: '10px 14px', border: '1px dashed var(--border)', borderRadius: 10, fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.5 }}>
-                    <strong style={{ color: 'var(--text)' }}>This is a starting point.</strong> Week 1 is written; the weeks after it are written one at a time from how you train and what you tell your coach. Tell your coach what you&rsquo;d change and next week is written from it.
+                    <strong style={{ color: 'var(--text)' }}>This is a starting point.</strong> Week 1 is written; the weeks after it are written one at a time from how you train and what you tell your coach. Your next week is written once you&rsquo;ve logged something on each day of this one, or 7 days in, whichever comes first. Tell your coach what you&rsquo;d change and next week is written from it.
                   </div>
                 )}
                 {/* "Tell your coach" notes live under each week's days; this is
@@ -1061,7 +1062,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                                       </div>
                                       <div className="program-day-summary-lines">
                                         <div className="program-day-summary-line">
-                                          <span className="program-day-summary-text">{parts.length ? parts.join(' · ') : (sk?.day_intent ?? 'Written when the previous week is finished.')}</span>
+                                          <span className="program-day-summary-text">{parts.length ? parts.join(' · ') : (sk?.day_intent ?? 'Written once you log each day of the week before, or 7 days in.')}</span>
                                         </div>
                                       </div>
                                     </div>

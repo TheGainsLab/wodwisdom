@@ -442,6 +442,11 @@ export async function saveProgramV3(
           written_weeks: writtenWeeksToStore,
           last_fill_error: null,
           ...(opts.weekly.builtFrom ? { built_from: opts.weekly.builtFrom } : {}),
+          // A fresh month build (not a week job) restarts the month's clock:
+          // the weekly cron delivers week N at day 7 × (N-1) from here, so an
+          // admin rebuild must not inherit the original build's created_at
+          // through the upsert (founder, 2026-11-15).
+          ...(opts.weekly.weekAppend ? {} : { created_at: new Date().toISOString() }),
         }, { onConflict: "program_id,month_number" });
       if (skErr) throw new Error(`[save-v3] program_month_skeletons upsert failed: ${skErr.message}`);
       await supa.from("programs").update({ weekly_mode: true }).eq("id", programId);
