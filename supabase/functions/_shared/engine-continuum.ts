@@ -1,18 +1,25 @@
 /**
  * engine-continuum — the conditioning continuum, pure compute.
  *
- * Spec: docs/conditioning_continuum_spec.md (v2, 2026-11-16). Phase 0 plan:
- * docs/conditioning_continuum_phase0_plan.md.
+ * Spec: docs/conditioning_continuum_spec.md (v2 + the 2026-11-16 revisions
+ * after the first production run). Phase 0 plan: docs/conditioning_continuum_phase0_plan.md.
  *
- * The idea: an athlete's conditioning is a curve over one axis — pace as a
- * multiple of their own 10-minute time trial (log scale). Two anchors place
- * everything: the trial (1.0×) sets the level; the max-effort anaerobic day
- * (~2.6× for a balanced athlete on Echo-bike calories) sets the ceiling. A
- * session lands at the pace the athlete actually delivered; its height is how
- * long they sustained a bout at that pace against what a balanced athlete
- * sustains there (the power-duration curve, D(r)). Max efforts pin the
- * ceiling; sub-max days prove floors; misses lower. The ratchet replays those
- * into the athlete's multiplier curve M(r), which is what the sequencer reads.
+ * The idea: an athlete's conditioning is a curve over one axis. Each machine
+ * and unit has a BALANCED power-duration curve in its own native pace: at
+ * pace r × the athlete's 10-minute trial, a balanced athlete sustains one
+ * bout of D(r) seconds. A session lands at the pace the athlete actually
+ * delivered (r), which the machine's curve turns into an EFFORT DURATION
+ * D(r) — the machine-independent coordinate ("a 30-second-max effort" is the
+ * same place on a rower at 1.33× pace and on an Echo at 2.6× calories). The
+ * session's height is how long the athlete sustained a bout at that pace
+ * against D(r). Max efforts pin the ceiling; sub-max days prove floors;
+ * misses lower. The ratchet replays those into the athlete's multiplier
+ * curve M over effort duration — shared across machines, read by the
+ * sequencer.
+ *
+ * Decisions 2026-11-16 (post first run): no unit conversion — every curve is
+ * authored in its machine's native pace multiples; the shared coordinate is
+ * effort duration, not the pace multiple.
  *
  * Everything here is pure (no I/O) and unit-tested in engine-continuum_test.ts
  * against a real athlete's history (fixtures/continuum_athlete.json).
@@ -27,11 +34,10 @@ export interface PdCurvePoint {
   seconds: number;
 }
 
-/** v1 Echo-bike calories curve (founder anchors 2.6× @ 30 s and 1.0× @ 600 s,
- *  envelope midpoints between). The database seed; kept here so the module
- *  and its tests do not depend on the table. Other machines: see
- *  conversions below — the C2 machines use this curve in watt-multiples as a
- *  first pass until their own max-effort data refits them. */
+/** Echo-bike calories curve (founder anchors 2.6× @ 30 s and 1.0× @ 600 s;
+ *  envelope midpoints between). 2.6× sits near the 78th percentile of Echo
+ *  athletes' 30-s max efforts in the first production run — "high-capacity,
+ *  balanced", as intended. Also the fan bikes' curve (Assault, Airdyne). */
 export const ECHO_BIKE_CAL_CURVE_V1: PdCurvePoint[] = [
   { r: 3.2, seconds: 10 },
   { r: 2.9, seconds: 20 },
@@ -47,6 +53,20 @@ export const ECHO_BIKE_CAL_CURVE_V1: PdCurvePoint[] = [
   { r: 0.88, seconds: 1800 },
   { r: 0.82, seconds: 3600 },
 ];
+
+/** Concept2-class ergs in metres (rower, ski, bike-erg, Rogue rower): PACE
+ *  multiples. Power ∝ pace³, so the same effort spans a much narrower pace
+ *  range than Echo calories. Anchored 2026-11-16 at 1.33× @ 30 s — the same
+ *  percentile of this base's rowers as 2.6× is of its Echo riders — and
+ *  derived from the Echo curve by r_pace = r_echo^0.30 elsewhere. First pass;
+ *  refit from each machine's own max-effort data. */
+export const C2_METERS_CURVE_V1: PdCurvePoint[] = ECHO_BIKE_CAL_CURVE_V1.map((p) => ({ r: Number(Math.pow(p.r, 0.30).toFixed(3)), seconds: p.seconds }));
+
+/** Concept2 ergs read in calories (cal/hr = 4·W + 300 on the monitor): the
+ *  calorie multiple of a watt multiple depends on the athlete's level; for a
+ *  ~200 W 10-minute athlete a 30-s max near 2.35× watts reads ≈ 2.0× calories.
+ *  Derived by r_cal = r_echo^0.73. First pass. */
+export const C2_CAL_CURVE_V1: PdCurvePoint[] = ECHO_BIKE_CAL_CURVE_V1.map((p) => ({ r: Number(Math.pow(p.r, 0.73).toFixed(3)), seconds: p.seconds }));
 
 /** The balanced 30-s ceiling for this curve: the r at 30 s (2.6 on Echo cal). */
 export function balancedCeiling(curve: PdCurvePoint[]): number {
@@ -91,36 +111,15 @@ export function balancedPaceMultiple(curve: PdCurvePoint[], seconds: number): nu
   return pts[pts.length - 1].r;
 }
 
-// ─── Units → a comparable currency ───────────────────────────────────────────
+// ─── Units ───────────────────────────────────────────────────────────────────
 
-/** Machines whose pace converts to watts by a published relation. Echo bike
- *  calories stay on their own per-calorie curve (decided 2026-11-16: Rogue
- *  publishes no formula). */
-const C2_MACHINES = new Set(["c2_row_erg", "c2_ski_erg", "c2_bike_erg", "rogue_row_erg"]);
-
-/** A pace (units per minute) in the currency the curve for that machine/unit
- *  is expressed in. For C2 machines that is watts (meters: W = 2.80 / (s/m)^3;
- *  cal: W = (cal/hr − 300) / 4; watts: identity). For everything else it is
- *  the pace itself. Only RATIOS of this value are ever used, so the absolute
- *  scale does not matter — what matters is that a 5 % step means the same
- *  physical demand on every machine that shares a curve. */
-export function comparablePace(modality: string, units: string | null, pacePerMin: number): number | null {
+/** No conversion (decided 2026-11-16, after the first production run showed
+ *  the watt-converted Concept2 curves were wrong on the right): every
+ *  machine/unit is compared in its own native pace against its own curve.
+ *  Kept as a function so a conversion can be reintroduced in one place. */
+export function comparablePace(_modality: string, _units: string | null, pacePerMin: number): number | null {
   if (!Number.isFinite(pacePerMin) || pacePerMin <= 0) return null;
-  if (!C2_MACHINES.has(modality)) return pacePerMin;
-  switch (units) {
-    case "meters": {
-      const secondsPerMeter = 60 / pacePerMin;
-      return 2.80 / Math.pow(secondsPerMeter, 3);
-    }
-    case "cal": {
-      const calPerHour = pacePerMin * 60;
-      return Math.max(0, (calPerHour - 300) / 4);
-    }
-    case "watts":
-      return pacePerMin;
-    default:
-      return pacePerMin;
-  }
+  return pacePerMin;
 }
 
 // ─── Per session ─────────────────────────────────────────────────────────────
@@ -159,6 +158,8 @@ export interface ContinuumSessionInput {
 
 export interface ContinuumSession {
   r: number | null;
+  /** the machine-independent coordinate: the bout a balanced athlete sustains at this pace, D(r) */
+  effort_seconds: number | null;
   bout_seconds: number | null;
   rest_ratio: number | null;
   sustain: number | null;
@@ -172,7 +173,10 @@ export const ASSESS_DAY_TYPES = new Set(["time_trial", "rocket_races_b", "infini
 /** Day types whose envelope is max effort: ceiling evidence by construction. */
 export const MAX_EFFORT_DAY_TYPES = new Set(["anaerobic"]);
 
-export const ZONE2_CUTOFF_R = 0.85; // fixed (decided 2026-11-16)
+/** Zone 2 = an effort a balanced athlete sustains for 40 min or more. Fixed
+ *  (decided 2026-11-16); on the Echo curve this is r ≈ 0.86. Expressed in
+ *  seconds so it means the same on every machine. */
+export const ZONE2_MIN_EFFORT_SECONDS = 2400;
 export const CEILING_SUSTAIN = 0.85; // "reached the curve" — open threshold (spec §11)
 const MISS_TOLERANCE = 0.98; // delivered below 98 % of asked = a miss
 
@@ -207,7 +211,7 @@ export function sessionContinuum(
   trialPaceInForce: number | null,
   curve: PdCurvePoint[] | null,
 ): ContinuumSession {
-  const none = (evidence: ContinuumEvidence): ContinuumSession => ({ r: null, bout_seconds: null, rest_ratio: null, sustain: null, evidence, asked_r: null });
+  const none = (evidence: ContinuumEvidence): ContinuumSession => ({ r: null, effort_seconds: null, bout_seconds: null, rest_ratio: null, sustain: null, evidence, asked_r: null });
   if (!trialPaceInForce || trialPaceInForce <= 0) return none("no_trial");
   if (!curve || curve.length === 0) return none("no_curve");
   const delivered = s.actual_pace != null ? comparablePace(s.modality, s.units, s.actual_pace) : null;
@@ -220,7 +224,8 @@ export function sessionContinuum(
   const restRatio = s.total_work_seconds && s.total_work_seconds > 0 && s.total_rest_seconds != null
     ? s.total_rest_seconds / s.total_work_seconds
     : null;
-  const sustain = bout != null ? bout / balancedBout(curve, r) : null;
+  const effort = balancedBout(curve, r);
+  const sustain = bout != null ? bout / effort : null;
   const askedComparable = s.target_pace != null ? comparablePace(s.modality, s.units, s.target_pace) : null;
   const askedR = askedComparable != null ? askedComparable / trial : null;
 
@@ -230,7 +235,7 @@ export function sessionContinuum(
   // (atomic, afterburner) does not make the blended session a ceiling.
   const maxEffortDay = MAX_EFFORT_DAY_TYPES.has(s.day_type) || judgedBlock(s)?.max_effort === true;
   if (ASSESS_DAY_TYPES.has(s.day_type)) evidence = "record";
-  else if (r < ZONE2_CUTOFF_R) evidence = "zone2";
+  else if (effort >= ZONE2_MIN_EFFORT_SECONDS) evidence = "zone2";
   else if (maxEffortDay || (sustain != null && sustain >= CEILING_SUSTAIN)) evidence = "ceiling";
   else if (askedR != null && r < askedR * MISS_TOLERANCE && bout != null && bout / balancedBout(curve, askedR) < CEILING_SUSTAIN) {
     // A miss lowers the curve only when the ASK was comfortably sub-max for a
@@ -239,15 +244,16 @@ export function sessionContinuum(
     evidence = "miss";
   } else evidence = "floor";
 
-  return { r, bout_seconds: bout, rest_ratio: restRatio, sustain, evidence, asked_r: askedR };
+  return { r, effort_seconds: effort, bout_seconds: bout, rest_ratio: restRatio, sustain, evidence, asked_r: askedR };
 }
 
-// ─── The athlete's curve M(r) ────────────────────────────────────────────────
+// ─── The athlete's curve M over effort duration ──────────────────────────────
 
 export type NodeState = "measured" | "floor" | "blank";
 
 export interface CurveNode {
-  r: number;
+  /** effort duration in seconds — the bout a balanced athlete sustains at that pace */
+  seconds: number;
   m: number;
   conf: number;
   state: NodeState;
@@ -259,36 +265,41 @@ export interface EngineCurve {
   flags: string[];
   /** YYYY-MM-DD of the last session folded in */
   as_of: string | null;
-  /** set at a retest; cleared by the next ceiling-evidence anaerobic session */
+  /** set at a retest; cleared by the next ceiling-evidence short max effort */
   awaiting_right_anchor: boolean;
 }
 
-export const CURVE_VERSION = 1;
-const NODE_STEP_LOG10 = 0.05; // nodes every 0.05 in log10 r
-const SIGMA_LOG10 = 0.1; // a session touches roughly r/1.25 … r×1.25
+export const CURVE_VERSION = 2; // v2: nodes indexed by effort seconds (was pace multiple)
+const NODE_STEP_LOG10 = 0.1; // nodes every 0.1 in log10 seconds: 10, 12.6, 15.8 … 3600
+const SIGMA_LOG10 = 0.15; // a session touches roughly ×/÷ 1.4 in duration
 const K = 0.6; // how far a ceiling session pulls the node toward its sustain
-const STATE_W = 0.75; // a session marks a node measured/floor only within ~13 % of its pace (w ≥ 0.75)
+const STATE_W = 0.75; // a session marks a node measured/floor only within ~×/÷ 1.25 of its effort
 const STEP_CLAMP = 0.15;
 const M_MIN = 0.7, M_MAX = 1.5;
 const CONF_HALF_LIFE_DAYS = 60;
-const RIGHT_ANCHOR_R = 1.8; // retest hold-back applies above this
+const TRIAL_SECONDS = 600; // the pinned node
+const RIGHT_ANCHOR_SECONDS = 60; // efforts shorter than this are re-anchored by their own max effort after a retest
+const CEILING_SECONDS = 30; // the glycolytic anchor
 const DAMP_BETA = 0.5;
+const MIN_SECONDS = 10, MAX_SECONDS = 3600;
 
 export function newCurve(): EngineCurve {
   const nodes: CurveNode[] = [];
-  for (let x = Math.log10(ZONE2_CUTOFF_R); x <= Math.log10(3.5) + 1e-9; x += NODE_STEP_LOG10) {
-    nodes.push({ r: Number(Math.pow(10, x).toFixed(4)), m: 1.0, conf: 0, state: "blank" });
+  for (let x = Math.log10(MIN_SECONDS); x <= Math.log10(MAX_SECONDS) + 1e-9; x += NODE_STEP_LOG10) {
+    nodes.push({ seconds: Number(Math.pow(10, x).toFixed(1)), m: 1.0, conf: 0, state: "blank" });
   }
   return { version: CURVE_VERSION, nodes, flags: [], as_of: null, awaiting_right_anchor: false };
 }
 
-function weight(nodeR: number, r: number): number {
-  const d = (Math.log10(nodeR) - Math.log10(r)) / SIGMA_LOG10;
+function weight(nodeSeconds: number, seconds: number): number {
+  const d = (Math.log10(nodeSeconds) - Math.log10(seconds)) / SIGMA_LOG10;
   return Math.exp(-d * d);
 }
 
-function nearestNode(curve: EngineCurve, r: number): CurveNode {
-  return curve.nodes.reduce((best, n) => (Math.abs(Math.log10(n.r) - Math.log10(r)) < Math.abs(Math.log10(best.r) - Math.log10(r)) ? n : best));
+function nearestNode(curve: EngineCurve, seconds: number): CurveNode {
+  return curve.nodes.reduce((best, n) =>
+    Math.abs(Math.log10(n.seconds) - Math.log10(seconds)) < Math.abs(Math.log10(best.seconds) - Math.log10(seconds)) ? n : best
+  );
 }
 
 function daysBetween(a: string, b: string): number {
@@ -303,41 +314,45 @@ function decayConfidence(curve: EngineCurve, toDate: string): void {
   for (const n of curve.nodes) n.conf *= f;
 }
 
-/** Apply one session's evidence to the curve (mutates). Pure in the sense of
- *  no I/O; the caller owns ordering by date. */
-export function applySession(curve: EngineCurve, s: ContinuumSessionInput, c: ContinuumSession): void {
+function clampM(m: number): number {
+  return Math.max(M_MIN, Math.min(M_MAX, m));
+}
+
+/** Apply one session's evidence to the curve (mutates). The session's
+ *  coordinate is its effort duration D(r). The caller owns ordering by date. */
+export function applySession(curve: EngineCurve, s: ContinuumSessionInput, c: ContinuumSession, curveForAsk?: PdCurvePoint[] | null): void {
   decayConfidence(curve, s.date);
   curve.as_of = s.date;
-  if (c.r == null || c.sustain == null) return;
+  if (c.r == null || c.sustain == null || c.effort_seconds == null) return;
   if (c.evidence === "record" || c.evidence === "zone2" || c.evidence === "no_trial" || c.evidence === "no_curve") return;
 
-  const r = c.r;
+  const x = c.effort_seconds;
   if (c.evidence === "ceiling") {
-    const err = Math.max(-STEP_CLAMP, Math.min(STEP_CLAMP, c.sustain - nearestNode(curve, r).m));
+    const err = Math.max(-STEP_CLAMP, Math.min(STEP_CLAMP, c.sustain - nearestNode(curve, x).m));
     for (const n of curve.nodes) {
-      const w = weight(n.r, r);
+      const w = weight(n.seconds, x);
       if (w < 0.01) continue;
       n.m = clampM(n.m + K * w * err);
       n.conf += w;
       if (w >= STATE_W) n.state = "measured";
     }
-    // a ceiling-evidence anaerobic session re-anchors the right end after a retest
-    if (curve.awaiting_right_anchor && r >= RIGHT_ANCHOR_R) curve.awaiting_right_anchor = false;
+    if (curve.awaiting_right_anchor && x <= RIGHT_ANCHOR_SECONDS) curve.awaiting_right_anchor = false;
   } else if (c.evidence === "floor") {
     // raise only: a sub-max session proves the athlete can; it never proves they can't
     for (const n of curve.nodes) {
-      const w = weight(n.r, r);
+      const w = weight(n.seconds, x);
       if (w < 0.01) continue;
       if (c.sustain > n.m) n.m = clampM(n.m + w * Math.min(STEP_CLAMP, c.sustain - n.m));
       n.conf += 0.25 * w; // a floor is weak evidence
       if (n.state === "blank" && w >= STATE_W) n.state = "floor";
     }
   } else if (c.evidence === "miss") {
-    // lower toward what was delivered, at the pace that was ASKED
-    const askedR = c.asked_r ?? r;
-    const err = Math.max(-STEP_CLAMP, Math.min(0, r / askedR - 1));
+    // lower toward what was delivered, at the effort that was ASKED
+    const askedR = c.asked_r ?? c.r;
+    const askedX = curveForAsk ? balancedBout(curveForAsk, askedR) : x;
+    const err = Math.max(-STEP_CLAMP, Math.min(0, c.r / askedR - 1));
     for (const n of curve.nodes) {
-      const w = weight(n.r, askedR);
+      const w = weight(n.seconds, askedX);
       if (w < 0.01) continue;
       n.m = clampM(n.m + K * w * err);
       n.conf += 0.5 * w;
@@ -346,23 +361,19 @@ export function applySession(curve: EngineCurve, s: ContinuumSessionInput, c: Co
   }
 }
 
-function clampM(m: number): number {
-  return Math.max(M_MIN, Math.min(M_MAX, m));
-}
-
-/** A retest landed: fold drift at the pinned node back into the level, and
- *  hold back part of the level change on the fast-twitch end until its own
- *  anchor (the next ceiling-evidence anaerobic session) re-places it. */
+/** A retest landed: fold drift at the pinned node (the 10-minute effort)
+ *  back into the level, and hold back part of the level change on the
+ *  fast-twitch end until its own anchor (the next ceiling-evidence effort of
+ *  60 s or shorter) re-places it. */
 export function applyRetest(curve: EngineCurve, oldTrialPace: number, newTrialPace: number): void {
-  const pinned = nearestNode(curve, 1.0).m;
+  const pinned = nearestNode(curve, TRIAL_SECONDS).m;
   if (pinned > 0 && Math.abs(pinned - 1) > 1e-9) {
     for (const n of curve.nodes) n.m = clampM(n.m / pinned);
   }
   if (oldTrialPace > 0 && newTrialPace > 0 && newTrialPace !== oldTrialPace) {
-    const ceiling = 2.6;
     for (const n of curve.nodes) {
-      if (n.r <= RIGHT_ANCHOR_R) continue;
-      const ramp = Math.min(1, (Math.log10(n.r) - Math.log10(RIGHT_ANCHOR_R)) / (Math.log10(ceiling) - Math.log10(RIGHT_ANCHOR_R)));
+      if (n.seconds >= RIGHT_ANCHOR_SECONDS) continue;
+      const ramp = Math.min(1, (Math.log10(RIGHT_ANCHOR_SECONDS) - Math.log10(n.seconds)) / (Math.log10(RIGHT_ANCHOR_SECONDS) - Math.log10(CEILING_SECONDS)));
       n.m = clampM(n.m * Math.pow(oldTrialPace / newTrialPace, DAMP_BETA * ramp));
     }
     curve.awaiting_right_anchor = true;
@@ -405,7 +416,8 @@ export function replayCurve(
   const lastTrialByKey = new Map<string, number>();
   const uncalibrated = new Set<string>();
   let trialLow = false;
-  let maxCeilingR = 0;
+  // the athlete's short max efforts against each machine's OWN curve
+  let ceilingRatio: number | null = null;
 
   for (const s of ordered) {
     const key = `${s.modality}|${s.units ?? ""}`;
@@ -418,23 +430,26 @@ export function replayCurve(
     }
     const c = sessionContinuum(s, t?.pace ?? null, pdc);
     if (c.evidence === "no_trial") uncalibrated.add(key);
-    if (c.evidence === "ceiling" && c.r != null && c.sustain != null) {
-      // TRIAL_LOW: sustained longer than the balanced max at (or just above)
-      // trial pace on a long bout — only possible if the level is wrong. A
-      // 20-s sprint past the curve is the other flag (ceiling above balanced).
-      if (c.r >= 1.0 && c.r <= 1.3 && c.sustain > 1.05 && (c.bout_seconds ?? 0) >= 300) trialLow = true;
-      if (c.bout_seconds != null && c.bout_seconds <= 45 && c.r > maxCeilingR) maxCeilingR = c.r;
+    if (c.evidence === "ceiling" && c.r != null && c.sustain != null && c.effort_seconds != null && pdc) {
+      // TRIAL_LOW: sustained longer than the balanced max on a long bout at
+      // or just above trial pace — only possible if the level is wrong.
+      if (c.effort_seconds <= TRIAL_SECONDS && c.effort_seconds >= 180 && c.sustain > 1.05 && (c.bout_seconds ?? 0) >= 300) trialLow = true;
+      // CEILING vs balanced: a short all-out bout's pace against what the
+      // machine's curve says a balanced athlete holds for that bout.
+      if (c.bout_seconds != null && c.bout_seconds <= 45) {
+        const ratio = c.r / balancedPaceMultiple(pdc, c.bout_seconds);
+        if (ceilingRatio == null || ratio > ceilingRatio) ceilingRatio = ratio;
+      }
     }
     if (s.day_type === "time_trial") trialLow = false; // a retest resolves the flag
-    applySession(curve, s, c);
+    applySession(curve, s, c, pdc);
     out.push({ ...s, ...c });
   }
 
   const flags: string[] = [];
   if (trialLow) flags.push("TRIAL_LOW");
-  const echoCeiling = balancedCeiling(curves["echo_bike|cal"] ?? ECHO_BIKE_CAL_CURVE_V1);
-  if (maxCeilingR >= echoCeiling * 1.05) flags.push("CEILING_ABOVE_BALANCED");
-  else if (maxCeilingR > 0 && maxCeilingR <= echoCeiling * 0.9) flags.push("CEILING_BELOW_BALANCED");
+  if (ceilingRatio != null && ceilingRatio >= 1.05) flags.push("CEILING_ABOVE_BALANCED");
+  else if (ceilingRatio != null && ceilingRatio <= 0.9) flags.push("CEILING_BELOW_BALANCED");
   for (const k of uncalibrated) flags.push(`UNCALIBRATED:${k}`);
   if (curve.awaiting_right_anchor) flags.push("AWAITING_RIGHT_ANCHOR");
   curve.flags = flags;
@@ -445,32 +460,33 @@ export function replayCurve(
 
 export interface RegionSummary {
   label: string;
-  r_lo: number;
-  r_hi: number | null;
+  seconds_lo: number;
+  seconds_hi: number | null;
   m: number | null;
   state: NodeState;
   n: number;
   trend: "up" | "flat" | "down" | "unknown";
 }
 
+/** Effort-duration bands, short on the right as on the chart. */
 export const REGIONS: Array<[number, number | null, string]> = [
-  [0.85, 0.95, "0.85–0.95×"],
-  [0.95, 1.1, "0.95–1.1×"],
-  [1.1, 1.3, "1.1–1.3×"],
-  [1.3, 1.6, "1.3–1.6×"],
-  [1.6, 2.0, "1.6–2.0×"],
-  [2.0, 2.6, "2.0–2.6×"],
-  [2.6, null, ">2.6×"],
+  [1200, 2400, "20–40 min"],
+  [600, 1200, "10–20 min"],
+  [240, 600, "4–10 min"],
+  [120, 240, "2–4 min"],
+  [60, 120, "1–2 min"],
+  [30, 60, "30–60 s"],
+  [0, 30, "≤30 s"],
 ];
 
 export function summarizeCurve(curve: EngineCurve, sessions: ReplayResult["sessions"], now = curve.as_of ?? ""): RegionSummary[] {
   return REGIONS.map(([lo, hi, label]) => {
-    const nodes = curve.nodes.filter((n) => n.r >= lo && (hi == null || n.r < hi));
+    const inBand = (sec: number) => sec >= lo && (hi == null || sec < hi);
+    const nodes = curve.nodes.filter((n) => inBand(n.seconds));
     const totalConf = nodes.reduce((a, n) => a + n.conf, 0);
     const m = totalConf > 0 ? nodes.reduce((a, n) => a + n.m * n.conf, 0) / totalConf : null;
     const state: NodeState = nodes.some((n) => n.state === "measured") ? "measured" : nodes.some((n) => n.state === "floor") ? "floor" : "blank";
-    // trend: ceiling-evidence sustains in the region, last 28 days vs the 28 before
-    const ceil = sessions.filter((s) => s.evidence === "ceiling" && s.r != null && s.r >= lo && (hi == null || s.r < hi) && s.sustain != null);
+    const ceil = sessions.filter((s) => s.evidence === "ceiling" && s.effort_seconds != null && inBand(s.effort_seconds) && s.sustain != null);
     const recent = ceil.filter((s) => now && daysBetween(s.date, now) <= 28).map((s) => s.sustain as number);
     const prior = ceil.filter((s) => now && daysBetween(s.date, now) > 28 && daysBetween(s.date, now) <= 56).map((s) => s.sustain as number);
     let trend: RegionSummary["trend"] = "unknown";
@@ -480,7 +496,7 @@ export function summarizeCurve(curve: EngineCurve, sessions: ReplayResult["sessi
     } else if (recent.length >= 2) {
       trend = "flat";
     }
-    return { label, r_lo: lo, r_hi: hi, m: m != null ? Number(m.toFixed(3)) : null, state, n: Number(totalConf.toFixed(1)), trend };
+    return { label, seconds_lo: lo, seconds_hi: hi, m: m != null ? Number(m.toFixed(3)) : null, state, n: Number(totalConf.toFixed(1)), trend };
   });
 }
 
@@ -492,8 +508,8 @@ function mean(xs: number[]): number {
 export function formatCurveForPrompt(curve: EngineCurve, regions: RegionSummary[], trials: TrialInput[], opts?: { trialsShown?: number }): string {
   const shown = opts?.trialsShown ?? 6;
   const lines: string[] = [];
-  lines.push("ATHLETE CONDITIONING CURVE (pace as a multiple of the 10-min trial; M = ceiling vs a balanced athlete at your level, 1.0 = balanced; zone 2 below 0.85× is dose, not scored)");
-  lines.push("r:      " + regions.map((x) => x.label.padEnd(11)).join(""));
+  lines.push("ATHLETE CONDITIONING CURVE (by effort duration — the bout a balanced athlete sustains at the pace the athlete actually delivered; M = ceiling vs a balanced athlete at your level, 1.0 = balanced; efforts of 40 min+ are zone 2: dose, not scored)");
+  lines.push("effort: " + regions.map((x) => x.label.padEnd(11)).join(""));
   lines.push("M:      " + regions.map((x) => (x.m == null ? "—" : x.m.toFixed(2)).padEnd(11)).join(""));
   lines.push("state:  " + regions.map((x) => x.state.padEnd(11)).join(""));
   lines.push("n:      " + regions.map((x) => String(x.n).padEnd(11)).join(""));

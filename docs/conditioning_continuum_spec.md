@@ -328,6 +328,28 @@ for analytics), `engine_day_types`, `engine_workouts`,
   block** (what the athlete had to sustain).
 - The admin continuum chart lives on a **new tab of the admin athlete
   page**.
+- **Post first-run revisions (2026-11-16, production data):**
+  - **No unit conversion.** The watt-converted Concept2 curves were wrong on
+    the right (their 30-s ceiling sits near 1.95× watts, not 2.6×). Every
+    machine/unit now has its own curve in its own native pace multiples;
+    `comparablePace` is identity. Reference curves are machine-specific by
+    nature; what is shared is the athlete's curve.
+  - **The shared coordinate is EFFORT DURATION**, `D(r)`: the single bout a
+    balanced athlete sustains at the pace the athlete delivered, on that
+    machine's own curve. A 30-s-max effort is the same place whether it was
+    1.33× pace on a rower or 2.6× calories on an Echo. The athlete's
+    multiplier curve `M` is indexed by effort seconds (10 s … 60 min, log
+    grid); the sequencer's regions are duration bands (≤30 s, 30–60 s,
+    1–2 min, 2–4 min, 4–10 min, 10–20 min, 20–40 min); zone 2 = efforts a
+    balanced athlete sustains 40 min+ (fixed). The chart's x-axis is effort
+    duration, long on the left, short on the right — the founder's original
+    duration ↔ fibre-type framing.
+  - **Anchors from this base's own data:** Echo cal 2.6× @ 30 s sits at ≈ the
+    78th percentile of Echo riders' 30-s max efforts ("high-capacity,
+    balanced"); the same percentile of rowers is **1.33× pace @ 30 s** (C2
+    metres curve = Echo curve^0.30); C2 calories ≈ 2.0× @ 30 s (^0.73). Ski
+    and bike-erg are scaled copies until their own data refits them.
+  - Stored per session: `continuum_effort_s`. Curve version 2.
 - Build order: Phase 0 data-only (curves, backfill, replay, admin chart,
   cross-athlete diagnostic) → founder checkpoint on 2.6 / curve / 0.85 →
   Phase 1 sequencer prompt → Phase 2 targets + calibrate-on-switch →

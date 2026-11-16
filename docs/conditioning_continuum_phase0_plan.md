@@ -191,6 +191,20 @@ Deploy, in order:
 5. Open a few athletes' continuum pages and the overview's population
    table — that is the checkpoint (§5).
 
+## v2 (2026-11-16, after the first production run)
+
+- `20261116200000_engine_continuum_v2_native_curves.sql`: adds
+  `continuum_effort_s`; replaces the Concept2 curves with native pace
+  multiples (metres 1.33× @ 30 s, calories ≈ 2.0×).
+- Module v2: no unit conversion; the athlete's curve is indexed by effort
+  seconds; regions are duration bands; flags computed against each
+  machine's own curve.
+- Admin chart: x = effort duration (60 min on the left … 10 s on the right),
+  anchors at 10 min and 30 s, zone 2 shaded at 40 min+.
+- Deploy: `supabase db push`, redeploy `engine-continuum-backfill`, frontend,
+  then a full run `{ all: true, stale_only: false }` (curve version changed;
+  every athlete replays).
+
 ## Out of scope for Phase 0
 
 Targets, the ratchet affecting what athletes are asked, the sequencer

@@ -20,6 +20,7 @@ interface SessionRow {
   actual_pace: number | null;
   target_pace: number | null;
   r: number | null;
+  effort_s: number | null;
   bout_s: number | null;
   sustain: number | null;
   evidence: string | null;
@@ -28,7 +29,7 @@ interface SessionRow {
   total_rest_time: number | null;
 }
 interface TrialRow { modality: string; units: string | null; pace: number; date: string; is_current: boolean }
-interface CurveNode { r: number; m: number; conf: number; state: 'measured' | 'floor' | 'blank' }
+interface CurveNode { seconds: number; m: number; conf: number; state: 'measured' | 'floor' | 'blank' }
 interface EngineCurve { version: number; nodes: CurveNode[]; flags: string[]; as_of: string | null; computed_at?: string; module_version?: number }
 interface Payload {
   sessions: SessionRow[];
@@ -37,17 +38,20 @@ interface Payload {
   curves: Record<string, Array<{ r: number; seconds: number }>>;
 }
 
+// Effort-duration bands (seconds), long on the left as on the chart.
 const REGIONS: Array<[number, number | null, string]> = [
-  [0.85, 0.95, '0.85–0.95×'], [0.95, 1.1, '0.95–1.1×'], [1.1, 1.3, '1.1–1.3×'], [1.3, 1.6, '1.3–1.6×'],
-  [1.6, 2.0, '1.6–2.0×'], [2.0, 2.6, '2.0–2.6×'], [2.6, null, '>2.6×'],
+  [1200, 2400, '20–40 min'], [600, 1200, '10–20 min'], [240, 600, '4–10 min'], [120, 240, '2–4 min'],
+  [60, 120, '1–2 min'], [30, 60, '30–60 s'], [0, 30, '≤30 s'],
 ];
+const ZONE2_SECONDS = 2400;
 
 // Chart geometry
 const W = 1040, H = 410, L = 90, R = 960, T = 40, B = 330;
-const RMIN = 0.65, RMAX = 3.6, YMAX = 1.35;
-const px = (r: number) => L + (Math.log(Math.min(Math.max(r, RMIN), RMAX)) - Math.log(RMIN)) / (Math.log(RMAX) - Math.log(RMIN)) * (R - L);
+const SMAX = 3600, SMIN = 10, YMAX = 1.35;
+// x = effort duration on a log scale, LONG on the left (slow twitch) and SHORT on the right (fast twitch)
+const px = (sec: number) => L + (Math.log(SMAX) - Math.log(Math.min(Math.max(sec, SMIN), SMAX))) / (Math.log(SMAX) - Math.log(SMIN)) * (R - L);
 const py = (v: number) => T + (1 - Math.min(v, YMAX) / YMAX) * (B - T);
-const XTICKS = [0.7, 0.85, 1.0, 1.25, 1.5, 2.0, 2.6, 3.0, 3.5];
+const XTICKS: Array<[number, string]> = [[3600, '60 min'], [2400, '40'], [1200, '20'], [600, '10 min'], [240, '4'], [120, '2'], [60, '1 min'], [30, '30 s'], [10, '10 s']];
 const YTICKS = [0.25, 0.5, 0.75, 1.0, 1.25];
 
 export default function AdminContinuumPage({ session }: { session: Session }) {
@@ -92,13 +96,13 @@ export default function AdminContinuumPage({ session }: { session: Session }) {
   const ceilingR = useMemo(() => {
     const pts = data?.curves?.[activeMachine] ?? [];
     const at30 = pts.find((p) => Number(p.seconds) === 30);
-    return at30 ? Number(at30.r) : 2.6;
+    return at30 ? Number(at30.r) : null;
   }, [data, activeMachine]);
 
   const regions = useMemo(() => {
     const nodes = data?.curve?.nodes ?? [];
     return REGIONS.map(([lo, hi, label]) => {
-      const ns = nodes.filter((n) => n.r >= lo && (hi == null || n.r < hi));
+      const ns = nodes.filter((n) => n.seconds >= lo && (hi == null || n.seconds < hi));
       const conf = ns.reduce((a, n) => a + n.conf, 0);
       const m = conf > 0 ? ns.reduce((a, n) => a + n.m * n.conf, 0) / conf : null;
       const state = ns.some((n) => n.state === 'measured') ? 'measured' : ns.some((n) => n.state === 'floor') ? 'floor' : 'blank';
@@ -119,14 +123,14 @@ export default function AdminContinuumPage({ session }: { session: Session }) {
     }
   };
 
-  const ceilings = sessions.filter((s) => s.evidence === 'ceiling' && s.r != null && s.sustain != null).sort((a, b) => (a.r! - b.r!));
-  const envelope = ceilings.length > 1 ? 'M' + ceilings.map((s) => `${px(s.r!).toFixed(0)},${py(s.sustain!).toFixed(0)}`).join(' L') : '';
-  const uncomputable = sessions.filter((s) => s.evidence === 'no_trial' || s.evidence === 'no_curve' || s.r == null);
+  const ceilings = sessions.filter((s) => s.evidence === 'ceiling' && s.effort_s != null && s.sustain != null).sort((a, b) => (b.effort_s! - a.effort_s!));
+  const envelope = ceilings.length > 1 ? 'M' + ceilings.map((s) => `${px(s.effort_s!).toFixed(0)},${py(s.sustain!).toFixed(0)}`).join(' L') : '';
+  const uncomputable = sessions.filter((s) => s.evidence === 'no_trial' || s.evidence === 'no_curve' || s.r == null || s.effort_s == null);
 
   const describe = (s: SessionRow) => {
     const kind = s.evidence === 'ceiling' ? 'reached the curve (ceiling)' : s.evidence === 'floor' ? 'floor only' : s.evidence === 'miss' ? 'miss — below the asked pace' : s.evidence === 'record' ? 'record (assess day)' : s.evidence === 'zone2' ? 'zone 2 — not scored' : s.evidence ?? '';
     return `<b>${s.date}</b> · ${(s.day_type ?? '').replace(/_/g, ' ')}<br>` +
-      `<b>${s.r?.toFixed(2)}× trial pace</b> · bout ${s.bout_s ?? '?'} s × ${s.intervals ?? '?'} · rest ${s.total_work_time && s.total_rest_time != null ? (s.total_rest_time / s.total_work_time).toFixed(2) : '?'}×<br>` +
+      `<b>${s.r?.toFixed(2)}× trial pace</b> = a ${fmtSeconds(s.effort_s ?? 0)} effort for a balanced athlete · bout ${s.bout_s ?? '?'} s × ${s.intervals ?? '?'} · rest ${s.total_work_time && s.total_rest_time != null ? (s.total_rest_time / s.total_work_time).toFixed(2) : '?'}×<br>` +
       `sustain <b>${s.sustain?.toFixed(2)}</b> · ${kind}` +
       (s.target_pace != null && s.actual_pace != null ? `<br>asked ${s.target_pace.toFixed(1)} · delivered ${s.actual_pace.toFixed(1)} ${s.units ?? ''}/min` : '');
   };
@@ -169,29 +173,29 @@ export default function AdminContinuumPage({ session }: { session: Session }) {
           </div>
 
           <div style={{ position: 'relative' }}>
-            <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Sessions by delivered pace (multiple of the trial) and sustained bout versus balanced" style={{ width: '100%', height: 'auto', display: 'block', color: 'var(--text)' }}>
-              <rect x={L} y={T} width={px(0.85) - L} height={B - T} fill="var(--surface2)" />
-              <text x={(L + px(0.85)) / 2} y={T + 28} textAnchor="middle" fontSize={11} fill="var(--text-muted)">zone 2</text>
-              <rect x={px(ceilingR)} y={T} width={R - px(ceilingR)} height={B - T} fill="var(--surface2)" />
-              <text x={(px(ceilingR) + R) / 2} y={T + 28} textAnchor="middle" fontSize={11} fill="var(--text-muted)">beyond balanced</text>
+            <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Sessions by effort duration and sustained bout versus balanced" style={{ width: '100%', height: 'auto', display: 'block', color: 'var(--text)' }}>
+              <rect x={L} y={T} width={px(ZONE2_SECONDS) - L} height={B - T} fill="var(--surface2)" />
+              <text x={(L + px(ZONE2_SECONDS)) / 2} y={T + 28} textAnchor="middle" fontSize={11} fill="var(--text-muted)">zone 2 · 40 min+</text>
+              <rect x={px(30)} y={T} width={R - px(30)} height={B - T} fill="var(--surface2)" />
+              <text x={(px(30) + R) / 2} y={T + 28} textAnchor="middle" fontSize={11} fill="var(--text-muted)">beyond balanced</text>
               <g stroke="var(--border)" strokeWidth={1}>
                 {YTICKS.filter((v) => v !== 1).map((v) => <line key={v} x1={L} x2={R} y1={py(v)} y2={py(v)} />)}
-                {XTICKS.map((v) => <line key={v} x1={px(v)} x2={px(v)} y1={T} y2={B} />)}
+                {XTICKS.map(([sec]) => <line key={sec} x1={px(sec)} x2={px(sec)} y1={T} y2={B} />)}
               </g>
               <line x1={L} x2={R} y1={py(1)} y2={py(1)} stroke="var(--text-muted)" strokeWidth={1.5} strokeDasharray="6 5" />
-              <text x={px(1.08)} y={py(1) - 6} fontSize={11} fill="var(--text-muted)">on the balanced power-duration curve = 1.0</text>
-              <line x1={px(1)} x2={px(1)} y1={T} y2={B} stroke="currentColor" strokeWidth={1.3} strokeDasharray="3 3" />
-              <text x={px(1) + 5} y={B - 8} fontSize={11} fill="var(--text-dim)">time trial · 1.0×</text>
-              <line x1={px(ceilingR)} x2={px(ceilingR)} y1={T} y2={B} stroke="currentColor" strokeWidth={1.3} strokeDasharray="3 3" />
-              <text x={px(ceilingR) - 5} y={B - 8} fontSize={11} fill="var(--text-dim)" textAnchor="end">balanced 30-s ceiling · {ceilingR}×</text>
+              <text x={px(500)} y={py(1) - 6} fontSize={11} fill="var(--text-muted)">on the balanced power-duration curve = 1.0</text>
+              <line x1={px(600)} x2={px(600)} y1={T} y2={B} stroke="currentColor" strokeWidth={1.3} strokeDasharray="3 3" />
+              <text x={px(600) + 5} y={B - 8} fontSize={11} fill="var(--text-dim)">time trial · 10 min · 1.0×</text>
+              <line x1={px(30)} x2={px(30)} y1={T} y2={B} stroke="currentColor" strokeWidth={1.3} strokeDasharray="3 3" />
+              <text x={px(30) - 5} y={B - 8} fontSize={11} fill="var(--text-dim)" textAnchor="end">30-s max{ceilingR != null ? ` · ${ceilingR}× on this machine` : ''}</text>
               {YTICKS.map((v) => <text key={v} x={L - 8} y={py(v) + 4} fontSize={11} fill="var(--text-dim)" textAnchor="end">{v.toFixed(2)}</text>)}
-              {XTICKS.map((v) => <text key={v} x={px(v)} y={B + 18} fontSize={11} fill="var(--text-dim)" textAnchor="middle">{v}×</text>)}
-              <text x={(L + R) / 2} y={B + 44} fontSize={12.5} fill="currentColor" textAnchor="middle">delivered pace · multiple of the 10-minute trial (log) · left = slow twitch, right = fast twitch</text>
+              {XTICKS.map(([sec, label]) => <text key={sec} x={px(sec)} y={B + 18} fontSize={11} fill="var(--text-dim)" textAnchor="middle">{label}</text>)}
+              <text x={(L + R) / 2} y={B + 44} fontSize={12.5} fill="currentColor" textAnchor="middle">effort duration — the bout a balanced athlete sustains at the pace delivered (log) · left = slow twitch, right = fast twitch</text>
               <text x={30} y={(T + B) / 2} fontSize={12.5} fill="currentColor" textAnchor="middle" transform={`rotate(-90 30 ${(T + B) / 2})`}>sustained bout ÷ balanced max bout at that pace</text>
               {envelope && <path d={envelope} fill="none" stroke="var(--accent)" strokeWidth={2.2} strokeLinejoin="round" opacity={.75} />}
               {sessions.map((s) => {
-                if (s.r == null || s.sustain == null) return null;
-                const cx = px(s.r), cy = py(s.sustain);
+                if (s.r == null || s.sustain == null || s.effort_s == null) return null;
+                const cx = px(s.effort_s), cy = py(s.sustain);
                 const common = {
                   onMouseMove: (e: React.MouseEvent) => {
                     const host = (e.currentTarget as SVGElement).closest('div');
@@ -243,12 +247,12 @@ export default function AdminContinuumPage({ session }: { session: Session }) {
           <h3 style={sectionH3}>Sessions</h3>
           <div style={{ overflowX: 'auto' }}>
             <table className="admin-table" style={{ fontSize: 12 }}>
-              <thead><tr><th>date</th><th>type</th><th>× trial</th><th>bout s</th><th>rest:work</th><th>asked</th><th>delivered</th><th>sustain</th><th>evidence</th></tr></thead>
+              <thead><tr><th>date</th><th>type</th><th>× trial</th><th>effort</th><th>bout s</th><th>rest:work</th><th>asked</th><th>delivered</th><th>sustain</th><th>evidence</th></tr></thead>
               <tbody>
                 {sessions.map((s) => (
                   <tr key={s.id}>
                     <td>{s.date}</td><td>{(s.day_type ?? '').replace(/_/g, ' ')}</td>
-                    <td>{s.r?.toFixed(2) ?? '—'}</td><td>{s.bout_s ?? '—'}</td>
+                    <td>{s.r?.toFixed(2) ?? '—'}</td><td>{s.effort_s != null ? fmtSeconds(s.effort_s) : '—'}</td><td>{s.bout_s ?? '—'}</td>
                     <td>{s.total_work_time && s.total_rest_time != null ? (s.total_rest_time / s.total_work_time).toFixed(2) : '—'}</td>
                     <td>{s.target_pace?.toFixed(1) ?? '—'}</td><td>{s.actual_pace?.toFixed(1) ?? '—'}</td>
                     <td>{s.sustain?.toFixed(2) ?? '—'}</td><td>{s.evidence ?? 'not computed'}</td>
@@ -263,6 +267,10 @@ export default function AdminContinuumPage({ session }: { session: Session }) {
   );
 }
 
+function fmtSeconds(sec: number): string {
+  if (sec >= 120) return `${Math.round(sec / 60)} min`;
+  return `${Math.round(sec)} s`;
+}
 const sectionH3: React.CSSProperties = { fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--text-muted)', marginTop: 28, marginBottom: 10 };
 function legendDot(bg: string, border?: string, opacity?: number): React.CSSProperties {
   return { display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: bg, border, opacity, marginRight: 6, verticalAlign: 'middle', boxSizing: 'border-box' };
