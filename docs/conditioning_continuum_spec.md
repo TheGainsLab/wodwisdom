@@ -124,6 +124,23 @@ do not scale alike). `R(600) = 1.0` by definition.
   machine/unit, once there are enough.
 - Stored as a small table of (seconds, fraction) points, interpolated on
   log-duration.
+- **Two measured anchors** (founder, 2026-11-16). The 10-minute time trial
+  anchors the middle at 1.0. The anaerobic day — 30 s max effort with
+  ~150 s rest, i.e. a glycolytic test — anchors the right: a balanced,
+  high-capacity athlete sits near **2.6×** trial pace at 30 s on Echo-bike
+  calories. That number is unit-specific and lives in the per-unit curve,
+  not in a shared constant (watts and rower metres have their own). The
+  anaerobic day is the right-hand probe the way the trial is the middle
+  probe; it is a probe only at full rest — the same 30 s at 1:1 is a
+  different session (§3.1 kink) and does not re-anchor the right.
+- **Reading the right end.** Delivered ÷ 2.6 is the normalised height at
+  the far right. A high value can mean a strong glycolytic system OR a weak
+  10-minute level — the ratio has two inputs and cannot say which. The tie
+  is broken by the trial's level and its progression: trial low for the
+  athlete's history + ratio high → the aerobic side is the gap; trial
+  strong + ratio high → a genuine fast-twitch athlete. The sequencer reads
+  the ratio **together with trial progression**, never alone (prompt
+  instruction, §5).
 
 ### 3.3 Target — what the athlete is asked to hold
 
@@ -166,14 +183,14 @@ athlete.
   2. Fold the drift back into the level: `M[n] /= M[35]` for every node,
      so `M(35)` returns to 1.0 and the shape is preserved relative to the
      new anchor.
-  3. **Damped retest for the fast-twitch end.** A trial gained through
-     aerobic work does not transfer fully to 20-second efforts. For nodes
-     right of ~70, hold back part of the level jump as a one-time
-     adjustment: `M[n] *= (old_trial / new_trial) ^ β × ramp(n)`, with
-     `β ≈ 0.5` and `ramp` rising from 0 at position 70 to 1 at 100. The
-     next anaerobic sessions then ratchet those nodes to wherever the
-     athlete really is. (This is not a new concept: it is the ordinary
-     ratchet applied once at the moment the level changes.)
+  3. **The right end re-anchors from its own probe.** A trial gained
+     through aerobic work does not transfer fully to 20-second efforts.
+     With the anaerobic day as the right-hand probe (§3.2), the far-right
+     nodes are re-anchored by the next full-rest anaerobic session rather
+     than inheriting the trial's jump. Until that session lands, hold back
+     part of the level jump: `M[n] *= (old_trial / new_trial) ^ β × ramp(n)`
+     for nodes right of ~70, `β ≈ 0.5`, `ramp` 0 at 70 → 1 at 100. (The
+     ordinary ratchet applied once at the moment the level changes.)
   4. Confidence is left alone; shape survives, level updates.
 
 ### 3.5 Delivered fraction and the normalised height
@@ -293,7 +310,9 @@ The prompt's instruction simplifies to: *prescribe into the lowest
 well-measured region without letting the strong regions sag; probe a
 region marked "?" with a day placed there; choose the day's shape and the
 ratchet sets its intensity — do not chase the athlete with the pace
-fraction.* The envelope's pace range becomes the band the ratchet may move
+fraction. Read the far-right multiplier together with the trial's level
+and progression: high right + low or stalled trial means the aerobic side
+is the gap; high right + strong trial means a fast-twitch athlete.* The envelope's pace range becomes the band the ratchet may move
 the target within, not a value the model picks.
 
 Day types remain the vocabulary the model uses to name a day, exactly as
