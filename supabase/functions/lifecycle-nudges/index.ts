@@ -272,6 +272,21 @@ Deno.serve(async (req) => {
 
   const supa = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
+  // Continuum refresh (Phase 0, 2026-11-16): ride the daily tick to recompute
+  // athletes whose Engine sessions are newer than their curve. The backfill
+  // acks 202 at once and works in the background; a failure here never
+  // affects the sweeps, so it only logs.
+  try {
+    const resp = await fetch(`${SUPABASE_URL}/functions/v1/engine-continuum-backfill`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Cron-Key": CRON_KEY ?? "" },
+      body: JSON.stringify({ all: true, stale_only: true }),
+    });
+    console.log(`[lifecycle-nudges] continuum refresh kicked: ${resp.status}`);
+  } catch (e) {
+    console.warn(`[lifecycle-nudges] continuum refresh kick failed: ${e instanceof Error ? e.message : String(e)}`);
+  }
+
   const welcome = await runSweep(supa, "welcome_nudge_candidates", "welcome_nudge", WELCOME_SUBJECT, renderWelcome);
   const freeLimit = await runSweep(supa, "free_limit_candidates", "free_limit_nudge", FREE_LIMIT_SUBJECT, renderFreeLimit);
   const evalFollowup = await runEvalFollowupSweep(supa);

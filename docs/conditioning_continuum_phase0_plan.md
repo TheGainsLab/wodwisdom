@@ -164,6 +164,33 @@ multi-machine athlete, a new 3-day athlete, a long-tenured one) and decide:
 Decisions from the checkpoint go into the spec's decisions log; a changed
 curve or threshold reruns the backfill.
 
+## Built (2026-11-16) and how to deploy
+
+| Piece | Where |
+|---|---|
+| Pure module + 18 tests | `supabase/functions/_shared/engine-continuum.ts`, `engine-continuum_test.ts`, fixture `fixtures/continuum_athlete.json` |
+| Prescription expander | `supabase/functions/_shared/engine-continuum-prescription.ts` (longest work block via `engine-block-resolve`) |
+| Migration | `supabase/migrations/20261116000000_engine_continuum.sql` — linted on a local Postgres 16, idempotent |
+| Backfill function | `supabase/functions/engine-continuum-backfill/` (`config.toml`: verify_jwt=false; gates itself) |
+| Daily refresh | `lifecycle-nudges` kicks `{ all: true, stale_only: true }` at the start of its tick |
+| Admin page | `/admin/users/:id/continuum` (`src/pages/AdminContinuumPage.tsx`), linked from the athlete page's Engine section |
+| Population diagnostic | "Continuum · population" table on the admin overview |
+
+Deploy, in order:
+
+1. `supabase db push` (the migration seeds `engine_pd_curves`; no data is
+   recomputed yet).
+2. `supabase functions deploy engine-continuum-backfill --no-verify-jwt`
+   and `supabase functions deploy lifecycle-nudges --no-verify-jwt`.
+3. Frontend deploy.
+4. First full backfill, once, from an admin session or with the cron key:
+   `POST /functions/v1/engine-continuum-backfill` body `{ "all": true, "stale_only": false }`
+   (acks 202; per-athlete lines in the function log). From then on the
+   daily tick keeps curves fresh; the admin page's button recomputes one
+   athlete on demand.
+5. Open a few athletes' continuum pages and the overview's population
+   table — that is the checkpoint (§5).
+
 ## Out of scope for Phase 0
 
 Targets, the ratchet affecting what athletes are asked, the sequencer

@@ -318,3 +318,10 @@ verify_jwt = false
 
 [functions.weekly-programming-cron]
 verify_jwt = false
+
+[functions.engine-continuum-backfill]
+# Continuum (Phase 0): recompute per-session continuum values and the
+# athlete's curve from history. Gates itself: X-Cron-Key (the daily
+# lifecycle tick kicks a stale-only sweep) or an admin JWT (the admin
+# page's "Recompute from history" button).
+verify_jwt = false
