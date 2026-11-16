@@ -203,9 +203,15 @@ Options:
   proposal. Acceptable to start; wrong by a few percent on the Echo at the
   extremes.
 
-Decision needed. Proposal: option 1 for Echo bike, rower, ski-erg and
-bike-erg (all have usable conversions); option 3 as the fallback for any
-machine without one.
+**Decided 2026-11-16: the shape is shared; option 1.** Level stays per
+machine (each machine keeps its own trial; nothing predicts one machine's
+capacity from another). Shape — the multiplier — is a property of the
+athlete and transfers. Watts are used only so a given percentage means the
+same physical demand on every machine: convert pace → watt-equivalent
+before the fraction math, convert the target back to the athlete's unit
+for display. The athlete never sees watts unless they chose watts. Option
+3 (per-unit curves) remains the fallback for a machine with no published
+conversion.
 
 ## 4. The ratchet
 
@@ -341,19 +347,20 @@ never uses this table; it computes position from the day as written.
 
 ## 11. Open questions for the founder
 
-- Node spacing and `σ`: how local should a session's effect be? (5 and 8
-  are guesses.)
-- Should `M` be per machine after all? See §3.7 — proposal is shared, in a
-  power-equivalent currency; revisit if a rower-heavy athlete's bike curve
-  looks genuinely different after that.
+- ~~Node spacing and `σ`~~ **Decided 2026-11-16: start at nodes every 5,
+  σ = 8**, one width for the whole axis. Founder notes differences on the
+  right are starker; split the width only if the fast-twitch end looks
+  smeared in practice.
+- ~~Should `M` be per machine after all?~~ **Decided 2026-11-16: shared
+  shape, per-machine level** (§3.7).
 - ~~The zone-2 cutoff (~20): fixed, or per athlete?~~ **Decided 2026-11-16:
   fixed.** Zone 2 is defined by intent, not by the athlete.
 - ~~Should assess types ratchet, or only record?~~ **Decided 2026-11-16:
   record only.** Assess days (time trial, rocket_races_b, infinity,
   afterburner, synthesis) are plotted as points and never move `M`. The
   ratchet learns from develop days only.
-- Echo bike calories are non-linear in watts: resolved in §3.7 as a
-  decision between power-equivalent conversion and per-unit curves.
+- ~~Echo bike calories are non-linear in watts~~ **Decided 2026-11-16:
+  watt-equivalent conversion** (§3.7).
 - Damped retest: `β` and the 70→100 ramp (§3.4) are guesses.
 
 ## 12. Parked list, reconciled
