@@ -1,25 +1,32 @@
-# Conditioning continuum — pace fraction + ratchet on the power-duration curve
+# Conditioning continuum — two anchors, a ratchet, and a curve the sequencer reads
 
-Status: DRAFT for founder review (2026-11-16). Nothing here is built.
+Status: DRAFT v2 for founder review (2026-11-16). Nothing here is built.
+v2 replaces the v1 draft of the same day: position is no longer fitted
+from a prescription's parameters; it is read from the pace the athlete
+delivered, placed between two anchors the athlete cannot argue with.
 
 Supersedes, once adopted, the parked signal changes from the 2026-11-15/16
-review: pace-over-baseline as the headline, pooling per day type across
-machines, anaerobic against the athlete's own best, and the rolling
-multiplier on sequenced days. All four become one design.
+review (pace-over-baseline headline, pooling per day type across machines,
+anaerobic against own best, rolling multiplier on sequenced days).
 
 ## 1. The idea in one paragraph
 
-An athlete's conditioning is a curve over one axis, from long steady
-slow-twitch work on the left to short all-out fast-twitch work on the
-right. The time trial sets the athlete's **level**. A reference
-**power-duration curve** says what a balanced athlete at that level holds at
-every other duration. Every training day lands on the axis by its own
-parameters, and its target is `trial pace × expected fraction at that
-duration × the athlete's multiplier at that position`. Beat the target and
-the multiplier there ratchets up; miss it and it ratchets down. The
-multiplier curve is the athlete's shape: flat means balanced, a dip is the
-missing piece the sequencer prescribes into. One rule on every training
-day, curated or sequenced.
+An athlete's conditioning is a curve over one axis: **pace as a multiple
+of their own 10-minute time trial**, on a log scale. Left is slow-twitch,
+long steady work around 0.7×; right is fast-twitch, all-out work around
+2.6× and beyond. Two anchors place everything: the **time trial** (1.0×)
+sets the level, and the **max-effort anaerobic day** (30 s all-out, long
+rest) sets the ceiling, which no day can be constructed to exceed. A
+balanced athlete's ceiling sits at **2.6×** on Echo-bike calories. Every
+logged session lands on the axis at the pace it was actually ridden, and
+its height is **how long the athlete sustained a bout at that pace**
+against what a balanced athlete sustains there. Max efforts pin the
+ceiling; sub-max days prove floors. The **ratchet** raises floors toward
+ceilings by asking a little more each time. The resulting curve is what the
+sequencer reads: where the athlete is above balanced, below it, or never
+measured. The sequencer prescribes into the gaps and **probes** the
+blanks. Day types, tags and the Analytics page stay exactly as the
+athlete-facing vocabulary.
 
 ## 2. What it replaces, and what it keeps
 
@@ -27,400 +34,307 @@ Replaced (sequencer inputs only — nothing the athlete sees goes away):
 
 - `rolling_avg_ratio` / `last_5_ratios` per (day_type, modality) as the
   headline signal. Kept in the table for analytics; demoted in the prompt.
-- The per-day-type rolling multiplier that moves curated targets, and its
-  `gen:` exemption on sequenced days.
-- The anaerobic "pace ÷ aerobic baseline" metric.
+- The per-day-type rolling multiplier on curated targets and its `gen:`
+  exemption on sequenced days.
+- The anaerobic "pace ÷ aerobic baseline" metric — replaced by the
+  anaerobic day as the right-hand anchor.
 - The ENGINE ANALYTICS dump in the sequencer prompt.
-- Energy-system tags as the way the sequencer reasons about what a day
-  trains.
+- Energy-system tags as the sequencer's evidence about the athlete.
+- (v1 only) the fitted position formula and its coefficients — gone.
 
 Kept, unchanged, because athletes and the product reference them:
 
 - **Day types.** Names, coaching intent, envelopes, readiness
   prerequisites, the catalogue the sequencer picks from, the program
-  mapping, the day-type labels on every screen and in every email. A day
-  is still "Max Aerobic Power" to the athlete. The continuum position is
-  an additional computed property of a day, not a replacement for its
-  type.
-- **Day-type tags** (`class`, `trains`, `prerequisites`). Readiness gating
-  and the Analytics page still read them. They stop being the sequencer's
-  evidence about the athlete; they remain the catalogue's description of
-  the day.
-- **The Analytics page** and `engine-analytics.ts`. Per-type, per-machine
-  statistics stay as they are. The continuum view is added beside them,
-  not instead of them.
+  mapping, every label on every screen. A day is still "Max Aerobic Power"
+  to the athlete. The continuum reads what happened on it; it does not
+  rename it.
+- **Day-type tags** (`class`, `trains`, `prerequisites`): readiness gating
+  and the Analytics page still read them. Not the sequencer's evidence.
+- **The Analytics page** and `engine-analytics.ts`. The continuum view is
+  added beside them.
 - **Time trials** on day one of every month, per machine and unit.
+- **The log screen.** One total per session. No per-block or per-interval
+  logging is asked of anyone.
 
 ## 3. Definitions
 
-### 3.1 Position — where a day sits on the axis
-
-Computed per **block** from its prescription, then combined per day. Scale
-0–100: 0 = roughly an hour of continuous work, 100 = a 10-second effort.
+### 3.1 The axis — pace as a multiple of the trial
 
 ```
-duration_norm   = 1 − (log10(work_seconds_per_bout) − 1) / 2.56        # 10 s → 1.0, 3600 s → 0
-rest_ratio      = max(rest_seconds / work_seconds, 0.25)               # continuous work counts as SHORT rest, not none
-rest_below      = min(log2(rest_ratio), 0)                             # the approach to 1:1
-rest_above      = max(log2(rest_ratio), 0)                             # beyond 1:1
-position        = clamp(20 × duration_norm
-                      + 67 × (prescribed_fraction − 0.90)
-                      + 19.7 × rest_below
-                      + 2.0 × rest_above
-                      + 54, 0, 100)
+r = delivered_pace / trial_pace(machine, units, current)
 ```
 
-Fitted 2026-11-16 to six founder anchors (endurance 3, threshold 19,
-devour 25, max aerobic power 60, rocket races A 79, anaerobic 100); all
-six reproduce within 2 points. What the fit says about the axis:
+Plotted on a log scale. No fitted position; no coefficients. The
+prescription's parameters (bout, rest, asked pace) do not decide where a
+session sits — the athlete does, by the pace they delivered. Duration and
+rest are consequences of intensity, not its definition: an athlete does
+not go far above the asked pace "at a position"; they move right.
 
-- **Intensity and recovery dominate; duration is a tiebreaker.** With pace
-  fraction and rest ratio known, bout length adds little — a long piece is
-  necessarily slower and a short piece necessarily faster, so duration
-  enters through those. A 4 × 4-min and an 8 × 90-s max-aerobic-power day
-  at the same pace and rest land 4 points apart (66 vs 70).
-- **The rest ratio has a kink at 1:1** (founder: "once rest exceeds work,
-  pace goes up considerably"). Below 1:1 the ratio moves position hard —
-  that is the aerobic-to-power transition (threshold 19 → devour 25 →
-  max aerobic power 60). Above 1:1 the ratio itself adds little, because
-  the extra recovery expresses itself as a higher prescribed pace, which
-  the intensity term already carries (rocket races 79, anaerobic 100).
-- **Continuous work is treated as rest ratio 0.25**, not zero: a 15-minute
-  threshold piece and a devour set with a minute's rest are the same kind
-  of work, and the formula now agrees (19 vs 24).
+Landmarks on the axis (Echo bike, cal; other units have their own):
 
-Examples under this fit: interval 2 min at 0.95, rest a third of work → 37;
-descending devour 3 min at 0.97, rest a quarter → 29; hybrid anaerobic
-60 s at 1.12, rest 2.25× → 85; atomic sprint block 10 s max → 100 with its
-aerobic block at ~45 (spread ~55, reported).
+| r | meaning |
+|---|---|
+| ~0.70 | zone 2 — endurance, polarized, flux. Trained, never scored (§4) |
+| 0.90–0.95 | threshold |
+| **1.0** | **the time trial. Pinned: the level.** |
+| 1.1–1.5 | aerobic power, hard intervals |
+| 1.5–2.2 | glycolytic repeats, rocket races, hybrid anaerobic |
+| **2.6** | **balanced 30-s max effort. The ceiling for a balanced athlete.** |
+| > 2.6 | fast-twitch stretch — the athlete's own ceiling is past balanced |
 
-- `prescribed_fraction` for a max-effort block is taken as 1.30 for the
-  position calculation only (the target itself comes from §3.3).
-- Continuous work with bursts (polarized, flux): weight by time, so the
-  base dominates and the bursts barely move the position.
-- A multi-block day's position is the work-time-weighted mean of its
-  blocks; its **spread** (max − min block position) is stored beside it.
-  A blended day is placed honestly as a blend, with its uncertainty
-  visible. No per-block logging is asked of the athlete.
-- The coefficients are fitted to six points. Re-fit when the founder adds
-  anchors, especially pairs that differ only in duration.
+The two anchors are inarguable: the trial is a measured 10-minute best,
+and the anaerobic day (30 s all-out, ~5:1 rest) is the hardest effort any
+day in the program can construct. An athlete's own ceiling may sit above
+or below 2.6; that single number is the fast-twitch / slow-twitch read.
 
-Day type does not enter the formula. Two Max Aerobic Power days at 90 s and
-5 min land eleven points apart, and should.
+### 3.2 The static curve — balanced duration at a pace
 
-### 3.2 Expected fraction — the power-duration curve
+`D(r)`: the longest single bout a **balanced** athlete sustains at pace
+`r×trial`. One curve per **machine and unit**. Authored v1 from the two
+anchors plus the catalogue's envelope midpoints; refit from pooled
+max-effort data later (§3.6).
 
-`R(d)`: for a work-bout duration `d` (seconds), the pace a **balanced**
-athlete holds, as a fraction of their 10-minute time-trial pace. One curve
-per **machine and unit** (Echo bike calories, rower metres, ski-erg metres
-do not scale alike). `R(600) = 1.0` by definition.
+Echo bike, calories, v1 (seconds at multiple of trial):
+`3.2×→10 s · 2.9×→20 s · 2.6×→30 s · 2.2×→45 s · 1.8×→60 s · 1.35×→120 s ·
+1.2×→180 s · 1.12×→240 s · 1.0×→600 s · 0.95×→900 s · 0.92×→1200 s ·
+0.88×→1800 s · 0.82×→3600 s`. Interpolated on log-duration. (This is the
+same curve as v1's `R(d)`, read the other way round.)
 
-- v1: authored, anchored to the envelope midpoints the catalogue already
-  encodes (endurance 0.70, threshold ~0.90, max aerobic power ~0.95–1.05,
-  short intervals 1.1–1.3) and to observed max-effort data on the right
-  (this athlete: 20 s ≈ 3.0, 30 s ≈ 2.7, 45 s ≈ 2.3, 60 s ≈ 1.5 on Echo bike
-  calories).
-- v2: fitted from the pooled max-effort sessions of all athletes per
-  machine/unit, once there are enough.
-- Stored as a small table of (seconds, fraction) points, interpolated on
-  log-duration.
-- **Two measured anchors** (founder, 2026-11-16). The 10-minute time trial
-  anchors the middle at 1.0. The anaerobic day — 30 s max effort with
-  ~150 s rest, i.e. a glycolytic test — anchors the right: a balanced,
-  high-capacity athlete sits near **2.6×** trial pace at 30 s on Echo-bike
-  calories. That number is unit-specific and lives in the per-unit curve,
-  not in a shared constant (watts and rower metres have their own). The
-  anaerobic day is the right-hand probe the way the trial is the middle
-  probe; it is a probe only at full rest — the same 30 s at 1:1 is a
-  different session (§3.1 kink) and does not re-anchor the right.
-- **Reading the right end.** Delivered ÷ 2.6 is the normalised height at
-  the far right. A high value can mean a strong glycolytic system OR a weak
-  10-minute level — the ratio has two inputs and cannot say which. The tie
-  is broken by the trial's level and its progression: trial low for the
-  athlete's history + ratio high → the aerobic side is the gap; trial
-  strong + ratio high → a genuine fast-twitch athlete. The sequencer reads
-  the ratio **together with trial progression**, never alone (prompt
-  instruction, §5).
-
-### 3.3 Target — what the athlete is asked to hold
-
-For every work block, on every day, curated or sequenced:
+### 3.3 Height — how long the athlete sustained it
 
 ```
-target_pace = trial_pace(machine, units, current) × R(d) × M(position)
+y = bout_seconds / D(r)
 ```
 
-- `trial_pace`: the athlete's current time trial on that machine and unit.
-  No trial on the machine → no target (see §6, calibrate on switch).
-- `M(position)`: the athlete's multiplier at that position (§3.4).
-- "Max effort" days are not special: the target is computed the same way
-  and shown as "beat this". The athlete still goes all out; the target is
-  the ratchet's reference, not a cap.
-- Sequencer-generated days use this target too. The `gen:` exemption in
-  `effectiveRollingMult` is removed. The sequencer chooses the day's shape
-  (and so its position); it does **not** set intensity to chase the
-  athlete — that is the ratchet's job (§5).
+- `y ≈ 1.0`: the athlete sustained what a balanced athlete sustains at that
+  pace — the session **reached the curve**. It pins the ceiling there.
+- `y < 1.0` on a sub-max day: the athlete sustained *at least* this. A
+  **floor**. It says nothing about the ceiling.
+- `y > 1.0`: the athlete sustained **longer** than the balanced maximum at
+  that pace. Only possible if the level is wrong → **the trial is low**
+  (§6, diagnostic). Observed on this athlete 2 & 7 Oct 2026, confirmed by
+  the 15 Oct retest (16.1 → 18.4).
 
-### 3.4 The athlete's multiplier curve `M(x)`
+A session is a **max effort** (ceiling evidence) when the day type is
+max-effort by envelope, or when `y ≥ 0.85` on any day. Otherwise it is a
+floor.
 
-The athlete's shape. Dimensionless, **shared across machines** (the trial
-carries machine level; the multiplier carries fibre-type balance), one per
-athlete.
+Multi-block days: one logged total, so one `r` and one bout length (the
+longest work block, or the work-time-weighted mean, to decide). Honest
+blend; no per-block logging.
 
-- Representation: a fixed grid of nodes along the axis (e.g. every 5
-  positions, 21 nodes), each holding a multiplier and a confidence
-  (effective session count with decay).
-- Initial value: 1.0 at every node, confidence 0, on the athlete's first
-  time trial.
-- Bounds: `[0.80, 1.40]` per node, so one bad day cannot sink a region.
-- **Level lives in one place.** The trial position (~35 for a 10-minute
-  effort) is pinned: `M(35) = 1.0`. Time-trial sessions set the level and
-  **never** update `M`. Between trials, ordinary sessions near 35 may drift
-  the node — that drift is evidence the level has moved since the trial,
-  and it is resolved at the next retest, not fought in between.
-- **Retest = renormalise, then damp the right.** When a new trial lands:
-  1. `trial_pace` takes the new value.
-  2. Fold the drift back into the level: `M[n] /= M[35]` for every node,
-     so `M(35)` returns to 1.0 and the shape is preserved relative to the
-     new anchor.
-  3. **The right end re-anchors from its own probe.** A trial gained
-     through aerobic work does not transfer fully to 20-second efforts.
-     With the anaerobic day as the right-hand probe (§3.2), the far-right
-     nodes are re-anchored by the next full-rest anaerobic session rather
-     than inheriting the trial's jump. Until that session lands, hold back
-     part of the level jump: `M[n] *= (old_trial / new_trial) ^ β × ramp(n)`
-     for nodes right of ~70, `β ≈ 0.5`, `ramp` 0 at 70 → 1 at 100. (The
-     ordinary ratchet applied once at the moment the level changes.)
-  4. Confidence is left alone; shape survives, level updates.
+Continuous-with-bursts days (polarized, flux): `r` from the whole session's
+pace, which the base dominates → they land in zone 2, as intended. Their
+contribution to fitness shows up as the trial rising, not on the curve.
 
-### 3.5 Delivered fraction and the normalised height
+### 3.4 The multiplier curve `M(r)` — what the sequencer reads
 
-Per session (or per block where blocks are logged separately — the day
-page only takes one total today, so per session):
+The athlete's estimated ceiling along the axis, as a fraction of balanced:
+1.0 = balanced at this athlete's level. One per athlete, **shared across
+machines** (the trial carries machine level; the shape is the athlete's —
+decided 2026-11-16, §3.7 for units).
 
-```
-delivered_fraction = actual_pace / trial_pace
-normalised_height  = delivered_fraction / R(d)        # 1.0 = balanced at this position
-ratio_vs_target    = actual_pace / target_pace        # = normalised_height / M(position)
-```
+- Nodes on a log grid from 0.85× to 3.5× (e.g. every 0.05 in log10 → ~26
+  nodes), each with a value, a confidence (effective session count,
+  decaying) and a **measured / floor / blank** state.
+- Initial: 1.0 everywhere, confidence 0, state blank.
+- **Pinned**: `M(1.0) = 1.0`. The trial sets the level and never moves
+  the curve. Drift near 1.0 between trials is evidence the level moved; it
+  is resolved at the next retest (§3.5).
+- Bounds `[0.7, 1.5]`.
 
-`normalised_height` is the point plotted on the chart and the quantity
-the ratchet moves `M` toward. `ratio_vs_target` is the athlete-facing
-"hit / beat / missed" and stays as the in-session feedback.
+### 3.5 Retest
+
+When a new trial lands: `trial_pace` takes the new value; every session's
+`r` is relative to the trial in force when it was logged, so the history
+is not rewritten. Fold drift: `M[n] /= M[1.0]` for all nodes. The right
+end is **re-anchored by its own next max-effort anaerobic day**, not by
+the trial's jump; until that session lands, hold back half the level
+change on nodes above ~1.8× (the damped retest). Confidence untouched.
 
 ### 3.6 Refitting the static curve
 
-`R(d)` is static per machine/unit, but it will be refit as data
-accumulates. A refit **must replay every athlete's multiplier**: rerun the
-ratchet over each athlete's session history against the new `R(d)` and
-replace their `M`. Changing the shape under unchanged multipliers would
-move every target at once for reasons the athlete never caused.
+A refit of `D(r)` must **replay every athlete's curve** from their session
+history; otherwise every target jumps for reasons no athlete caused. The
+diagnostic that says a refit is due: the **average `M` across athletes at
+each `r` should sit near 1.0**. Where it does not, the static curve is
+wrong there. Report per machine/unit on the admin side.
 
-The replay doubles as the diagnostic that says when a refit is due: the
-**average `M` across athletes should sit near 1.0 at every position.**
-Where it does not, the static curve is wrong there — the population is
-systematically above or below "balanced" at that duration, which means the
-curve, not the athletes, is off. Report that average per machine/unit on
-the admin side.
+### 3.7 Units — the Echo problem
 
-### 3.7 One multiplier, several units — the Echo problem
+The trial is per machine and unit; `M` is shared. A given multiple means a
+different physical demand in rower metres (pace ∝ ∛power) than in Echo
+calories (≈ linear in power with an offset). **Decided 2026-11-16:**
+convert pace to a **watt-equivalent** before computing `r` and `y` on the
+machines with published conversions (Echo bike, C2 rower, ski-erg,
+bike-erg), and convert targets back to the athlete's unit for display.
+Per-unit `D(r)` curves are the fallback for a machine with no conversion.
+The athlete never sees watts unless they chose watts. The 2.6 is a
+calories number; its watt-equivalent is what the shared curve carries.
 
-The trial is per machine and unit; the multiplier is shared. A multiplier
-of 1.05 learned on rower metres is then applied to Echo-bike calories,
-where "5 % above balanced" is a different size of ask: rower pace scales
-with roughly the cube root of power, Echo calories scale close to linearly
-in power with an offset. The same `M` is a different physical demand on
-each machine.
+## 4. The ratchet — asymmetric
 
-Options:
+A session's evidence depends on what it proved:
 
-- **Convert to a power equivalent before the fraction math.** Where the
-  machine publishes a conversion (Concept2: cal/hr = 4·W + 300; metres from
-  pace via the 2.80/pace³ relation; Rogue's Echo table), compute
-  `delivered_fraction`, `R(d)` and `M` in watt-equivalents, and convert the
-  target back to the athlete's units for display. `M` is then shared in a
-  common currency. Recommended where a conversion exists.
-- **Per-machine `M` with a shared prior.** A new machine starts from the
-  shared curve and diverges with its own sessions. Simpler, but the
-  picture fragments again for rotating athletes, which is the problem the
-  shared curve exists to solve.
-- **Per-unit `R(d)` absorbing the non-linearity, shared `M`.** The v1
-  proposal. Acceptable to start; wrong by a few percent on the Echo at the
-  extremes.
+| Session outcome | Evidence | Effect on `M` near `r` |
+|---|---|---|
+| reached the curve (`y ≥ 0.85`, or max-effort day) | ceiling | set toward `y`, state **measured** |
+| completed as asked or faster, `y < 0.85` | floor | **raise only**: `M = max(M, y)` if `y > M`; otherwise no change |
+| fell short of the asked pace | miss | lower toward the delivered `r`/`y` |
+| assess day (time trial, rocket B, infinity, afterburner, synthesis) | record only | no change (decided 2026-11-16) |
+| zone 2 (`r < 0.85`) | dose | no change; logged for adherence (decided 2026-11-16: fixed cutoff) |
 
-**Decided 2026-11-16: the shape is shared; option 1.** Level stays per
-machine (each machine keeps its own trial; nothing predicts one machine's
-capacity from another). Shape — the multiplier — is a property of the
-athlete and transfers. Watts are used only so a given percentage means the
-same physical demand on every machine: convert pace → watt-equivalent
-before the fraction math, convert the target back to the athlete's unit
-for display. The athlete never sees watts unless they chose watts. Option
-3 (per-unit curves) remains the fallback for a machine with no published
-conversion.
+- Locality: a session at `r` touches nodes within about ±0.1 in log10
+  (roughly the range `r/1.25 … r×1.25`), weight falling off Gaussian.
+  Nodes every 0.05 log10, σ ≈ 0.1 log10 (decided 2026-11-16 as "5 and 8"
+  on the old 0–100 scale; same width).
+- Step clamp ±0.15 per session; node bounds §3.4.
+- Confidence decays with a ~60-day half-life; `M` itself does not decay.
+- **Why asymmetric.** Holding a sub-max pace proves you can; it never
+  proves you can't go faster. Only a miss, or a max effort, carries
+  information about the ceiling. This is what keeps the curve from being
+  dragged down by ordinary compliant training (the v1 failure mode).
 
-## 4. The ratchet
-
-After every scored session on a machine with a current trial:
+**The target the athlete sees** is still one number per block:
 
 ```
-err   = clamp(normalised_height − M(x), −0.15, +0.15)   # x = the day's position
-for each node n:
-    w = exp(−((n − x) / σ)²)          # σ ≈ 8 positions: neighbours move a little
-    M[n] += k × w × err               # k ≈ 0.5
-    conf[n] += w
+target_pace = trial_pace × r_asked × M(r_asked)
 ```
 
-- Direction symmetric: beat the target, the region rises; miss it, it
-  falls. The athlete is always asked for a little more than last time
-  until they stop beating it — the floor finds the ceiling.
-- **Off below position ~20.** Zone-2 work is dose, not capacity. Endurance
-  and polarized sessions log for adherence and are plotted as "trained",
-  but do not move `M` and carry no target ratchet. Their `R(d)` fraction is
-  the prescription, full stop.
-- Multi-block days with spread > ~25 update with half weight, spread over
-  the block positions rather than the mean.
-- **Assess days never ratchet** (decided 2026-11-16). They are recorded and
-  plotted; `M` is untouched. Rocket Races B in particular measures pacing
-  repeatability against A's actual pace, not capacity against the curve.
-- Decay: node confidence decays with a ~60-day half-life so an old region
-  is weakly held; `M` itself does not decay (an old 1.2 is still the best
-  estimate until contradicted).
-- Clamp per step (±0.15) and per node (§3.4) bound the damage of a
-  mis-logged session.
+where `r_asked` is the day's prescribed multiple (today's envelope pace
+fraction, unchanged in the catalogue). The ratchet moves `M(r_asked)`, so
+a region the athlete keeps beating is asked for more next time — on every
+training day, curated or sequenced (decided 2026-11-16; the `gen:`
+exemption goes). "Max effort" days keep saying beat this.
 
 ## 5. What the sequencer receives
 
-Replace the per-(type, machine) ratio table and the analytics dump with:
+Replace the per-(type, machine) ratio table and the analytics dump with
+the curve, by region:
 
 ```
-ATHLETE CONDITIONING CURVE (multiplier vs balanced shape; 1.0 = balanced at your level)
-position:  0-20 (zone 2, dose only) | 25   35   45   55   65   75   85   95
-M:         —                         | 0.93 1.00 1.04 1.08 1.15 1.22 1.28 1.31
-conf (n):  12 sessions, last 3 d ago | 4    3    6    5    2    3    4    7
-trend 28d:                           | ↓    →    ↑    ↑    ?    →    ↑    ↑
-Trials (echo bike, cal): 16.1 (09-14) → 18.4 (10-15)   [last 6 shown]
-Days since last session: 3.  Sessions: 11 in 28 d (cadence implies 12), 20 in 90 d.
+ATHLETE CONDITIONING CURVE (pace as a multiple of the trial; M = ceiling vs balanced, 1.0 = balanced at your level)
+r:        0.85–0.95  0.95–1.1  1.1–1.3  1.3–1.6  1.6–2.0  2.0–2.6  >2.6
+M:        1.00       1.00*     —        —        0.95     0.98     1.15
+state:    measured   pinned    blank    blank    measured measured measured
+n (eff):  5          2         0        0        3        4        7
+trend:    →          —         ?        ?        ↑        →        ↑
+Trials (echo bike, cal): 16.1 (09-14) → 18.4 (10-15)   [last 6]
+Flags: none   (possible: TRIAL LOW — sustained longer than balanced at ≥1.0×; CEILING ABOVE BALANCED; machine X uncalibrated)
+Days since last session: 2.  Sessions: 11 in 28 d (cadence implies 12), 20 in 90 d.
 ```
 
 Then, unchanged: the readiness-filtered catalogue with envelopes and
 coaching intent, the previous block (variety), per-type caps, never-done
 types, other training load, the programming week, coach notes.
 
-The prompt's instruction simplifies to: *prescribe into the lowest
-well-measured region without letting the strong regions sag; probe a
-region marked "?" with a day placed there; choose the day's shape and the
-ratchet sets its intensity — do not chase the athlete with the pace
-fraction. Read the far-right multiplier together with the trial's level
-and progression: high right + low or stalled trial means the aerobic side
-is the gap; high right + strong trial means a fast-twitch athlete.* The envelope's pace range becomes the band the ratchet may move
-the target within, not a value the model picks.
+The instruction: *prescribe into the lowest **measured** region without
+letting the strong regions sag; where a region is **blank**, PROBE it —
+place a max-effort day there before prescribing development into it;
+choose the day's type and shape and let the ratchet set its intensity;
+read a high right end together with the trial's level and progression
+(high right + low or stalled trial = the aerobic side is the gap; high
+right + strong trial = a fast-twitch athlete); act on the TRIAL LOW flag by
+placing a retest early.*
 
-Day types remain the vocabulary the model uses to name a day, exactly as
-now; the catalogue tells it what shapes each type permits. The model
-decides the type and the shape; the system computes position and target.
+Day types remain the vocabulary the model names a day with; the catalogue
+tells it what shapes each type permits. The model decides type and shape;
+the system reads where it landed.
 
-## 6. Calibration rules (unchanged in spirit, made explicit)
+## 6. Diagnostics the frame gives for free
 
-- A session on a machine/unit with no current trial produces **no target
-  and no ratchet update**. The day page already warns; it should also
-  offer "do a time trial on this machine instead of today's session", which
-  sets the baseline and counts as the day. (Parked change 3.)
-- A trial older than ~40 days on a machine the athlete still uses is
-  flagged in the sequencer's block; the model may place a trial there.
-- The monthly day-one trial stays.
+- **Trial low.** Any session with `y > 1.0` at `r ≥ 1.0` (sustained longer
+  than balanced at or above trial pace). Action: early retest. Proven on
+  the exploration athlete two weeks before his scheduled retest.
+- **Ceiling above / below balanced.** The athlete's own 30-s max effort
+  relative to 2.6×. One number: fast-twitch or slow-twitch leaning.
+- **Hard day vs held back.** Two identical prescriptions land at different
+  `r`; the one that reached the curve is the real effort. The
+  prescription-based frame could not tell them apart.
+- **Uncalibrated machine.** No trial → no `r` → session plotted nowhere.
+  The day page offers a trial on that machine instead of the day (§7).
 
-## 7. Athlete-facing views
+## 7. Calibration rules
 
-- **Training day:** target pace shown as today, with "beat this" on
-  max-effort days. The day's type, name and coaching intent unchanged.
-- **Analytics page:** existing per-type, per-machine stats unchanged. Add
-  one chart: the continuum. Two toggles — *raw* (delivered pace vs the
-  expected curve, in the athlete's units) for pacing intuition, and
-  *balanced* (normalised height, flat 1.0 line) for strengths and gaps.
-  Points are sessions; the fitted `M` curve is drawn through them; the
-  zone-2 region is shaded "trained, not scored".
-- **Coach chat:** reads the same `M` curve and speaks in day-type names.
+- A session on a machine/unit with no current trial produces no `r`, no
+  `y`, no ratchet update. The day page already warns; it should offer
+  "do a time trial on this machine instead of today's session". (Parked
+  change 3, kept.)
+- A trial older than ~40 days on a machine still in use is flagged to the
+  sequencer.
+- The monthly day-one trial stays. Trial history shown to the sequencer:
+  last 6 per machine/unit (parked change 1, kept).
 
-## 8. Data model
+## 8. Athlete-facing views
+
+- **Training day:** the day's type, name and intent unchanged; one target
+  pace per block, "beat this" on max-effort days.
+- **Analytics page:** existing stats unchanged. Add the continuum chart
+  (the exploration chart, 2026-11-16): x = multiple of trial on a log
+  scale with the two anchors marked, y = sustain vs balanced, filled =
+  ceiling, hollow = floor, zone 2 shaded, the ceiling envelope drawn
+  through the filled dots. Raw-units toggle for pacing intuition.
+- **Coach chat:** reads the same curve, speaks in day-type names.
+
+## 9. Data model
 
 New:
 
-- `engine_pd_curves` — (modality, units, seconds, fraction). The reference
-  curves, authored v1.
-- `athlete_profiles.engine_curve` (jsonb) — `M` nodes + confidence +
-  updated_at. One row per athlete; small; rewritten by the ratchet.
-- `engine_workout_sessions.position`, `.position_spread`,
-  `.delivered_fraction`, `.normalised_height` — computed at save (and
-  backfillable from `workout_data` + `target_pace` + the trial history, as
-  the 2026-11-16 exploration did for one athlete).
+- `engine_pd_curves` — (modality, units, r, seconds): `D(r)`, authored v1.
+- `athlete_profiles.engine_curve` (jsonb) — `M` nodes with value,
+  confidence, state, updated_at.
+- `engine_workout_sessions.r`, `.sustain` (= `y`), `.evidence`
+  (`ceiling|floor|miss|record|zone2`) — computed at save; backfillable
+  from `actual_pace`, `workout_data` and the trial history (done for one
+  athlete in the 2026-11-16 exploration).
 
 Unchanged: `engine_time_trials`, `engine_user_performance_metrics` (kept
-for analytics; no longer the sequencer's headline), `engine_day_types`,
-`engine_workouts`, `engine_program_mapping`.
-
-## 9. Day-type placement (reference, not an input)
-
-Positions typical prescriptions land at under §3.1 (as actually written in
-the curated catalogue / executed by athletes), for sanity-checking the
-coefficients. The system never uses this table; it computes position from
-the day as written.
-
-| Pos | Type (typical prescription) | | Pos | Type |
-|---|---|---|---|---|
-| 4 | endurance (27 min @0.70) | | 60 | max_aerobic_power (3 min @0.95, 1:1) |
-| 5 | polarized (base dominates) | | 66–70 | max_aerobic_power (4 min / 90 s, 1:1) |
-| ~8 | flux / flux_stages (base + surges) | | ~70 | hybrid_aerobic (90–120 s @0.98, 1:2) |
-| 19 | threshold (15 min @0.90) | | 78 | rocket_races_a (60 s @1.02, 2:1) |
-| 24 | devour (1→6 min @0.90, 60 s rest) | | ~72 | rocket_races_b (same, 1:1; assess) |
-| 29 | descending_devour (3 min @0.97, 1:4) | | ~80 | ascending (60 s, pace climbing to 1.30) |
-| ~30 | ascending_devour | | 85 | hybrid_anaerobic (60 s @1.12, 2.25:1) |
-| ~35 | towers (blend, spread ~30) | | 100 | anaerobic (30 s max, 5:1) |
-| 37 | interval (2 min @0.95, 1:3) | | 45 + 100 | atomic (spread ~55) |
-| 35 | time_trial (10 min max; assess) | | wide | infinity / afterburner / synthesis (assess) |
+for analytics), `engine_day_types`, `engine_workouts`,
+`engine_program_mapping`.
 
 ## 10. Migration
 
-1. Author `R(d)` for Echo bike cal, rower m, ski-erg m, bike-erg m from
-   envelope midpoints + observed max-effort data. Validate against the
-   36-session exploration (`scratchpad` chart, 2026-11-16).
-2. Backfill `position` and `normalised_height` for all sessions. Initialise
-   `M` for each athlete by running the ratchet over their history in date
-   order (so nobody starts from flat 1.0 except true newcomers).
-3. Switch the target computation to §3.3 on the day page. Remove the
-   `gen:` exemption. The athlete sees the same screen with slightly
-   different numbers.
-4. Switch the sequencer prompt to §5. Keep the old ratio table in the
-   prompt for one cycle, labelled "legacy", then drop it.
+1. Author `D(r)` for Echo bike cal, rower m, ski-erg m, bike-erg m (watt
+   conversions per §3.7). Validate on the exploration athlete.
+2. Backfill `r`, `sustain`, `evidence` for all sessions; initialise `M`
+   per athlete by replaying the ratchet in date order.
+3. Switch the target computation to §4 on the day page; remove the `gen:`
+   exemption. The athlete sees the same screen.
+4. Switch the sequencer prompt to §5, with "probe" in the instruction.
+   Keep the old ratio table one cycle, labelled legacy, then drop it.
 5. Add the continuum chart to Analytics.
 
-## 11. Open questions for the founder
+## 11. Decisions log (2026-11-16)
 
-- ~~Node spacing and `σ`~~ **Decided 2026-11-16: start at nodes every 5,
-  σ = 8**, one width for the whole axis. Founder notes differences on the
-  right are starker; split the width only if the fast-twitch end looks
-  smeared in practice.
-- ~~Should `M` be per machine after all?~~ **Decided 2026-11-16: shared
-  shape, per-machine level** (§3.7).
-- ~~The zone-2 cutoff (~20): fixed, or per athlete?~~ **Decided 2026-11-16:
-  fixed.** Zone 2 is defined by intent, not by the athlete.
-- ~~Should assess types ratchet, or only record?~~ **Decided 2026-11-16:
-  record only.** Assess days (time trial, rocket_races_b, infinity,
-  afterburner, synthesis) are plotted as points and never move `M`. The
-  ratchet learns from develop days only.
-- ~~Echo bike calories are non-linear in watts~~ **Decided 2026-11-16:
-  watt-equivalent conversion** (§3.7).
-- Damped retest: `β` and the 70→100 ramp (§3.4) are guesses.
+- Position: **from delivered pace, two anchors, log axis in multiples of
+  the trial.** No fitted coefficients (v1's formula retired).
+- Height: **sustained bout vs balanced** (`D(r)`), not pace vs target.
+- Ratchet: **asymmetric** — floors raise, misses lower, max efforts pin.
+- Zone-2 cutoff: **fixed** (~0.85×).
+- Assess days: **record only.**
+- Shape shared across machines; level per machine; **watt-equivalent**
+  conversion.
+- Node spacing / locality: ~0.05 log10 nodes, σ ≈ 0.1 log10.
+- Anaerobic day = the **glycolytic anchor**, 2.6× on Echo cal, unit-specific.
+- Read the right end **with the trial's level**; absolute norms out of
+  scope — progress is what matters to the athlete.
+- Day types and tags **stay** as the athlete-facing vocabulary.
+
+Open: `D(r)` v1 values beyond the two anchors (authored, to refit); the
+2.6 itself (first athlete agreed within 15 %); damped-retest hold-back;
+multi-block bout choice (longest vs weighted mean).
 
 ## 12. Parked list, reconciled
 
 | Parked change | Under this spec |
 |---|---|
-| 1. Trial history to last 6 | Keep. §5 shows last 6. |
-| 2. Pace over baseline headline | Absorbed: §3.5 normalised height. |
-| 3. Calibrate on machine switch | Keep. §6. |
-| 4. Pool per type across machines | Absorbed: `M` is shared across machines. |
-| 5. Drop PH tags; blend multi-block honestly | Keep tags as UI/catalogue (founder); §3.1 spread handles the blend. |
-| 6. Anaerobic vs own best | Absorbed: max-effort days use the same target rule. |
+| 1. Trial history to last 6 | Keep (§7). |
+| 2. Pace over baseline headline | Absorbed: `r` is the axis. |
+| 3. Calibrate on machine switch | Keep (§7). |
+| 4. Pool per type across machines | Absorbed: `M` shared across machines. |
+| 5. Drop PH tags; blend multi-block honestly | Tags stay as UI; blend handled by one `r` per session. |
+| 6. Anaerobic vs own best | Absorbed: anaerobic is the right anchor. |
 | 7. Shrink the prompt | §5. |
-| 8. Ratchet on sequenced days | Absorbed: §3.3, §4. |
-| Catalogue "when to use" guidance into DB | Keep; independent of this spec. |
+| 8. Ratchet on sequenced days | Absorbed: §4. |
+| Catalogue "when to use" guidance into DB | Keep; independent. |
