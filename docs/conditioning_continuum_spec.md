@@ -343,7 +343,8 @@ never uses this table; it computes position from the day as written.
 - Should `M` be per machine after all? See §3.7 — proposal is shared, in a
   power-equivalent currency; revisit if a rower-heavy athlete's bike curve
   looks genuinely different after that.
-- The zone-2 cutoff (~20): fixed, or per athlete?
+- ~~The zone-2 cutoff (~20): fixed, or per athlete?~~ **Decided 2026-11-16:
+  fixed.** Zone 2 is defined by intent, not by the athlete.
 - Should assess types (infinity, afterburner, synthesis) ratchet, or only
   record? Proposal: record only, as today's "readout" intent.
 - Echo bike calories are non-linear in watts: resolved in §3.7 as a
