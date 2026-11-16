@@ -30,12 +30,13 @@ const near = (a: number, b: number, tol = 0.02) => assertAlmostEquals(a, b, tol)
 
 // ── reference curve ──────────────────────────────────────────────────────────
 
-Deno.test("curve: the two anchors — 2.6× at 30 s, 1.0× at 600 s", () => {
-  near(balancedBout(ECHO, 2.6), 30, 1e-9);
+Deno.test("curve: the anchors — 2.6× peak at 15 s, 2.2× at 30 s (the glycolytic reference), 1.0× at 600 s", () => {
+  near(balancedBout(ECHO, 2.6), 15, 1e-9);
+  near(balancedBout(ECHO, 2.2), 30, 1e-9);
   near(balancedBout(ECHO, 1.0), 600, 1e-9);
-  near(balancedPaceMultiple(ECHO, 30), 2.6, 1e-9);
+  near(balancedPaceMultiple(ECHO, 15), 2.6, 1e-9);
   near(balancedPaceMultiple(ECHO, 600), 1.0, 1e-9);
-  near(balancedCeiling(ECHO), 2.6, 1e-9);
+  near(balancedCeiling(ECHO), 2.2, 1e-9);
 });
 
 Deno.test("curve: interpolation is on log-duration and clamps at the ends", () => {
@@ -53,23 +54,23 @@ Deno.test("units: no conversion — every machine is compared in its own native 
   assertEquals(comparablePace("echo_bike", "cal", 0), null);
 });
 
-Deno.test("curves: Concept2 metres anchored at 1.33× @ 30 s, calories near 2.0× — the same effort as the Echo's 2.6×", () => {
-  near(balancedCeiling(C2_METERS_CURVE_V1), 1.33, 0.01);
-  near(balancedCeiling(C2_CAL_CURVE_V1), 2.0, 0.02);
+Deno.test("curves: Concept2 metres ≈ 1.27× @ 30 s, calories ≈ 1.78× — the same effort as the Echo's 2.2×", () => {
+  near(balancedCeiling(C2_METERS_CURVE_V1), 1.27, 0.01);
+  near(balancedCeiling(C2_CAL_CURVE_V1), 1.78, 0.02);
   near(balancedBout(C2_METERS_CURVE_V1, 1.0), 600, 1e-9);
-  // a rower sprinting at 1.33× pace and an Echo rider at 2.6× land at the same effort duration
-  near(balancedBout(C2_METERS_CURVE_V1, 1.33), balancedBout(ECHO_BIKE_CAL_CURVE_V1, 2.6), 1);
+  // a rower sprinting at 1.27× pace and an Echo rider at 2.2× land at the same effort duration
+  near(balancedBout(C2_METERS_CURVE_V1, 1.267), balancedBout(ECHO_BIKE_CAL_CURVE_V1, 2.2), 1);
 });
 
 // ── per session, against the real athlete ────────────────────────────────────
 
-Deno.test("session: 30-s all-out anaerobic lands at 2.63× and reaches the curve (ceiling)", () => {
+Deno.test("session: 30-s all-out anaerobic at 2.63× is a ~14-s balanced effort held for 30 s — a ceiling well above the curve", () => {
   const c = sessionContinuum(byDate("2026-09-15"), 16.1, ECHO);
   near(c.r!, 2.63);
-  near(c.sustain!, 1.04, 0.05);
   assertEquals(c.evidence, "ceiling");
   assertEquals(c.bout_seconds, 30);
-  near(c.effort_seconds!, 29, 1); // a 30-s-max effort
+  near(c.effort_seconds!, 14, 1.5);
+  assert(c.sustain! > 2.0, `sustain ${c.sustain}`);
 });
 
 Deno.test("session: 15 min at 1.06× — sustained longer than the balanced max → sustain > 1, the trial was low", () => {
@@ -153,7 +154,7 @@ Deno.test("bout: the longest work block decides a multi-block day; continuous wo
 
 // ── the curve ────────────────────────────────────────────────────────────────
 
-Deno.test("replay: the real athlete — measured from 10-min efforts down to ≤30 s; only the 20–40 min band is floor-only; ceiling above balanced; trial-low resolved by the retest", () => {
+Deno.test("replay: the real athlete — measured from 10-min efforts down to 1 min and at ≤30 s; 20–40 min floor-only; the 30–60 s band is blank (his 30-s maxes are ~14-s efforts now); aerobic side behind the sprint; trial-low resolved by the retest", () => {
   const { curve, sessions } = replayCurve(fixture.sessions, fixture.trials, CURVES);
   const regions = summarizeCurve(curve, sessions);
   const byLabel = Object.fromEntries(regions.map((r) => [r.label, r]));
@@ -161,9 +162,9 @@ Deno.test("replay: the real athlete — measured from 10-min efforts down to ≤
   assertEquals(byLabel["2–4 min"].state, "measured"); // the 3-min interval at 1.18× reached the curve
   assertEquals(byLabel["1–2 min"].state, "measured"); // the 1:2 interval at 1.73×
   assertEquals(byLabel["≤30 s"].state, "measured"); // the 20–30 s max efforts at 2.6–3.2×
-  assertEquals(byLabel["30–60 s"].state, "measured"); // his 30-s efforts at 2.3–2.5× are 31–39-s efforts for a balanced athlete
+  assertEquals(byLabel["30–60 s"].state, "blank"); // his 30-s maxes at 2.3–2.6× are 13–25-s efforts under the 15-s anchor; nothing lands in 30–60 s
   assertEquals(byLabel["20–40 min"].state, "floor"); // threshold at 0.90–0.94×: trained there, never maximal
-  assert(curve.flags.includes("CEILING_ABOVE_BALANCED"), curve.flags.join(","));
+  assert(curve.flags.includes("AEROBIC_SIDE_BEHIND_SPRINT"), curve.flags.join(","));
   // TRIAL_LOW was true in early October and the 15 Oct retest cleared it
   assert(!curve.flags.includes("TRIAL_LOW"), curve.flags.join(","));
   // the pinned node (600 s) sits near 1.0 after the retest fold (later sessions may drift it slightly)
@@ -216,6 +217,6 @@ Deno.test("prompt block: regions, trials (last 6), flags", () => {
   const text = formatCurveForPrompt(curve, summarizeCurve(curve, sessions), fixture.trials);
   assert(text.includes("ATHLETE CONDITIONING CURVE"));
   assert(text.includes("16.1 (2026-09-14) → 18.4 (2026-10-15)"));
-  assert(text.includes("CEILING_ABOVE_BALANCED"));
+  assert(text.includes("AEROBIC_SIDE_BEHIND_SPRINT"));
   assert(text.includes("≤30 s"));
 });
