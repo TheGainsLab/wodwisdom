@@ -152,6 +152,7 @@ async function computeAthlete(supa: SupabaseClient, userId: string, curves: Reco
         user_id: s.user_id,
         date: s.date,
         continuum_r: r.r != null ? Number(r.r.toFixed(4)) : null,
+        continuum_effort_s: r.effort_seconds != null ? Math.round(r.effort_seconds) : null,
         continuum_bout_s: r.bout_seconds != null ? Math.round(r.bout_seconds) : null,
         continuum_sustain: r.sustain != null ? Number(r.sustain.toFixed(4)) : null,
         continuum_evidence: r.evidence,
