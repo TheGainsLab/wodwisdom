@@ -59,23 +59,51 @@ Computed per **block** from its prescription, then combined per day. Scale
 0–100: 0 = roughly an hour of continuous work, 100 = a 10-second effort.
 
 ```
-duration_score  = 100 × (1 − (log10(work_seconds_per_bout) − 1) / 2.56)   # 10 s → 100, 3600 s → 0
-intensity_shift = 50 × (prescribed_fraction − 0.90)                        # 1.20 → +15, 0.70 → −10
-rest_shift      = 4 × log2(rest_seconds / work_seconds)                    # 5:1 → +9, 1:3 → −6
-position        = clamp(duration_score + intensity_shift + rest_shift, 0, 100)
+duration_norm   = 1 − (log10(work_seconds_per_bout) − 1) / 2.56        # 10 s → 1.0, 3600 s → 0
+rest_ratio      = max(rest_seconds / work_seconds, 0.25)               # continuous work counts as SHORT rest, not none
+rest_below      = min(log2(rest_ratio), 0)                             # the approach to 1:1
+rest_above      = max(log2(rest_ratio), 0)                             # beyond 1:1
+position        = clamp(20 × duration_norm
+                      + 67 × (prescribed_fraction − 0.90)
+                      + 19.7 × rest_below
+                      + 2.0 × rest_above
+                      + 54, 0, 100)
 ```
+
+Fitted 2026-11-16 to six founder anchors (endurance 3, threshold 19,
+devour 25, max aerobic power 60, rocket races A 79, anaerobic 100); all
+six reproduce within 2 points. What the fit says about the axis:
+
+- **Intensity and recovery dominate; duration is a tiebreaker.** With pace
+  fraction and rest ratio known, bout length adds little — a long piece is
+  necessarily slower and a short piece necessarily faster, so duration
+  enters through those. A 4 × 4-min and an 8 × 90-s max-aerobic-power day
+  at the same pace and rest land 4 points apart (66 vs 70).
+- **The rest ratio has a kink at 1:1** (founder: "once rest exceeds work,
+  pace goes up considerably"). Below 1:1 the ratio moves position hard —
+  that is the aerobic-to-power transition (threshold 19 → devour 25 →
+  max aerobic power 60). Above 1:1 the ratio itself adds little, because
+  the extra recovery expresses itself as a higher prescribed pace, which
+  the intensity term already carries (rocket races 79, anaerobic 100).
+- **Continuous work is treated as rest ratio 0.25**, not zero: a 15-minute
+  threshold piece and a devour set with a minute's rest are the same kind
+  of work, and the formula now agrees (19 vs 24).
+
+Examples under this fit: interval 2 min at 0.95, rest a third of work → 37;
+descending devour 3 min at 0.97, rest a quarter → 29; hybrid anaerobic
+60 s at 1.12, rest 2.25× → 85; atomic sprint block 10 s max → 100 with its
+aerobic block at ~45 (spread ~55, reported).
 
 - `prescribed_fraction` for a max-effort block is taken as 1.30 for the
   position calculation only (the target itself comes from §3.3).
-- Continuous work with bursts (polarized): weight by time, so the base
-  dominates and the bursts barely move the position.
+- Continuous work with bursts (polarized, flux): weight by time, so the
+  base dominates and the bursts barely move the position.
 - A multi-block day's position is the work-time-weighted mean of its
   blocks; its **spread** (max − min block position) is stored beside it.
   A blended day is placed honestly as a blend, with its uncertainty
   visible. No per-block logging is asked of the athlete.
-- The three coefficients (2.56, 50, 4) are first guesses tuned against the
-  founder's placement of the 22 day types (table in §9). They are
-  constants to revisit, not physiology.
+- The coefficients are fitted to six points. Re-fit when the founder adds
+  anchors, especially pairs that differ only in duration.
 
 Day type does not enter the formula. Two Max Aerobic Power days at 90 s and
 5 min land eleven points apart, and should.
@@ -313,22 +341,23 @@ for analytics; no longer the sequencer's headline), `engine_day_types`,
 
 ## 9. Day-type placement (reference, not an input)
 
-Positions a typical prescription of each type lands at under §3.1, for
-tuning the coefficients and for the catalogue's own sanity. The system
-never uses this table; it computes position from the day as written.
+Positions typical prescriptions land at under §3.1 (as actually written in
+the curated catalogue / executed by athletes), for sanity-checking the
+coefficients. The system never uses this table; it computes position from
+the day as written.
 
-| Pos | Type | | Pos | Type |
+| Pos | Type (typical prescription) | | Pos | Type |
 |---|---|---|---|---|
-| 5 | endurance | | 45 | hybrid_aerobic |
-| 8 | polarized | | 55 | rocket_races_a / b |
-| 18 | flux | | 65 | ascending |
-| 20 | threshold | | 75 | hybrid_anaerobic |
-| 22 | flux_stages | | 90 | anaerobic |
-| 25 | devour | | 35 + 95 | atomic (spread) |
-| 28 | towers | | 40–65 | infinity (assess) |
-| 30 | ascending_devour / descending_devour | | 25 / 45 / 90 | afterburner (assess) |
-| 35 | time_trial | | whole axis | synthesis (assess) |
-| 40 | max_aerobic_power (3–5 min) | | | |
+| 4 | endurance (27 min @0.70) | | 60 | max_aerobic_power (3 min @0.95, 1:1) |
+| 5 | polarized (base dominates) | | 66–70 | max_aerobic_power (4 min / 90 s, 1:1) |
+| ~8 | flux / flux_stages (base + surges) | | ~70 | hybrid_aerobic (90–120 s @0.98, 1:2) |
+| 19 | threshold (15 min @0.90) | | 78 | rocket_races_a (60 s @1.02, 2:1) |
+| 24 | devour (1→6 min @0.90, 60 s rest) | | ~72 | rocket_races_b (same, 1:1; assess) |
+| 29 | descending_devour (3 min @0.97, 1:4) | | ~80 | ascending (60 s, pace climbing to 1.30) |
+| ~30 | ascending_devour | | 85 | hybrid_anaerobic (60 s @1.12, 2.25:1) |
+| ~35 | towers (blend, spread ~30) | | 100 | anaerobic (30 s max, 5:1) |
+| 37 | interval (2 min @0.95, 1:3) | | 45 + 100 | atomic (spread ~55) |
+| 35 | time_trial (10 min max; assess) | | wide | infinity / afterburner / synthesis (assess) |
 
 ## 10. Migration
 
