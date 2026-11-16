@@ -350,6 +350,11 @@ for analytics), `engine_day_types`, `engine_workouts`,
     metres curve = Echo curve^0.30); C2 calories ≈ 2.0× @ 30 s (^0.73). Ski
     and bike-erg are scaled copies until their own data refits them.
   - Stored per session: `continuum_effort_s`. Curve version 2.
+  - **Running curve** (decided 2026-11-16): authored from the literature,
+    not fitted — trained balanced runner ≈ 1.42× 10-min pace at 30 s, 0.89×
+    at 60 min; one curve for every running modality and distance unit (a
+    pace multiple is unit-free). **Echo bike in metres/miles stays without a
+    curve** — uncommon, no published distance formula.
 - Build order: Phase 0 data-only (curves, backfill, replay, admin chart,
   cross-athlete diagnostic) → founder checkpoint on 2.6 / curve / 0.85 →
   Phase 1 sequencer prompt → Phase 2 targets + calibrate-on-switch →
