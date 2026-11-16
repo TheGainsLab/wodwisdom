@@ -182,8 +182,17 @@ async function computeAthlete(supa: SupabaseClient, userId: string, curves: Reco
 
 async function runAll(supa: SupabaseClient, curves: Record<string, PdCurvePoint[]>, staleOnly: boolean): Promise<void> {
   const t0 = Date.now();
-  const { data: users } = await supa.from("engine_workout_sessions").select("user_id").eq("completed", true);
-  const ids = [...new Set(((users ?? []) as Array<{ user_id: string }>).map((u) => u.user_id))];
+  // Every athlete with a completed session. PostgREST caps a response at
+  // 1000 rows, so page through — the first run missed 9 athletes whose rows
+  // all sat past the cap (2026-11-16).
+  const idSet = new Set<string>();
+  for (let from = 0; ; from += 1000) {
+    const { data: page, error } = await supa.from("engine_workout_sessions").select("user_id").eq("completed", true).order("user_id").range(from, from + 999);
+    if (error) throw new Error(`user list failed: ${error.message}`);
+    for (const u of (page ?? []) as Array<{ user_id: string }>) idSet.add(u.user_id);
+    if (!page || page.length < 1000) break;
+  }
+  const ids = [...idSet];
   let done = 0, skipped = 0, failed = 0;
   for (const uid of ids) {
     try {
