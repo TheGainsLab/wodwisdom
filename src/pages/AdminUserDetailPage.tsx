@@ -1214,6 +1214,12 @@ export default function AdminUserDetailPage({ session: _session }: { session: Se
                       AI preview →
                     </button>
                     <button
+                      onClick={() => navigate(`/admin/users/${id}/continuum`)}
+                      style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: "'Outfit', sans-serif", padding: 0 }}
+                    >
+                      Continuum →
+                    </button>
+                    <button
                       onClick={() => navigate(`/admin/users/${id}/engine-sessions`)}
                       style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: "'Outfit', sans-serif", padding: 0 }}
                     >
