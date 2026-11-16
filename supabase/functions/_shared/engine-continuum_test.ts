@@ -137,6 +137,9 @@ Deno.test("bout: the longest work block decides a multi-block day; continuous wo
     prescription: { blocks: [{ work_seconds: 10, rest_seconds: 50, max_effort: true }, { work_seconds: 180, rest_seconds: 0, pace_multiple: 0.85, continuous: false }] },
   };
   assertEquals(sessionBout(atomic), 180);
+  // the judged block is the 180-s aerobic one, so the sprint block's max effort does not make this a ceiling
+  const c = sessionContinuum(atomic, 20, ECHO); // 20 cal/min delivered on a 20 trial → 1.0×, 180 s vs 600 s balanced
+  assertEquals(c.evidence, "floor");
   const endurance = byDate("2026-09-17");
   assertEquals(sessionBout(endurance), 1260);
   const noPrescription: ContinuumSessionInput = { ...byDate("2026-09-25"), prescription: null };

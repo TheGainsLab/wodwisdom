@@ -176,14 +176,25 @@ export const ZONE2_CUTOFF_R = 0.85; // fixed (decided 2026-11-16)
 export const CEILING_SUSTAIN = 0.85; // "reached the curve" — open threshold (spec §11)
 const MISS_TOLERANCE = 0.98; // delivered below 98 % of asked = a miss
 
-/** The bout a session is judged on: the LONGEST work block of the prescription
+/** The block a session is judged on: the one with the LONGEST work bout
  *  (decided 2026-11-16 — what the athlete had to sustain); a continuous block
- *  is the whole block; fallback is the logged average interval. */
+ *  counts as its whole work time. Null when the prescription has no usable
+ *  block. */
+export function judgedBlock(s: ContinuumSessionInput): { work_seconds: number; max_effort: boolean } | null {
+  let best: { work_seconds: number; max_effort: boolean } | null = null;
+  for (const b of s.prescription?.blocks ?? []) {
+    const w = b.continuous ? (b.work_seconds ?? s.total_work_seconds ?? null) : (b.work_seconds ?? null);
+    if (typeof w !== "number" || w <= 0) continue;
+    if (!best || w > best.work_seconds) best = { work_seconds: w, max_effort: b.max_effort === true };
+  }
+  return best;
+}
+
+/** The bout a session is judged on (seconds): the judged block's work, else
+ *  the logged average interval. */
 export function sessionBout(s: ContinuumSessionInput): number | null {
-  const blocks = s.prescription?.blocks ?? [];
-  const works = blocks.map((b) => (b.continuous ? (b.work_seconds ?? s.total_work_seconds ?? null) : (b.work_seconds ?? null)))
-    .filter((w): w is number => typeof w === "number" && w > 0);
-  if (works.length) return Math.max(...works);
+  const jb = judgedBlock(s);
+  if (jb) return jb.work_seconds;
   if (s.total_work_seconds && s.total_work_seconds > 0) {
     const n = s.intervals && s.intervals > 0 ? s.intervals : 1;
     return s.total_work_seconds / n;
@@ -214,7 +225,10 @@ export function sessionContinuum(
   const askedR = askedComparable != null ? askedComparable / trial : null;
 
   let evidence: ContinuumEvidence;
-  const maxEffortDay = MAX_EFFORT_DAY_TYPES.has(s.day_type) || (s.prescription?.blocks ?? []).some((b) => b.max_effort);
+  // Max effort by construction: the day type is max effort, or the JUDGED
+  // block (the longest) is. A sprint block beside a longer aerobic block
+  // (atomic, afterburner) does not make the blended session a ceiling.
+  const maxEffortDay = MAX_EFFORT_DAY_TYPES.has(s.day_type) || judgedBlock(s)?.max_effort === true;
   if (ASSESS_DAY_TYPES.has(s.day_type)) evidence = "record";
   else if (r < ZONE2_CUTOFF_R) evidence = "zone2";
   else if (maxEffortDay || (sustain != null && sustain >= CEILING_SUSTAIN)) evidence = "ceiling";
