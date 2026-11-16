@@ -10,7 +10,7 @@
  * bout of D(r) seconds. A session lands at the pace the athlete actually
  * delivered (r), which the machine's curve turns into an EFFORT DURATION
  * D(r) — the machine-independent coordinate ("a 30-second-max effort" is the
- * same place on a rower at 1.33× pace and on an Echo at 2.6× calories). The
+ * same place on a rower at 1.27× pace and on an Echo at 2.2× calories). The
  * session's height is how long the athlete sustained a bout at that pace
  * against D(r). Max efforts pin the ceiling; sub-max days prove floors;
  * misses lower. The ratchet replays those into the athlete's multiplier
@@ -34,16 +34,19 @@ export interface PdCurvePoint {
   seconds: number;
 }
 
-/** Echo-bike calories curve (founder anchors 2.6× @ 30 s and 1.0× @ 600 s;
- *  envelope midpoints between). 2.6× sits near the 78th percentile of Echo
- *  athletes' 30-s max efforts in the first production run — "high-capacity,
- *  balanced", as intended. Also the fan bikes' curve (Assault, Airdyne). */
+/** Echo-bike calories curve. Anchors: 1.0× @ 600 s (the trial) and the
+ *  research figure of peak power ≈ 2.6× VO2max power, placed at its own
+ *  duration — a 10–15 s peak, not 30 s (decided 2026-11-16 after the first
+ *  production run): 2.6× @ 15 s, hence ≈ 2.2× @ 30 s, which is where this
+ *  base's median 30-s effort (2.27×) sits. Envelope midpoints between. Also
+ *  the fan bikes' curve (Assault, Airdyne). */
 export const ECHO_BIKE_CAL_CURVE_V1: PdCurvePoint[] = [
-  { r: 3.2, seconds: 10 },
-  { r: 2.9, seconds: 20 },
-  { r: 2.6, seconds: 30 },
-  { r: 2.2, seconds: 45 },
-  { r: 1.8, seconds: 60 },
+  { r: 2.8, seconds: 10 },
+  { r: 2.6, seconds: 15 },
+  { r: 2.5, seconds: 20 },
+  { r: 2.2, seconds: 30 },
+  { r: 1.95, seconds: 45 },
+  { r: 1.75, seconds: 60 },
   { r: 1.35, seconds: 120 },
   { r: 1.2, seconds: 180 },
   { r: 1.12, seconds: 240 },
@@ -56,10 +59,9 @@ export const ECHO_BIKE_CAL_CURVE_V1: PdCurvePoint[] = [
 
 /** Concept2-class ergs in metres (rower, ski, bike-erg, Rogue rower): PACE
  *  multiples. Power ∝ pace³, so the same effort spans a much narrower pace
- *  range than Echo calories. Anchored 2026-11-16 at 1.33× @ 30 s — the same
- *  percentile of this base's rowers as 2.6× is of its Echo riders — and
- *  derived from the Echo curve by r_pace = r_echo^0.30 elsewhere. First pass;
- *  refit from each machine's own max-effort data. */
+ *  range than Echo calories. Derived from the Echo curve by
+ *  r_pace = r_echo^0.30 → ≈ 1.27× @ 30 s, on this base's rowers' median.
+ *  First pass; refit from each machine's own max-effort data. */
 export const C2_METERS_CURVE_V1: PdCurvePoint[] = ECHO_BIKE_CAL_CURVE_V1.map((p) => ({ r: Number(Math.pow(p.r, 0.30).toFixed(3)), seconds: p.seconds }));
 
 /** Concept2 ergs read in calories (cal/hr = 4·W + 300 on the monitor): the
@@ -448,8 +450,11 @@ export function replayCurve(
 
   const flags: string[] = [];
   if (trialLow) flags.push("TRIAL_LOW");
-  if (ceilingRatio != null && ceilingRatio >= 1.05) flags.push("CEILING_ABOVE_BALANCED");
-  else if (ceilingRatio != null && ceilingRatio <= 0.9) flags.push("CEILING_BELOW_BALANCED");
+  // A short max effort well ABOVE the balanced curve, relative to the trial,
+  // is not a strong sprint — it is a trial (aerobic level) that lags the
+  // athlete's fast-twitch capacity (founder, 2026-11-16). Named accordingly.
+  if (ceilingRatio != null && ceilingRatio >= 1.05) flags.push("AEROBIC_SIDE_BEHIND_SPRINT");
+  else if (ceilingRatio != null && ceilingRatio <= 0.9) flags.push("GLYCOLYTIC_BELOW_BALANCED");
   for (const k of uncalibrated) flags.push(`UNCALIBRATED:${k}`);
   if (curve.awaiting_right_anchor) flags.push("AWAITING_RIGHT_ANCHOR");
   curve.flags = flags;

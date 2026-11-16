@@ -17,7 +17,9 @@ long steady work around 0.7×; right is fast-twitch, all-out work around
 2.6× and beyond. Two anchors place everything: the **time trial** (1.0×)
 sets the level, and the **max-effort anaerobic day** (30 s all-out, long
 rest) sets the ceiling, which no day can be constructed to exceed. A
-balanced athlete's ceiling sits at **2.6×** on Echo-bike calories. Every
+balanced athlete's 30-s ceiling sits at **2.2×** on Echo-bike calories
+(the 2.6× peak-power figure belongs to a 15-s effort — re-anchored
+2026-11-16, see the decisions log). Every
 logged session lands on the axis at the pace it was actually ridden, and
 its height is **how long the athlete sustained a bout at that pace**
 against what a balanced athlete sustains there. Max efforts pin the
@@ -80,13 +82,16 @@ Landmarks on the axis (Echo bike, cal; other units have their own):
 | **1.0** | **the time trial. Pinned: the level.** |
 | 1.1–1.5 | aerobic power, hard intervals |
 | 1.5–2.2 | glycolytic repeats, rocket races, hybrid anaerobic |
-| **2.6** | **balanced 30-s max effort. The ceiling for a balanced athlete.** |
+| **2.2** | **balanced 30-s max effort. The ceiling for a balanced athlete.** |
+| 2.6 | balanced 15-s peak (research: peak power ≈ 2.6× VO2max power) |
 | > 2.6 | fast-twitch stretch — the athlete's own ceiling is past balanced |
 
 The two anchors are inarguable: the trial is a measured 10-minute best,
 and the anaerobic day (30 s all-out, ~5:1 rest) is the hardest effort any
 day in the program can construct. An athlete's own ceiling may sit above
-or below 2.6; that single number is the fast-twitch / slow-twitch read.
+or below 2.2; that single number is the fast-twitch / slow-twitch read —
+and read the founder's way: a 30-s max well above the curve, relative to
+the trial, is an aerobic side that lags the sprint, not a strong sprint.
 
 ### 3.2 The static curve — balanced duration at a pace
 
@@ -96,7 +101,7 @@ anchors plus the catalogue's envelope midpoints; refit from pooled
 max-effort data later (§3.6).
 
 Echo bike, calories, v1 (seconds at multiple of trial):
-`3.2×→10 s · 2.9×→20 s · 2.6×→30 s · 2.2×→45 s · 1.8×→60 s · 1.35×→120 s ·
+`2.8×→10 s · 2.6×→15 s · 2.5×→20 s · 2.2×→30 s · 1.95×→45 s · 1.75×→60 s · 1.35×→120 s ·
 1.2×→180 s · 1.12×→240 s · 1.0×→600 s · 0.95×→900 s · 0.92×→1200 s ·
 0.88×→1800 s · 0.82×→3600 s`. Interpolated on log-duration. (This is the
 same curve as v1's `R(d)`, read the other way round.)
@@ -221,7 +226,7 @@ state:    measured   pinned    blank    blank    measured measured measured
 n (eff):  5          2         0        0        3        4        7
 trend:    →          —         ?        ?        ↑        →        ↑
 Trials (echo bike, cal): 16.1 (09-14) → 18.4 (10-15)   [last 6]
-Flags: none   (possible: TRIAL LOW — sustained longer than balanced at ≥1.0×; CEILING ABOVE BALANCED; machine X uncalibrated)
+Flags: none   (possible: TRIAL LOW — sustained longer than balanced at ≥1.0×; AEROBIC SIDE BEHIND SPRINT / GLYCOLYTIC BELOW BALANCED; machine X uncalibrated)
 Days since last session: 2.  Sessions: 11 in 28 d (cadence implies 12), 20 in 90 d.
 ```
 
@@ -247,8 +252,9 @@ the system reads where it landed.
 - **Trial low.** Any session with `y > 1.0` at `r ≥ 1.0` (sustained longer
   than balanced at or above trial pace). Action: early retest. Proven on
   the exploration athlete two weeks before his scheduled retest.
-- **Ceiling above / below balanced.** The athlete's own 30-s max effort
-  relative to 2.6×. One number: fast-twitch or slow-twitch leaning.
+- **Aerobic side behind sprint / glycolytic below balanced.** The
+  athlete's own 30-s max effort relative to the curve's 2.2× (≥ 1.05 or
+  ≤ 0.9). One number: which side of the continuum lags.
 - **Hard day vs held back.** Two identical prescriptions land at different
   `r`; the one that reached the curve is the real effort. The
   prescription-based frame could not tell them apart.
@@ -316,7 +322,8 @@ for analytics), `engine_day_types`, `engine_workouts`,
 - Shape shared across machines; level per machine; **watt-equivalent**
   conversion.
 - Node spacing / locality: ~0.05 log10 nodes, σ ≈ 0.1 log10.
-- Anaerobic day = the **glycolytic anchor**, 2.6× on Echo cal, unit-specific.
+- Anaerobic day = the **glycolytic anchor**, 2.2× @ 30 s on Echo cal
+  (2.6× is the 15-s peak), unit-specific.
 - Read the right end **with the trial's level**; absolute norms out of
   scope — progress is what matters to the athlete.
 - Day types and tags **stay** as the athlete-facing vocabulary.
@@ -344,11 +351,19 @@ for analytics), `engine_day_types`, `engine_workouts`,
     balanced athlete sustains 40 min+ (fixed). The chart's x-axis is effort
     duration, long on the left, short on the right — the founder's original
     duration ↔ fibre-type framing.
-  - **Anchors from this base's own data:** Echo cal 2.6× @ 30 s sits at ≈ the
-    78th percentile of Echo riders' 30-s max efforts ("high-capacity,
-    balanced"); the same percentile of rowers is **1.33× pace @ 30 s** (C2
-    metres curve = Echo curve^0.30); C2 calories ≈ 2.0× @ 30 s (^0.73). Ski
-    and bike-erg are scaled copies until their own data refits them.
+  - **Anchor placement (decided 2026-11-16, after the v2 run):** 2.6× is the
+    research figure for *peak* power (≈ 2.6× VO2max power), a 10–15 s
+    effort, so it sits at **15 s**; the **30-s point is 2.2×** — the
+    glycolytic reference for CrossFit and this base's median 30-s max
+    (2.27×). With 2.6× at 30 s the population's 30 s–2 min bands read 0.86,
+    which was the curve, not the athletes. Concept2 curves are derived
+    (metres = Echo^0.30 → ≈ 1.27× @ 30 s; calories ^0.73 → ≈ 1.78×). Ski
+    and bike-erg are scaled copies until their own data refits them. The
+    curve's shape 30 s → 10 min is unchanged, so middle-band results move
+    little; sprint efforts now land at 13–25 s instead of 30–40 s.
+  - Flags renamed to the founder's reading: a short max well above the
+    curve is **AEROBIC_SIDE_BEHIND_SPRINT** (a trial that lags fast-twitch
+    capacity), well below is **GLYCOLYTIC_BELOW_BALANCED**.
   - Stored per session: `continuum_effort_s`. Curve version 2.
   - **Running curve** (decided 2026-11-16): authored from the literature,
     not fitted — trained balanced runner ≈ 1.42× 10-min pace at 30 s, 0.89×
@@ -356,12 +371,12 @@ for analytics), `engine_day_types`, `engine_workouts`,
     pace multiple is unit-free). **Echo bike in metres/miles stays without a
     curve** — uncommon, no published distance formula.
 - Build order: Phase 0 data-only (curves, backfill, replay, admin chart,
-  cross-athlete diagnostic) → founder checkpoint on 2.6 / curve / 0.85 →
+  cross-athlete diagnostic) → founder checkpoint on the anchors / curve / 0.85 (done 2026-11-16: 0.85 kept, 2.6× moved to 15 s) →
   Phase 1 sequencer prompt → Phase 2 targets + calibrate-on-switch →
   Phase 3 athlete-facing chart and coach.
 
-Open: `D(r)` v1 values beyond the two anchors (authored, to refit); the
-2.6 itself (first athlete agreed within 15 %); damped-retest hold-back;
+Open: `D(r)` values beyond the anchors (authored, to refit from pooled
+max-effort data); damped-retest hold-back;
 multi-block bout choice (longest vs weighted mean); the **0.85 "reached
 the curve" threshold** (§3.3) — a working guess for "within 15 % of the
 balanced max bout counts as maximal", not a founder number.

@@ -205,6 +205,23 @@ Deploy, in order:
   then a full run `{ all: true, stale_only: false }` (curve version changed;
   every athlete replays).
 
+## Checkpoint outcome (2026-11-16)
+
+- 0.85 "reached the curve" line: kept.
+- Anchors: 2.6× is peak power (≈ 2.6× VO2max power), a 10–15 s effort, so it
+  moves to **15 s**; the **30-s point is 2.2×**, the glycolytic reference and
+  this base's median. The population bands 30 s–2 min had read 0.86 with
+  2.6× at 30 s — the curve, not the athletes. Concept2 curves follow
+  (metres ≈ 1.27× @ 30 s, calories ≈ 1.78×); the running curve is unchanged.
+  Migration `20261116600000_engine_continuum_anchor_15s.sql`.
+- Flags renamed: `AEROBIC_SIDE_BEHIND_SPRINT` (was CEILING_ABOVE_BALANCED —
+  a high sprint ratio is an aerobic weakness, not a strong sprint) and
+  `GLYCOLYTIC_BELOW_BALANCED`.
+- Running curve authored for all running modalities and units
+  (`20261116500000`); Echo metres/miles left without a curve.
+- Deploy: `supabase db push`, redeploy `engine-continuum-backfill`, then a
+  full run `{ all: true, stale_only: false }`. Then Phase 1.
+
 ## Out of scope for Phase 0
 
 Targets, the ratchet affecting what athletes are asked, the sequencer
