@@ -228,6 +228,9 @@ for each node n:
   the prescription, full stop.
 - Multi-block days with spread > ~25 update with half weight, spread over
   the block positions rather than the mean.
+- **Assess days never ratchet** (decided 2026-11-16). They are recorded and
+  plotted; `M` is untouched. Rocket Races B in particular measures pacing
+  repeatability against A's actual pace, not capacity against the curve.
 - Decay: node confidence decays with a ~60-day half-life so an old region
   is weakly held; `M` itself does not decay (an old 1.2 is still the best
   estimate until contradicted).
@@ -345,8 +348,10 @@ never uses this table; it computes position from the day as written.
   looks genuinely different after that.
 - ~~The zone-2 cutoff (~20): fixed, or per athlete?~~ **Decided 2026-11-16:
   fixed.** Zone 2 is defined by intent, not by the athlete.
-- Should assess types (infinity, afterburner, synthesis) ratchet, or only
-  record? Proposal: record only, as today's "readout" intent.
+- ~~Should assess types ratchet, or only record?~~ **Decided 2026-11-16:
+  record only.** Assess days (time trial, rocket_races_b, infinity,
+  afterburner, synthesis) are plotted as points and never move `M`. The
+  ratchet learns from develop days only.
 - Echo bike calories are non-linear in watts: resolved in §3.7 as a
   decision between power-equivalent conversion and per-unit curves.
 - Damped retest: `β` and the 70→100 ramp (§3.4) are guesses.
