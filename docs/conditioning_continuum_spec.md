@@ -320,6 +320,18 @@ for analytics), `engine_day_types`, `engine_workouts`,
 - Read the right end **with the trial's level**; absolute norms out of
   scope — progress is what matters to the athlete.
 - Day types and tags **stay** as the athlete-facing vocabulary.
+- Echo bike watts: no published formula → **Echo stays on a per-calorie
+  curve**; the watt conversion applies to the Concept2 machines (rower,
+  ski-erg, bike-erg). Derive an Echo formula later from athletes who log
+  both, if ever needed.
+- Multi-block days: the bout used for sustain is the **longest work
+  block** (what the athlete had to sustain).
+- The admin continuum chart lives on a **new tab of the admin athlete
+  page**.
+- Build order: Phase 0 data-only (curves, backfill, replay, admin chart,
+  cross-athlete diagnostic) → founder checkpoint on 2.6 / curve / 0.85 →
+  Phase 1 sequencer prompt → Phase 2 targets + calibrate-on-switch →
+  Phase 3 athlete-facing chart and coach.
 
 Open: `D(r)` v1 values beyond the two anchors (authored, to refit); the
 2.6 itself (first athlete agreed within 15 %); damped-retest hold-back;
