@@ -1,0 +1,855 @@
+{
+ "athlete": "exploration athlete, Echo bike cal, 2026-09-14..2026-11-14",
+ "trials": [
+  {
+   "modality": "echo_bike",
+   "units": "cal",
+   "pace": 16.1,
+   "date": "2026-09-14"
+  },
+  {
+   "modality": "echo_bike",
+   "units": "cal",
+   "pace": 18.4,
+   "date": "2026-10-15"
+  }
+ ],
+ "sessions": [
+  {
+   "date": "2026-09-14",
+   "day_type": "time_trial",
+   "modality": "echo_bike",
+   "units": "cal",
+   "actual_pace": 16.1,
+   "target_pace": null,
+   "total_work_seconds": 600,
+   "total_rest_seconds": 0,
+   "intervals": 1,
+   "prescription": {
+    "blocks": [
+     {
+      "work_seconds": 600,
+      "rest_seconds": 0,
+      "pace_multiple": null,
+      "max_effort": true,
+      "continuous": true
+     }
+    ]
+   }
+  },
+  {
+   "date": "2026-09-15",
+   "day_type": "anaerobic",
+   "modality": "echo_bike",
+   "units": "cal",
+   "actual_pace": 42.3333333333333,
+   "target_pace": null,
+   "total_work_seconds": 180,
+   "total_rest_seconds": 750,
+   "intervals": 6,
+   "prescription": {
+    "blocks": [
+     {
+      "work_seconds": 30,
+      "rest_seconds": 150,
+      "pace_multiple": null,
+      "max_effort": true,
+      "continuous": false
+     }
+    ]
+   }
+  },
+  {
+   "date": "2026-09-17",
+   "day_type": "endurance",
+   "modality": "echo_bike",
+   "units": "cal",
+   "actual_pace": 11.3809523809524,
+   "target_pace": 11.27,
+   "total_work_seconds": 1260,
+   "total_rest_seconds": 0,
+   "intervals": 1,
+   "prescription": {
+    "blocks": [
+     {
+      "work_seconds": 1260,
+      "rest_seconds": 0,
+      "pace_multiple": 0.7,
+      "max_effort": false,
+      "continuous": true
+     }
+    ]
+   }
+  },
+  {
+   "date": "2026-09-18",
+   "day_type": "max_aerobic_power",
+   "modality": "echo_bike",
+   "units": "cal",
+   "actual_pace": 16.25,
+   "target_pace": 15.295,
+   "total_work_seconds": 960,
+   "total_rest_seconds": 720,
+   "intervals": 4,
+   "prescription": {
+    "blocks": [
+     {
+      "work_seconds": 240,
+      "rest_seconds": 240,
+      "pace_multiple": 0.95,
+      "max_effort": false,
+      "continuous": false
+     }
+    ]
+   }
+  },
+  {
+   "date": "2026-09-19",
+   "day_type": "interval",
+   "modality": "echo_bike",
+   "units": "cal",
+   "actual_pace": 13.3333333333333,
+   "target_pace": 15.295,
+   "total_work_seconds": 720,
+   "total_rest_seconds": 300,
+   "intervals": 6,
+   "prescription": {
+    "blocks": [
+     {
+      "work_seconds": 120,
+      "rest_seconds": 60,
+      "pace_multiple": 0.9500000000000001,
+      "max_effort": false,
+      "continuous": false
+     }
+    ]
+   }
+  },
+  {
+   "date": "2026-09-21",
+   "day_type": "anaerobic",
+   "modality": "echo_bike",
+   "units": "cal",
+   "actual_pace": 48.6666666666667,
+   "target_pace": null,
+   "total_work_seconds": 160,
+   "total_rest_seconds": 700,
+   "intervals": 8,
+   "prescription": {
+    "blocks": [
+     {
+      "work_seconds": 20,
+      "rest_seconds": 100,
+      "pace_multiple": null,
+      "max_effort": true,
+      "continuous": false
+     }
+    ]
+   }
+  },
+  {
+   "date": "2026-09-22",
+   "day_type": "endurance",
+   "modality": "echo_bike",
+   "units": "cal",
+   "actual_pace": 11.7083333333333,
+   "target_pace": 11.3809523809523,
+   "total_work_seconds": 1440,
+   "total_rest_seconds": 0,
+   "intervals": 1,
+   "prescription": {
+    "blocks": [
+     {
+      "work_seconds": 1440,
+      "rest_seconds": 0,
+      "pace_multiple": 0.7,
+      "max_effort": false,
+      "continuous": true
+     }
+    ]
+   }
+  },
+  {
+   "date": "2026-09-25",
+   "day_type": "max_aerobic_power",
+   "modality": "echo_bike",
+   "units": "cal",
+   "actual_pace": 18.4166666666667,
+   "target_pace": 16.25,
+   "total_work_seconds": 720,
+   "total_rest_seconds": 630,
+   "intervals": 8,
+   "prescription": {
+    "blocks": [
+     {
+      "work_seconds": 90,
+      "rest_seconds": 90,
+      "pace_multiple": 0.95,
+      "max_effort": false,
+      "continuous": false
+     }
+    ]
+   }
+  },
+  {
+   "date": "2026-09-26",
+   "day_type": "interval",
+   "modality": "echo_bike",
+   "units": "cal",
+   "actual_pace": 18.75,
+   "target_pace": 13.3333333333333,
+   "total_work_seconds": 720,
+   "total_rest_seconds": 360,
+   "intervals": 4,
+   "prescription": {
+    "blocks": [
+     {
+      "work_seconds": 180,
+      "rest_seconds": 120,
+      "pace_multiple": 0.9500000000000001,
+      "max_effort": false,
+      "continuous": false
+     }
+    ]
+   }
+  },
+  {
+   "date": "2026-09-28",
+   "day_type": "threshold",
+   "modality": "echo_bike",
+   "units": "cal",
+   "actual_pace": 15.0833333333333,
+   "target_pace": 14.49,
+   "total_work_seconds": 720,
+   "total_rest_seconds": 0,
+   "intervals": 1,
+   "prescription": {
+    "blocks": [
+     {
+      "work_seconds": 720,
+      "rest_seconds": 0,
+      "pace_multiple": 0.8999999999999999,
+      "max_effort": false,
+      "continuous": true
+     }
+    ]
+   }
+  },
+  {
+   "date": "2026-09-29",
+   "day_type": "endurance",
+   "modality": "echo_bike",
+   "units": "cal",
+   "actual_pace": 11.6296296296296,
+   "target_pace": 11.4875708557482,
+   "total_work_seconds": 1620,
+   "total_rest_seconds": 0,
+   "intervals": 1,
+   "prescription": {
+    "blocks": [
+     {
+      "work_seconds": 1620,
+      "rest_seconds": 0,
+      "pace_multiple": 0.7,
+      "max_effort": false,
+      "continuous": true
+     }
+    ]
+   }
+  },
+  {
+   "date": "2026-09-30",
+   "day_type": "max_aerobic_power",
+   "modality": "echo_bike",
+   "units": "cal",
+   "actual_pace": 18.6666666666667,
+   "target_pace": 16.7921666666667,
+   "total_work_seconds": 900,
+   "total_rest_seconds": 720,
+   "intervals": 5,
+   "prescription": {
+    "blocks": [
+     {
+      "work_seconds": 180,
+      "rest_seconds": 180,
+      "pace_multiple": 0.95,
+      "max_effort": false,
+      "continuous": false
+     }
+    ]
+   }
+  },
+  {
+   "date": "2026-10-02",
+   "day_type": "interval",
+   "modality": "echo_bike",
+   "units": "cal",
+   "actual_pace": 27.8333333333333,
+   "target_pace": 17.4209635416667,
+   "total_work_seconds": 360,
+   "total_rest_seconds": 600,
+   "intervals": 6,
+   "prescription": {
+    "blocks": [
+     {
+      "work_seconds": 60,
+      "rest_seconds": 120,
+      "pace_multiple": 0.9500000000000001,
+      "max_effort": false,
+      "continuous": false
+     }
+    ]
+   }
+  },
+  {
+   "date": "2026-10-02",
+   "day_type": "threshold",
+   "modality": "echo_bike",
+   "units": "cal",
+   "actual_pace": 17,
+   "target_pace": 15.0833333333333,
+   "total_work_seconds": 900,
+   "total_rest_seconds": 0,
+   "intervals": 1,
+   "prescription": {
+    "blocks": [
+     {
+      "work_seconds": 900,
+      "rest_seconds": 0,
+      "pace_multiple": 0.8999999999999999,
+      "max_effort": false,
+      "continuous": true
+     }
+    ]
+   }
+  },
+  {
+   "date": "2026-10-03",
+   "day_type": "anaerobic",
+   "modality": "echo_bike",
+   "units": "cal",
+   "actual_pace": 48,
+   "target_pace": null,
+   "total_work_seconds": 180,
+   "total_rest_seconds": 750,
+   "intervals": 6,
+   "prescription": {
+    "blocks": [
+     {
+      "work_seconds": 30,
+      "rest_seconds": 150,
+      "pace_multiple": null,
+      "max_effort": true,
+      "continuous": false
+     }
+    ]
+   }
+  },
+  {
+   "date": "2026-10-05",
+   "day_type": "max_aerobic_power",
+   "modality": "echo_bike",
+   "units": "cal",
+   "actual_pace": 24.1111111111111,
+   "target_pace": 16.8622351570452,
+   "total_work_seconds": 540,
+   "total_rest_seconds": 510,
+   "intervals": 18,
+   "prescription": {
+    "blocks": [
+     {
+      "work_seconds": 30,
+      "rest_seconds": 30,
+      "pace_multiple": 0.95,
+      "max_effort": false,
+      "continuous": false
+     }
+    ]
+   }
+  },
+  {
+   "date": "2026-10-07",
+   "day_type": "interval",
+   "modality": "echo_bike",
+   "units": "cal",
+   "actual_pace": 19,
+   "target_pace": 19.7595418551056,
+   "total_work_seconds": 900,
+   "total_rest_seconds": 240,
+   "intervals": 5,
+   "prescription": {
+    "blocks": [
+     {
+      "work_seconds": 180,
+      "rest_seconds": 60,
+      "pace_multiple": 0.9500000000000001,
+      "max_effort": false,
+      "continuous": false
+     }
+    ]
+   }
+  },
+  {
+   "date": "2026-10-07",
+   "day_type": "threshold",
+   "modality": "echo_bike",
+   "units": "cal",
+   "actual_pace": 16.2222222222222,
+   "target_pace": 15.7073020257827,
+   "total_work_seconds": 1080,
+   "total_rest_seconds": 0,
+   "intervals": 1,
+   "prescription": {
+    "blocks": [
+     {
+      "work_seconds": 1080,
+      "rest_seconds": 0,
+      "pace_multiple": 0.8999999999999999,
+      "max_effort": false,
+      "continuous": true
+     }
+    ]
+   }
+  },
+  {
+   "date": "2026-10-09",
+   "day_type": "anaerobic",
+   "modality": "echo_bike",
+   "units": "cal",
+   "actual_pace": 37.6666666666667,
+   "target_pace": null,
+   "total_work_seconds": 180,
+   "total_rest_seconds": 675,
+   "intervals": 4,
+   "prescription": {
+    "blocks": [
+     {
+      "work_seconds": 45,
+      "rest_seconds": 225,
+      "pace_multiple": null,
+      "max_effort": true,
+      "continuous": false
+     }
+    ]
+   }
+  },
+  {
+   "date": "2026-10-13",
+   "day_type": "endurance",
+   "modality": "echo_bike",
+   "units": "cal",
+   "actual_pace": 11.3666666666667,
+   "target_pace": 11.4615033128014,
+   "total_work_seconds": 1800,
+   "total_rest_seconds": 0,
+   "intervals": 1,
+   "prescription": {
+    "blocks": [
+     {
+      "work_seconds": 1800,
+      "rest_seconds": 0,
+      "pace_multiple": 0.7,
+      "max_effort": false,
+      "continuous": true
+     }
+    ]
+   }
+  },
+  {
+   "date": "2026-10-15",
+   "day_type": "time_trial",
+   "modality": "echo_bike",
+   "units": "cal",
+   "actual_pace": 18.4,
+   "target_pace": null,
+   "total_work_seconds": 600,
+   "total_rest_seconds": 0,
+   "intervals": 1,
+   "prescription": {
+    "blocks": [
+     {
+      "work_seconds": 600,
+      "rest_seconds": 0,
+      "pace_multiple": null,
+      "max_effort": true,
+      "continuous": true
+     }
+    ]
+   }
+  },
+  {
+   "date": "2026-10-15",
+   "day_type": "anaerobic",
+   "modality": "echo_bike",
+   "units": "cal",
+   "actual_pace": 47,
+   "target_pace": null,
+   "total_work_seconds": 240,
+   "total_rest_seconds": 1050,
+   "intervals": 8,
+   "prescription": {
+    "blocks": [
+     {
+      "work_seconds": 30,
+      "rest_seconds": 150,
+      "pace_multiple": null,
+      "max_effort": true,
+      "continuous": false
+     }
+    ]
+   }
+  },
+  {
+   "date": "2026-10-15",
+   "day_type": "endurance",
+   "modality": "echo_bike",
+   "units": "cal",
+   "actual_pace": 12.9166666666667,
+   "target_pace": 13.0175022458045,
+   "total_work_seconds": 1440,
+   "total_rest_seconds": 0,
+   "intervals": 1,
+   "prescription": {
+    "blocks": [
+     {
+      "work_seconds": 1440,
+      "rest_seconds": 0,
+      "pace_multiple": 0.7,
+      "max_effort": false,
+      "continuous": true
+     }
+    ]
+   }
+  },
+  {
+   "date": "2026-10-16",
+   "day_type": "max_aerobic_power",
+   "modality": "echo_bike",
+   "units": "cal",
+   "actual_pace": 19.0625,
+   "target_pace": 20.7019558632466,
+   "total_work_seconds": 960,
+   "total_rest_seconds": 720,
+   "intervals": 4,
+   "prescription": {
+    "blocks": [
+     {
+      "work_seconds": 240,
+      "rest_seconds": 240,
+      "pace_multiple": 0.95,
+      "max_effort": false,
+      "continuous": false
+     }
+    ]
+   }
+  },
+  {
+   "date": "2026-10-17",
+   "day_type": "interval",
+   "modality": "echo_bike",
+   "units": "cal",
+   "actual_pace": 19.75,
+   "target_pace": 21.138770664264,
+   "total_work_seconds": 960,
+   "total_rest_seconds": 420,
+   "intervals": 8,
+   "prescription": {
+    "blocks": [
+     {
+      "work_seconds": 120,
+      "rest_seconds": 60,
+      "pace_multiple": 0.9500000000000001,
+      "max_effort": false,
+      "continuous": false
+     }
+    ]
+   }
+  },
+  {
+   "date": "2026-10-19",
+   "day_type": "anaerobic",
+   "modality": "echo_bike",
+   "units": "cal",
+   "actual_pace": 58.3333333333333,
+   "target_pace": null,
+   "total_work_seconds": 200,
+   "total_rest_seconds": 900,
+   "intervals": 10,
+   "prescription": {
+    "blocks": [
+     {
+      "work_seconds": 20,
+      "rest_seconds": 100,
+      "pace_multiple": null,
+      "max_effort": true,
+      "continuous": false
+     }
+    ]
+   }
+  },
+  {
+   "date": "2026-10-21",
+   "day_type": "endurance",
+   "modality": "echo_bike",
+   "units": "cal",
+   "actual_pace": 13,
+   "target_pace": 12.9700477035346,
+   "total_work_seconds": 1620,
+   "total_rest_seconds": 0,
+   "intervals": 1,
+   "prescription": {
+    "blocks": [
+     {
+      "work_seconds": 1620,
+      "rest_seconds": 0,
+      "pace_multiple": 0.7,
+      "max_effort": false,
+      "continuous": true
+     }
+    ]
+   }
+  },
+  {
+   "date": "2026-10-21",
+   "day_type": "max_aerobic_power",
+   "modality": "echo_bike",
+   "units": "cal",
+   "actual_pace": 21.1333333333333,
+   "target_pace": 19.7807049708793,
+   "total_work_seconds": 900,
+   "total_rest_seconds": 810,
+   "intervals": 10,
+   "prescription": {
+    "blocks": [
+     {
+      "work_seconds": 90,
+      "rest_seconds": 90,
+      "pace_multiple": 0.95,
+      "max_effort": false,
+      "continuous": false
+     }
+    ]
+   }
+  },
+  {
+   "date": "2026-10-24",
+   "day_type": "interval",
+   "modality": "echo_bike",
+   "units": "cal",
+   "actual_pace": 19.5333333333333,
+   "target_pace": 20.177337033044,
+   "total_work_seconds": 900,
+   "total_rest_seconds": 480,
+   "intervals": 5,
+   "prescription": {
+    "blocks": [
+     {
+      "work_seconds": 180,
+      "rest_seconds": 120,
+      "pace_multiple": 0.9500000000000001,
+      "max_effort": false,
+      "continuous": false
+     }
+    ]
+   }
+  },
+  {
+   "date": "2026-10-24",
+   "day_type": "threshold",
+   "modality": "echo_bike",
+   "units": "cal",
+   "actual_pace": 17.3333333333333,
+   "target_pace": 17.6684260525096,
+   "total_work_seconds": 720,
+   "total_rest_seconds": 0,
+   "intervals": 1,
+   "prescription": {
+    "blocks": [
+     {
+      "work_seconds": 720,
+      "rest_seconds": 0,
+      "pace_multiple": 0.8999999999999999,
+      "max_effort": false,
+      "continuous": true
+     }
+    ]
+   }
+  },
+  {
+   "date": "2026-10-28",
+   "day_type": "endurance",
+   "modality": "echo_bike",
+   "units": "cal",
+   "actual_pace": 12.6666666666667,
+   "target_pace": 12.9506360283926,
+   "total_work_seconds": 1800,
+   "total_rest_seconds": 0,
+   "intervals": 1,
+   "prescription": {
+    "blocks": [
+     {
+      "work_seconds": 1800,
+      "rest_seconds": 0,
+      "pace_multiple": 0.7,
+      "max_effort": false,
+      "continuous": true
+     }
+    ]
+   }
+  },
+  {
+   "date": "2026-10-28",
+   "day_type": "max_aerobic_power",
+   "modality": "echo_bike",
+   "units": "cal",
+   "actual_pace": 18.4666666666667,
+   "target_pace": 19.8014799352753,
+   "total_work_seconds": 900,
+   "total_rest_seconds": 600,
+   "intervals": 3,
+   "prescription": {
+    "blocks": [
+     {
+      "work_seconds": 300,
+      "rest_seconds": 300,
+      "pace_multiple": 0.95,
+      "max_effort": false,
+      "continuous": false
+     }
+    ]
+   }
+  },
+  {
+   "date": "2026-10-30",
+   "day_type": "interval",
+   "modality": "echo_bike",
+   "units": "cal",
+   "actual_pace": 25,
+   "target_pace": 20.5141355238494,
+   "total_work_seconds": 480,
+   "total_rest_seconds": 840,
+   "intervals": 8,
+   "prescription": {
+    "blocks": [
+     {
+      "work_seconds": 60,
+      "rest_seconds": 120,
+      "pace_multiple": 0.9500000000000001,
+      "max_effort": false,
+      "continuous": false
+     }
+    ]
+   }
+  },
+  {
+   "date": "2026-11-03",
+   "day_type": "threshold",
+   "modality": "echo_bike",
+   "units": "cal",
+   "actual_pace": 16.8,
+   "target_pace": 17.3128018574299,
+   "total_work_seconds": 900,
+   "total_rest_seconds": 0,
+   "intervals": 1,
+   "prescription": {
+    "blocks": [
+     {
+      "work_seconds": 900,
+      "rest_seconds": 0,
+      "pace_multiple": 0.8999999999999999,
+      "max_effort": false,
+      "continuous": true
+     }
+    ]
+   }
+  },
+  {
+   "date": "2026-11-06",
+   "day_type": "anaerobic",
+   "modality": "echo_bike",
+   "units": "cal",
+   "actual_pace": 43.5,
+   "target_pace": null,
+   "total_work_seconds": 240,
+   "total_rest_seconds": 1050,
+   "intervals": 8,
+   "prescription": {
+    "blocks": [
+     {
+      "work_seconds": 30,
+      "rest_seconds": 150,
+      "pace_multiple": null,
+      "max_effort": true,
+      "continuous": false
+     }
+    ]
+   }
+  },
+  {
+   "date": "2026-11-07",
+   "day_type": "max_aerobic_power",
+   "modality": "echo_bike",
+   "units": "cal",
+   "actual_pace": 22.2727272727273,
+   "target_pace": 19.0996820353383,
+   "total_work_seconds": 630,
+   "total_rest_seconds": 600,
+   "intervals": 21,
+   "prescription": {
+    "blocks": [
+     {
+      "work_seconds": 30,
+      "rest_seconds": 30,
+      "pace_multiple": 0.95,
+      "max_effort": false,
+      "continuous": false
+     }
+    ]
+   }
+  },
+  {
+   "date": "2026-11-13",
+   "day_type": "interval",
+   "modality": "echo_bike",
+   "units": "cal",
+   "actual_pace": 18.5,
+   "target_pace": 19.8583623983631,
+   "total_work_seconds": 1080,
+   "total_rest_seconds": 300,
+   "intervals": 6,
+   "prescription": {
+    "blocks": [
+     {
+      "work_seconds": 180,
+      "rest_seconds": 60,
+      "pace_multiple": 0.9500000000000001,
+      "max_effort": false,
+      "continuous": false
+     }
+    ]
+   }
+  },
+  {
+   "date": "2026-11-14",
+   "day_type": "threshold",
+   "modality": "echo_bike",
+   "units": "cal",
+   "actual_pace": 16.6111111111111,
+   "target_pace": 17.0641406836709,
+   "total_work_seconds": 1080,
+   "total_rest_seconds": 0,
+   "intervals": 1,
+   "prescription": {
+    "blocks": [
+     {
+      "work_seconds": 1080,
+      "rest_seconds": 0,
+      "pace_multiple": 0.8999999999999999,
+      "max_effort": false,
+      "continuous": true
+     }
+    ]
+   }
+  }
+ ]
+}

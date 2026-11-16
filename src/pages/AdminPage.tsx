@@ -5,6 +5,9 @@ import { supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
 
 type Tab = 'overview' | 'engagement' | 'users';
+
+interface ContinuumPopulationRegion { label: string; avg_m_measured: number | null; n_measured: number; avg_m_all: number | null; n_all: number }
+interface ContinuumPopulation { athletes_with_curve: number; regions: ContinuumPopulationRegion[] }
 type SubscriberFilter = 'all' | 'subscribers' | 'non_subscribers';
 type CompetitionFilter = 'all' | 'linked' | 'not_linked';
 type UserSort = 'last_active' | 'signup_date' | 'question_count' | 'engine_sessions_count' | 'workouts_logged' | 'nutrition_days_logged' | 'total_tokens' | 'needs_contact';
@@ -153,6 +156,8 @@ export default function AdminPage({ session }: { session: Session }) {
   // AI Chat Insights (classified questions) — own window so the all-time
   // taxonomy mix stays available regardless of the engagement period.
   const [chatInsights, setChatInsights] = useState<any>(null);
+  // Continuum population diagnostic (Phase 0): avg M per region across athletes — near 1.0 = the static curve is right.
+  const [continuumPop, setContinuumPop] = useState<ContinuumPopulation | null>(null);
   const [insightsPeriod, setInsightsPeriod] = useState<number | null>(null); // null = all time
 
   useEffect(() => {
@@ -208,6 +213,8 @@ export default function AdminPage({ session }: { session: Session }) {
           const { data, error } = await supabase.rpc('admin_overview_stats', { tz });
           if (error) throw new Error(error.message);
           setOverviewStats(data);
+          // best-effort: the diagnostic must never block the overview
+          supabase.rpc('admin_continuum_population').then(({ data: pop }) => setContinuumPop((pop as ContinuumPopulation | null) ?? null), () => setContinuumPop(null));
           break;
         }
         case 'engagement': {
@@ -560,6 +567,30 @@ export default function AdminPage({ session }: { session: Session }) {
                     View Chat Ratings →
                   </button>
                 </div>
+
+                {/* Conditioning continuum — population diagnostic (spec §3.6) */}
+                {continuumPop && (continuumPop.athletes_with_curve ?? 0) > 0 && (
+                  <>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginTop: 32, marginBottom: 12 }}>
+                      <h3 style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--accent)', margin: 0 }}>
+                        Continuum · population
+                      </h3>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 'auto' }}>
+                        {continuumPop.athletes_with_curve} athletes with a curve · avg M by region (1.0 = balanced; a region off 1.0 across athletes means the reference curve is wrong there)
+                      </span>
+                    </div>
+                    <div style={{ overflowX: 'auto' }}>
+                      <table className="admin-table" style={{ fontSize: 12 }}>
+                        <thead><tr><th>region</th>{(continuumPop.regions ?? []).map((r) => <th key={r.label}>{r.label}</th>)}</tr></thead>
+                        <tbody>
+                          <tr><td>avg M (measured)</td>{(continuumPop.regions ?? []).map((r) => <td key={r.label}>{r.avg_m_measured ?? '—'}</td>)}</tr>
+                          <tr><td>athletes measured</td>{(continuumPop.regions ?? []).map((r) => <td key={r.label}>{r.n_measured}</td>)}</tr>
+                          <tr><td>avg M (all)</td>{(continuumPop.regions ?? []).map((r) => <td key={r.label}>{r.avg_m_all ?? '—'}</td>)}</tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                )}
 
                 {/* AI Chat Insights — classified question labels */}
                 {chatInsights && (
