@@ -128,9 +128,25 @@ athlete.
 - Initial value: 1.0 at every node, confidence 0, on the athlete's first
   time trial.
 - Bounds: `[0.80, 1.40]` per node, so one bad day cannot sink a region.
-- A new time trial updates the trial pace, **not** `M`. Level moves, shape
-  survives. (If the retest moves level a lot, the next few sessions will
-  re-centre `M` naturally.)
+- **Level lives in one place.** The trial position (~35 for a 10-minute
+  effort) is pinned: `M(35) = 1.0`. Time-trial sessions set the level and
+  **never** update `M`. Between trials, ordinary sessions near 35 may drift
+  the node — that drift is evidence the level has moved since the trial,
+  and it is resolved at the next retest, not fought in between.
+- **Retest = renormalise, then damp the right.** When a new trial lands:
+  1. `trial_pace` takes the new value.
+  2. Fold the drift back into the level: `M[n] /= M[35]` for every node,
+     so `M(35)` returns to 1.0 and the shape is preserved relative to the
+     new anchor.
+  3. **Damped retest for the fast-twitch end.** A trial gained through
+     aerobic work does not transfer fully to 20-second efforts. For nodes
+     right of ~70, hold back part of the level jump as a one-time
+     adjustment: `M[n] *= (old_trial / new_trial) ^ β × ramp(n)`, with
+     `β ≈ 0.5` and `ramp` rising from 0 at position 70 to 1 at 100. The
+     next anaerobic sessions then ratchet those nodes to wherever the
+     athlete really is. (This is not a new concept: it is the ordinary
+     ratchet applied once at the moment the level changes.)
+  4. Confidence is left alone; shape survives, level updates.
 
 ### 3.5 Delivered fraction and the normalised height
 
@@ -146,6 +162,50 @@ ratio_vs_target    = actual_pace / target_pace        # = normalised_height / M(
 `normalised_height` is the point plotted on the chart and the quantity
 the ratchet moves `M` toward. `ratio_vs_target` is the athlete-facing
 "hit / beat / missed" and stays as the in-session feedback.
+
+### 3.6 Refitting the static curve
+
+`R(d)` is static per machine/unit, but it will be refit as data
+accumulates. A refit **must replay every athlete's multiplier**: rerun the
+ratchet over each athlete's session history against the new `R(d)` and
+replace their `M`. Changing the shape under unchanged multipliers would
+move every target at once for reasons the athlete never caused.
+
+The replay doubles as the diagnostic that says when a refit is due: the
+**average `M` across athletes should sit near 1.0 at every position.**
+Where it does not, the static curve is wrong there — the population is
+systematically above or below "balanced" at that duration, which means the
+curve, not the athletes, is off. Report that average per machine/unit on
+the admin side.
+
+### 3.7 One multiplier, several units — the Echo problem
+
+The trial is per machine and unit; the multiplier is shared. A multiplier
+of 1.05 learned on rower metres is then applied to Echo-bike calories,
+where "5 % above balanced" is a different size of ask: rower pace scales
+with roughly the cube root of power, Echo calories scale close to linearly
+in power with an offset. The same `M` is a different physical demand on
+each machine.
+
+Options:
+
+- **Convert to a power equivalent before the fraction math.** Where the
+  machine publishes a conversion (Concept2: cal/hr = 4·W + 300; metres from
+  pace via the 2.80/pace³ relation; Rogue's Echo table), compute
+  `delivered_fraction`, `R(d)` and `M` in watt-equivalents, and convert the
+  target back to the athlete's units for display. `M` is then shared in a
+  common currency. Recommended where a conversion exists.
+- **Per-machine `M` with a shared prior.** A new machine starts from the
+  shared curve and diverges with its own sessions. Simpler, but the
+  picture fragments again for rotating athletes, which is the problem the
+  shared curve exists to solve.
+- **Per-unit `R(d)` absorbing the non-linearity, shared `M`.** The v1
+  proposal. Acceptable to start; wrong by a few percent on the Echo at the
+  extremes.
+
+Decision needed. Proposal: option 1 for Echo bike, rower, ski-erg and
+bike-erg (all have usable conversions); option 3 as the fallback for any
+machine without one.
 
 ## 4. The ratchet
 
@@ -280,14 +340,15 @@ never uses this table; it computes position from the day as written.
 
 - Node spacing and `σ`: how local should a session's effect be? (5 and 8
   are guesses.)
-- Should `M` be per machine after all, if a rower-heavy athlete's bike
-  curve looks genuinely different? Proposal: shared, revisit with data.
+- Should `M` be per machine after all? See §3.7 — proposal is shared, in a
+  power-equivalent currency; revisit if a rower-heavy athlete's bike curve
+  looks genuinely different after that.
 - The zone-2 cutoff (~20): fixed, or per athlete?
 - Should assess types (infinity, afterburner, synthesis) ratchet, or only
   record? Proposal: record only, as today's "readout" intent.
-- Echo bike calories are non-linear in watts: do we convert to watts
-  before computing fractions, or keep per-unit curves? Proposal: per-unit
-  curves (simpler, matches calibration as it exists).
+- Echo bike calories are non-linear in watts: resolved in §3.7 as a
+  decision between power-equivalent conversion and per-unit curves.
+- Damped retest: `β` and the 70→100 ramp (§3.4) are guesses.
 
 ## 12. Parked list, reconciled
 
