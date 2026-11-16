@@ -323,7 +323,14 @@ for analytics), `engine_day_types`, `engine_workouts`,
 
 Open: `D(r)` v1 values beyond the two anchors (authored, to refit); the
 2.6 itself (first athlete agreed within 15 %); damped-retest hold-back;
-multi-block bout choice (longest vs weighted mean).
+multi-block bout choice (longest vs weighted mean); the **0.85 "reached
+the curve" threshold** (§3.3) — a working guess for "within 15 % of the
+balanced max bout counts as maximal", not a founder number.
+
+Chart convention (decided 2026-11-16): floors are drawn as **upward
+stems** ("at least this"), ceilings as filled dots. A floor is a lower
+bound and should look like one; a hollow dot below the line read as
+"worse".
 
 ## 12. Parked list, reconciled
 
