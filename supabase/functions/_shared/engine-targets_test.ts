@@ -120,7 +120,7 @@ Deno.test("mAtEffort / effortBandOf: blank curve → 1; a band reads its M; 600 
   assertEquals(effortBandOf(2400), "zone 2 (40 min+)");
 });
 
-import { dayTargets, previousFromSnapshot } from "./engine-targets.ts";
+import { dayTargets, previousFromSnapshot, withIntensityShares } from "./engine-targets.ts";
 const DAY = (id: string, extra: Record<number, Partial<TargetBlockParams>> = {}) => {
   const t = TYPES.find((x) => x.id === id)! as unknown as { block_count: number; block_1_params: TargetBlockParams | null; block_2_params: TargetBlockParams | null; block_3_params: TargetBlockParams | null; block_4_params: TargetBlockParams | null; max_duration_minutes: number | null };
   const b = (n: number, p: TargetBlockParams | null) => (p ? { ...p, ...(extra[n] ?? {}) } : null);
@@ -169,4 +169,18 @@ Deno.test("dayTargets: the weekly cap reads the previous snapshot per band and b
   // a retest (different trial pace in the snapshot) lifts it
   const lifted = dayTargets(DAY("max_aerobic_power", { 1: { intensityShare: [0.72, 0.82] } }), BASE, previousFromSnapshot({ ...snap, trial: { pace: 17.0 } }));
   assert(!lifted.blocks[0].segments[0].curve.capped);
+});
+
+Deno.test("withIntensityShares: a concrete catalogue day takes its type's shares block by block; its own value wins", () => {
+  const day = DAY("hybrid_anaerobic");
+  assertEquals(day.block_1_params!.intensityShare, undefined);
+  const merged = withIntensityShares(day, { block_1_params: { intensityShare: [0.68, 0.78] }, block_2_params: { intensityShare: [0.6, 0.7] } });
+  assertEquals(merged.block_1_params!.intensityShare, [0.68, 0.78]);
+  assertEquals(merged.block_2_params!.intensityShare, [0.6, 0.7]);
+  const own = withIntensityShares({ ...day, block_1_params: { ...day.block_1_params!, intensityShare: [0.9, 0.9] } }, { block_1_params: { intensityShare: [0.68, 0.78] } });
+  assertEquals(own.block_1_params!.intensityShare, [0.9, 0.9]);
+  assertEquals(withIntensityShares(day, null), day);
+  // and the target then comes from the curve, not the authored fraction
+  const d = dayTargets(merged, BASE);
+  assertEquals(d.blocks[0].segments[0].curve.basis, "curve");
 });

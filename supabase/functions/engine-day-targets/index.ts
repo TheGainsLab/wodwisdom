@@ -20,7 +20,7 @@ import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supa
 import { getCorsHeaders } from "../_shared/cors.ts";
 import type { CatalogEngineDay } from "../_shared/engine-block-resolve.ts";
 import { type EngineCurve, type PdCurvePoint } from "../_shared/engine-continuum.ts";
-import { dayTargets, type DayTargets, previousFromSnapshot, type SegmentTarget } from "../_shared/engine-targets.ts";
+import { dayTargets, type DayTargets, previousFromSnapshot, type SegmentTarget, withIntensityShares } from "../_shared/engine-targets.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -84,17 +84,20 @@ Deno.serve(async (req) => {
     if (!modality) return json({ error: "no machine: pass modality/units or record a time trial", position }, 400);
     const trial = trialRows.find((t) => t.modality === modality && (t.units ?? "") === (units ?? "") && t.calculated_rpm != null) ?? null;
 
-    const [{ data: curveRows }, { data: metric }, { data: prevSess }] = await Promise.all([
+    const [{ data: curveRows }, { data: metric }, { data: prevSess }, { data: envelope }] = await Promise.all([
       supa.from("engine_pd_curves").select("r, seconds, k_effort").eq("modality", modality).eq("units", units ?? ""),
       supa.from("engine_user_performance_metrics").select("rolling_avg_ratio").eq("user_id", userId).eq("day_type", workout.day_type).eq("modality", modality).maybeSingle(),
       supa.from("engine_workout_sessions").select("targets, date").eq("user_id", userId).eq("modality", modality).eq("units", units ?? "")
         .not("targets", "is", null).gte("date", new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10)).order("date", { ascending: false }).limit(1).maybeSingle(),
+      // the intensityShare lives on the day TYPE's envelope, not the concrete day
+      supa.from("engine_day_types").select("block_1_params, block_2_params, block_3_params, block_4_params").eq("id", workout.day_type).maybeSingle(),
     ]);
     const machineCurve: PdCurvePoint[] | null = curveRows && curveRows.length >= 2 ? (curveRows as Array<{ r: number; seconds: number }>).map((p) => ({ r: Number(p.r), seconds: Number(p.seconds) })) : null;
     const kEffort = curveRows?.[0] ? Number((curveRows[0] as { k_effort: number }).k_effort) : null;
     const athleteCurve = (profile?.engine_curve as EngineCurve | null) ?? null;
 
-    const targets: DayTargets = dayTargets(workout, {
+    const day = withIntensityShares(workout, envelope as Parameters<typeof withIntensityShares>[1]);
+    const targets: DayTargets = dayTargets(day, {
       trialPace: trial?.calculated_rpm != null ? Number(trial.calculated_rpm) : null,
       machineCurve,
       kEffort,

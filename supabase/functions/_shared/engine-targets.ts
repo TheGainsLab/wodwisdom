@@ -246,3 +246,20 @@ export function previousFromSnapshot(snapshot: { trial?: { pace?: number | null 
   }
   return out;
 }
+
+/** The intensityShare lives on the day TYPE's envelope (engine_day_types), not on
+ *  the concrete catalogue day (engine_workouts). Merge it per block before
+ *  computing targets; the workout's own value wins when present (sequenced days
+ *  may carry one from stage 3 on). */
+export function withIntensityShares(day: CatalogEngineDay, envelope: { block_1_params?: Record<string, unknown> | null; block_2_params?: Record<string, unknown> | null; block_3_params?: Record<string, unknown> | null; block_4_params?: Record<string, unknown> | null } | null): CatalogEngineDay {
+  if (!envelope) return day;
+  const merge = (b: Record<string, unknown> | null, e: Record<string, unknown> | null | undefined) =>
+    b && e && Array.isArray(e.intensityShare) && !Array.isArray(b.intensityShare) ? { ...b, intensityShare: e.intensityShare } : b;
+  return {
+    ...day,
+    block_1_params: merge(day.block_1_params, envelope.block_1_params),
+    block_2_params: merge(day.block_2_params, envelope.block_2_params),
+    block_3_params: merge(day.block_3_params, envelope.block_3_params),
+    block_4_params: merge(day.block_4_params, envelope.block_4_params),
+  };
+}
