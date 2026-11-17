@@ -44,9 +44,14 @@ Deno.test("reaches: time_trial is a 10-min max effort → 10–20 min band; rock
   assertEquals(formatReaches(byId("rocket_races_b"), ECHO_BIKE_CAL_CURVE_V1), null);
 });
 
-Deno.test("reaches: every type resolves to at least one band, except B (inherits) and the flux family (no workDuration in the envelope)", () => {
+Deno.test("reaches: flux is read at its base pace — zone 2", () => {
+  assertEquals(reachableBands(byId("flux"), ECHO_BIKE_CAL_CURVE_V1), ["zone 2 (40 min+)"]);
+  assertEquals(reachableBands(byId("flux_stages"), ECHO_BIKE_CAL_CURVE_V1), ["zone 2 (40 min+)"]);
+});
+
+Deno.test("reaches: every type resolves to at least one band, except B (inherits)", () => {
   for (const r of ROWS) {
-    if (["rocket_races_b", "flux", "flux_stages"].includes(r.id)) continue;
+    if (r.id === "rocket_races_b") continue;
     assert(reachableBands(r, ECHO_BIKE_CAL_CURVE_V1).length > 0, r.id);
   }
 });

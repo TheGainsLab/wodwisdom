@@ -8,6 +8,7 @@ import { assert, assertEquals } from "jsr:@std/assert";
 
 import type { EngineDayTypeRow } from "./engine-catalogue.ts";
 import { computeAllowedDayTypes, fillDeterministicParams, parseProposal, validateBlock, validateProposal } from "./engine-sequence.ts";
+import { resolveSegments } from "./engine-block-resolve.ts";
 
 function row(id: string, phase: number, params: Partial<EngineDayTypeRow>): EngineDayTypeRow {
   return {
@@ -292,4 +293,30 @@ Deno.test("parseProposal: extracts day_type + blocks, strips fences", () => {
 
 Deno.test("parseProposal: garbage → null", () => {
   assertEquals(parseProposal("nope"), null);
+});
+
+// The live flux envelope (2026-11-17): no workDuration; the model chooses rounds/base/flux.
+const FLUX_LIVE = row("flux", 3, {
+  max_duration_minutes: 42,
+  block_1_params: { rounds: [4, 8], basePace: [0.7, 0.7], baseDuration: [300, 360], fluxDuration: [30, 120], fluxPaceRange: [0.75, 0.95], workProgression: "alternating_paces", fluxIntensityByDuration: { "30": 0.9, "60": 0.85, "120": 0.8 } },
+});
+
+Deno.test("fill: a generated flux day gets workDuration = rounds × (base + flux) — the day page resolves it (live finding: it rendered empty)", () => {
+  const filled = fillDeterministicParams({ rounds: 6, baseDuration: 300, fluxDuration: 60, fluxPaceRange: [0.8, 0.9] }, FLUX_LIVE.block_1_params);
+  assertEquals(filled.workDuration, 2160);
+  assertEquals(validateBlock(filled, FLUX_LIVE.block_1_params!, "flux"), []);
+  const segs = resolveSegments({ day_number: 0, day_type: "flux", phase: null, month: null, block_count: 1, set_rest_seconds: null, block_1_params: filled, block_2_params: null, block_3_params: null, block_4_params: null, total_duration_minutes: 42 });
+  const work = segs.filter((x) => x.type === "work");
+  assertEquals(work.reduce((a, x) => a + x.duration_seconds, 0), 2160);
+  assertEquals(work.filter((x) => x.label === "Flux").length, 6);
+});
+
+Deno.test("validateProposal: a 36-min flux day passes the 42-min cap (continuous total, not rounds × total)", () => {
+  const res = validateProposal(
+    { summary: "", days: [{ day_type: "flux", reason: "Easy base with short controlled lifts.", blocks: [{ rounds: 6, baseDuration: 300, fluxDuration: 60, fluxPaceRange: [0.8, 0.9] }] }] },
+    [FLUX_LIVE], { allowedDayTypes: new Set(["flux"]) },
+  );
+  assertEquals(res.errors, []);
+  assertEquals(res.accepted.length, 1);
+  assertEquals(res.accepted[0].blocks[0].workDuration, 2160);
 });

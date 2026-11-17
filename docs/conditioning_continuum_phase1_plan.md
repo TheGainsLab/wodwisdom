@@ -182,3 +182,19 @@ anaerobic          can reach: 2–4 min at 120 s work, 1–2 min at 60–119 s w
 
 and the probe instruction says to spend one day of the block on a blank band
 a type can reach.
+
+## Second dry run and the flux fix (2026-11-17)
+
+With the per-band paces in the can-reach lines, the same athlete's block
+came back as: anaerobic probe at 6 × 45 s (the blank 30–60 s band, named as
+such), devour at 0.9–0.95×, flux, and 4 × 4 min MAP at 0.97–1.03× described
+as "around trial pace" — both earlier misreadings gone.
+
+It chose flux, and the generated day had no `workDuration` (the envelope has
+none; the model picks rounds, base and flux lengths), so every resolver — day
+page, runner, continuum — would have skipped the block. Fixed in the
+sequencer's fill step: `workDuration = rounds × (baseDuration + fluxDuration)`,
+the shape the catalogue's own flux days use; the duration-cap check reads a
+continuous block's total rather than rounds × total. The reaches module
+derives the same, so flux now carries a can-reach line (zone 2 at its base
+pace). Tests in `engine-sequence_test.ts` (fill + cap) and the reaches suite.

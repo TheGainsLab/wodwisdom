@@ -48,6 +48,12 @@ function concreteBlock(env: Record<string, unknown> | null, which: Extreme): Rec
       out[OPTION_KEYS[k]] = pick(v as number[]);
     }
   }
+  // flux family: total time derived as the sequencer's fill does (engine-sequence.ts)
+  const prog = out.workProgression;
+  if ((prog === "alternating_paces" || prog === "progressive_flux_intensity") && typeof out.workDuration !== "number") {
+    const rounds = typeof out.rounds === "number" ? out.rounds : 1;
+    if (typeof out.baseDuration === "number" && typeof out.fluxDuration === "number") out.workDuration = rounds * (out.baseDuration + out.fluxDuration);
+  }
   return out;
 }
 
@@ -89,7 +95,7 @@ function judgedEnvelope(row: EngineDayTypeRow): { env: Record<string, unknown>; 
   // p.blocks is in block order, skipping blocks the resolver dropped (no work);
   // map back to the envelope by counting resolvable blocks.
   const envs = [row.block_1_params, row.block_2_params, row.block_3_params, row.block_4_params].slice(0, row.block_count);
-  const resolvable = envs.filter((e) => e && (e.workDuration != null || (Array.isArray(e.workDurationOptions) && e.workDurationOptions.length)));
+  const resolvable = envs.filter((e) => e && (e.workDuration != null || (Array.isArray(e.workDurationOptions) && e.workDurationOptions.length) || (e.baseDuration != null && e.fluxDuration != null)));
   const env = resolvable[idx] ?? null;
   if (!env) return null;
   return { env, maxEffort: judged.max_effort, continuous: p.blocks[idx]?.continuous === true };
@@ -136,7 +142,11 @@ export function reachMap(row: EngineDayTypeRow, curve: PdCurvePoint[]): Reach[] 
     });
   }
   // a paced block's band follows its pace: the longest bout a balanced athlete holds at that pace
-  const paceKey = j.env.workProgression === "continuous_with_bursts" ? "basePace" : j.env.paceRange != null ? "paceRange" : j.env.fluxPaceRange != null ? "fluxPaceRange" : "basePace";
+  // a continuous block is judged on the pace actually delivered — its
+  // average — which the base segments dominate (flux at 0.95× for 60 s inside
+  // 300 s of 0.7× averages ≈ 0.74×): read it at its base pace
+  const prog = String(j.env.workProgression ?? "");
+  const paceKey = ["continuous_with_bursts", "alternating_paces", "progressive_flux_intensity"].includes(prog) ? "basePace" : j.env.paceRange != null ? "paceRange" : "basePace";
   const pr = numRange(j.env[paceKey]);
   if (!pr) return [];
   const [lo, hi] = pr;
