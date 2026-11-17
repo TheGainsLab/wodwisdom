@@ -226,3 +226,11 @@ fails or is unreachable, the page falls back to legacy math and logs
 
 Still to build (rollout stage 3): the sequencer choosing `intensityShare`,
 with the fill step writing both keys.
+
+## Post-deploy fixes from the first live sequencer preview (2026-11-17)
+
+1. **Trend row dropped** from the band table: ceilings are too sparse per band for a 4-week comparison, and a retest inside the window made the one populated cell misleading. Revisit with a cycle of landings.
+2. **Sprint flag qualified in the block**: `AEROBIC_SIDE_BEHIND_SPRINT (trial RISING: +14% in 31 days — a fast-twitch athlete whose level is catching up; not an aerobic deficit)` / `(trial FLAT … — the aerobic side is the gap …)`, so the model no longer combines flag and trial itself.
+3. **Max-effort reach widened** from ×/÷1.20 to ×/÷1.27 (`STATE_W` 0.75 → 0.62): a 45-s all-out at 1.74× landed at 61 s and left the 30–60 s band blank by one second. Consequence worth knowing: a 24-s sprint now also marks the 31.6-s node, so the exploration athlete's 30–60 s band reads measured from his short sprints.
+4. **`intensityShare` hidden from the sequencer** (catalogue text) and **stripped from generated blocks** (fill step): the migration had put the range on the envelope, the model started emitting values, and the targets function would have honoured them on a switched athlete's sequenced days — stage 3 by accident, with the midpoint shares decision 6 rejected.
+5. **Previous block regardless of origin** (curated or sequenced, labelled), and **at least one day per block must reach the lowest measured band**, named in the summary.

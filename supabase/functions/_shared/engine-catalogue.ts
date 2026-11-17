@@ -96,7 +96,9 @@ export function formatDayTypeCatalogue(rows: EngineDayTypeRow[], opts?: { reache
     const blocks = [dt.block_1_params, dt.block_2_params, dt.block_3_params, dt.block_4_params];
     for (let i = 0; i < dt.block_count; i++) {
       const b = blocks[i];
-      if (b) parts.push(`block_${i + 1}_params: ${JSON.stringify(b)}`);
+      // intensityShare is Phase 2's target machinery (the sequencer's stage-3
+      // choice range), not something the model chooses yet — hidden until then.
+      if (b) parts.push(`block_${i + 1}_params: ${JSON.stringify(Object.fromEntries(Object.entries(b).filter(([k]) => k !== "intensityShare")))}`);
     }
   }
 

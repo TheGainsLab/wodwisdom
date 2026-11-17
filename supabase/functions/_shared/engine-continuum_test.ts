@@ -1,23 +1,6 @@
 // deno test -A supabase/functions/_shared/engine-continuum_test.ts --no-check
 import { assert, assertAlmostEquals, assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import {
-  applyRetest,
-  balancedBout,
-  balancedCeiling,
-  balancedPaceMultiple,
-  C2_CAL_CURVE_V1,
-  C2_METERS_CURVE_V1,
-  comparablePace,
-  type ContinuumSessionInput,
-  ECHO_BIKE_CAL_CURVE_V1,
-  formatCurveForPrompt,
-  newCurve,
-  replayCurve,
-  sessionBout,
-  sessionContinuum,
-  summarizeCurve,
-  type TrialInput,
-} from "./engine-continuum.ts";
+import { applyRetest, balancedBout, balancedCeiling, balancedPaceMultiple, C2_CAL_CURVE_V1, C2_METERS_CURVE_V1, comparablePace, type ContinuumSessionInput, ECHO_BIKE_CAL_CURVE_V1, formatCurveForPrompt, newCurve, replayCurve, sessionBout, sessionContinuum, summarizeCurve, type TrialInput, qualifyFlag } from "./engine-continuum.ts";
 
 const fixture = JSON.parse(await Deno.readTextFile(new URL("./fixtures/continuum_athlete.json", import.meta.url))) as {
   trials: TrialInput[];
@@ -154,7 +137,7 @@ Deno.test("bout: the longest work block decides a multi-block day; continuous wo
 
 // ── the curve ────────────────────────────────────────────────────────────────
 
-Deno.test("replay: the real athlete — measured from 10-min efforts down to 1 min and at ≤30 s; 20–40 min floor-only; the 30–60 s band is blank (his 30-s maxes are ~14-s efforts now); aerobic side behind the sprint; trial-low resolved by the retest", () => {
+Deno.test("replay: the real athlete — measured from 10-min efforts down to ≤30 s; 20–40 min floor-only; the 30–60 s band reads measured from his 24–25 s max efforts (reach ×/÷1.27 since 2026-11-17); aerobic side behind the sprint; trial-low resolved by the retest", () => {
   const { curve, sessions } = replayCurve(fixture.sessions, fixture.trials, CURVES);
   const regions = summarizeCurve(curve, sessions);
   const byLabel = Object.fromEntries(regions.map((r) => [r.label, r]));
@@ -162,7 +145,7 @@ Deno.test("replay: the real athlete — measured from 10-min efforts down to 1 m
   assertEquals(byLabel["2–4 min"].state, "measured"); // the 3-min interval at 1.18× reached the curve
   assertEquals(byLabel["1–2 min"].state, "measured"); // the 1:2 interval at 1.73×
   assertEquals(byLabel["≤30 s"].state, "measured"); // the 20–30 s max efforts at 2.6–3.2×
-  assertEquals(byLabel["30–60 s"].state, "blank"); // his 30-s maxes at 2.3–2.6× are 13–25-s efforts under the 15-s anchor; nothing lands in 30–60 s
+  assertEquals(byLabel["30–60 s"].state, "measured"); // nothing lands inside 30–60 s, but his 24–25-s max efforts reach the 31.6-s node (×1.27) — was blank at the old ×1.20 reach
   assertEquals(byLabel["20–40 min"].state, "floor"); // threshold at 0.90–0.94×: trained there, never maximal
   assert(curve.flags.includes("AEROBIC_SIDE_BEHIND_SPRINT"), curve.flags.join(","));
   // TRIAL_LOW was true in early October and the 15 Oct retest cleared it
@@ -230,4 +213,26 @@ Deno.test("flags: TRIAL_STALE when a machine trained in the last 28 days has a t
   assert(stale.curve.flags.includes("TRIAL_STALE:echo_bike|cal"), stale.curve.flags.join(","));
   const fresh = replayCurve(sessions, [{ modality: "echo_bike", units: "cal", pace: 17, date: "2026-10-20" }], { "echo_bike|cal": ECHO });
   assert(!fresh.curve.flags.some((f) => f.startsWith("TRIAL_STALE")), fresh.curve.flags.join(","));
+});
+
+Deno.test("prompt block: no trend row; the sprint flag carries its trial-trend qualifier", () => {
+  const { curve, sessions } = replayCurve(fixture.sessions, fixture.trials, CURVES);
+  const text = formatCurveForPrompt(curve, summarizeCurve(curve, sessions), fixture.trials);
+  assert(!text.includes("trend:"), text);
+  assert(text.includes("AEROBIC_SIDE_BEHIND_SPRINT (trial RISING: +14% in 31 days"), text);
+  // flat trial → the other reading
+  const flat = qualifyFlag("AEROBIC_SIDE_BEHIND_SPRINT", [{ modality: "echo_bike", units: "cal", pace: 16.0, date: "2026-09-14" }, { modality: "echo_bike", units: "cal", pace: 16.2, date: "2026-10-15" }]);
+  assert(flat.includes("FLAT") && flat.includes("aerobic side is the gap"), flat);
+  assertEquals(qualifyFlag("TRIAL_LOW", fixture.trials), "TRIAL_LOW");
+});
+
+Deno.test("state reach: a 45-s max effort ridden at 1.74× (a 61-s effort) marks the 30–60 s band measured, not blank", () => {
+  const r = replayCurve(
+    [{ date: "2026-11-17", day_type: "anaerobic", modality: "echo_bike", units: "cal", actual_pace: 32.0, total_work_seconds: 270, intervals: 6, prescription: { blocks: [{ work_seconds: 45, rest_seconds: 225, pace_multiple: null, max_effort: true, continuous: false }] } }],
+    [{ modality: "echo_bike", units: "cal", pace: 18.4, date: "2026-10-15" }],
+    { "echo_bike|cal": ECHO },
+  );
+  near(r.sessions[0].effort_seconds!, 61, 1.5);
+  const band = summarizeCurve(r.curve, r.sessions).find((x) => x.label === "30–60 s")!;
+  assertEquals(band.state, "measured");
 });

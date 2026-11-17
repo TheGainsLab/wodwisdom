@@ -54,9 +54,11 @@ const SYSTEM_PROMPT =
   `its clock. M is the athlete against a balanced athlete at their own time-trial level: 1.0 = balanced, ` +
   `below = that band lags, above = that band is ahead of their trial. state: "measured" = a max effort ` +
   `proved it; "floor" = only sub-max days have landed there (M is a lower bound); "blank" = nothing has landed ` +
-  `there. n = evidence weight; trend = last 4 weeks vs the 4 before. Trials are the athlete's 10-min ` +
+  `there. n = evidence weight. Trials are the athlete's 10-min ` +
   `time-trial history per machine (the level itself). Efforts of 40 min+ are zone 2: dose, not scored.\n\n` +
-  `WHAT TO DO WITH IT. Prescribe into the LOWEST MEASURED band without letting the strong bands sag. Where a ` +
+  `WHAT TO DO WITH IT. Prescribe into the LOWEST MEASURED band without letting the strong bands sag: at least ` +
+  `ONE day of every block must be a type and pace that "can reach" that band — name the band and the day in ` +
+  `your summary. Where a ` +
   `band is BLANK, PROBE it: spend one day of this block on a max-effort day whose longest work block lands ` +
   `in that band, before prescribing development into it. Each catalogue type says which bands it "can ` +
   `reach" and WHAT puts it there — for a paced day that is the PACE you set (a 3-minute interval at 1.0× is ` +
@@ -369,28 +371,37 @@ export async function runResequence(
   // ── Variety inputs: the previous block, the per-type caps, the never-done
   // ready types. The validator enforces the first two; the third is the
   // model's to honour and the log shows whether it does. ─────────────────
+  // The previous block is what the athlete actually trained in the last
+  // maxDays positions, whoever wrote it: the sequencer's override where one
+  // exists, else the curated catalogue day (2026-11-17 — a curated 6 × 45 s
+  // anaerobic was proposed again the day after it was done).
   const previousBlock: WeekRuleDay[] = [];
+  const previousOrigin: string[] = [];
   if (maxCompletedSeq > 0) {
+    const positions = Array.from({ length: Math.min(maxDays, maxCompletedSeq) }, (_, i) => maxCompletedSeq - i).reverse();
     const { data: prevOvs } = await supa
       .from("engine_user_day_overrides")
       .select("sequence_position, engine_workout_id")
       .eq("user_id", userId).eq("program_version", version)
-      .lte("sequence_position", maxCompletedSeq)
-      .order("sequence_position", { ascending: false })
-      .limit(maxDays);
-    const ids = (prevOvs ?? []).map((o) => o.engine_workout_id as string).filter(Boolean);
-    if (ids.length > 0) {
-      const { data: prevDays } = await supa
-        .from("engine_workouts")
-        .select("id, day_type, block_1_params, block_2_params, block_3_params, block_4_params")
-        .in("id", ids);
-      for (const o of (prevOvs ?? []).slice().reverse()) {
-        const w = (prevDays ?? []).find((d) => d.id === o.engine_workout_id);
-        if (!w) continue;
-        const blocks = [w.block_1_params, w.block_2_params, w.block_3_params, w.block_4_params]
-          .filter((b): b is Record<string, unknown> => !!b && typeof b === "object");
-        previousBlock.push({ day_type: w.day_type as string, blocks });
-      }
+      .in("sequence_position", positions);
+    const ovByPos = new Map((prevOvs ?? []).map((o) => [o.sequence_position as number, o.engine_workout_id as string]));
+    const catalogDayByPos = new Map(mapping.filter((m) => positions.includes(m.seq) && !ovByPos.has(m.seq)).map((m) => [m.seq, m.day]));
+    const SEL = "id, program_type, day_number, day_type, block_1_params, block_2_params, block_3_params, block_4_params";
+    const [{ data: ovDays }, { data: catDays }] = await Promise.all([
+      ovByPos.size ? supa.from("engine_workouts").select(SEL).in("id", [...ovByPos.values()]) : Promise.resolve({ data: [] }),
+      catalogDayByPos.size ? supa.from("engine_workouts").select(SEL).eq("program_type", version).in("day_number", [...catalogDayByPos.values()]) : Promise.resolve({ data: [] }),
+    ]);
+    type W = { id: string; day_number: number; day_type: string; block_1_params: unknown; block_2_params: unknown; block_3_params: unknown; block_4_params: unknown };
+    for (const pos of positions) {
+      const ovId = ovByPos.get(pos);
+      const w = ovId
+        ? ((ovDays ?? []) as W[]).find((d) => d.id === ovId)
+        : ((catDays ?? []) as W[]).find((d) => d.day_number === catalogDayByPos.get(pos));
+      if (!w) continue;
+      const blocks = [w.block_1_params, w.block_2_params, w.block_3_params, w.block_4_params]
+        .filter((b): b is Record<string, unknown> => !!b && typeof b === "object");
+      previousBlock.push({ day_type: w.day_type, blocks });
+      previousOrigin.push(ovId ? "sequenced" : "curated");
     }
   }
   const curatedMonthTypes = mapping.filter((m) => m.month === blockMonth).map((m) => typeByDay.get(m.day) ?? "");
@@ -408,8 +419,8 @@ export async function runResequence(
     }).join(" | ");
   const varietyNote =
     (previousBlock.length > 0
-      ? `PREVIOUS BLOCK (do not repeat any of these prescriptions):\n` +
-        previousBlock.map((d, i) => `  ${i + 1}. ${d.day_type}: ${describeBlocks(d.blocks ?? [])}`).join("\n") + `\n`
+      ? `PREVIOUS BLOCK — what the athlete actually trained last (do not repeat any of these prescriptions):\n` +
+        previousBlock.map((d, i) => `  ${i + 1}. ${d.day_type} (${previousOrigin[i] ?? "curated"}): ${describeBlocks(d.blocks ?? [])}`).join("\n") + `\n`
       : "") +
     (typeCap.size > 0
       ? `PER-BLOCK CAP BY TYPE (share of the curated month): ` +
