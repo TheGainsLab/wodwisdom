@@ -120,7 +120,7 @@ Deno.serve(async (req) => {
       trial: trial ? { id: trial.id, pace: Number(trial.calculated_rpm), date: trial.date } : null,
       machine: `${modality}|${units ?? ""}`,
       computed_at: new Date().toISOString(),
-      blocks: targets.blocks.map((b) => b.segments.map((s): SegmentTarget & { label: string; round_index: number; duration_seconds: number } => ({ ...s[mode], label: s.label, round_index: s.round_index, duration_seconds: s.duration_seconds }))),
+      blocks: targets.blocks.map((b) => b.segments.map((s): SegmentTarget & { block_index: number; label: string; round_index: number; duration_seconds: number } => ({ ...s[mode], block_index: b.block_index, label: s.label, round_index: s.round_index, duration_seconds: s.duration_seconds }))),
     };
 
     return json({

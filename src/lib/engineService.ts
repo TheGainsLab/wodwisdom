@@ -82,6 +82,9 @@ export interface EngineWorkoutSession {
   // Program-sequence position this session was trained at (sequence-identity
   // migration; backfilled for history, NULL for out-of-program sessions).
   sequence_position?: number | null;
+  /** Continuum Phase 2: the per-segment target snapshot frozen when the session
+   *  was started (engine-day-targets); null on legacy-target sessions. */
+  targets?: Record<string, unknown> | null;
   created_at: string;
 }
 
