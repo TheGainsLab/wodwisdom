@@ -147,8 +147,24 @@ export function fillDeterministicParams(
       continue;
     }
   }
+  // Flux family: the envelope has no workDuration (the model chooses rounds,
+  // baseDuration, fluxDuration), but every resolver — the day page, the
+  // runner, the continuum — reads a continuous block's total time from
+  // workDuration and skips the block when it is missing (live finding
+  // 2026-11-17: a generated flux day rendered empty). The catalogue's own flux
+  // days carry workDuration = rounds × (base + flux); derive the same.
+  const prog = out.workProgression ?? envelope.workProgression;
+  if ((prog === "alternating_paces" || prog === "progressive_flux_intensity") && typeof out.workDuration !== "number") {
+    const rounds = typeof out.rounds === "number" ? out.rounds : 1;
+    const base = typeof out.baseDuration === "number" ? out.baseDuration : null;
+    const flux = typeof out.fluxDuration === "number" ? out.fluxDuration : null;
+    if (base != null && flux != null) out.workDuration = rounds * (base + flux);
+  }
   return out;
 }
+
+/** Progressions whose workDuration is the block's TOTAL continuous time, not a per-round value. */
+const CONTINUOUS_TOTAL = new Set(["alternating_paces", "progressive_flux_intensity", "continuous_with_bursts"]);
 
 /** Validate one generated block against its authored envelope. Returns error strings. */
 export function validateBlock(
@@ -215,6 +231,7 @@ export function validateBlock(
 function blockWorkSeconds(gen: GeneratedBlock): number {
   const rounds = typeof gen.rounds === "number" ? gen.rounds : 1;
   const work = typeof gen.workDuration === "number" ? gen.workDuration : 0;
+  if (CONTINUOUS_TOTAL.has(String(gen.workProgression))) return work;
   return rounds * work;
 }
 
