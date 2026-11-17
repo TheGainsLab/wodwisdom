@@ -57,8 +57,11 @@ const SYSTEM_PROMPT =
   `there. n = evidence weight; trend = last 4 weeks vs the 4 before. Trials are the athlete's 10-min ` +
   `time-trial history per machine (the level itself). Efforts of 40 min+ are zone 2: dose, not scored.\n\n` +
   `WHAT TO DO WITH IT. Prescribe into the LOWEST MEASURED band without letting the strong bands sag. Where a ` +
-  `band is BLANK, PROBE it: place a max-effort day whose longest work block lands in that band (each ` +
-  `catalogue type says which bands it "can reach") before prescribing development into it. Weight the ` +
+  `band is BLANK, PROBE it: spend one day of this block on a max-effort day whose longest work block lands ` +
+  `in that band, before prescribing development into it. Each catalogue type says which bands it "can ` +
+  `reach" and WHAT puts it there — for a paced day that is the PACE you set (a 3-minute interval at 1.0× is ` +
+  `a 10–20 min effort, not a 2–4 min one; the clock does not move the band), for a max effort it is the ` +
+  `work length. Weight the ` +
   `four middle bands — 30 s to 10 min — as the destination: that is where metcons live; ≤30 s and 20–40 min ` +
   `are diagnostics. A gap at 1–4 min outranks a gap at ≤30 s. Confidence by n: where a band has solid ` +
   `evidence and a clear trend, set intensity decisively; where it is thin, stay mid-envelope — don't jump ` +
