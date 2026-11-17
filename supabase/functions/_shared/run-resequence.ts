@@ -73,7 +73,8 @@ const SYSTEM_PROMPT =
   `longer than balanced at trial pace — the baseline is stale; place a retest early in the block (the one ` +
   `case that earns a self-made time trial; otherwise the scheduled monthly trial keeps calibration fresh and ` +
   `an extra one spends a training day). UNCALIBRATED:<machine>: no trial on that machine — do not prescribe ` +
-  `to it as if calibrated. AWAITING_RIGHT_ANCHOR: a recent retest; the sprint bands are provisional until the ` +
+  `to it as if calibrated. TRIAL_STALE:<machine>: that machine's trial is over 40 days old and still in use — ` +
+  `treat it like TRIAL_LOW: an early retest is justified. AWAITING_RIGHT_ANCHOR: a recent retest; the sprint bands are provisional until the ` +
   `next max effort.\n\n` +
   `Your lever is conditioning days and their intensity within each envelope — not the trial schedule, not ` +
   `the number of days, not the athlete's targets. Day types are the words you answer in; the curve is what ` +

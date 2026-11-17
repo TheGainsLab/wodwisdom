@@ -220,3 +220,14 @@ Deno.test("prompt block: regions, trials (last 6), flags", () => {
   assert(text.includes("AEROBIC_SIDE_BEHIND_SPRINT"));
   assert(text.includes("≤30 s"));
 });
+
+Deno.test("flags: TRIAL_STALE when a machine trained in the last 28 days has a trial older than 40 days; not when the trial is fresh", () => {
+  const sessions = [
+    { date: "2026-10-01", day_type: "threshold", modality: "echo_bike", units: "cal", actual_pace: 16, total_work_seconds: 600, intervals: 1 },
+    { date: "2026-11-10", day_type: "threshold", modality: "echo_bike", units: "cal", actual_pace: 16, total_work_seconds: 600, intervals: 1 },
+  ];
+  const stale = replayCurve(sessions, [{ modality: "echo_bike", units: "cal", pace: 17, date: "2026-09-01" }], { "echo_bike|cal": ECHO });
+  assert(stale.curve.flags.includes("TRIAL_STALE:echo_bike|cal"), stale.curve.flags.join(","));
+  const fresh = replayCurve(sessions, [{ modality: "echo_bike", units: "cal", pace: 17, date: "2026-10-20" }], { "echo_bike|cal": ECHO });
+  assert(!fresh.curve.flags.some((f) => f.startsWith("TRIAL_STALE")), fresh.curve.flags.join(","));
+});

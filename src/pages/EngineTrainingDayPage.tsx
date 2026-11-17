@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { track } from '../lib/appEvents';
 import { useParams, useNavigate } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
 import type { Session } from '@supabase/supabase-js';
 import Nav from '../components/Nav';
 import {
@@ -76,6 +77,38 @@ interface Segment {
   label: string;
   intensity: string;
 }
+
+// ── Continuum Phase 2: targets from the curve (engine-day-targets) ──
+// The function returns both formulas and which one this athlete is on. In
+// curve mode the page shows the snapshot's per-segment paces and records the
+// snapshot on the session; in legacy mode nothing below changes.
+interface TargetSnapshotSegment {
+  block_index?: number;
+  label: string;
+  round_index: number;
+  duration_seconds: number;
+  target_pace: number | null;
+  basis: string;
+  floored?: boolean;
+  capped?: boolean;
+}
+interface TargetSnapshot {
+  version: number;
+  mode: 'curve' | 'legacy';
+  trial: { id: string; pace: number; date: string } | null;
+  machine: string;
+  computed_at: string;
+  blocks: TargetSnapshotSegment[][];
+}
+interface DayTargetsResponse {
+  error?: string;
+  mode?: 'curve' | 'legacy';
+  flag?: boolean;
+  machine_curve?: boolean;
+  snapshot?: TargetSnapshot;
+}
+/** The time-trial day, for a calibration trial on a machine with no baseline. */
+const TIME_TRIAL_BLOCK = { rounds: 1, paceRange: 'max_effort', restDuration: 0, workDuration: 600, workProgression: 'single' };
 
 // ── Equipment taxonomy (matches mobile app) ──
 
@@ -551,6 +584,12 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
   const [monthsUnlocked, setMonthsUnlocked] = useState<number>(1);
   const [rocketADay, setRocketADay] = useState<number | null>(null);
   const [rocketASession, setRocketASession] = useState<EngineWorkoutSession | null>(null);
+  // Continuum Phase 2: the targets function's answer for this day on this
+  // machine. null until loaded or when it failed (→ legacy math, as today).
+  const [dayTargets, setDayTargets] = useState<DayTargetsResponse | null>(null);
+  // A calibration time trial run in place of today's day (machine with no
+  // baseline). Saved out of sequence: the scheduled day stays next up.
+  const [calibrationTrial, setCalibrationTrial] = useState(false);
   const { hasFeature, hasEngineAccess } = useEntitlements(session.user.id);
   const hasAccess = hasEngineAccess;
 
@@ -690,6 +729,69 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
       }
     })();
   }, [modality, selectedUnit, workout?.day_type]);
+
+  // Continuum Phase 2: ask the targets function for this day on this machine.
+  // Only before the session starts — from Start on, the snapshot in state is
+  // the one the session is scored against (frozen).
+  useEffect(() => {
+    if (!workout?.id || !modality || !selectedUnit || calibrationTrial) { setDayTargets(null); return; }
+    if (stage !== 'equipment' && stage !== 'preview') return;
+    let active = true;
+    (async () => {
+      const { data, error } = await supabase.functions.invoke('engine-day-targets', { body: { workout_id: workout.id, modality, units: selectedUnit } });
+      if (!active) return;
+      if (error || !data || data.error) {
+        console.error(JSON.stringify({ tag: 'day_targets_failed', error: error?.message ?? data?.error }));
+        setDayTargets(null);
+        return;
+      }
+      setDayTargets(data as DayTargetsResponse);
+    })();
+    return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workout?.id, modality, selectedUnit, calibrationTrial, stage === 'equipment' || stage === 'preview']);
+
+  // Curve mode: the athlete is switched (engine_targets_v2) and the snapshot
+  // loaded. Per-segment paces keyed by block, label and the segment's ordinal
+  // among same-label work segments in that block — the order both the page
+  // and the server enumerate segments in.
+  const curveMode = dayTargets?.mode === 'curve' && !!dayTargets.snapshot;
+  const curveGoalMap = useMemo(() => {
+    const map = new Map<string, number>();
+    if (!curveMode || !dayTargets?.snapshot) return map;
+    dayTargets.snapshot.blocks.forEach((block, arrayIdx) => {
+      const counts = new Map<string, number>();
+      for (const seg of block) {
+        const b = seg.block_index ?? arrayIdx;
+        const n = counts.get(seg.label) ?? 0;
+        counts.set(seg.label, n + 1);
+        if (seg.target_pace != null) map.set(`${b}|${seg.label}|${n}`, seg.target_pace);
+      }
+    });
+    return map;
+  }, [curveMode, dayTargets]);
+
+  /** The goal for one work segment: the curve snapshot's pace when in curve
+   *  mode, else today's math (calculateIntervalGoal), unchanged. */
+  const goalFor = (bp: BlockParams, segDuration: number, label: string, blockIdx: number, ordinal: number, baselineRpm: number, rollingAdj: number, roundPaceOverride?: number): number | null => {
+    if (curveMode) {
+      const pace = curveGoalMap.get(`${blockIdx}|${label}|${ordinal}`);
+      // no entry = the snapshot has no target for this segment (max effort / no trial)
+      if (pace == null) return null;
+      if (isRateUnit(selectedUnit)) return Math.round(pace * 10) / 10;
+      return Math.round(pace * (segDuration / 60) * 10) / 10;
+    }
+    return calculateIntervalGoal(bp, segDuration, label, baselineRpm, rollingAdj, isRateUnit(selectedUnit), roundPaceOverride);
+  };
+
+  /** Run a 10-minute time trial on this machine in place of today's day. */
+  const startCalibrationTrial = () => {
+    if (!workout) return;
+    setCalibrationTrial(true);
+    setWorkout({ ...workout, day_type: 'time_trial', block_count: 1, block_1_params: TIME_TRIAL_BLOCK, block_2_params: null, block_3_params: null, block_4_params: null, total_duration_minutes: 10 });
+    setDayReason(null);
+    track('engine_calibration_trial_started', { kind: 'engine' });
+  };
 
   // Sync refs
   useEffect(() => { segIndexRef.current = segIndex; }, [segIndex]);
@@ -953,7 +1055,14 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
     if (!workout) return null;
     const baselineRpm = baseline?.calculated_rpm ?? 0;
     let targetPace: number | null = null;
-    if (baselineRpm > 0) {
+    if (curveMode && dayTargets?.snapshot) {
+      // Curve mode: the duration-weighted mean of the snapshot's targeted segments.
+      let w = 0, sum = 0;
+      for (const block of dayTargets.snapshot.blocks) for (const seg of block) {
+        if (seg.target_pace != null) { w += seg.duration_seconds; sum += seg.duration_seconds * seg.target_pace; }
+      }
+      targetPace = w > 0 ? sum / w : null;
+    } else if (baselineRpm > 0) {
       const workSegs = segs.filter(s => s.type === 'work');
       if (workSegs.length > 0) {
         let totalTargetPace = 0;
@@ -1033,7 +1142,11 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
         date: localDateString(),
         program_day: catalogDay ?? dayNumber,
         program_day_number: catalogDay ?? dayNumber,
-        sequence_position: dayNumber,
+        // A calibration trial is saved OUT of sequence (null position): the
+        // scheduled day stays next up and the pointer does not move.
+        sequence_position: calibrationTrial ? null : dayNumber,
+        // Continuum Phase 2: the target snapshot frozen when the session started.
+        targets: curveMode && dayTargets?.snapshot ? (dayTargets.snapshot as unknown as Record<string, unknown>) : null,
         day_type: workout.day_type,
         modality,
         units: selectedUnit,
@@ -1089,9 +1202,14 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
         }
       }
 
+      // Continuum Phase 2: fold this session into the athlete's curve now, so
+      // tomorrow's target reflects it (the daily tick is the safety net).
+      supabase.functions.invoke('engine-continuum-backfill', { body: {} }).catch(() => {});
+
       // Advance the pointer if the athlete trained at or past it. Sequence
       // identity: advancement is position + 1, clamped to the program length.
-      if (dayNumber >= currentDay) {
+      // A calibration trial does not advance anything.
+      if (!calibrationTrial && dayNumber >= currentDay) {
         const next = programLength != null ? Math.min(dayNumber + 1, programLength) : dayNumber + 1;
         await advanceCurrentDay(next).catch(() => {});
       }
@@ -1273,6 +1391,12 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                   <div style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.5 }}>
                     No time trial baseline for <strong>{selectedMod?.label}</strong> with <strong>{SCORE_UNITS.find(u => u.value === selectedUnit)?.label}</strong>.
                     Complete a time trial to see pace targets.
+                    <div style={{ marginTop: 8 }}>
+                      <button type="button" className="engine-btn engine-btn-secondary" onClick={startCalibrationTrial} style={{ fontSize: 13, padding: '6px 12px' }}>
+                        Do a 10-minute time trial on this machine instead
+                      </button>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>Today's session stays next up for when you come back.</div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -1450,7 +1574,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
 
                           while (remaining > 0) {
                             const bSeg = Math.min(baseDur, remaining);
-                            const baseGoal = calculateIntervalGoal(bp, bSeg, 'Base', baselineRpm, rollingAdj, isRateUnit(selectedUnit));
+                            const baseGoal = goalFor(bp, bSeg, 'Base', blockIdx, segIdx, baselineRpm, rollingAdj);
                             rows.push(
                               <div key={`b-${segIdx}`} className="engine-breakdown-row">
                                 <span className="engine-breakdown-label">WORK</span>
@@ -1464,7 +1588,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                             if (remaining <= 0) break;
 
                             const fSeg = Math.min(fluxDur, remaining);
-                            const fluxGoal = calculateIntervalGoal(bp, fSeg, 'Flux', baselineRpm, rollingAdj, isRateUnit(selectedUnit));
+                            const fluxGoal = goalFor(bp, fSeg, 'Flux', blockIdx, segIdx, baselineRpm, rollingAdj);
                             rows.push(
                               <div key={`f-${segIdx}`} className="engine-breakdown-row engine-breakdown-row--flux">
                                 <span className="engine-breakdown-label engine-breakdown-label--flux">FLUX</span>
@@ -1500,7 +1624,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
 
                           while (remaining > 0) {
                             const baseSeg = Math.min(burstInterval, remaining);
-                            const baseGoal = calculateIntervalGoal(bp, baseSeg, 'Base', baselineRpm, rollingAdj, isRateUnit(selectedUnit));
+                            const baseGoal = goalFor(bp, baseSeg, 'Base', blockIdx, segIdx, baselineRpm, rollingAdj);
                             rows.push(
                               <div key={`base-${segIdx}`} className="engine-breakdown-row">
                                 <span className="engine-breakdown-label">BASE</span>
@@ -1549,7 +1673,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
 
                           while (remaining > 0) {
                             const bSeg = Math.min(baseDur, remaining);
-                            const baseGoal = calculateIntervalGoal(bp, bSeg, 'Base', baselineRpm, rollingAdj, isRateUnit(selectedUnit));
+                            const baseGoal = goalFor(bp, bSeg, 'Base', blockIdx, segIdx, baselineRpm, rollingAdj);
                             rows.push(
                               <div key={`b-${segIdx}`} className="engine-breakdown-row">
                                 <span className="engine-breakdown-label">WORK</span>
@@ -1564,7 +1688,10 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
 
                             const fSeg = Math.min(fluxDur, remaining);
                             const fluxIntensity = startIntensity + segIdx * increment;
-                            const fluxGoal = baselineRpm > 0
+                            const curveFluxPace = curveMode ? curveGoalMap.get(`${blockIdx}|Flux|${segIdx}`) : undefined;
+                            const fluxGoal = curveFluxPace != null
+                              ? (isRateUnit(selectedUnit) ? Math.round(curveFluxPace * 10) / 10 : Math.round(curveFluxPace * (fSeg / 60) * 10) / 10)
+                              : baselineRpm > 0
                               ? Math.round(baselineRpm * fluxIntensity * rollingAdj * (fSeg / 60) * 10) / 10
                               : null;
                             rows.push(
@@ -1593,7 +1720,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                               <span className="engine-breakdown-goal">
                                 {(() => {
                                   const totalDur = workDur * rounds;
-                                  const goal = calculateIntervalGoal(bp, totalDur, 'Work', baselineRpm, rollingAdj, isRateUnit(selectedUnit));
+                                  const goal = goalFor(bp, totalDur, 'Work', blockIdx, 0, baselineRpm, rollingAdj);
                                   const isMax = bp.paceRange === 'max_effort';
                                   return isMax ? 'Max Effort' : goal != null ? <GoalWithPace goal={goal} durationSeconds={totalDur} unit={selectedUnit} modality={modality} /> : pace || '—';
                                 })()}
@@ -1617,7 +1744,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                               const roundPace = bp.paceProgression === 'increasing' && Array.isArray(bp.paceRange) && effectivePaceInc
                                 ? bp.paceRange[0] + r * effectivePaceInc
                                 : undefined;
-                              const intervalGoal = calculateIntervalGoal(bp, roundWorkDur, 'Work', baselineRpm, rollingAdj, isRateUnit(selectedUnit), roundPace);
+                              const intervalGoal = goalFor(bp, roundWorkDur, 'Work', blockIdx, r, baselineRpm, rollingAdj, roundPace);
                               const isMax = bp.paceRange === 'max_effort';
                               return (
                                 <div key={r}>
@@ -1942,7 +2069,9 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
       const bp = raw as unknown as BlockParams | null;
       const rollingAdj = effectiveRollingMult(workout, performanceMetrics);
       if (bp) {
-        currentGoal = calculateIntervalGoal(bp, seg.duration, seg.label, baseline?.calculated_rpm ?? 0, rollingAdj, isRateUnit(selectedUnit));
+        // ordinal among same-label work segments of this block, as the snapshot is keyed
+        const ordinal = segments.slice(0, segIndex).filter((x) => x.type === 'work' && x.blockIndex === seg.blockIndex && x.label === seg.label).length;
+        currentGoal = goalFor(bp, seg.duration, seg.label, seg.blockIndex, ordinal, baseline?.calculated_rpm ?? 0, rollingAdj);
       }
     }
 

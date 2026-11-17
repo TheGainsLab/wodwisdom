@@ -280,6 +280,7 @@ const STEP_CLAMP = 0.15;
 const M_MIN = 0.7, M_MAX = 1.5;
 const CONF_HALF_LIFE_DAYS = 60;
 const TRIAL_SECONDS = 600; // the pinned node
+export const TRIAL_STALE_DAYS = 40;
 const RIGHT_ANCHOR_SECONDS = 60; // efforts shorter than this are re-anchored by their own max effort after a retest
 const CEILING_SECONDS = 30; // the glycolytic anchor
 const DAMP_BETA = 0.5;
@@ -457,6 +458,21 @@ export function replayCurve(
   else if (ceilingRatio != null && ceilingRatio <= 0.9) flags.push("GLYCOLYTIC_BELOW_BALANCED");
   for (const k of uncalibrated) flags.push(`UNCALIBRATED:${k}`);
   if (curve.awaiting_right_anchor) flags.push("AWAITING_RIGHT_ANCHOR");
+  // Stale trial (Phase 2, spec §7): a machine trained in the last 28 days whose
+  // latest trial is older than TRIAL_STALE_DAYS — the ruler has aged under
+  // training; an early retest is justified (the sequencer reads it like TRIAL_LOW).
+  if (curve.as_of) {
+    const recentMachines = new Set(ordered.filter((s) => daysBetween(s.date, curve.as_of!) <= 28).map((s) => `${s.modality}|${s.units ?? ""}`));
+    const latestTrial = new Map<string, string>();
+    for (const t of trials) {
+      const k = `${t.modality}|${t.units ?? ""}`;
+      if (!latestTrial.has(k) || latestTrial.get(k)! < t.date) latestTrial.set(k, t.date);
+    }
+    for (const k of recentMachines) {
+      const d = latestTrial.get(k);
+      if (d && daysBetween(d, curve.as_of) > TRIAL_STALE_DAYS) flags.push(`TRIAL_STALE:${k}`);
+    }
+  }
   curve.flags = flags;
   return { curve, sessions: out };
 }

@@ -207,3 +207,22 @@ band's M, shared across day types, took a target below what the athlete
 delivers on that type. The function also had to stop merging the envelope's
 stored shares into curated days (they are the sequencer's range), and read
 the share from each day's own fraction and duration.
+
+## Built (2026-11-17) — step 5, the day page; step 6a, the stale-trial flag
+
+| Piece | Where |
+|---|---|
+| Day page asks `engine-day-targets` for the day on the chosen machine while the athlete is still choosing (equipment/preview stages). In **curve mode** (the athlete is switched and the snapshot loaded) every work segment's goal — breakdown rows, the live timer, the session-level target — comes from the snapshot's per-segment pace; the snapshot is recorded on the session (`targets`) at the completion save. In **legacy mode** (everyone today) the page's own math runs exactly as before and `targets` is null | `src/pages/EngineTrainingDayPage.tsx` (`goalFor`, `curveGoalMap`, `computeTargetPace`) |
+| Frozen from Start: the fetch only runs in the equipment/preview stages; from Start on, the snapshot held in state is the one shown and recorded | same |
+| Completion refresh: after a successful save the page calls `engine-continuum-backfill` for the athlete's own id (fire-and-forget) | same |
+| Calibrate on switch: the "no baseline" warning offers *Do a 10-minute time trial on this machine instead*; the day becomes a time trial, saved **out of sequence** (null position) so the scheduled day stays next up and the pointer does not move | same |
+| `TRIAL_STALE:<machine>` — a machine trained in the last 28 days whose latest trial is over 40 days old; one sentence in the sequencer prompt (treat like TRIAL_LOW) | `_shared/engine-continuum.ts`, `run-resequence.ts`; test in `engine-continuum_test.ts` |
+
+Legacy parity: the browser math was NOT dropped — unswitched athletes keep
+running it; the function's legacy mode (used by the admin view's legacy
+column) mirrors it and is covered by `engine-targets_test.ts`. If the function
+fails or is unreachable, the page falls back to legacy math and logs
+`day_targets_failed`.
+
+Still to build (rollout stage 3): the sequencer choosing `intensityShare`,
+with the fill step writing both keys.

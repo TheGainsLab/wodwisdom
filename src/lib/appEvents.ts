@@ -32,6 +32,7 @@ type AppEvent =
   | 'workout_viewed'
   | 'timer_started'
   | 'log_started'
+  | 'engine_calibration_trial_started'
   | 'nutrition_method'
   | 'eval_viewed'
   | 'paywall_hit'
