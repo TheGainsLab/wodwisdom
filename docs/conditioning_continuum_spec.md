@@ -215,37 +215,52 @@ exemption goes). "Max effort" days keep saying beat this.
 
 ## 5. What the sequencer receives
 
-Replace the per-(type, machine) ratio table and the analytics dump with
-the curve, by region:
+**Built 2026-11-17 (Phase 1).** The per-(type, machine) ratio table and the
+analytics dump are gone from the sequencer's prompt; it reads the curve, by
+effort band, then days since the last session and adherence:
 
 ```
-ATHLETE CONDITIONING CURVE (pace as a multiple of the trial; M = ceiling vs balanced, 1.0 = balanced at your level)
-r:        0.85–0.95  0.95–1.1  1.1–1.3  1.3–1.6  1.6–2.0  2.0–2.6  >2.6
-M:        1.00       1.00*     —        —        0.95     0.98     1.15
-state:    measured   pinned    blank    blank    measured measured measured
-n (eff):  5          2         0        0        3        4        7
-trend:    →          —         ?        ?        ↑        →        ↑
-Trials (echo bike, cal): 16.1 (09-14) → 18.4 (10-15)   [last 6]
-Flags: none   (possible: TRIAL LOW — sustained longer than balanced at ≥1.0×; AEROBIC SIDE BEHIND SPRINT / GLYCOLYTIC BELOW BALANCED; machine X uncalibrated)
-Days since last session: 2.  Sessions: 11 in 28 d (cadence implies 12), 20 in 90 d.
+ATHLETE CONDITIONING CURVE (by effort duration — the bout a balanced athlete sustains at the pace the athlete actually delivered; M = ceiling vs a balanced athlete at your level, 1.0 = balanced; efforts of 40 min+ are zone 2: dose, not scored)
+effort: 20–40 min  10–20 min  4–10 min   2–4 min    1–2 min    30–60 s    ≤30 s
+M:      0.91       0.96       0.90       0.82       0.90       0.93       1.10
+state:  floor      measured   measured   measured   measured   blank      measured
+n:      1.2        2.4        7.8        5.4        1.7        1.7        9.7
+trend:  ?          ?          ?          ?          ?          ?          ↓
+Trials echo bike (cal): 16.1 (2026-09-14) → 18.4 (2026-10-15)          [last 6]
+Flags: AEROBIC_SIDE_BEHIND_SPRINT
+Days since last completed session: 3.
+Adherence: 12 sessions in the last 28 days (the program's cadence implies 16); 38 in the last 90.
 ```
+
+The athlete's curve is refreshed inline before the prompt is built (a
+session logged this morning is folded in); if the refresh fails the stored
+curve is used and the failure logged.
 
 Then, unchanged: the readiness-filtered catalogue with envelopes and
-coaching intent, the previous block (variety), per-type caps, never-done
-types, other training load, the programming week, coach notes.
+coaching intent — each type now carrying a computed **`can reach:`** line
+naming the effort bands its envelope can land in on the athlete's primary
+machine (derived through the same expansion the day page uses; a reading
+aid, never a constraint) — the previous block (variety), per-type caps,
+never-done types, other training load, the programming week, coach notes.
 
-The instruction: *prescribe into the lowest **measured** region without
-letting the strong regions sag; where a region is **blank**, PROBE it —
-place a max-effort day there before prescribing development into it;
-choose the day's type and shape and let the ratchet set its intensity;
-read a high right end together with the trial's level and progression
-(high right + low or stalled trial = the aerobic side is the gap; high
-right + strong trial = a fast-twitch athlete); act on the TRIAL LOW flag by
-placing a retest early.*
+The instruction: *prescribe into the lowest **measured** band without
+letting the strong bands sag; where a band is **blank**, PROBE it — place a
+max-effort day whose longest block lands there before prescribing
+development into it; weight the four middle bands (30 s–10 min, where
+metcons live) as the destination and the ends as diagnostics; read
+AEROBIC_SIDE_BEHIND_SPRINT with the trial history (low or stalled trial =
+the aerobic side is the gap; rising trial = a fast-twitch athlete catching
+up); act on TRIAL_LOW with an early retest — the one case that earns a
+self-made time trial.* The sequencer's lever is conditioning days and their
+intensity within the envelope; not the trial schedule, the day count or the
+athlete's targets (Phase 2).
 
 Day types remain the vocabulary the model names a day with; the catalogue
 tells it what shapes each type permits. The model decides type and shape;
 the system reads where it landed.
+
+The Coach (chat, workout review) keeps its existing context and gets the
+same curve block appended (the stored one — chat is latency-sensitive).
 
 ## 6. Diagnostics the frame gives for free
 
@@ -372,7 +387,9 @@ for analytics), `engine_day_types`, `engine_workouts`,
     curve** — uncommon, no published distance formula.
 - Build order: Phase 0 data-only (curves, backfill, replay, admin chart,
   cross-athlete diagnostic) → founder checkpoint on the anchors / curve / 0.85 (done 2026-11-16: 0.85 kept, 2.6× moved to 15 s) →
-  Phase 1 sequencer prompt → Phase 2 targets + calibrate-on-switch →
+  Phase 1 sequencer prompt (built 2026-11-17: ratio table and analytics dropped
+  from the sequencer, curve block + `can reach` lines, inline refresh, Coach
+  gets the curve, trials to 6) → Phase 2 targets + calibrate-on-switch →
   Phase 3 athlete-facing chart and coach.
 
 Open: `D(r)` values beyond the anchors (authored, to refit from pooled

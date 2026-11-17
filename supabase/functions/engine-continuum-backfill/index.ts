@@ -12,6 +12,8 @@
  *
  * Idempotent: rerunning recomputes from scratch. A changed reference curve or
  * module version is picked up by a full rerun (spec §3.6: a refit replays everyone).
+ * The compute lives in _shared/engine-continuum-io.ts; the sequencer and the
+ * Coach refresh one athlete inline through the same module (Phase 1).
  *
  * Auth (either):
  *   - X-Cron-Key = LIFECYCLE_CRON_KEY   (pg_cron / service; verify_jwt=false)
@@ -27,161 +29,29 @@
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { requireCronKey } from "../_shared/cron-auth.ts";
-import { type CatalogEngineDay } from "../_shared/engine-block-resolve.ts";
-import { prescriptionFromCatalog } from "../_shared/engine-continuum-prescription.ts";
-import {
-  type ContinuumSessionInput,
-  CURVE_VERSION,
-  formatCurveForPrompt,
-  type PdCurvePoint,
-  replayCurve,
-  summarizeCurve,
-  type TrialInput,
-} from "../_shared/engine-continuum.ts";
+import { computeAthleteContinuum, curveIsFresh, loadCurves, type PdCurves } from "../_shared/engine-continuum-io.ts";
+import { formatCurveForPrompt } from "../_shared/engine-continuum.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const CRON_KEY = Deno.env.get("LIFECYCLE_CRON_KEY");
 
-interface SessionRow {
-  id: string;
-  user_id: string;
-  date: string;
-  day_type: string | null;
-  modality: string | null;
-  units: string | null;
-  actual_pace: number | null;
-  target_pace: number | null;
-  workout_data: Record<string, unknown> | null;
-  program_version: string | null;
-  program_day: number | null;
-  sequence_position: number | null;
-  created_at: string;
-}
-
-async function loadCurves(supa: SupabaseClient): Promise<Record<string, PdCurvePoint[]>> {
-  const { data } = await supa.from("engine_pd_curves").select("modality, units, r, seconds");
-  const out: Record<string, PdCurvePoint[]> = {};
-  for (const row of (data ?? []) as Array<{ modality: string; units: string; r: number; seconds: number }>) {
-    const k = `${row.modality}|${row.units}`;
-    (out[k] ??= []).push({ r: Number(row.r), seconds: Number(row.seconds) });
-  }
-  return out;
-}
-
-async function computeAthlete(supa: SupabaseClient, userId: string, curves: Record<string, PdCurvePoint[]>, opts: { write: boolean }) {
-  const [{ data: sessRows }, { data: trialRows }, { data: ovRows }, { data: profile }] = await Promise.all([
-    supa.from("engine_workout_sessions")
-      .select("id, user_id, date, day_type, modality, units, actual_pace, target_pace, workout_data, program_version, program_day, sequence_position, created_at")
-      .eq("user_id", userId).eq("completed", true).order("date").order("created_at"),
-    supa.from("engine_time_trials").select("modality, units, calculated_rpm, date").eq("user_id", userId).not("calculated_rpm", "is", null),
-    supa.from("engine_user_day_overrides").select("sequence_position, program_version, engine_workout_id").eq("user_id", userId),
-    supa.from("athlete_profiles").select("user_id, engine_program_version, engine_curve").eq("user_id", userId).maybeSingle(),
-  ]);
-  const sessions = (sessRows ?? []) as SessionRow[];
-  if (sessions.length === 0) return { user_id: userId, sessions: 0, skipped: "no sessions" };
-
-  const trials: TrialInput[] = ((trialRows ?? []) as Array<{ modality: string; units: string | null; calculated_rpm: number; date: string }>)
-    .map((t) => ({ modality: t.modality, units: t.units, pace: Number(t.calculated_rpm), date: t.date }));
-
-  // Prescriptions: the sequencer's override at that position wins; else the
-  // catalog day for the session's program. One batched read per kind.
-  const overrideByKey = new Map<string, string>();
-  for (const o of (ovRows ?? []) as Array<{ sequence_position: number; program_version: string; engine_workout_id: string }>) {
-    overrideByKey.set(`${o.program_version}|${o.sequence_position}`, o.engine_workout_id);
-  }
-  const fallbackVersion = (profile as { engine_program_version?: string } | null)?.engine_program_version ?? "main_5day";
-  const overrideIds = new Set<string>();
-  const catalogKeys = new Set<string>();
-  for (const s of sessions) {
-    const version = s.program_version ?? fallbackVersion;
-    const ov = s.sequence_position != null ? overrideByKey.get(`${version}|${s.sequence_position}`) : undefined;
-    if (ov) overrideIds.add(ov);
-    else if (s.program_day != null) catalogKeys.add(`${version}|${s.program_day}`);
-  }
-  const catalogByKey = new Map<string, CatalogEngineDay>();
-  const versions = [...new Set([...catalogKeys].map((k) => k.split("|")[0]))];
-  const days = [...new Set([...catalogKeys].map((k) => Number(k.split("|")[1])))];
-  const SEL = "id, program_type, day_number, day_type, phase, month, block_count, set_rest_seconds, block_1_params, block_2_params, block_3_params, block_4_params, total_duration_minutes";
-  if (versions.length && days.length) {
-    const { data } = await supa.from("engine_workouts").select(SEL).in("program_type", versions).in("day_number", days);
-    for (const w of (data ?? []) as Array<CatalogEngineDay & { id: string; program_type: string }>) catalogByKey.set(`${w.program_type}|${w.day_number}`, w);
-  }
-  const catalogById = new Map<string, CatalogEngineDay>();
-  if (overrideIds.size) {
-    const { data } = await supa.from("engine_workouts").select(SEL).in("id", [...overrideIds]);
-    for (const w of (data ?? []) as Array<CatalogEngineDay & { id: string }>) catalogById.set(w.id, w);
-  }
-
-  const inputs: Array<ContinuumSessionInput & { id: string }> = sessions.map((s) => {
-    const version = s.program_version ?? fallbackVersion;
-    const ov = s.sequence_position != null ? overrideByKey.get(`${version}|${s.sequence_position}`) : undefined;
-    const day = ov ? catalogById.get(ov) ?? null : s.program_day != null ? catalogByKey.get(`${version}|${s.program_day}`) ?? null : null;
-    const wd = s.workout_data ?? {};
-    const n = (k: string) => (typeof wd[k] === "number" ? (wd[k] as number) : null);
-    return {
-      id: s.id,
-      date: s.date,
-      day_type: s.day_type ?? "unknown",
-      modality: s.modality ?? "unknown",
-      units: s.units,
-      actual_pace: s.actual_pace != null ? Number(s.actual_pace) : null,
-      target_pace: s.target_pace != null ? Number(s.target_pace) : null,
-      total_work_seconds: n("total_work_time"),
-      total_rest_seconds: n("total_rest_time"),
-      intervals: n("total_intervals"),
-      prescription: prescriptionFromCatalog(day),
-    };
-  });
-
-  const { curve, sessions: results } = replayCurve(inputs, trials, curves);
-  const regions = summarizeCurve(curve, results);
-  // replayCurve returns results in date order (stable), so pair them with the
-  // inputs sorted the same way.
-  const ordered = [...inputs].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
-  const byId = new Map(ordered.map((inp, idx) => [inp.id, results[idx]]));
-
-  const evidenceCounts: Record<string, number> = {};
-  for (const r of results) evidenceCounts[r.evidence] = (evidenceCounts[r.evidence] ?? 0) + 1;
-
-  if (opts.write) {
-    const rows = sessions.map((s) => {
-      const r = byId.get(s.id)!;
-      return {
-        id: s.id,
-        user_id: s.user_id,
-        date: s.date,
-        continuum_r: r.r != null ? Number(r.r.toFixed(4)) : null,
-        continuum_effort_s: r.effort_seconds != null ? Math.round(r.effort_seconds) : null,
-        continuum_bout_s: r.bout_seconds != null ? Math.round(r.bout_seconds) : null,
-        continuum_sustain: r.sustain != null ? Number(r.sustain.toFixed(4)) : null,
-        continuum_evidence: r.evidence,
-      };
-    });
-    for (let i = 0; i < rows.length; i += 200) {
-      const { error } = await supa.from("engine_workout_sessions").upsert(rows.slice(i, i + 200), { onConflict: "id" });
-      if (error) throw new Error(`session write failed for ${userId}: ${error.message}`);
-    }
-    if (profile) {
-      const { error } = await supa.from("athlete_profiles")
-        .update({ engine_curve: { ...curve, computed_at: new Date().toISOString(), module_version: CURVE_VERSION } })
-        .eq("user_id", userId);
-      if (error) throw new Error(`curve write failed for ${userId}: ${error.message}`);
-    }
-  }
-
+/** One athlete: compute (write unless dry run) and return the inspectable summary. */
+async function computeAthlete(supa: SupabaseClient, userId: string, curves: PdCurves, opts: { write: boolean }) {
+  const r = await computeAthleteContinuum(supa, userId, curves, opts);
+  if (!r) return { user_id: userId, sessions: 0, skipped: "no sessions" };
   return {
     user_id: userId,
-    sessions: sessions.length,
-    evidence: evidenceCounts,
-    flags: curve.flags,
-    regions,
-    prompt_block: formatCurveForPrompt(curve, regions, trials),
-    wrote: opts.write && !!profile,
+    sessions: r.sessions,
+    evidence: r.evidence,
+    flags: r.curve.flags,
+    regions: r.regions,
+    prompt_block: formatCurveForPrompt(r.curve, r.regions, r.trials),
+    wrote: r.wrote,
   };
 }
 
-async function runAll(supa: SupabaseClient, curves: Record<string, PdCurvePoint[]>, staleOnly: boolean): Promise<void> {
+async function runAll(supa: SupabaseClient, curves: PdCurves, staleOnly: boolean): Promise<void> {
   const t0 = Date.now();
   // Every athlete with a completed session. PostgREST caps a response at
   // 1000 rows, so page through — the first run missed 9 athletes whose rows
@@ -197,16 +67,9 @@ async function runAll(supa: SupabaseClient, curves: Record<string, PdCurvePoint[
   let done = 0, skipped = 0, failed = 0;
   for (const uid of ids) {
     try {
-      if (staleOnly) {
-        const [{ data: prof }, { data: latest }] = await Promise.all([
-          supa.from("athlete_profiles").select("engine_curve").eq("user_id", uid).maybeSingle(),
-          supa.from("engine_workout_sessions").select("created_at").eq("user_id", uid).eq("completed", true).order("created_at", { ascending: false }).limit(1).maybeSingle(),
-        ]);
-        const curve = (prof as { engine_curve?: { computed_at?: string; module_version?: number } } | null)?.engine_curve;
-        if (curve?.computed_at && curve.module_version === CURVE_VERSION && latest?.created_at && latest.created_at <= curve.computed_at) {
-          skipped++;
-          continue;
-        }
+      if (staleOnly && await curveIsFresh(supa, uid)) {
+        skipped++;
+        continue;
       }
       const r = await computeAthlete(supa, uid, curves, { write: true });
       done++;
