@@ -37,6 +37,17 @@ interface Payload {
   curve: EngineCurve | null;
   curves: Record<string, Array<{ r: number; seconds: number }>>;
 }
+// Phase 2 (engine-day-targets): both formulas for the athlete's next day — the rollout view.
+interface SegTarget { target_pace: number | null; basis: string; fraction: number | null; share?: number; m?: number; band?: string; p_balanced?: number; capped?: boolean }
+interface DayTargetsPayload {
+  error?: string;
+  workout?: { id: string; day_type: string; program_type: string; day_number: number; position: number | null };
+  modality?: string; units?: string | null; mode?: 'curve' | 'legacy'; flag?: boolean;
+  trial?: { id: string; pace: number; date: string } | null;
+  machine_curve?: boolean; k_effort?: number | null; athlete_curve?: boolean;
+  blocks?: Array<{ block_index: number; rounds: number; segments: Array<{ label: string; round_index: number; duration_seconds: number; curve: SegTarget; legacy: SegTarget }> }>;
+  curve_fraction?: number | null; legacy_fraction?: number | null;
+}
 
 // Effort-duration bands (seconds), long on the left as on the chart.
 const REGIONS: Array<[number, number | null, string]> = [
@@ -65,6 +76,8 @@ export default function AdminContinuumPage({ session }: { session: Session }) {
   const [tip, setTip] = useState<{ x: number; y: number; html: string } | null>(null);
 
   const [reloadKey, setReloadKey] = useState(0);
+  const [targets, setTargets] = useState<DayTargetsPayload | null>(null);
+  const [targetsLoading, setTargetsLoading] = useState(false);
 
   // Fetch on mount and whenever a recompute bumps reloadKey. No synchronous
   // setState in the effect body: loading starts true and is only set after
@@ -82,6 +95,16 @@ export default function AdminContinuumPage({ session }: { session: Session }) {
     return () => { active = false; };
   }, [id, reloadKey]);
   const load = useCallback(() => { setLoading(true); setError(''); setReloadKey((k) => k + 1); }, []);
+
+  // Next day's targets, both formulas, on the selected machine (Phase 2 rollout view).
+  const loadTargets = useCallback(async (machineKey: string) => {
+    if (!id) return;
+    setTargetsLoading(true);
+    const [modality, units] = machineKey.split('|');
+    const { data: res, error: err } = await supabase.functions.invoke('engine-day-targets', { body: { target_user_id: id, modality, units: units || null } });
+    setTargets(err ? { error: err.message } : (res as DayTargetsPayload));
+    setTargetsLoading(false);
+  }, [id]);
 
   const machines = useMemo(() => {
     const set = new Set<string>();
@@ -223,6 +246,51 @@ export default function AdminContinuumPage({ session }: { session: Session }) {
               <div style={{ position: 'absolute', left: tip.x, top: tip.y, pointerEvents: 'none', background: 'var(--text)', color: 'var(--bg)', fontSize: 12, padding: '8px 10px', borderRadius: 6, lineHeight: 1.4, maxWidth: 340 }} dangerouslySetInnerHTML={{ __html: tip.html }} />
             )}
           </div>
+
+          <h3 style={sectionH3}>Next day — targets (Phase 2 rollout view)</h3>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 }}>
+            <button className="auth-btn" disabled={targetsLoading || !activeMachine} onClick={() => loadTargets(activeMachine)} style={{ width: 'auto', padding: '6px 14px', marginTop: 0, fontSize: 13 }}>
+              {targetsLoading ? 'Computing…' : `Compute next day on ${activeMachine.replace('|', ' · ').replace(/_/g, ' ')}`}
+            </button>
+            {targets?.workout && (
+              <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+                {targets.workout.day_type.replace(/_/g, ' ')} · position {targets.workout.position ?? '?'} · {targets.workout.program_type.startsWith('gen:') ? 'sequenced' : 'curated'} ·
+                athlete is on <b>{targets.mode}</b> targets · trial {targets.trial ? `${targets.trial.pace} (${targets.trial.date})` : 'none'} ·
+                machine curve {targets.machine_curve ? `yes (k ${targets.k_effort})` : 'no'} · athlete curve {targets.athlete_curve ? 'yes' : 'no'}
+              </span>
+            )}
+            {targets?.error && <span style={{ fontSize: 12, color: 'var(--danger, #e5484d)' }}>{targets.error}</span>}
+          </div>
+          {targets?.blocks && (
+            <div style={{ overflowX: 'auto' }}>
+              <table className="admin-table" style={{ fontSize: 12 }}>
+                <thead><tr><th>block</th><th>round</th><th>segment</th><th>work</th><th>legacy target</th><th>curve target</th><th>Δ</th><th>basis</th><th>share</th><th>balanced</th><th>M</th><th>band</th></tr></thead>
+                <tbody>
+                  {targets.blocks.flatMap((b) => b.segments.map((sg) => {
+                    const l = sg.legacy.target_pace, c = sg.curve.target_pace;
+                    const delta = l != null && c != null && l > 0 ? ((c / l - 1) * 100) : null;
+                    return (
+                      <tr key={`${b.block_index}-${sg.round_index}-${sg.label}`}>
+                        <td>{b.block_index + 1}</td><td>{sg.round_index + 1}/{b.rounds}</td><td>{sg.label}</td><td>{fmtSeconds(sg.duration_seconds)}</td>
+                        <td>{l == null ? '—' : `${l.toFixed(1)} (${sg.legacy.fraction?.toFixed(2)}×)`}</td>
+                        <td style={{ fontWeight: 600 }}>{c == null ? '—' : `${c.toFixed(1)} (${sg.curve.fraction?.toFixed(2)}×)`}{sg.curve.capped ? ' ·cap' : ''}</td>
+                        <td style={{ color: delta == null ? undefined : delta > 0 ? 'var(--accent)' : 'var(--text-dim)' }}>{delta == null ? '—' : `${delta > 0 ? '+' : ''}${delta.toFixed(0)}%`}</td>
+                        <td>{sg.curve.basis}</td>
+                        <td>{sg.curve.share != null ? sg.curve.share.toFixed(2) : '—'}</td>
+                        <td>{sg.curve.p_balanced != null ? `${sg.curve.p_balanced.toFixed(2)}×` : '—'}</td>
+                        <td>{sg.curve.m != null ? sg.curve.m.toFixed(2) : '—'}</td>
+                        <td>{sg.curve.band ?? '—'}</td>
+                      </tr>
+                    );
+                  }))}
+                </tbody>
+              </table>
+              <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 6 }}>
+                Work-weighted ask: legacy {targets.legacy_fraction?.toFixed(2) ?? '—'}× trial · curve {targets.curve_fraction?.toFixed(2) ?? '—'}× trial.
+                Legacy = trial × centre of the pace range × rolling ratio. Curve = trial × balanced pace for the bout × share^k × the athlete's M in that band, capped ±5 %/week.
+              </div>
+            </div>
+          )}
 
           <h3 style={sectionH3}>What the sequencer would receive</h3>
           <div style={{ overflowX: 'auto' }}>

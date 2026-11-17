@@ -15,9 +15,10 @@
  * The compute lives in _shared/engine-continuum-io.ts; the sequencer and the
  * Coach refresh one athlete inline through the same module (Phase 1).
  *
- * Auth (either):
+ * Auth (any):
  *   - X-Cron-Key = LIFECYCLE_CRON_KEY   (pg_cron / service; verify_jwt=false)
  *   - an admin's JWT                    (profiles.role = 'admin')
+ *   - an athlete's JWT, for their own user_id only (the day page's completion refresh)
  * Body: { user_id } | { email } | { all: true, stale_only?: boolean (default true) }
  *   One athlete runs synchronously and returns the result (including the
  *   prompt block, for inspection). `all` acks 202 and runs in the background;
@@ -90,8 +91,12 @@ Deno.serve(async (req) => {
 
   const supa = createClient(SUPABASE_URL, SERVICE_KEY);
 
-  // Auth: cron key, else an admin's JWT.
+  // Auth: cron key; else an admin's JWT; else an athlete's own JWT for their
+  // OWN id only (Phase 2: the day page refreshes the athlete's curve after a
+  // completion save — docs/conditioning_continuum_phase2_plan.md §5).
+  const body = await req.json().catch(() => ({})) as { user_id?: string; email?: string; all?: boolean; stale_only?: boolean; dry_run?: boolean };
   let authorized = requireCronKey(req, CRON_KEY) === null;
+  let selfOnly = false;
   if (!authorized) {
     const token = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
     if (token) {
@@ -99,13 +104,18 @@ Deno.serve(async (req) => {
       if (userData?.user) {
         const { data: caller } = await supa.from("profiles").select("role").eq("id", userData.user.id).maybeSingle();
         authorized = caller?.role === "admin";
+        if (!authorized && !body.all && !body.email && (body.user_id == null || body.user_id === userData.user.id)) {
+          authorized = true;
+          selfOnly = true;
+          body.user_id = userData.user.id;
+        }
       }
     }
   }
   if (!authorized) return json({ error: "forbidden" }, 403);
   if (req.method !== "POST") return json({ error: "POST only" }, 405);
+  if (selfOnly && body.dry_run === true) body.dry_run = false; // an athlete's call always refreshes
 
-  const body = await req.json().catch(() => ({})) as { user_id?: string; email?: string; all?: boolean; stale_only?: boolean; dry_run?: boolean };
   const curves = await loadCurves(supa);
   if (Object.keys(curves).length === 0) return json({ error: "engine_pd_curves is empty — run the migration seed first" }, 500);
 
