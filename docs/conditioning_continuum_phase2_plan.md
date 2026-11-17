@@ -167,3 +167,20 @@ At every stage the save path records which basis produced the target, so landing
 ## 9. Out of scope (Phase 3)
 
 The athlete-facing continuum chart on Analytics, the Coach speaking in bands, a rest-aware share, refitting the reference curves from pooled max-effort data, and any change to the catalogue's shapes or to readiness.
+
+## Built (2026-11-17) — steps 1–4, the hidden week
+
+| Piece | Where |
+|---|---|
+| Pure target math (both formulas, exceptions, weekly cap, whole-day assembler, snapshot reader); 17 tests | `_shared/engine-targets.ts`, `engine-targets_test.ts`; `effortBandOf` / `mAtEffort` in `engine-continuum.ts` |
+| Migration: `k_effort` on curves; `intensityShare` on **23** paced blocks (the plan's 15 was an undercount — hybrid aerobic, hybrid anaerobic, infinity, towers, afterburner and synthesis have several paced blocks each; derived mechanically, listed in the migration); `targets` snapshot column; `engine_targets_v2` flag | `20261118000000_engine_targets_v2.sql` (linted on local Postgres against the live catalogue) |
+| `engine-day-targets` function: both formulas per work segment, the athlete's mode, the snapshot; admin may pass `target_user_id`; machine defaults to the latest current trial | `supabase/functions/engine-day-targets/` (`config.toml`: verify_jwt=true) |
+| Backfill accepts an athlete's own JWT (the completion refresh, used by step 5) | `engine-continuum-backfill/index.ts` |
+| Admin rollout view: "Next day — targets" on the continuum page, legacy vs curve per segment with Δ, basis, share, balanced pace, M, band | `src/pages/AdminContinuumPage.tsx` |
+
+Nobody is switched: no athlete's day page changes. Deploy: `supabase db push`,
+`supabase functions deploy engine-day-targets engine-continuum-backfill`, frontend.
+
+Still to build: step 5 (day page — preview, Start snapshot, calibrate-on-switch
+offer, completion refresh; the legacy parity fixture before the browser math
+goes) and step 6 (sequencer: `TRIAL_STALE` now; share choices at stage 3).

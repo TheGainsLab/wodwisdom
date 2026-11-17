@@ -325,3 +325,6 @@ verify_jwt = false
 # lifecycle tick kicks a stale-only sweep) or an admin JWT (the admin
 # page's "Recompute from history" button).
 verify_jwt = false
+
+[functions.engine-day-targets]
+verify_jwt = true

@@ -119,3 +119,54 @@ Deno.test("mAtEffort / effortBandOf: blank curve → 1; a band reads its M; 600 
   assertEquals(effortBandOf(600), "10–20 min");
   assertEquals(effortBandOf(2400), "zone 2 (40 min+)");
 });
+
+import { dayTargets, previousFromSnapshot } from "./engine-targets.ts";
+const DAY = (id: string, extra: Record<number, Partial<TargetBlockParams>> = {}) => {
+  const t = TYPES.find((x) => x.id === id)! as unknown as { block_count: number; block_1_params: TargetBlockParams | null; block_2_params: TargetBlockParams | null; block_3_params: TargetBlockParams | null; block_4_params: TargetBlockParams | null; max_duration_minutes: number | null };
+  const b = (n: number, p: TargetBlockParams | null) => (p ? { ...p, ...(extra[n] ?? {}) } : null);
+  // concrete values where the envelope is a range (the day page gets concrete catalogue days)
+  const concrete = (p: TargetBlockParams | null): TargetBlockParams | null => {
+    if (!p) return null;
+    const out: TargetBlockParams = { ...p };
+    for (const k of ["rounds", "workDuration", "baseDuration", "fluxDuration"]) if (Array.isArray(out[k])) out[k] = (out[k] as number[])[1];
+    return out;
+  };
+  return { day_number: 0, day_type: id, phase: null, month: null, block_count: t.block_count, set_rest_seconds: null, block_1_params: concrete(b(1, t.block_1_params)), block_2_params: concrete(b(2, t.block_2_params)), block_3_params: concrete(b(3, t.block_3_params)), block_4_params: concrete(b(4, t.block_4_params)), total_duration_minutes: t.max_duration_minutes };
+};
+const BASE = { trialPace: 18.4, machineCurve: ECHO_BIKE_CAL_CURVE_V1, kEffort: 1, athleteCurve: null, rollingRatio: 1.04, isGenerated: false };
+
+Deno.test("dayTargets: MAP day — both formulas per segment; legacy 0.95 × 1.04, curve from the share; weighted fractions", () => {
+  const d = dayTargets(DAY("max_aerobic_power", { 1: { intensityShare: [0.72, 0.82] } }), BASE);
+  assertEquals(d.blocks.length, 1);
+  assertEquals(d.blocks[0].rounds, 10);
+  assertEquals(d.blocks[0].segments.length, 10);
+  near(d.legacy_fraction!, 0.95 * 1.04, 1e-9);
+  const s = d.blocks[0].segments[0];
+  assertEquals(s.curve.basis, "curve");
+  near(s.curve.share!, 0.77, 1e-9);
+  near(s.curve.p_balanced!, 1.10, 0.01); // 300-s intervals
+});
+
+Deno.test("dayTargets: hybrid anaerobic (2 blocks) targets both blocks; polarized day is authored base + untargeted bursts", () => {
+  const h = dayTargets(DAY("hybrid_anaerobic", { 1: { intensityShare: [0.68, 0.78] }, 2: { intensityShare: [0.68, 0.78] } }), BASE);
+  assertEquals(h.blocks.map((b) => b.block_index), [0, 1]);
+  assert(h.blocks.every((b) => b.segments.every((s) => s.curve.basis === "curve")));
+  const p = dayTargets(DAY("polarized"), BASE);
+  const bases = new Set(p.blocks[0].segments.map((s) => s.curve.basis));
+  assertEquals(bases, new Set(["authored", "max_effort"]));
+  near(p.curve_fraction!, 0.70, 1e-9); // bursts carry no fraction
+});
+
+Deno.test("dayTargets: the weekly cap reads the previous snapshot per band and binds only that band", () => {
+  const first = dayTargets(DAY("max_aerobic_power", { 1: { intensityShare: [0.72, 0.82] } }), BASE);
+  const snap = { trial: { pace: 18.4 }, blocks: first.blocks.map((b) => b.segments.map((s) => ({ ...s.curve, target_pace: s.curve.target_pace! * 0.9 }))) };
+  const prev = previousFromSnapshot(snap);
+  assert(Object.keys(prev).length === 1, JSON.stringify(prev));
+  const second = dayTargets(DAY("max_aerobic_power", { 1: { intensityShare: [0.72, 0.82] } }), BASE, prev);
+  const s = second.blocks[0].segments[0];
+  assert(s.curve.capped);
+  near(s.curve.target_pace!, first.blocks[0].segments[0].curve.target_pace! * 0.9 * 1.05, 1e-6);
+  // a retest (different trial pace in the snapshot) lifts it
+  const lifted = dayTargets(DAY("max_aerobic_power", { 1: { intensityShare: [0.72, 0.82] } }), BASE, previousFromSnapshot({ ...snap, trial: { pace: 17.0 } }));
+  assert(!lifted.blocks[0].segments[0].curve.capped);
+});

@@ -183,3 +183,66 @@ export function segmentTarget(block: TargetBlockParams, seg: TargetSegment, ctx:
     capped,
   };
 }
+
+// ─── A whole day ──────────────────────────────────────────────────────────────
+
+import { type CatalogEngineDay, resolveSegments } from "./engine-block-resolve.ts";
+
+export interface DaySegmentTargets {
+  label: string;
+  round_index: number;
+  duration_seconds: number;
+  curve: SegmentTarget;
+  legacy: SegmentTarget;
+}
+export interface DayBlockTargets {
+  block_index: number;
+  rounds: number;
+  segments: DaySegmentTargets[];
+}
+export interface DayTargets {
+  blocks: DayBlockTargets[];
+  /** duration-weighted mean fraction of trial over targeted work segments, per mode (null when nothing is targeted) */
+  curve_fraction: number | null;
+  legacy_fraction: number | null;
+}
+
+/** The last target shown for each band on this machine within 7 days, for the weekly cap. */
+export type PreviousByBand = Record<string, { target_pace: number; trial_pace: number }>;
+
+/** Both formulas for every work segment of a day. `base` carries everything but `mode`/`previous`. */
+export function dayTargets(day: CatalogEngineDay, base: Omit<TargetContext, "mode" | "previous">, previousByBand: PreviousByBand = {}): DayTargets {
+  const segs = resolveSegments(day).filter((s) => s.type === "work");
+  const blockParams = [day.block_1_params, day.block_2_params, day.block_3_params, day.block_4_params] as Array<TargetBlockParams | null>;
+  const roundsByBlock = new Map<number, number>();
+  for (const s of segs) roundsByBlock.set(s.block_index, Math.max(roundsByBlock.get(s.block_index) ?? 0, s.round_index + 1));
+  const blocks: DayBlockTargets[] = [];
+  let cw = 0, cs = 0, lw = 0, ls = 0;
+  for (const s of segs) {
+    const bp = blockParams[s.block_index] ?? {};
+    const rounds = roundsByBlock.get(s.block_index) ?? 1;
+    const seg: TargetSegment = { label: s.label, duration_seconds: s.duration_seconds, round_index: s.round_index, rounds };
+    // the cap needs the band first: compute once uncapped to learn it, then with its previous
+    const probe = segmentTarget(bp, seg, { ...base, mode: "curve" });
+    const previous = probe.band && previousByBand[probe.band] ? { band: probe.band, ...previousByBand[probe.band] } : null;
+    const curve = previous ? segmentTarget(bp, seg, { ...base, mode: "curve", previous }) : probe;
+    const legacy = segmentTarget(bp, seg, { ...base, mode: "legacy" });
+    let b = blocks.find((x) => x.block_index === s.block_index);
+    if (!b) { b = { block_index: s.block_index, rounds, segments: [] }; blocks.push(b); }
+    b.segments.push({ label: s.label, round_index: s.round_index, duration_seconds: s.duration_seconds, curve, legacy });
+    if (curve.fraction != null) { cw += s.duration_seconds; cs += s.duration_seconds * curve.fraction; }
+    if (legacy.fraction != null) { lw += s.duration_seconds; ls += s.duration_seconds * legacy.fraction; }
+  }
+  return { blocks, curve_fraction: cw > 0 ? cs / cw : null, legacy_fraction: lw > 0 ? ls / lw : null };
+}
+
+/** The per-band "last shown" map from a stored snapshot (engine_workout_sessions.targets). */
+export function previousFromSnapshot(snapshot: { trial?: { pace?: number | null } | null; blocks?: Array<Array<{ basis?: string; band?: string; target_pace?: number | null }>> } | null): PreviousByBand {
+  const out: PreviousByBand = {};
+  const trial = snapshot?.trial?.pace;
+  if (!snapshot?.blocks || trial == null) return out;
+  for (const block of snapshot.blocks) for (const s of block) {
+    if (s.basis === "curve" && s.band && s.target_pace != null) out[s.band] = { target_pace: s.target_pace, trial_pace: trial };
+  }
+  return out;
+}
