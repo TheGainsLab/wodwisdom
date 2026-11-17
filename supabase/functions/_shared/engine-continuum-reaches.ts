@@ -59,9 +59,9 @@ function bandOf(effortSeconds: number): string {
   return REGIONS[REGIONS.length - 1][2]; // shorter than the shortest band → ≤30 s
 }
 
-/** The judged block's effort duration at one extreme of the envelope, or null when it cannot be resolved. */
-function effortAtExtreme(row: EngineDayTypeRow, curve: PdCurvePoint[], which: Extreme): number | null {
-  const day: CatalogEngineDay = {
+/** The concrete day at one extreme of the envelope. */
+function dayAtExtreme(row: EngineDayTypeRow, which: Extreme): CatalogEngineDay {
+  return {
     day_number: 0,
     day_type: row.id,
     phase: null,
@@ -74,34 +74,90 @@ function effortAtExtreme(row: EngineDayTypeRow, curve: PdCurvePoint[], which: Ex
     block_4_params: concreteBlock(row.block_4_params, which),
     total_duration_minutes: row.max_duration_minutes,
   };
-  const p = prescriptionFromCatalog(day);
-  if (!p) return null;
-  // the judged block is the longest work block (decided 2026-11-16) — the same
-  // rule the continuum applies to the logged session
-  const judged = judgedBlock({ date: "", day_type: row.id, modality: "", units: null, actual_pace: null, target_pace: null, total_work_seconds: null, total_rest_seconds: null, intervals: null, prescription: p });
-  if (!judged) return null;
-  if (judged.max_effort) return judged.work_seconds; // a balanced athlete's max effort of that length
-  const block = p.blocks.find((b) => (b.continuous ? b.work_seconds : b.work_seconds) === judged.work_seconds);
-  if (block?.pace_multiple == null) return null;
-  return balancedBout(curve, block.pace_multiple);
 }
 
+/** The envelope of the block a session on this type is judged on (the longest
+ *  work block at the envelope's long extreme), or null when it cannot be
+ *  resolved (e.g. rocket_races_b, which inherits; flux, no workDuration). */
+function judgedEnvelope(row: EngineDayTypeRow): { env: Record<string, unknown>; maxEffort: boolean; continuous: boolean } | null {
+  const day = dayAtExtreme(row, "max");
+  const p = prescriptionFromCatalog(day);
+  if (!p) return null;
+  const judged = judgedBlock({ date: "", day_type: row.id, modality: "", units: null, actual_pace: null, target_pace: null, total_work_seconds: null, total_rest_seconds: null, intervals: null, prescription: p });
+  if (!judged) return null;
+  const idx = p.blocks.findIndex((b) => b.work_seconds === judged.work_seconds);
+  // p.blocks is in block order, skipping blocks the resolver dropped (no work);
+  // map back to the envelope by counting resolvable blocks.
+  const envs = [row.block_1_params, row.block_2_params, row.block_3_params, row.block_4_params].slice(0, row.block_count);
+  const resolvable = envs.filter((e) => e && (e.workDuration != null || (Array.isArray(e.workDurationOptions) && e.workDurationOptions.length)));
+  const env = resolvable[idx] ?? null;
+  if (!env) return null;
+  return { env, maxEffort: judged.max_effort, continuous: p.blocks[idx]?.continuous === true };
+}
+
+function numRange(v: unknown): [number, number] | null {
+  if (typeof v === "number") return [v, v];
+  if (Array.isArray(v) && v.length && v.every((x) => typeof x === "number")) return [Math.min(...(v as number[])), Math.max(...(v as number[]))];
+  return null;
+}
+
+export interface Reach {
+  band: string;
+  /** "0.95–1.05×" for a paced block, "30–60 s work" for a max effort */
+  at: string;
+}
+
+const fmtX = (x: number) => x.toFixed(2).replace(/0$/, "");
+
 /**
- * Bands the day type can land in, chart order (long → short). Empty when the
- * envelope cannot be resolved (e.g. rocket_races_b, which inherits from A).
+ * Which effort bands the day type can land in and WHAT puts it there — the
+ * pace fraction for a paced block, the work length for a max effort. Chart
+ * order (long → short). Empty when the envelope cannot be resolved.
  */
+export function reachMap(row: EngineDayTypeRow, curve: PdCurvePoint[]): Reach[] {
+  const j = judgedEnvelope(row);
+  if (!j) return [];
+  const out = new Map<string, { lo: number; hi: number }>();
+  const put = (band: string, x: number) => {
+    const cur = out.get(band);
+    if (!cur) out.set(band, { lo: x, hi: x });
+    else { cur.lo = Math.min(cur.lo, x); cur.hi = Math.max(cur.hi, x); }
+  };
+  if (j.maxEffort) {
+    // a max effort's band follows its work length (a balanced athlete's max of that length)
+    const w = numRange(j.env.workDuration) ?? numRange(j.env.workDurationOptions);
+    if (!w) return [];
+    const [lo, hi] = w;
+    for (let s = lo; s <= hi; s += Math.max(1, Math.round((hi - lo) / 200))) put(bandOf(s), s);
+    put(bandOf(hi), hi);
+    return BAND_LABELS.filter((b) => out.has(b)).map((band) => {
+      const r = out.get(band)!;
+      return { band, at: r.lo === r.hi ? `${r.lo} s work` : `${r.lo}–${r.hi} s work` };
+    });
+  }
+  // a paced block's band follows its pace: the longest bout a balanced athlete holds at that pace
+  const paceKey = j.env.workProgression === "continuous_with_bursts" ? "basePace" : j.env.paceRange != null ? "paceRange" : j.env.fluxPaceRange != null ? "fluxPaceRange" : "basePace";
+  const pr = numRange(j.env[paceKey]);
+  if (!pr) return [];
+  const [lo, hi] = pr;
+  for (let x = lo; x <= hi + 1e-9; x = Math.round((x + 0.01) * 100) / 100) put(bandOf(Math.round(balancedBout(curve, x))), x);
+  return BAND_LABELS.filter((b) => out.has(b)).map((band) => {
+    const r = out.get(band)!;
+    return { band, at: r.lo === r.hi ? `${fmtX(r.lo)}×` : `${fmtX(r.lo)}–${fmtX(r.hi)}×` };
+  });
+}
+
+/** Bands only (chart order). */
 export function reachableBands(row: EngineDayTypeRow, curve: PdCurvePoint[]): string[] {
-  const efforts = (["min", "max"] as Extreme[]).map((w) => effortAtExtreme(row, curve, w)).filter((x): x is number => x != null);
-  if (efforts.length === 0) return [];
-  const idx = efforts.map((e) => BAND_LABELS.indexOf(bandOf(e)));
-  const lo = Math.min(...idx), hi = Math.max(...idx);
-  return BAND_LABELS.slice(lo, hi + 1);
+  return reachMap(row, curve).map((r) => r.band);
 }
 
 /** One line for the catalogue entry, or null when nothing can be said. */
 export function formatReaches(row: EngineDayTypeRow, curve: PdCurvePoint[]): string | null {
-  const bands = reachableBands(row, curve);
-  if (bands.length === 0) return null;
   if (row.id === "rocket_races_b") return null;
-  return `can reach: ${bands.join(", ")}`;
+  const reaches = reachMap(row, curve);
+  if (reaches.length === 0) return null;
+  const j = judgedEnvelope(row);
+  const note = j?.maxEffort ? " (max effort — the band follows the work length)" : " (the band follows the pace you set, not the clock)";
+  return `can reach: ${reaches.map((r) => `${r.band} at ${r.at}`).join(", ")}${note}`;
 }

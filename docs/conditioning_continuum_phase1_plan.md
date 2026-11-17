@@ -162,3 +162,23 @@ Deploy: `supabase functions deploy engine-resequence engine-resequence-cron
 engine-continuum-backfill chat workout-review` (no migration, no frontend).
 Then an admin dry run (`engine-resequence` with `{ target_user_id, debug: true }`)
 on three athletes, reading the prompt and the proposal.
+
+## First dry run and the fix (2026-11-17)
+
+Dry run on the exploration athlete (month 3, 4 days): the model named the
+lowest measured bands correctly (2–4 min 0.82, 4–10 min 0.90) and chose
+ascending to 1.25× for the right reason, but read "2–4 min" as clock time —
+a MAP day of 5 × 3 min at 0.95–1.02× was called "3–4 minute power" though it
+lands at 10–20 min of effort. It also skipped the blank 30–60 s band in
+favour of the time-trial goal.
+
+Fix: the `can reach:` line now says what puts the type in each band — the
+pace for a paced block, the work length for a max effort:
+
+```
+max_aerobic_power  can reach: zone 2 at 0.85×, 20–40 min at 0.86–0.92×, 10–20 min at 0.93–1.0×, 4–10 min at 1.01–1.05× (the band follows the pace you set, not the clock)
+anaerobic          can reach: 2–4 min at 120 s work, 1–2 min at 60–119 s work, 30–60 s at 30–59 s work, ≤30 s at 15–29 s work (max effort — the band follows the work length)
+```
+
+and the probe instruction says to spend one day of the block on a blank band
+a type can reach.
