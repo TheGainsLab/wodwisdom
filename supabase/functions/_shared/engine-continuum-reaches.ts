@@ -16,10 +16,10 @@
 
 import type { CatalogEngineDay } from "./engine-block-resolve.ts";
 import { prescriptionFromCatalog } from "./engine-continuum-prescription.ts";
-import { balancedBout, judgedBlock, type PdCurvePoint, REGIONS, ZONE2_MIN_EFFORT_SECONDS } from "./engine-continuum.ts";
+import { balancedBout, effortBandOf, judgedBlock, type PdCurvePoint, REGIONS, ZONE2_BAND_LABEL } from "./engine-continuum.ts";
 import type { EngineDayTypeRow } from "./engine-catalogue.ts";
 
-export const ZONE2_LABEL = "zone 2 (40 min+)";
+export const ZONE2_LABEL = ZONE2_BAND_LABEL;
 
 /** Band labels in chart order (long → short), zone 2 first. */
 export const BAND_LABELS: string[] = [ZONE2_LABEL, ...REGIONS.map((r) => r[2])];
@@ -57,13 +57,7 @@ function concreteBlock(env: Record<string, unknown> | null, which: Extreme): Rec
   return out;
 }
 
-function bandOf(effortSeconds: number): string {
-  if (effortSeconds >= ZONE2_MIN_EFFORT_SECONDS) return ZONE2_LABEL;
-  for (const [lo, hi, label] of REGIONS) {
-    if (effortSeconds >= lo && (hi == null || effortSeconds < hi)) return label;
-  }
-  return REGIONS[REGIONS.length - 1][2]; // shorter than the shortest band → ≤30 s
-}
+const bandOf = effortBandOf;
 
 /** The concrete day at one extreme of the envelope. */
 function dayAtExtreme(row: EngineDayTypeRow, which: Extreme): CatalogEngineDay {

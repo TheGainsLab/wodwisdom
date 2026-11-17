@@ -1,16 +1,17 @@
 # Continuum — Phase 2 design (targets from the curve, calibrate on switch)
 
-Status: DESIGN for founder approval (2026-11-17). Spec: `conditioning_continuum_spec.md` §4, §7.
+Status: APPROVED 2026-11-17 (all four decisions, below); building. Spec: `conditioning_continuum_spec.md` §4, §7.
 Phase 0 (measure) and Phase 1 (the sequencer reads the curve) are live.
 
 Phase 2 is where the curve changes what the athlete is asked to do.
 
-## Decisions needed (read these first)
+## Decisions (founder, 2026-11-17)
 
-1. **The intensity shares** (§3, table). Approve the first-pass values or edit them.
-2. **One share per type, or rest-aware** (§3.2). Recommended: one number per type to start; refine from landings.
-3. **How far a target may move per week** (§4). Recommended: ±5 % per band per 7 days.
-4. **Rollout** (§8). Recommended: computed-but-hidden for a week, then a per-athlete switch, then everyone.
+1. **The intensity shares**: start with the derived values (§3); the hidden week is the review.
+2. **One share per block** to start; rest-aware later, fitted from landings.
+3. **Weekly cap ±5 %** per band; retests exempt.
+4. **Rollout** computed-but-hidden → per-athlete switch → everyone; stage 2 may be short if the first reviews are clean.
+5. (From review) the share is a share of **effort**; each machine's exponent converts it to pace.
 
 Everything else below is mechanics that follow from §2.
 

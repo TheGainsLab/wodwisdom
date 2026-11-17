@@ -484,6 +484,32 @@ export const REGIONS: Array<[number, number | null, string]> = [
   [0, 30, "≤30 s"],
 ];
 
+/** The band an effort duration falls in: "zone 2" at 40 min+, else one of REGIONS' labels. */
+export const ZONE2_BAND_LABEL = "zone 2 (40 min+)";
+export function effortBandOf(effortSeconds: number): string {
+  if (effortSeconds >= ZONE2_MIN_EFFORT_SECONDS) return ZONE2_BAND_LABEL;
+  for (const [lo, hi, label] of REGIONS) {
+    if (effortSeconds >= lo && (hi == null || effortSeconds < hi)) return label;
+  }
+  return REGIONS[REGIONS.length - 1][2]; // shorter than the shortest band → ≤30 s
+}
+
+/** The athlete's multiplier at an effort duration: confidence-weighted,
+ *  Gaussian in log-duration (the ratchet's own locality). 1.0 when the curve
+ *  knows nothing there. */
+export function mAtEffort(curve: EngineCurve | null, effortSeconds: number): number {
+  if (!curve || !curve.nodes.length || effortSeconds <= 0) return 1;
+  const x = Math.log10(effortSeconds);
+  let num = 0, den = 0;
+  for (const n of curve.nodes) {
+    const d = (Math.log10(n.seconds) - x) / SIGMA_LOG10;
+    const w = Math.exp(-0.5 * d * d) * n.conf;
+    num += w * n.m;
+    den += w;
+  }
+  return den > 1e-6 ? num / den : 1;
+}
+
 export function summarizeCurve(curve: EngineCurve, sessions: ReplayResult["sessions"], now = curve.as_of ?? ""): RegionSummary[] {
   return REGIONS.map(([lo, hi, label]) => {
     const inBand = (sec: number) => sec >= lo && (hi == null || sec < hi);
