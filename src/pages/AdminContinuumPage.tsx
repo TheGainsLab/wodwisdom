@@ -44,7 +44,7 @@ interface DayTargetsPayload {
   workout?: { id: string; day_type: string; program_type: string; day_number: number; position: number | null };
   modality?: string; units?: string | null; mode?: 'curve' | 'legacy'; flag?: boolean;
   trial?: { id: string; pace: number; date: string } | null;
-  machine_curve?: boolean; k_effort?: number | null; athlete_curve?: boolean; delivered_floor?: number | null; recent_sessions?: number;
+  machine_curve?: boolean; k_effort?: number | null; athlete_curve?: boolean; delivered_floor?: number | null; recent_sessions?: number; rocket_a?: { position: number; pace: number } | null;
   blocks?: Array<{ block_index: number; rounds: number; segments: Array<{ label: string; round_index: number; duration_seconds: number; curve: SegTarget; legacy: SegTarget }> }>;
   curve_fraction?: number | null; legacy_fraction?: number | null;
 }
@@ -261,7 +261,7 @@ export default function AdminContinuumPage({ session }: { session: Session }) {
               <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>
                 {targets.workout.day_type.replace(/_/g, ' ')} · position {targets.workout.position ?? '?'} · {targets.workout.program_type.startsWith('gen:') ? 'sequenced' : 'curated'} ·
                 athlete is on <b>{targets.mode}</b> targets · trial {targets.trial ? `${targets.trial.pace} (${targets.trial.date})` : 'none'} ·
-                machine curve {targets.machine_curve ? `yes (k ${targets.k_effort})` : 'no'} · athlete curve {targets.athlete_curve ? 'yes' : 'no'} · delivered floor {targets.delivered_floor != null ? `${targets.delivered_floor.toFixed(1)} (${targets.recent_sessions} recent)` : 'none'}
+                machine curve {targets.machine_curve ? `yes (k ${targets.k_effort})` : 'no'} · athlete curve {targets.athlete_curve ? 'yes' : 'no'} · delivered floor {targets.delivered_floor != null ? `${targets.delivered_floor.toFixed(1)} (${targets.recent_sessions} recent)` : 'none'}{targets.rocket_a ? ` · rocket A at position ${targets.rocket_a.position}: ${targets.rocket_a.pace} — B re-races it` : ''}
               </span>
             )}
             {targets?.error && <span style={{ fontSize: 12, color: 'var(--danger, #e5484d)' }}>{targets.error}</span>}
