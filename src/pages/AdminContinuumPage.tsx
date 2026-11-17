@@ -102,7 +102,12 @@ export default function AdminContinuumPage({ session }: { session: Session }) {
     setTargetsLoading(true);
     const [modality, units] = machineKey.split('|');
     const { data: res, error: err } = await supabase.functions.invoke('engine-day-targets', { body: { target_user_id: id, modality, units: units || null } });
-    setTargets(err ? { error: err.message } : (res as DayTargetsPayload));
+    if (err) {
+      // the function's own error body (e.g. "no workout for that day") beats the generic status message
+      let detail = err.message;
+      try { const body = await (err as { context?: Response }).context?.json(); if (body?.error) detail = `${body.error}${body.position != null ? ` (position ${body.position})` : ''}`; } catch { /* keep the generic message */ }
+      setTargets({ error: detail });
+    } else setTargets(res as DayTargetsPayload);
     setTargetsLoading(false);
   }, [id]);
 
