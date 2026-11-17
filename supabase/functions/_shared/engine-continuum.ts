@@ -275,7 +275,10 @@ export const CURVE_VERSION = 2; // v2: nodes indexed by effort seconds (was pace
 const NODE_STEP_LOG10 = 0.1; // nodes every 0.1 in log10 seconds: 10, 12.6, 15.8 … 3600
 const SIGMA_LOG10 = 0.15; // a session touches roughly ×/÷ 1.4 in duration
 const K = 0.6; // how far a ceiling session pulls the node toward its sustain
-const STATE_W = 0.75; // a session marks a node measured/floor only within ~×/÷ 1.25 of its effort
+// A session marks a node measured/floor only within ~×/÷ 1.27 of its effort
+// (weight ≥ 0.62). Was 0.75 (×/÷ 1.20) until 2026-11-17: a 45-s max effort
+// ridden at 1.74× landed at 61 s and left the 30–60 s band blank by one second.
+const STATE_W = 0.62;
 const STEP_CLAMP = 0.15;
 const M_MIN = 0.7, M_MAX = 1.5;
 const CONF_HALF_LIFE_DAYS = 60;
@@ -560,7 +563,9 @@ export function formatCurveForPrompt(curve: EngineCurve, regions: RegionSummary[
   lines.push("M:      " + regions.map((x) => (x.m == null ? "—" : x.m.toFixed(2)).padEnd(11)).join(""));
   lines.push("state:  " + regions.map((x) => x.state.padEnd(11)).join(""));
   lines.push("n:      " + regions.map((x) => String(x.n).padEnd(11)).join(""));
-  lines.push("trend:  " + regions.map((x) => ({ up: "↑", flat: "→", down: "↓", unknown: "?" }[x.trend]).padEnd(11)).join(""));
+  // No trend row (dropped 2026-11-17): ceilings are too sparse per band for a
+  // 4-week comparison to hold anything but "?", and a retest inside the window
+  // made the one populated cell misleading. Revisit with a cycle of landings.
   const byKey = new Map<string, TrialInput[]>();
   for (const t of trials) {
     const k = `${t.modality} (${t.units ?? "?"})`;
@@ -570,6 +575,22 @@ export function formatCurveForPrompt(curve: EngineCurve, regions: RegionSummary[
     const last = ts.sort((a, b) => (a.date < b.date ? -1 : 1)).slice(-shown);
     lines.push(`Trials ${k.replace(/_/g, " ")}: ` + last.map((t) => `${t.pace} (${t.date})`).join(" → "));
   }
-  lines.push("Flags: " + (curve.flags.length ? curve.flags.join(", ") : "none"));
+  lines.push("Flags: " + (curve.flags.length ? curve.flags.map((f) => qualifyFlag(f, trials)).join(", ") : "none"));
   return lines.join("\n");
+}
+
+/** The sprint flag read WITH the trial history, so the model need not combine
+ *  them itself (2026-11-17): a rising trial means a fast-twitch athlete whose
+ *  level is catching up; a flat or falling one means the aerobic side is the gap. */
+export function qualifyFlag(flag: string, trials: TrialInput[]): string {
+  if (flag !== "AEROBIC_SIDE_BEHIND_SPRINT") return flag;
+  const latest = [...trials].sort((a, b) => (a.date < b.date ? 1 : -1))[0];
+  if (!latest) return flag;
+  const sameMachine = trials.filter((t) => t.modality === latest.modality && (t.units ?? "") === (latest.units ?? "")).sort((a, b) => (a.date < b.date ? -1 : 1));
+  if (sameMachine.length < 2) return `${flag} (one trial so far — read it again after the next retest)`;
+  const prev = sameMachine[sameMachine.length - 2];
+  const pct = (latest.pace / prev.pace - 1) * 100;
+  const days = daysBetween(prev.date, latest.date);
+  if (pct > 3) return `${flag} (trial RISING: ${pct >= 0 ? "+" : ""}${pct.toFixed(0)}% in ${days} days — a fast-twitch athlete whose level is catching up; not an aerobic deficit)`;
+  return `${flag} (trial ${pct < -3 ? "FALLING" : "FLAT"}: ${pct >= 0 ? "+" : ""}${pct.toFixed(0)}% in ${days} days — the aerobic side is the gap; bias toward 4–20 min work, consider an early retest)`;
 }

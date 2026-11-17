@@ -320,3 +320,10 @@ Deno.test("validateProposal: a 36-min flux day passes the 42-min cap (continuous
   assertEquals(res.accepted.length, 1);
   assertEquals(res.accepted[0].blocks[0].workDuration, 2160);
 });
+
+Deno.test("fill: a model-emitted intensityShare is dropped and the envelope's is not copied (stage 3 not yet)", () => {
+  const env = { ...THRESHOLD.block_1_params!, intensityShare: [0.87, 0.97] };
+  const filled = fillDeterministicParams({ workDuration: 720, paceRange: [0.88, 0.92], intensityShare: 0.9 }, env);
+  assertEquals(filled.intensityShare, undefined);
+  assertEquals(validateBlock(filled, env, "threshold"), []);
+});

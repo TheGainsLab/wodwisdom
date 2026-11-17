@@ -79,3 +79,11 @@ Deno.test("reaches: ascending reaches 2–4 min only at its top paces (1.13–1.
   assertEquals(by["2–4 min"], "1.13–1.3×");
   assertEquals(by["4–10 min"], "1.01–1.12×");
 });
+
+import { formatDayTypeCatalogue } from "./engine-catalogue.ts";
+Deno.test("catalogue text: intensityShare is hidden from the model", () => {
+  const row = { ...byId("threshold"), block_1_params: { ...byId("threshold").block_1_params, intensityShare: [0.87, 0.97] } };
+  const text = formatDayTypeCatalogue([row]);
+  assert(!text.includes("intensityShare"), text);
+  assert(text.includes('"paceRange":[0.85,0.95]'), text);
+});

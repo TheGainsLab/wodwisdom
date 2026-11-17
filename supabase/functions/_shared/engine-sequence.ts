@@ -127,8 +127,13 @@ export function fillDeterministicParams(
 ): GeneratedBlock {
   if (!envelope) return gen;
   const out: GeneratedBlock = { ...gen };
+  // intensityShare: not the model's to set until rollout stage 3 — a value it
+  // emits (it saw the range on the envelope before 2026-11-17) is dropped, so
+  // a switched athlete's sequenced day is targeted from its pace fraction like
+  // a curated one (Phase 2 decision 6).
+  delete out.intensityShare;
   for (const [key, env] of Object.entries(envelope)) {
-    if (key.endsWith("Options")) continue;
+    if (key.endsWith("Options") || key === "intensityShare") continue;
     if (typeof env === "string" || typeof env === "number") {
       out[key] = env;
       continue;
