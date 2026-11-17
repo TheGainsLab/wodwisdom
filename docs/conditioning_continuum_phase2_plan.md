@@ -12,6 +12,8 @@ Phase 2 is where the curve changes what the athlete is asked to do.
 3. **Weekly cap ±5 %** per band; retests exempt.
 4. **Rollout** computed-but-hidden → per-athlete switch → everyone; stage 2 may be short if the first reviews are clean.
 5. (From review) the share is a share of **effort**; each machine's exponent converts it to pace.
+6. (First production preview, 2026-11-17) **the share is a function of the bout's duration**: `share(work) = catalogue fraction ÷ R_echo(work)`. On the Echo the ask is the catalogue's fraction exactly; elsewhere it is that ask translated at equal effort; M scales it. One share per type was wrong at the ends of wide envelopes (interval: 1.34× at 30 s, 0.68× at 240 s). The 23 stored `intensityShare` values are now only the sequencer's choice range for rollout stage 3; a block carrying its own share uses it.
+7. (Same preview) **delivered-pace floor**: a curve target is never below 97 % of the athlete's median delivered pace on that day type and machine over the last 28 days. M is shared across types by band, so misses on one type were pulling another's target below what the athlete demonstrably delivers. A lower bound only; it can sit above today's ask when the athlete has been beating it by more than 3 %.
 
 Everything else below is mechanics that follow from §2.
 
@@ -39,9 +41,12 @@ Phase 2:
 
 ```
 p_balanced = R_machine(work_seconds)            the pace a balanced athlete holds for this bout, on this machine's curve
-p_asked    = p_balanced × share_type ^ k_machine  how close to that max this kind of day asks for — a share of EFFORT, converted to this machine's pace
-target     = trial_pace × p_asked × M_athlete(D(p_asked))
+share      = fraction / R_echo(work_seconds)     the catalogue's ask for this bout, as a share of a balanced athlete's EFFORT (decision 6)
+p_asked    = p_balanced × share ^ k_machine      that share converted to this machine's pace
+target     = max( trial_pace × p_asked × M_athlete(D(p_asked)),  0.97 × recent delivered pace on this type )   (decision 7)
 ```
+
+On the Echo `p_asked = fraction`: the catalogue stays the authority on intensity, the machine conversion and M are what Phase 2 adds.
 
 **The share is a share of effort, not of pace.** On the Echo, calories track power, so a share of effort is a share of pace (`k = 1`). On a rower, power ∝ pace³, so 73 % of the effort is 90 % of the pace: `k = 0.30`, the same exponent Phase 0 used to derive the rower's curve from the Echo's. C2 calories `k = 0.73`, running ≈ `0.45` (the exponent relating the authored running curve to the Echo's at 30 s). Applied to pace directly, the rower's hybrid-anaerobic ask would come out at 0.83× — slower than threshold — which is why the exponent is there. `k` lives beside each reference curve in `engine_pd_curves` (one column), so a new machine brings its own.
 
@@ -184,3 +189,21 @@ Nobody is switched: no athlete's day page changes. Deploy: `supabase db push`,
 Still to build: step 5 (day page — preview, Start snapshot, calibrate-on-switch
 offer, completion refresh; the legacy parity fixture before the browser math
 goes) and step 6 (sequencer: `TRIAL_STALE` now; share choices at stage 3).
+
+## First production preview (2026-11-17) and what it changed
+
+Exploration athlete, Echo, trial 18.4, M 0.96 at 10–20 min, 0.92 at 20–40 min, 0.83 at 2–4 min:
+
+| Catalogue day | Legacy | Curve, as first built | Curve, final |
+|---|---|---|---|
+| MAP 4 × 240 s | 1.05× (rolling 1.10) | 0.79× | 1.11× — floored at 97 % of the 21.1 he delivers on MAP |
+| threshold 720 s | 0.92× | 0.83× | 0.89× — floored |
+| interval 120 s | 0.95× | 0.75× (read as zone 2) | 1.03× — floored |
+| hybrid anaerobic 60 s | 1.13× | 1.07× | 0.94× — M 0.83 in his weakest band, no recent sessions of the type to floor it |
+
+Two things the first build got wrong, both fixed (decisions 6 and 7 above):
+one share per type applied at a midpoint misread wide envelopes; and the
+band's M, shared across day types, took a target below what the athlete
+delivers on that type. The function also had to stop merging the envelope's
+stored shares into curated days (they are the sequencer's range), and read
+the share from each day's own fraction and duration.

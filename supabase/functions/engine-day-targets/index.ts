@@ -20,7 +20,7 @@ import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supa
 import { getCorsHeaders } from "../_shared/cors.ts";
 import type { CatalogEngineDay } from "../_shared/engine-block-resolve.ts";
 import { type EngineCurve, type PdCurvePoint } from "../_shared/engine-continuum.ts";
-import { dayTargets, type DayTargets, previousFromSnapshot, type SegmentTarget } from "../_shared/engine-targets.ts";
+import { dayTargets, type DayTargets, deliveredPaceFloor, previousFromSnapshot, type SegmentTarget } from "../_shared/engine-targets.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -84,16 +84,25 @@ Deno.serve(async (req) => {
     if (!modality) return json({ error: "no machine: pass modality/units or record a time trial", position }, 400);
     const trial = trialRows.find((t) => t.modality === modality && (t.units ?? "") === (units ?? "") && t.calculated_rpm != null) ?? null;
 
-    const [{ data: curveRows }, { data: metric }, { data: prevSess }] = await Promise.all([
+    const since28 = new Date(Date.now() - 28 * 86400000).toISOString().slice(0, 10);
+    const [{ data: curveRows }, { data: metric }, { data: prevSess }, { data: recent }] = await Promise.all([
       supa.from("engine_pd_curves").select("r, seconds, k_effort").eq("modality", modality).eq("units", units ?? ""),
       supa.from("engine_user_performance_metrics").select("rolling_avg_ratio").eq("user_id", userId).eq("day_type", workout.day_type).eq("modality", modality).maybeSingle(),
       supa.from("engine_workout_sessions").select("targets, date").eq("user_id", userId).eq("modality", modality).eq("units", units ?? "")
         .not("targets", "is", null).gte("date", new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10)).order("date", { ascending: false }).limit(1).maybeSingle(),
+      // the delivered-pace floor: what the athlete has recently delivered on this day type and machine
+      supa.from("engine_workout_sessions").select("actual_pace").eq("user_id", userId).eq("completed", true).eq("day_type", workout.day_type).eq("modality", modality).eq("units", units ?? "").gte("date", since28),
     ]);
+    const deliveredFloor = deliveredPaceFloor(((recent ?? []) as Array<{ actual_pace: number | null }>).map((r) => (r.actual_pace != null ? Number(r.actual_pace) : null)));
     const machineCurve: PdCurvePoint[] | null = curveRows && curveRows.length >= 2 ? (curveRows as Array<{ r: number; seconds: number }>).map((p) => ({ r: Number(p.r), seconds: Number(p.seconds) })) : null;
     const kEffort = curveRows?.[0] ? Number((curveRows[0] as { k_effort: number }).k_effort) : null;
     const athleteCurve = (profile?.engine_curve as EngineCurve | null) ?? null;
 
+    // The share is derived per segment from the day's own pace fraction at its own
+    // duration (decided 2026-11-17); only a block carrying its OWN intensityShare
+    // (a sequenced day from rollout stage 3) overrides that. The envelope's
+    // intensityShare on engine_day_types is the sequencer's choice range, not
+    // merged here.
     const targets: DayTargets = dayTargets(workout, {
       trialPace: trial?.calculated_rpm != null ? Number(trial.calculated_rpm) : null,
       machineCurve,
@@ -101,6 +110,7 @@ Deno.serve(async (req) => {
       athleteCurve,
       rollingRatio: metric?.rolling_avg_ratio != null ? Number(metric.rolling_avg_ratio) : null,
       isGenerated: String(workout.program_type).startsWith("gen:"),
+      deliveredFloor,
     }, previousFromSnapshot((prevSess?.targets as Parameters<typeof previousFromSnapshot>[0]) ?? null));
 
     const mode: "curve" | "legacy" = flag ? "curve" : "legacy";
@@ -119,6 +129,7 @@ Deno.serve(async (req) => {
       modality, units, mode, flag,
       trial: snapshot.trial,
       machine_curve: machineCurve != null, k_effort: kEffort,
+      delivered_floor: deliveredFloor, recent_sessions: (recent ?? []).length,
       athlete_curve: athleteCurve != null,
       ...targets,
       snapshot,

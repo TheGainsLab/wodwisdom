@@ -38,13 +38,13 @@ interface Payload {
   curves: Record<string, Array<{ r: number; seconds: number }>>;
 }
 // Phase 2 (engine-day-targets): both formulas for the athlete's next day — the rollout view.
-interface SegTarget { target_pace: number | null; basis: string; fraction: number | null; share?: number; m?: number; band?: string; p_balanced?: number; capped?: boolean }
+interface SegTarget { target_pace: number | null; basis: string; fraction: number | null; share?: number; m?: number; band?: string; p_balanced?: number; capped?: boolean; floored?: boolean }
 interface DayTargetsPayload {
   error?: string;
   workout?: { id: string; day_type: string; program_type: string; day_number: number; position: number | null };
   modality?: string; units?: string | null; mode?: 'curve' | 'legacy'; flag?: boolean;
   trial?: { id: string; pace: number; date: string } | null;
-  machine_curve?: boolean; k_effort?: number | null; athlete_curve?: boolean;
+  machine_curve?: boolean; k_effort?: number | null; athlete_curve?: boolean; delivered_floor?: number | null; recent_sessions?: number;
   blocks?: Array<{ block_index: number; rounds: number; segments: Array<{ label: string; round_index: number; duration_seconds: number; curve: SegTarget; legacy: SegTarget }> }>;
   curve_fraction?: number | null; legacy_fraction?: number | null;
 }
@@ -256,7 +256,7 @@ export default function AdminContinuumPage({ session }: { session: Session }) {
               <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>
                 {targets.workout.day_type.replace(/_/g, ' ')} · position {targets.workout.position ?? '?'} · {targets.workout.program_type.startsWith('gen:') ? 'sequenced' : 'curated'} ·
                 athlete is on <b>{targets.mode}</b> targets · trial {targets.trial ? `${targets.trial.pace} (${targets.trial.date})` : 'none'} ·
-                machine curve {targets.machine_curve ? `yes (k ${targets.k_effort})` : 'no'} · athlete curve {targets.athlete_curve ? 'yes' : 'no'}
+                machine curve {targets.machine_curve ? `yes (k ${targets.k_effort})` : 'no'} · athlete curve {targets.athlete_curve ? 'yes' : 'no'} · delivered floor {targets.delivered_floor != null ? `${targets.delivered_floor.toFixed(1)} (${targets.recent_sessions} recent)` : 'none'}
               </span>
             )}
             {targets?.error && <span style={{ fontSize: 12, color: 'var(--danger, #e5484d)' }}>{targets.error}</span>}
@@ -273,7 +273,7 @@ export default function AdminContinuumPage({ session }: { session: Session }) {
                       <tr key={`${b.block_index}-${sg.round_index}-${sg.label}`}>
                         <td>{b.block_index + 1}</td><td>{sg.round_index + 1}/{b.rounds}</td><td>{sg.label}</td><td>{fmtSeconds(sg.duration_seconds)}</td>
                         <td>{l == null ? '—' : `${l.toFixed(1)} (${sg.legacy.fraction?.toFixed(2)}×)`}</td>
-                        <td style={{ fontWeight: 600 }}>{c == null ? '—' : `${c.toFixed(1)} (${sg.curve.fraction?.toFixed(2)}×)`}{sg.curve.capped ? ' ·cap' : ''}</td>
+                        <td style={{ fontWeight: 600 }}>{c == null ? '—' : `${c.toFixed(1)} (${sg.curve.fraction?.toFixed(2)}×)`}{sg.curve.capped ? ' ·cap' : ''}{sg.curve.floored ? ' ·floor' : ''}</td>
                         <td style={{ color: delta == null ? undefined : delta > 0 ? 'var(--accent)' : 'var(--text-dim)' }}>{delta == null ? '—' : `${delta > 0 ? '+' : ''}${delta.toFixed(0)}%`}</td>
                         <td>{sg.curve.basis}</td>
                         <td>{sg.curve.share != null ? sg.curve.share.toFixed(2) : '—'}</td>
@@ -287,7 +287,7 @@ export default function AdminContinuumPage({ session }: { session: Session }) {
               </table>
               <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 6 }}>
                 Work-weighted ask: legacy {targets.legacy_fraction?.toFixed(2) ?? '—'}× trial · curve {targets.curve_fraction?.toFixed(2) ?? '—'}× trial.
-                Legacy = trial × centre of the pace range × rolling ratio. Curve = trial × balanced pace for the bout × share^k × the athlete's M in that band, capped ±5 %/week.
+                Legacy = trial × centre of the pace range × rolling ratio. Curve = trial × balanced pace for the bout × share^k × the athlete's M in that band, capped ±5 %/week, never below 97 % of the recent delivered pace on this type.
               </div>
             </div>
           )}
