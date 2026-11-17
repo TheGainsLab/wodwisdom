@@ -80,6 +80,8 @@ export async function loadCurves(supa: SupabaseClient): Promise<PdCurves> {
 const SESSION_SEL =
   "id, user_id, date, day_type, modality, units, actual_pace, target_pace, workout_data, program_version, program_day, sequence_position, created_at, " +
   "continuum_r, continuum_effort_s, continuum_bout_s, continuum_sustain, continuum_evidence";
+/** The program_type every catalogue day is stored under; variant programs map onto its day numbers. */
+export const CATALOG_PROGRAM = "main_5day";
 const CATALOG_SEL = "id, program_type, day_number, day_type, phase, month, block_count, set_rest_seconds, block_1_params, block_2_params, block_3_params, block_4_params, total_duration_minutes";
 
 /**
@@ -116,19 +118,20 @@ export async function computeAthleteContinuum(
   }
   const fallbackVersion = profile?.engine_program_version ?? "main_5day";
   const overrideIds = new Set<string>();
-  const catalogKeys = new Set<string>();
+  const catalogDays = new Set<number>();
   for (const s of sessions) {
     const version = s.program_version ?? fallbackVersion;
     const ov = s.sequence_position != null ? overrideByKey.get(`${version}|${s.sequence_position}`) : undefined;
     if (ov) overrideIds.add(ov);
-    else if (s.program_day != null) catalogKeys.add(`${version}|${s.program_day}`);
+    else if (s.program_day != null) catalogDays.add(s.program_day);
   }
-  const catalogByKey = new Map<string, CatalogEngineDay>();
-  const versions = [...new Set([...catalogKeys].map((k) => k.split("|")[0]))];
-  const days = [...new Set([...catalogKeys].map((k) => Number(k.split("|")[1])))];
-  if (versions.length && days.length) {
-    const { data } = await supa.from("engine_workouts").select(CATALOG_SEL).in("program_type", versions).in("day_number", days);
-    for (const w of (data ?? []) as Array<CatalogEngineDay & { id: string; program_type: string }>) catalogByKey.set(`${w.program_type}|${w.day_number}`, w);
+  // Catalogue content lives under CATALOG_PROGRAM for EVERY program: a variant
+  // program's mapping points at main_5day day numbers (fixed 2026-11-17 —
+  // variant athletes' prescriptions were not being found).
+  const catalogByDay = new Map<number, CatalogEngineDay>();
+  if (catalogDays.size) {
+    const { data } = await supa.from("engine_workouts").select(CATALOG_SEL).eq("program_type", CATALOG_PROGRAM).in("day_number", [...catalogDays]);
+    for (const w of (data ?? []) as Array<CatalogEngineDay & { id: string }>) catalogByDay.set(w.day_number, w);
   }
   const catalogById = new Map<string, CatalogEngineDay>();
   if (overrideIds.size) {
@@ -139,7 +142,7 @@ export async function computeAthleteContinuum(
   const inputs: Array<ContinuumSessionInput & { id: string }> = sessions.map((s) => {
     const version = s.program_version ?? fallbackVersion;
     const ov = s.sequence_position != null ? overrideByKey.get(`${version}|${s.sequence_position}`) : undefined;
-    const day = ov ? catalogById.get(ov) ?? null : s.program_day != null ? catalogByKey.get(`${version}|${s.program_day}`) ?? null : null;
+    const day = ov ? catalogById.get(ov) ?? null : s.program_day != null ? catalogByDay.get(s.program_day) ?? null : null;
     const wd = s.workout_data ?? {};
     const n = (k: string) => (typeof wd[k] === "number" ? (wd[k] as number) : null);
     return {

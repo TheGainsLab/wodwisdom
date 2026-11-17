@@ -20,6 +20,7 @@ import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supa
 import { getCorsHeaders } from "../_shared/cors.ts";
 import type { CatalogEngineDay } from "../_shared/engine-block-resolve.ts";
 import { type EngineCurve, type PdCurvePoint } from "../_shared/engine-continuum.ts";
+import { CATALOG_PROGRAM } from "../_shared/engine-continuum-io.ts";
 import { dayTargets, type DayTargets, deliveredPaceFloor, previousFromSnapshot, type SegmentTarget } from "../_shared/engine-targets.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -42,7 +43,8 @@ async function loadDay(supa: SupabaseClient, userId: string, body: { workout_id?
   }
   const { data: map } = await supa.from("engine_program_mapping").select("engine_workout_day_number").eq("engine_program_id", version).eq("program_sequence_order", position).maybeSingle();
   if (!map) return { workout: null, position };
-  const { data } = await supa.from("engine_workouts").select(SEL).eq("program_type", version).eq("day_number", map.engine_workout_day_number).maybeSingle();
+  // catalogue content is stored under main_5day for every program (variants map onto its day numbers)
+  const { data } = await supa.from("engine_workouts").select(SEL).eq("program_type", CATALOG_PROGRAM).eq("day_number", map.engine_workout_day_number).maybeSingle();
   return { workout: (data as WorkoutRow | null) ?? null, position };
 }
 

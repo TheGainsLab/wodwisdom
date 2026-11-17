@@ -389,7 +389,8 @@ export async function runResequence(
     const SEL = "id, program_type, day_number, day_type, block_1_params, block_2_params, block_3_params, block_4_params";
     const [{ data: ovDays }, { data: catDays }] = await Promise.all([
       ovByPos.size ? supa.from("engine_workouts").select(SEL).in("id", [...ovByPos.values()]) : Promise.resolve({ data: [] }),
-      catalogDayByPos.size ? supa.from("engine_workouts").select(SEL).eq("program_type", version).in("day_number", [...catalogDayByPos.values()]) : Promise.resolve({ data: [] }),
+      // catalogue content is stored under main_5day for every program (variants map onto its day numbers)
+      catalogDayByPos.size ? supa.from("engine_workouts").select(SEL).eq("program_type", "main_5day").in("day_number", [...catalogDayByPos.values()]) : Promise.resolve({ data: [] }),
     ]);
     type W = { id: string; day_number: number; day_type: string; block_1_params: unknown; block_2_params: unknown; block_3_params: unknown; block_4_params: unknown };
     for (const pos of positions) {
