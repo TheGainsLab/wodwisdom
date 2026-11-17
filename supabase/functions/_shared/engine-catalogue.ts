@@ -67,8 +67,11 @@ export async function loadDayTypeCatalogue(supa: SupabaseClient): Promise<Engine
   return (data as EngineDayTypeRow[]) ?? [];
 }
 
-/** Format the catalogue as an AI-readable reference: legend + per-type intent + raw envelopes. */
-export function formatDayTypeCatalogue(rows: EngineDayTypeRow[]): string {
+/** Format the catalogue as an AI-readable reference: legend + per-type intent + raw envelopes.
+ *  `reaches` (Phase 1): one line per type saying which effort bands its envelope
+ *  can land in (engine-continuum-reaches.ts) — a reading aid for the probe
+ *  instruction, never a constraint. */
+export function formatDayTypeCatalogue(rows: EngineDayTypeRow[], opts?: { reaches?: (row: EngineDayTypeRow) => string | null }): string {
   if (rows.length === 0) return "";
   const parts: string[] = [PARAM_LEGEND, "", `DAY TYPES (${rows.length}):`];
 
@@ -87,6 +90,8 @@ export function formatDayTypeCatalogue(rows: EngineDayTypeRow[]): string {
 
     parts.push("", `### ${dt.id} (${dt.name}) — ${gating}`);
     if (dt.coaching_intent) parts.push(dt.coaching_intent);
+    const reaches = opts?.reaches?.(dt);
+    if (reaches) parts.push(reaches);
 
     const blocks = [dt.block_1_params, dt.block_2_params, dt.block_3_params, dt.block_4_params];
     for (let i = 0; i < dt.block_count; i++) {

@@ -12,6 +12,7 @@ import { assert, assertEquals } from "jsr:@std/assert";
 import {
   computeConditioningDiagnosis,
   formatConditioningState,
+  formatSequencerSignals,
   type PerfMetricRow,
   type TimeTrialRow,
 } from "./conditioning-state.ts";
@@ -158,7 +159,7 @@ Deno.test("max-effort types (anaerobic) render their ratio as 'vs baseline' and 
   if (!text.includes("MAX-EFFORT day types")) throw new Error("explainer missing");
 });
 
-Deno.test("time-trial history: the last three trials per modality+units, oldest→newest, on the calibration line", () => {
+Deno.test("time-trial history: the last six trials per modality+units, oldest→newest, on the calibration line", () => {
   const text = formatConditioningState({
     metrics: [],
     timeTrials: [
@@ -170,7 +171,7 @@ Deno.test("time-trial history: the last three trials per modality+units, oldest�
     sessions: [],
     now: new Date("2026-10-15T00:00:00Z"),
   });
-  if (!text.includes("baseline 16.2 · trials 15 (2026-08-01) → 15.8 (2026-09-01) → 16.2 (2026-10-01)")) throw new Error(text);
+  if (!text.includes("baseline 16.2 · trials 14 (2026-07-01) → 15 (2026-08-01) → 15.8 (2026-09-01) → 16.2 (2026-10-01)")) throw new Error(text);
 });
 
 Deno.test("adherence: sessions in the last 28 and 90 days, with the cadence's expectation when known", () => {
@@ -185,3 +186,19 @@ Deno.test("adherence: sessions in the last 28 and 90 days, with the cadence's ex
   if (!noCadence.includes("Adherence: 6 sessions in the last 28 days; 8 in the last 90.")) throw new Error(noCadence);
 });
 
+
+Deno.test("sequencer signals: days-since + adherence only — no ratio table, no analytics, no calibration lines", () => {
+  const now = new Date("2026-11-17T00:00:00Z");
+  const day = (n: number) => ({ date: new Date(now.getTime() - n * 86400000).toISOString().slice(0, 10) });
+  const text = formatSequencerSignals({
+    metrics: [metric({ day_type: "threshold", modality: "echo_bike", rolling_avg_ratio: 0.91 })],
+    timeTrials: [tt("echo_bike", "2026-11-01")],
+    sessions: [day(2), day(5), day(9)],
+    now,
+    daysPerWeek: 3,
+  });
+  assertEquals(text, "Days since last completed session: 2.\nAdherence: 3 sessions in the last 28 days (the program's cadence implies 12); 3 in the last 90.");
+  assert(!text.includes("ratio"));
+  assert(!text.includes("Calibration"));
+  assertEquals(formatSequencerSignals({ metrics: [], timeTrials: [], sessions: [], now }), "");
+});

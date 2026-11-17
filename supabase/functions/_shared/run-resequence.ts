@@ -20,7 +20,8 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { callClaude } from "./call-claude.ts";
 import { MODELS } from "./model-profiles.ts";
-import { buildConditioningState } from "./conditioning-state.ts";
+import { buildSequencerConditioning } from "./conditioning-state.ts";
+import { formatReaches } from "./engine-continuum-reaches.ts";
 import { buildOtherTrainingLoadBlock } from "./athlete-activities.ts";
 import { loadUpcomingProgrammingWeek } from "./programming-week.ts";
 import { buildCoachNotesBlock, markNotesConsumed } from "./coach-notes.ts";
@@ -33,8 +34,8 @@ const SYSTEM_PROMPT =
   `You are the Engine conditioning sequencer. You personalise an athlete's UPCOMING conditioning by ` +
   `GENERATING training days within a fixed taxonomy — you never invent day-types or parameters outside ` +
   `their authored envelopes.\n\n` +
-  `You are given: (1) the athlete's RAW conditioning signals (per-competency rolling ratios + recent ` +
-  `trend, time-trial/calibration age, days since last session — no labels; you interpret them), ` +
+  `You are given: (1) the athlete's CONDITIONING CURVE — where they stand against a balanced athlete at ` +
+  `their own level, by effort duration — plus days since their last session and adherence, ` +
   `(2) the day-type catalogue with each type's parameter envelope — it contains exactly the day-types ` +
   `available at this point in the athlete's program, (3) how many days to generate, (4) when present, ` +
   `ATHLETE CONTEXT — their age (factor recovery capacity into intensity placement and the hard/easy mix; ` +
@@ -47,20 +48,33 @@ const SYSTEM_PROMPT =
   `Balance this block against that week as a whole — its total load, its hard days, the systems it already ` +
   `taxes — never day by day, since neither side owns dates. (7) When present, the ATHLETE'S NOTES FOR THEIR ` +
   `COACH: what they asked for this week, in their words — honour them within the rules below.\n\n` +
-  `Read the signals and form your own judgment: which energy systems are behind, what's trending down, ` +
-  `whether a layoff warrants re-baselining, which prerequisites are met. Then choose day-types that ` +
-  `serve that judgment. For each chosen day, GENERATE concrete block ` +
-  `parameters STRICTLY inside that day-type's envelope.\n\n` +
-  `Intensity judgment — the key value you add: the rolling ratio is a SLOW smoother; if an athlete is ` +
-  `consistently beating target you may set the pace where they actually are NOW rather than waiting weeks ` +
-  `for it to catch up. BUT scale that confidence by the sample count: where a competency has a solid ` +
-  `rolling history (n≈3-4) and a clear trend, set intensity decisively; where it is thin (n≈1, or no ` +
-  `rolling data at all), stay conservative — pick a mid/standard intensity, don't jump on one session.\n\n` +
-  `Recalibration: the athlete is automatically re-baselined by a scheduled monthly time trial, so you do ` +
-  `NOT need to add one just to keep calibration fresh. Inserting your own time trial spends one of this ` +
-  `block's training days, so only do it when the signals strongly suggest the current baseline no longer ` +
-  `holds — e.g. a long layoff, a modality change, or recent paces that clearly contradict it — not merely ` +
-  `because the baseline is aging.\n\n` +
+  `READING THE CURVE. Seven bands of EFFORT DURATION, long on the left (slow twitch: 20–40 min) to short on ` +
+  `the right (fast twitch: ≤30 s). A session is placed by the pace the athlete actually delivered — a ` +
+  `balanced athlete sustains that pace for the band's duration — so a paced day's band follows its pace, not ` +
+  `its clock. M is the athlete against a balanced athlete at their own time-trial level: 1.0 = balanced, ` +
+  `below = that band lags, above = that band is ahead of their trial. state: "measured" = a max effort ` +
+  `proved it; "floor" = only sub-max days have landed there (M is a lower bound); "blank" = nothing has landed ` +
+  `there. n = evidence weight; trend = last 4 weeks vs the 4 before. Trials are the athlete's 10-min ` +
+  `time-trial history per machine (the level itself). Efforts of 40 min+ are zone 2: dose, not scored.\n\n` +
+  `WHAT TO DO WITH IT. Prescribe into the LOWEST MEASURED band without letting the strong bands sag. Where a ` +
+  `band is BLANK, PROBE it: place a max-effort day whose longest work block lands in that band (each ` +
+  `catalogue type says which bands it "can reach") before prescribing development into it. Weight the ` +
+  `four middle bands — 30 s to 10 min — as the destination: that is where metcons live; ≤30 s and 20–40 min ` +
+  `are diagnostics. A gap at 1–4 min outranks a gap at ≤30 s. Confidence by n: where a band has solid ` +
+  `evidence and a clear trend, set intensity decisively; where it is thin, stay mid-envelope — don't jump ` +
+  `on one session.\n\n` +
+  `FLAGS. AEROBIC_SIDE_BEHIND_SPRINT: the athlete's short max efforts sit well above the curve relative to ` +
+  `their trial — read it WITH the trial history: a low or stalled trial means the aerobic side is the gap ` +
+  `(bias toward 4–20 min work; consider an early retest); a rising trial means a fast-twitch athlete whose ` +
+  `level is catching up. GLYCOLYTIC_BELOW_BALANCED: short hard work is the gap. TRIAL_LOW: they sustained ` +
+  `longer than balanced at trial pace — the baseline is stale; place a retest early in the block (the one ` +
+  `case that earns a self-made time trial; otherwise the scheduled monthly trial keeps calibration fresh and ` +
+  `an extra one spends a training day). UNCALIBRATED:<machine>: no trial on that machine — do not prescribe ` +
+  `to it as if calibrated. AWAITING_RIGHT_ANCHOR: a recent retest; the sprint bands are provisional until the ` +
+  `next max effort.\n\n` +
+  `Your lever is conditioning days and their intensity within each envelope — not the trial schedule, not ` +
+  `the number of days, not the athlete's targets. Day types are the words you answer in; the curve is what ` +
+  `you read.\n\n` +
   `Rules:\n` +
   `- Only use day_types from the catalogue below — it contains exactly the types this athlete is READY ` +
   `for: every prerequisite completed at least twice. Readiness, not the calendar, decides availability.\n` +
@@ -263,10 +277,11 @@ export async function runResequence(
 
   // 4c) Diagnosis + catalogue rows. The catalogue TEXT is formatted later,
   // after the readiness pool is known.
-  const [diagnosis, catalogueRows] = await Promise.all([
-    buildConditioningState(supa, userId, { daysPerWeek: maxDays }),
+  const [conditioning, catalogueRows] = await Promise.all([
+    buildSequencerConditioning(supa, userId, { daysPerWeek: maxDays }),
     loadDayTypeCatalogue(supa),
   ]);
+  const diagnosis = conditioning.text;
   if (!diagnosis) {
     console.log(`[run-resequence] user=${userId} skip: no conditioning diagnosis available`);
     return { status: "skipped", reason: "no conditioning diagnosis available" };
@@ -424,8 +439,11 @@ export async function runResequence(
   // The catalogue the model sees is pre-filtered to the availability pool —
   // it cannot propose a day-type it was never shown (the validator enforces
   // the same set as the second fence).
+  // "can reach" lines are computed on the athlete's primary machine's curve:
+  // the same pace fraction is a different effort on a rower and an Echo.
   const catalogueText = formatDayTypeCatalogue(
     catalogueRows.filter((r) => allowedDayTypes.has(r.id)),
+    { reaches: (row) => formatReaches(row, conditioning.primaryCurve) },
   );
 
   const userContent =

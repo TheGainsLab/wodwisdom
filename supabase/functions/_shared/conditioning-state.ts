@@ -12,11 +12,20 @@
  * Returns "" when the user has no Engine data (safe no-op). The compute core is
  * pure and unit-tested in conditioning-state_test.ts.
  *
+ * Two audiences (Phase 1 of the continuum, 2026-11-17):
+ *   - the Coach / workout review: this block + the analytics + the athlete's
+ *     CONDITIONING CURVE (buildConditioningState);
+ *   - the sequencer: the curve + days-since + adherence ONLY — the per-type
+ *     ratio table and the analytics dump were dropped from its prompt
+ *     (buildSequencerConditioning). See docs/conditioning_continuum_phase1_plan.md.
+ *
  * See docs/engine_competency_graph.md.
  */
 
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { type AnalyticsSession, type AnalyticsTrial, computeEngineAnalytics, formatEngineAnalytics } from "./engine-analytics.ts";
+import { computeAthleteContinuum, loadCurves, type PdCurves, type StoredCurve } from "./engine-continuum-io.ts";
+import { ECHO_BIKE_CAL_CURVE_V1, type EngineCurve, formatCurveForPrompt, type PdCurvePoint, type ReplayResult, summarizeCurve, type TrialInput } from "./engine-continuum.ts";
 
 // ─── Competency-graph metadata (taxonomy, not judgment) ──────────────────────
 
@@ -129,8 +138,8 @@ export interface ModalityCalibration {
   units: string | null;
   time_trial_age_days: number | null; // null = no current time trial
   baseline_rpm: number | null;
-  /** The last up-to-3 trials for this (modality, units), oldest→newest —
-   *  whether the ruler itself has moved (founder, 2026-11-11). */
+  /** The last up-to-6 trials for this (modality, units), oldest→newest —
+   *  whether the ruler itself has moved (founder, 2026-11-11; 3 → 6 on 2026-11-17). */
   history: { date: string; rpm: number }[];
 }
 
@@ -178,7 +187,7 @@ function computeCalibration(
     const current = sorted.filter((t) => t.is_current).at(-1);
     const history = sorted
       .filter((t) => num(t.calculated_rpm) != null && (num(t.calculated_rpm) as number) > 0)
-      .slice(-3)
+      .slice(-6)
       .map((t) => ({ date: t.date, rpm: num(t.calculated_rpm) as number }));
     out.push({
       modality,
@@ -308,6 +317,95 @@ export function formatConditioningState(inputs: ConditioningInputs): string {
   return parts.join("\n");
 }
 
+/** The sequencer's non-curve signals: days since the last session and
+ *  adherence. No ratio table, no analytics (decided 2026-11-17). */
+export function formatSequencerSignals(inputs: ConditioningInputs): string {
+  const diag = computeConditioningDiagnosis(inputs);
+  if (!diag.hasData) return "";
+  const a = diag.adherence;
+  return [
+    `Days since last completed session: ${diag.daysSinceLastSession ?? "none in the lookback window (90 days)"}.`,
+    `Adherence: ${a.sessions_last_28_days} sessions in the last 28 days` +
+      (a.expected_last_28_days != null ? ` (the program's cadence implies ${a.expected_last_28_days})` : "") +
+      `; ${a.sessions_last_90_days} in the last 90.`,
+  ].join("\n");
+}
+
+// ─── The athlete's conditioning curve ────────────────────────────────────────
+
+export interface ContinuumBlock {
+  /** "" when the athlete has no Engine sessions */
+  text: string;
+  /** The reference curve of the athlete's primary machine (for the catalogue's "can reach" lines). */
+  primaryCurve: PdCurvePoint[];
+  primaryMachine: string | null;
+}
+
+const EMPTY_CONTINUUM: ContinuumBlock = { text: "", primaryCurve: ECHO_BIKE_CAL_CURVE_V1, primaryMachine: null };
+
+/**
+ * The athlete's conditioning curve as the prompt block (band table, trials,
+ * flags). `refresh: true` (the sequencer) recomputes the athlete's curve inline
+ * first — a session logged this morning is folded in — and writes it, so the
+ * admin page agrees; if that fails it falls back to the stored curve (logged
+ * loudly), never to "". `refresh: false` (the Coach, latency-sensitive) reads
+ * what the daily tick stored.
+ */
+export async function buildContinuumBlock(supa: SupabaseClient, userId: string, opts: { refresh: boolean }): Promise<ContinuumBlock> {
+  let curves: PdCurves | null = null;
+  let refreshFailed = false;
+  if (opts.refresh) {
+    try {
+      curves = await loadCurves(supa);
+      const r = await computeAthleteContinuum(supa, userId, curves, { write: true });
+      if (!r) return EMPTY_CONTINUUM;
+      const primary = primaryMachine(r.trials, r.results.map((x) => `${x.modality}|${x.units ?? ""}`), curves);
+      return { text: formatCurveForPrompt(r.curve, r.regions, r.trials), ...primary };
+    } catch (err) {
+      refreshFailed = true;
+      console.error(JSON.stringify({ tag: "continuum_refresh_failed", user: userId, error: err instanceof Error ? err.message : String(err) }));
+    }
+  }
+  // The stored curve (daily tick / admin button / a successful earlier refresh).
+  const [{ data: prof }, { data: sess }, { data: tts }, loaded] = await Promise.all([
+    supa.from("athlete_profiles").select("engine_curve").eq("user_id", userId).maybeSingle(),
+    supa.from("engine_workout_sessions").select("date, modality, units, continuum_effort_s, continuum_sustain, continuum_evidence").eq("user_id", userId).eq("completed", true),
+    supa.from("engine_time_trials").select("modality, units, calculated_rpm, date").eq("user_id", userId).not("calculated_rpm", "is", null),
+    curves ? Promise.resolve(curves) : loadCurves(supa).catch(() => ({} as PdCurves)),
+  ]);
+  const stored = (prof as { engine_curve?: StoredCurve | null } | null)?.engine_curve ?? null;
+  if (!stored?.nodes) return EMPTY_CONTINUUM;
+  const rows = (sess ?? []) as Array<{ date: string; modality: string | null; units: string | null; continuum_effort_s: number | null; continuum_sustain: number | null; continuum_evidence: string | null }>;
+  // summarizeCurve reads date / evidence / effort_seconds / sustain only
+  const results = rows.map((x) => ({
+    date: x.date,
+    effort_seconds: x.continuum_effort_s,
+    sustain: x.continuum_sustain != null ? Number(x.continuum_sustain) : null,
+    evidence: (x.continuum_evidence ?? "no_curve") as ReplayResult["sessions"][number]["evidence"],
+  })) as unknown as ReplayResult["sessions"];
+  const machines = rows.map((x) => `${x.modality ?? "unknown"}|${x.units ?? ""}`);
+  const trials: TrialInput[] = ((tts ?? []) as Array<{ modality: string; units: string | null; calculated_rpm: number; date: string }>)
+    .map((t) => ({ modality: t.modality, units: t.units, pace: Number(t.calculated_rpm), date: t.date }));
+  const curve: EngineCurve = { version: stored.version, nodes: stored.nodes, flags: stored.flags ?? [], as_of: stored.as_of ?? null, awaiting_right_anchor: stored.awaiting_right_anchor ?? false };
+  const regions = summarizeCurve(curve, results);
+  const primary = primaryMachine(trials, machines, loaded);
+  const text = formatCurveForPrompt(curve, regions, trials) + (refreshFailed ? "\n(stored curve — inline refresh failed; see the function log)" : "");
+  return { text, ...primary };
+}
+
+/** The machine the athlete is sequenced on: the most recent trial's machine
+ *  that has a reference curve; else the most-trained machine with one; else
+ *  the Echo. */
+function primaryMachine(trials: TrialInput[], sessionMachines: string[], curves: PdCurves): { primaryCurve: PdCurvePoint[]; primaryMachine: string | null } {
+  const latestTrial = [...trials].sort((a, b) => (a.date < b.date ? 1 : -1)).map((t) => `${t.modality}|${t.units ?? ""}`).find((k) => curves[k]);
+  if (latestTrial) return { primaryCurve: curves[latestTrial], primaryMachine: latestTrial };
+  const counts = new Map<string, number>();
+  for (const m of sessionMachines) if (curves[m]) counts.set(m, (counts.get(m) ?? 0) + 1);
+  const top = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+  if (top) return { primaryCurve: curves[top], primaryMachine: top };
+  return { primaryCurve: ECHO_BIKE_CAL_CURVE_V1, primaryMachine: null };
+}
+
 // ─── Fetch wrapper ───────────────────────────────────────────────────────────
 
 /**
@@ -372,5 +470,32 @@ export async function buildConditioningState(
   const analytics = formatEngineAnalytics(
     computeEngineAnalytics(allSessions, ((timeTrials as AnalyticsTrial[]) ?? [])),
   );
-  return signals + analytics;
+  // The Coach reads the athlete's conditioning curve too (founder, 2026-11-17);
+  // the stored one — chat is latency-sensitive and the daily tick keeps it fresh.
+  const continuum = await buildContinuumBlock(supa, userId, { refresh: false });
+  return signals + analytics + (continuum.text ? "\n\n" + continuum.text : "");
+}
+
+/**
+ * What the SEQUENCER reads (Phase 1): the athlete's conditioning curve, then
+ * days since the last session and adherence. Nothing else — the per-type ratio
+ * table and the analytics dump are gone from its prompt. `text` is "" when the
+ * athlete has no Engine data.
+ */
+export async function buildSequencerConditioning(
+  supa: SupabaseClient,
+  userId: string,
+  opts?: { recentDays?: number; daysPerWeek?: number | null },
+): Promise<ContinuumBlock> {
+  const recentDays = opts?.recentDays ?? 90;
+  const cutoff = new Date(Date.now() - recentDays * 86400000).toISOString().slice(0, 10);
+  const [continuum, sessRes] = await Promise.all([
+    buildContinuumBlock(supa, userId, { refresh: true }),
+    supa.from("engine_workout_sessions").select("date").eq("user_id", userId).eq("completed", true).gte("date", cutoff),
+  ]);
+  if (sessRes.error) throw new Error(`[conditioning-state] sessions fetch failed: ${sessRes.error.message}`);
+  const signals = formatSequencerSignals({ metrics: [], timeTrials: [], sessions: (sessRes.data ?? []) as SessionRow[], daysPerWeek: opts?.daysPerWeek ?? null });
+  if (!continuum.text && !signals) return continuum;
+  const text = [continuum.text, signals].filter(Boolean).join("\n");
+  return { ...continuum, text };
 }
