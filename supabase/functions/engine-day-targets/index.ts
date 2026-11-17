@@ -21,7 +21,7 @@ import { getCorsHeaders } from "../_shared/cors.ts";
 import type { CatalogEngineDay } from "../_shared/engine-block-resolve.ts";
 import { type EngineCurve, type PdCurvePoint } from "../_shared/engine-continuum.ts";
 import { CATALOG_PROGRAM } from "../_shared/engine-continuum-io.ts";
-import { dayTargets, type DayTargets, deliveredPaceFloor, previousFromSnapshot, type SegmentTarget } from "../_shared/engine-targets.ts";
+import { applyRocketB, dayTargets, type DayTargets, deliveredPaceFloor, previousFromSnapshot, type SegmentTarget } from "../_shared/engine-targets.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -46,6 +46,33 @@ async function loadDay(supa: SupabaseClient, userId: string, body: { workout_id?
   // catalogue content is stored under main_5day for every program (variants map onto its day numbers)
   const { data } = await supa.from("engine_workouts").select(SEL).eq("program_type", CATALOG_PROGRAM).eq("day_number", map.engine_workout_day_number).maybeSingle();
   return { workout: (data as WorkoutRow | null) ?? null, position };
+}
+
+/** The preceding Rocket Races A session's actual pace, or null. Mirrors the day
+ *  page's findPrecedingRocketRacesA: a 30-position window, effective type per
+ *  position = override ?? catalogue, nearest A wins. */
+async function findPrecedingRocketA(supa: SupabaseClient, userId: string, version: string, position: number): Promise<{ position: number; pace: number } | null> {
+  const { data: map } = await supa.from("engine_program_mapping").select("engine_workout_day_number, program_sequence_order")
+    .eq("engine_program_id", version).lt("program_sequence_order", position).order("program_sequence_order", { ascending: false }).limit(30);
+  const window = (map ?? []) as Array<{ engine_workout_day_number: number; program_sequence_order: number }>;
+  if (!window.length) return null;
+  const positions = window.map((m) => m.program_sequence_order);
+  const [{ data: ovs }, { data: cat }] = await Promise.all([
+    supa.from("engine_user_day_overrides").select("sequence_position, engine_workouts(day_type)").eq("user_id", userId).eq("program_version", version).in("sequence_position", positions),
+    supa.from("engine_workouts").select("day_number, day_type").eq("program_type", CATALOG_PROGRAM).in("day_number", window.map((m) => m.engine_workout_day_number)),
+  ]);
+  const ovType = new Map<number, string>();
+  for (const o of (ovs ?? []) as Array<{ sequence_position: number; engine_workouts: { day_type: string } | { day_type: string }[] | null }>) {
+    const w = Array.isArray(o.engine_workouts) ? o.engine_workouts[0] : o.engine_workouts;
+    if (w?.day_type) ovType.set(o.sequence_position, w.day_type);
+  }
+  const catType = new Map(((cat ?? []) as Array<{ day_number: number; day_type: string }>).map((w) => [w.day_number, w.day_type]));
+  const a = window.find((m) => (ovType.get(m.program_sequence_order) ?? catType.get(m.engine_workout_day_number)) === "rocket_races_a");
+  if (!a) return null;
+  const { data: sess } = await supa.from("engine_workout_sessions").select("actual_pace").eq("user_id", userId).eq("program_version", version)
+    .eq("sequence_position", a.program_sequence_order).eq("completed", true).order("created_at", { ascending: false }).limit(1).maybeSingle();
+  const pace = sess?.actual_pace != null ? Number(sess.actual_pace) : null;
+  return pace && pace > 0 ? { position: a.program_sequence_order, pace } : null;
 }
 
 Deno.serve(async (req) => {
@@ -105,7 +132,7 @@ Deno.serve(async (req) => {
     // (a sequenced day from rollout stage 3) overrides that. The envelope's
     // intensityShare on engine_day_types is the sequencer's choice range, not
     // merged here.
-    const targets: DayTargets = dayTargets(workout, {
+    let targets: DayTargets = dayTargets(workout, {
       trialPace: trial?.calculated_rpm != null ? Number(trial.calculated_rpm) : null,
       machineCurve,
       kEffort,
@@ -114,6 +141,18 @@ Deno.serve(async (req) => {
       isGenerated: String(workout.program_type).startsWith("gen:"),
       deliveredFloor,
     }, previousFromSnapshot((prevSess?.targets as Parameters<typeof previousFromSnapshot>[0]) ?? null));
+
+    // Rocket Races B re-races the preceding A's intervals at A's actual pace
+    // (the day page's rule). Find A the way the day page does: the nearest
+    // preceding position whose effective type (override ?? catalogue) is A.
+    let rocketA: { position: number; pace: number } | null = null;
+    if (workout.day_type === "rocket_races_b" && position != null) {
+      const a = await findPrecedingRocketA(supa, userId, version, position);
+      if (a) {
+        rocketA = a;
+        targets = applyRocketB(targets, a.pace, trial?.calculated_rpm != null ? Number(trial.calculated_rpm) : null);
+      }
+    }
 
     const mode: "curve" | "legacy" = flag ? "curve" : "legacy";
     const snapshot = {
@@ -132,6 +171,7 @@ Deno.serve(async (req) => {
       trial: snapshot.trial,
       machine_curve: machineCurve != null, k_effort: kEffort,
       delivered_floor: deliveredFloor, recent_sessions: (recent ?? []).length,
+      rocket_a: rocketA,
       athlete_curve: athleteCurve != null,
       ...targets,
       snapshot,

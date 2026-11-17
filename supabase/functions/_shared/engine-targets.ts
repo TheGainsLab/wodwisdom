@@ -32,7 +32,7 @@ export const SHARE_REFERENCE_CURVE: PdCurvePoint[] = ECHO_BIKE_CAL_CURVE_V1;
 /** Day types whose paced work is a zone-2 dose: always the authored fraction. */
 export const ZONE2_DAY_TYPES = new Set(["endurance", "polarized", "flux", "flux_stages"]);
 
-export type TargetBasis = "curve" | "legacy" | "authored" | "max_effort" | "no_curve" | "no_trial";
+export type TargetBasis = "curve" | "legacy" | "authored" | "max_effort" | "no_curve" | "no_trial" | "rocket_b";
 
 export interface TargetBlockParams {
   rounds?: number | number[] | string;
@@ -291,4 +291,14 @@ export function deliveredPaceFloor(paces: Array<number | null | undefined>): num
   const mid = Math.floor(xs.length / 2);
   const median = xs.length % 2 ? xs[mid] : (xs[mid - 1] + xs[mid]) / 2;
   return median * DELIVERED_FLOOR;
+}
+
+/** Rocket Races B re-races A's intervals: its target is the preceding A
+ *  session's actual pace, in both modes (the day page's rule). Applied to every
+ *  work segment that would otherwise be targeted; max efforts stay untargeted. */
+export function applyRocketB(targets: DayTargets, aPace: number, trialPace: number | null): DayTargets {
+  const fraction = trialPace && trialPace > 0 ? aPace / trialPace : null;
+  const seg = (t: SegmentTarget): SegmentTarget => (t.basis === "max_effort" ? t : { target_pace: aPace, basis: "rocket_b", fraction });
+  const blocks = targets.blocks.map((b) => ({ ...b, segments: b.segments.map((s) => ({ ...s, curve: seg(s.curve), legacy: seg(s.legacy) })) }));
+  return { blocks, curve_fraction: fraction, legacy_fraction: fraction };
 }

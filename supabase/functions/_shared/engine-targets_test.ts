@@ -148,7 +148,7 @@ Deno.test("mAtEffort / effortBandOf: blank curve → 1; a band reads its M; 600 
   assertEquals(effortBandOf(2400), "zone 2 (40 min+)");
 });
 
-import { dayTargets, previousFromSnapshot } from "./engine-targets.ts";
+import { applyRocketB, dayTargets, previousFromSnapshot } from "./engine-targets.ts";
 const DAY = (id: string, extra: Record<number, Partial<TargetBlockParams>> = {}) => {
   const t = TYPES.find((x) => x.id === id)! as unknown as { block_count: number; block_1_params: TargetBlockParams | null; block_2_params: TargetBlockParams | null; block_3_params: TargetBlockParams | null; block_4_params: TargetBlockParams | null; max_duration_minutes: number | null };
   const b = (n: number, p: TargetBlockParams | null) => (p ? { ...p, ...(extra[n] ?? {}) } : null);
@@ -197,4 +197,15 @@ Deno.test("dayTargets: the weekly cap reads the previous snapshot per band and b
   // a retest (different trial pace in the snapshot) lifts it
   const lifted = dayTargets(DAY("max_aerobic_power"), BASE, previousFromSnapshot({ ...snap, trial: { pace: 17.0 } }));
   assert(!lifted.blocks[0].segments[0].curve.capped);
+});
+
+Deno.test("rocket races B: every targeted segment takes the preceding A session's actual pace, both modes", () => {
+  const d = dayTargets(DAY("rocket_races_a"), BASE); // same shape as a materialised B
+  const b = applyRocketB(d, 20.4, 18.4);
+  for (const blk of b.blocks) for (const s of blk.segments) {
+    assertEquals(s.curve.basis, "rocket_b");
+    assertEquals(s.curve.target_pace, 20.4);
+    assertEquals(s.legacy.target_pace, 20.4);
+  }
+  near(b.curve_fraction!, 20.4 / 18.4, 1e-9);
 });
