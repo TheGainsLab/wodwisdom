@@ -2,21 +2,35 @@
  * engine-targets — the pace target for one work segment (Phase 2,
  * docs/conditioning_continuum_phase2_plan.md §2–§4).
  *
- *   curve mode   target = trial × R_machine(work) × share^k × M_athlete(D(p_asked))
+ *   curve mode   target = trial × R_machine(work) × share^k × M_athlete(D(p_asked)),  ≥ the delivered-pace floor
  *   legacy mode  target = trial × centre(paceRange) × rolling_ratio      (today's day page, verbatim)
  *
- * The share is a share of EFFORT: k converts it to this machine's pace
- * (1 for fan-bike calories, 0.30 for Concept2 metres, 0.73 C2 calories,
- * ≈0.45 running). Exceptions keep today's shape: max efforts have no target;
- * blocks without an intensityShare (zone 2, flux lifts, towers' continuous
- * blocks) are authored fractions; a machine/unit without a reference curve
- * uses the authored fraction; no current trial → no number.
+ * The share is a share of EFFORT, and it is a function of the bout's duration
+ * (decided 2026-11-17, after the first production preview): the catalogue's
+ * pace fraction was authored for Echo calories, so
+ *   share(work) = fraction / R_echo(work)
+ * — on the Echo the ask equals the catalogue fraction exactly; on another
+ * machine it is that ask translated at equal effort, k converting the share
+ * to the machine's pace (1 fan-bike calories, 0.30 Concept2 metres, 0.73 C2
+ * calories, ≈0.45 running). A block carrying its own intensityShare (a
+ * sequenced day from rollout stage 3) uses that instead. M then scales the
+ * ask; the delivered-pace floor keeps it from falling below ~97 % of what the
+ * athlete has recently delivered on this day type and machine (misses on
+ * other day types share the band's M). Exceptions keep today's shape: max
+ * efforts have no target; the zone 2 family and Base/Flux segments are
+ * authored fractions; a machine/unit without a reference curve uses the
+ * authored fraction; no current trial → no number.
  *
  * Pure. Both the targets function and its tests use this; nothing else
  * computes a target.
  */
 
-import { balancedBout, balancedPaceMultiple, effortBandOf, type EngineCurve, mAtEffort, type PdCurvePoint } from "./engine-continuum.ts";
+import { balancedBout, balancedPaceMultiple, ECHO_BIKE_CAL_CURVE_V1, effortBandOf, type EngineCurve, mAtEffort, type PdCurvePoint } from "./engine-continuum.ts";
+
+/** The catalogue's pace fractions were authored for Echo-bike calories: the reference for deriving a share from a fraction. */
+export const SHARE_REFERENCE_CURVE: PdCurvePoint[] = ECHO_BIKE_CAL_CURVE_V1;
+/** Day types whose paced work is a zone-2 dose: always the authored fraction. */
+export const ZONE2_DAY_TYPES = new Set(["endurance", "polarized", "flux", "flux_stages"]);
 
 export type TargetBasis = "curve" | "legacy" | "authored" | "max_effort" | "no_curve" | "no_trial";
 
@@ -60,6 +74,10 @@ export interface TargetContext {
   isGenerated?: boolean;
   /** weekly cap (§4): the target last shown for this band on this machine within 7 days, and the trial it used */
   previous?: { band: string; target_pace: number; trial_pace: number } | null;
+  /** the day type (zone 2 family → authored) */
+  dayType?: string | null;
+  /** curve mode: never ask below this pace (units/min) — ~97 % of the median delivered pace on this day type and machine in the last 28 days */
+  deliveredFloor?: number | null;
 }
 
 export interface SegmentTarget {
@@ -76,9 +94,13 @@ export interface SegmentTarget {
   effort_seconds?: number;
   /** true when the weekly cap bound the number */
   capped?: boolean;
+  /** true when the delivered-pace floor lifted the number */
+  floored?: boolean;
 }
 
 export const WEEKLY_CAP = 0.05;
+/** the delivered-pace floor: this share of the recent median delivered pace */
+export const DELIVERED_FLOOR = 0.97;
 
 function pair(v: unknown): [number, number] | null {
   if (Array.isArray(v) && v.length >= 2 && typeof v[0] === "number" && typeof v[1] === "number") return [v[0], v[1]];
@@ -126,12 +148,18 @@ export function legacyTarget(block: TargetBlockParams, seg: TargetSegment, ctx: 
   return { target_pace: ctx.trialPace * f * rolling, basis: "legacy", fraction: f * rolling };
 }
 
-/** The share for this segment: centre of intensityShare, or per round on a rising progression. */
+/** The share for this segment: the block's own intensityShare when it carries
+ *  one (centre, or per round on a rising progression); else derived from the
+ *  authored fraction at THIS bout's duration against the reference (Echo) curve. */
 function shareForSegment(block: TargetBlockParams, seg: TargetSegment): number | null {
   const range = pair(block.intensityShare);
-  if (!range) return null;
-  if (seg.label === "Work" && block.paceProgression === "increasing" && seg.rounds > 1) return progressed(range, seg);
-  return (range[0] + range[1]) / 2;
+  if (range) {
+    if (seg.label === "Work" && block.paceProgression === "increasing" && seg.rounds > 1) return progressed(range, seg);
+    return (range[0] + range[1]) / 2;
+  }
+  const f = authoredFraction(block, seg);
+  if (f == null) return null;
+  return f / balancedPaceMultiple(SHARE_REFERENCE_CURVE, Math.max(1, seg.duration_seconds));
 }
 
 /** Phase 2 target for one work segment. */
@@ -140,8 +168,8 @@ export function segmentTarget(block: TargetBlockParams, seg: TargetSegment, ctx:
   if (isMaxEffort(block, seg)) return { target_pace: null, basis: "max_effort", fraction: null };
   if (ctx.trialPace == null || ctx.trialPace <= 0) return { target_pace: null, basis: "no_trial", fraction: null };
 
-  // Base / Flux segments and blocks without a share are authored fractions (zone 2 is a dose, not a max).
-  const share = seg.label === "Work" ? shareForSegment(block, seg) : null;
+  // Base / Flux segments and the zone 2 family are authored fractions (zone 2 is a dose, not a max).
+  const share = seg.label === "Work" && !ZONE2_DAY_TYPES.has(ctx.dayType ?? "") ? shareForSegment(block, seg) : null;
   if (share == null) {
     const f = authoredFraction(block, seg);
     if (f == null) return { target_pace: null, basis: "max_effort", fraction: null };
@@ -170,6 +198,13 @@ export function segmentTarget(block: TargetBlockParams, seg: TargetSegment, ctx:
     capped = bound !== target;
     target = bound;
   }
+  // Delivered-pace floor: never below ~97 % of what the athlete has recently
+  // delivered on this day type and machine. A lower bound only — it lifts nothing.
+  let floored = false;
+  if (ctx.deliveredFloor != null && ctx.deliveredFloor > 0 && target < ctx.deliveredFloor) {
+    target = ctx.deliveredFloor;
+    floored = true;
+  }
   return {
     target_pace: target,
     basis: "curve",
@@ -181,6 +216,7 @@ export function segmentTarget(block: TargetBlockParams, seg: TargetSegment, ctx:
     band,
     effort_seconds: effort,
     capped,
+    floored,
   };
 }
 
@@ -211,7 +247,8 @@ export interface DayTargets {
 export type PreviousByBand = Record<string, { target_pace: number; trial_pace: number }>;
 
 /** Both formulas for every work segment of a day. `base` carries everything but `mode`/`previous`. */
-export function dayTargets(day: CatalogEngineDay, base: Omit<TargetContext, "mode" | "previous">, previousByBand: PreviousByBand = {}): DayTargets {
+export function dayTargets(day: CatalogEngineDay, baseIn: Omit<TargetContext, "mode" | "previous">, previousByBand: PreviousByBand = {}): DayTargets {
+  const base = { ...baseIn, dayType: baseIn.dayType ?? day.day_type };
   const segs = resolveSegments(day).filter((s) => s.type === "work");
   const blockParams = [day.block_1_params, day.block_2_params, day.block_3_params, day.block_4_params] as Array<TargetBlockParams | null>;
   const roundsByBlock = new Map<number, number>();
@@ -247,19 +284,11 @@ export function previousFromSnapshot(snapshot: { trial?: { pace?: number | null 
   return out;
 }
 
-/** The intensityShare lives on the day TYPE's envelope (engine_day_types), not on
- *  the concrete catalogue day (engine_workouts). Merge it per block before
- *  computing targets; the workout's own value wins when present (sequenced days
- *  may carry one from stage 3 on). */
-export function withIntensityShares(day: CatalogEngineDay, envelope: { block_1_params?: Record<string, unknown> | null; block_2_params?: Record<string, unknown> | null; block_3_params?: Record<string, unknown> | null; block_4_params?: Record<string, unknown> | null } | null): CatalogEngineDay {
-  if (!envelope) return day;
-  const merge = (b: Record<string, unknown> | null, e: Record<string, unknown> | null | undefined) =>
-    b && e && Array.isArray(e.intensityShare) && !Array.isArray(b.intensityShare) ? { ...b, intensityShare: e.intensityShare } : b;
-  return {
-    ...day,
-    block_1_params: merge(day.block_1_params, envelope.block_1_params),
-    block_2_params: merge(day.block_2_params, envelope.block_2_params),
-    block_3_params: merge(day.block_3_params, envelope.block_3_params),
-    block_4_params: merge(day.block_4_params, envelope.block_4_params),
-  };
+/** ~97 % of the median delivered pace over recent completed sessions (units/min), or null with no sessions. */
+export function deliveredPaceFloor(paces: Array<number | null | undefined>): number | null {
+  const xs = paces.filter((x): x is number => typeof x === "number" && Number.isFinite(x) && x > 0).sort((a, b) => a - b);
+  if (!xs.length) return null;
+  const mid = Math.floor(xs.length / 2);
+  const median = xs.length % 2 ? xs[mid] : (xs[mid - 1] + xs[mid]) / 2;
+  return median * DELIVERED_FLOOR;
 }
