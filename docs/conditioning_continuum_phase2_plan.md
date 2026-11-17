@@ -38,9 +38,11 @@ Phase 2:
 
 ```
 p_balanced = R_machine(work_seconds)            the pace a balanced athlete holds for this bout, on this machine's curve
-p_asked    = p_balanced × share_type            how close to that max this kind of day asks for
+p_asked    = p_balanced × share_type ^ k_machine  how close to that max this kind of day asks for — a share of EFFORT, converted to this machine's pace
 target     = trial_pace × p_asked × M_athlete(D(p_asked))
 ```
+
+**The share is a share of effort, not of pace.** On the Echo, calories track power, so a share of effort is a share of pace (`k = 1`). On a rower, power ∝ pace³, so 73 % of the effort is 90 % of the pace: `k = 0.30`, the same exponent Phase 0 used to derive the rower's curve from the Echo's. C2 calories `k = 0.73`, running ≈ `0.45` (the exponent relating the authored running curve to the Echo's at 30 s). Applied to pace directly, the rower's hybrid-anaerobic ask would come out at 0.83× — slower than threshold — which is why the exponent is there. `k` lives beside each reference curve in `engine_pd_curves` (one column), so a new machine brings its own.
 
 - `R_machine` is the inverse of the reference curve already in `engine_pd_curves` (`balancedPaceMultiple`, built in Phase 0).
 - `share_type` is one number per paced block (§3): the fraction of the balanced max this kind of work asks for. It is not a fourth term — it replaces today's pace fraction. The spec's `r_asked` (§4 of the spec) is now `R_machine(work) × share` instead of an authored fraction of trial.
@@ -59,7 +61,18 @@ target     = trial_pace × p_asked × M_athlete(D(p_asked))
 
 **Worked example.** MAP, 4 × 4 min, Echo, trial 18.4 cal/min, athlete's M at 4–10 min = 0.90.
 `R(240 s) = 1.12` → `p_asked = 1.12 × 0.80 = 0.90` → `target = 18.4 × 0.90 × 0.90 = 14.9 cal/min`.
-Same day on the rower, trial 2:05/500 m: `R(240 s) = 1.035` → `p_asked = 0.83` → 0.83 × trial pace × M. Today both machines get 0.95–1.05 × trial.
+Same day on the rower, trial 2:05/500 m: `R(240 s) = 1.035`, `0.80^0.30 = 0.935` → `p_asked = 0.97` → 0.97 × trial pace × M. Today both machines get 0.95–1.05 × trial.
+
+The same share across machines (before the athlete's M):
+
+| Block | Echo cal | C2 rower, metres | C2 calories | Running |
+|---|---|---|---|---|
+| hybrid anaerobic, 85 s, share 0.73 | 1.13× | 1.04× | 1.09× | ≈ 1.09× |
+| MAP, 240 s, share 0.80 | 0.90× | 0.97× | 0.92× | ≈ 0.93× |
+| threshold, 600 s, share 0.92 | 0.92× | 0.98× | 0.94× | ≈ 0.96× |
+| interval, 90 s, share 0.61 | 0.92× | 0.98× | 0.94× | ≈ 0.95× |
+
+Rowing and running are not special cases: the same 15 shares apply, and each machine's curve and exponent turn them into that machine's pace. Today's rower asks for hybrid anaerobic (1.05–1.2×, ≈ 99 % of a balanced rower's 1-min max pace, repeated) come down to 1.04×; its MAP asks go up slightly.
 
 ## 3. The intensity shares
 
@@ -133,7 +146,7 @@ Today the day page computes the target in the browser and records it on save. Ph
 | Edge function `engine-day-targets` (athlete JWT for own days; admin JWT + `target_user_id` for the rollout view; `start: true` writes the snapshot) | `supabase/functions/engine-day-targets/` |
 | Day page: preview + Start call the function; store the snapshot on the session; score against it; calibrate-on-switch offer; after a completion save, kick the athlete's continuum refresh. `calculateIntervalGoal` is dropped only after a **parity test**: the function's `legacy` basis reproduces its numbers for every (day, machine, unit, rolling ratio) in a fixture of real sessions | `src/pages/EngineTrainingDayPage.tsx` |
 | Backfill accepts an athlete's JWT for their own id (the completion refresh) | `supabase/functions/engine-continuum-backfill/index.ts` |
-| Migration: `intensityShare` on the 15 paced blocks' params; `engine_workout_sessions.targets` jsonb snapshot (per block: target_pace, p_balanced, share, m, band, basis, trial id/pace/date, formula version) — enough to reproduce every number | `supabase/migrations/2026111800xxxx_engine_targets_v2.sql` |
+| Migration: `intensityShare` on the 15 paced blocks' params; `engine_pd_curves.k_effort` (1 fan bikes, 0.30 C2 metres, 0.73 C2 cal, 0.45 running); `engine_workout_sessions.targets` jsonb snapshot (per block: target_pace, p_balanced, share, m, band, basis, trial id/pace/date, formula version) — enough to reproduce every number | `supabase/migrations/2026111800xxxx_engine_targets_v2.sql` |
 | Sequencer, Phase 2 PR: `TRIAL_STALE` sentence in the prompt. Sequencer, rollout stage 3: legend + validator accept `intensityShare` choices; `can reach` lines in share terms. The two representations are linear maps of each other within a block's envelope (position in `paceRange` ↔ position in `intensityShare`), so the fill step always writes BOTH keys on a generated block, whichever the model chose: a switched athlete reads the share, an unswitched or flipped-back athlete reads the fraction. The escape hatch therefore has its input in both directions | `_shared/engine-catalogue.ts`, `engine-sequence.ts`, `engine-continuum-reaches.ts`, `run-resequence.ts` |
 | Admin: upcoming day's old vs new target per athlete (the rollout view, §8) | `src/pages/AdminContinuumPage.tsx` |
 | Spec §4 / §7 / §8 updated; decisions log | `docs/conditioning_continuum_spec.md` |
