@@ -1,13 +1,14 @@
-import { useState } from 'react';
 import { parsePositive } from '../../lib/calculators/bands';
 import { computeLiftRatio, type LiftRatioCalculator } from '../../lib/calculators/liftRatios';
 import { CalcCard, NumberField, ResultPanel } from './CalculatorParts';
 import { useCalculatorUsed } from '../../lib/calculators/useCalculatorUsed';
+import { useSharedLift } from '../../lib/calculators/sharedLifts';
 
-/** One lift-vs-lift ratio: two numbers in, ratio and reading out. */
+/** One lift-vs-lift ratio: two numbers in, ratio and reading out. Each box
+ *  shares its value with the same lift on the other cards. */
 export default function LiftRatioCard({ calc }: { calc: LiftRatioCalculator }) {
-  const [a, setA] = useState('');
-  const [b, setB] = useState('');
+  const [a, setA] = useSharedLift(calc.liftAKey);
+  const [b, setB] = useSharedLift(calc.liftBKey);
   const result = computeLiftRatio(calc, parsePositive(a), parsePositive(b));
   useCalculatorUsed(calc.id, result?.band ?? null);
 

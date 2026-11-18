@@ -21,20 +21,20 @@ export interface CalculatorGroup {
 
 export const CALCULATOR_GROUPS: CalculatorGroup[] = [
   {
-    id: 'lifting',
-    title: 'Lifting ratios',
-    intro: 'How your Olympic lifts compare with your strength, and with each other.',
-    calculators: LIFT_RATIO_CALCULATORS.map((calc) => ({
-      id: calc.id,
-      render: () => <LiftRatioCard calc={calc} />,
-    })),
-  },
-  {
-    id: 'conditioning',
-    title: 'Conditioning',
+    id: 'energy_systems',
+    title: 'Energy Systems Calculator',
     intro: 'Where your engine leans: toward short, high-power efforts or long, sustained ones.',
     calculators: [
       { id: 'energy_system', render: () => <EnergySystemCard /> },
     ],
+  },
+  {
+    id: 'lifting',
+    title: 'Lifting ratios',
+    intro: 'How your Olympic lifts compare with your strength, and with each other. Enter a lift once and it fills in everywhere it is used.',
+    calculators: LIFT_RATIO_CALCULATORS.map((calc) => ({
+      id: calc.id,
+      render: () => <LiftRatioCard calc={calc} />,
+    })),
   },
 ];

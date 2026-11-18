@@ -22,6 +22,8 @@ export interface LiftRatioReading {
   detail: string;
 }
 
+export type LiftKey = 'snatch' | 'clean_jerk' | 'back_squat';
+
 export interface LiftRatioCalculator {
   id: string;
   title: string;
@@ -29,6 +31,10 @@ export interface LiftRatioCalculator {
   liftA: string;
   /** Denominator lift. */
   liftB: string;
+  /** Which lift each box holds. Boxes with the same key share one value
+   *  across cards (see sharedLifts.ts). */
+  liftAKey: LiftKey;
+  liftBKey: LiftKey;
   target: number;
   readings: Record<Band, LiftRatioReading>;
 }
@@ -64,6 +70,8 @@ export const LIFT_RATIO_CALCULATORS: LiftRatioCalculator[] = [
     title: 'Snatch vs Back Squat',
     liftA: 'Snatch',
     liftB: 'Back squat',
+    liftAKey: 'snatch',
+    liftBKey: 'back_squat',
     target: 0.60,
     readings: squatReadings('snatch'),
   },
@@ -72,6 +80,8 @@ export const LIFT_RATIO_CALCULATORS: LiftRatioCalculator[] = [
     title: 'Clean & Jerk vs Back Squat',
     liftA: 'Clean & jerk',
     liftB: 'Back squat',
+    liftAKey: 'clean_jerk',
+    liftBKey: 'back_squat',
     target: 0.80,
     readings: squatReadings('clean & jerk'),
   },
@@ -80,6 +90,8 @@ export const LIFT_RATIO_CALCULATORS: LiftRatioCalculator[] = [
     title: 'Snatch vs Clean & Jerk',
     liftA: 'Snatch',
     liftB: 'Clean & jerk',
+    liftAKey: 'snatch',
+    liftBKey: 'clean_jerk',
     target: 0.76,
     readings: {
       well_below: {
