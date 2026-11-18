@@ -22,7 +22,7 @@ export interface CalculatorGroup {
 export const CALCULATOR_GROUPS: CalculatorGroup[] = [
   {
     id: 'energy_systems',
-    title: 'Energy Systems Calculator',
+    title: 'Energy systems',
     intro: 'Where your engine leans: toward short, high-power efforts or long, sustained ones.',
     calculators: [
       { id: 'energy_system', render: () => <EnergySystemCard /> },
