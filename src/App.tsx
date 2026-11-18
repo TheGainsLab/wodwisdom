@@ -6,6 +6,7 @@ import { EntitlementsProvider, useEntitlements } from './hooks/useEntitlements';
 import { markWelcomeSeen } from './lib/welcome';
 import { captureAcquisition } from './lib/acquisition';
 import { track, routePattern } from './lib/appEvents';
+import { isTrackedPublicPath, trackVisitor } from './lib/visitorEvents';
 import BottomTabBar from './components/BottomTabBar';
 import InstallPrompt from './components/InstallPrompt';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -108,6 +109,7 @@ const StayPage = lazy(() => import('./pages/StayPage'));
 const QAEntryPage = lazy(() => import('./pages/QAEntryPage'));
 // Public examples/proof page (both trees — visitors and members)
 const ExamplesPage = lazy(() => import('./pages/ExamplesPage'));
+const CalculatorsPage = lazy(() => import('./pages/CalculatorsPage'));
 const PricingPage = lazy(() => import('./pages/PricingPage'));
 
 // Feature landing pages
@@ -117,6 +119,17 @@ const ResearchFeaturePage = lazy(() => import('./pages/features/ResearchFeatureP
 const ProgramsFeaturePage = lazy(() => import('./pages/features/ProgramsFeaturePage'));
 const EngineFeaturePage = lazy(() => import('./pages/features/EngineFeaturePage'));
 const NutritionFeaturePage = lazy(() => import('./pages/features/NutritionFeaturePage'));
+
+/** Signed-out page views of the public calculators and library, which
+ *  app_events (signed-in only) cannot see. Signed-in views of the same pages
+ *  are already counted by AuthenticatedApp's page_view. */
+function VisitorPageViews() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    if (isTrackedPublicPath(pathname)) trackVisitor('page_view', { path: pathname.slice(0, 120) });
+  }, [pathname]);
+  return null;
+}
 
 function PageLoader() {
   return <div className="loading-screen"><div className="loading-pulse" /></div>;
@@ -189,6 +202,7 @@ export default function App() {
   // provider holds an empty set and refresh() is a no-op.
   if (!session) return (
     <EntitlementsProvider userId={undefined}>
+      <VisitorPageViews />
       <ErrorBoundary>
         <Suspense fallback={<PageLoader />}>
           <Routes>
@@ -198,6 +212,7 @@ export default function App() {
             <Route path="/knowledge/:slug" element={<KnowledgeEntryPage />} />
             <Route path="/qa/:slug" element={<QAEntryPage />} />
             <Route path="/examples" element={<ExamplesPage />} />
+            <Route path="/calculators" element={<CalculatorsPage />} />
             <Route path="/pricing" element={<PricingPage />} />
             <Route path="/stay" element={<StayPage />} />
             <Route path="/features" element={<FeaturesHubPage />} />
@@ -318,6 +333,7 @@ function AuthenticatedApp({ session }: { session: Session }) {
             <Route path="/knowledge/:slug" element={<KnowledgeEntryPage signedIn />} />
             <Route path="/qa/:slug" element={<QAEntryPage signedIn />} />
             <Route path="/examples" element={<ExamplesPage signedIn />} />
+            <Route path="/calculators" element={<CalculatorsPage signedIn />} />
             <Route path="/pricing" element={<PricingPage signedIn />} />
             <Route path="/stay" element={<StayPage />} />
             <Route path="/chat" element={<ChatPage session={session} />} />

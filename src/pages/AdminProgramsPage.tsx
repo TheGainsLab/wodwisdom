@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
+import { supabase, FunctionsHttpError } from '../lib/supabase';
 import AdminSubPageLayout from '../components/admin/AdminSubPageLayout';
 import { formatRepPrescription } from '../lib/formatMovement';
 import { formatMovementName } from '../lib/movementName';
@@ -127,6 +127,7 @@ export default function AdminProgramsPage({ session }: { session: Session }) {
   const [loadingList, setLoadingList] = useState(true);
   const [rebuilding, setRebuilding] = useState(false);
   const [rebuildNote, setRebuildNote] = useState('');
+  const [generatingNext, setGeneratingNext] = useState(false);
   // Set when the delete half succeeded but the generation trigger failed —
   // a plain re-click would target the wrong (previous) month, so the retry
   // path re-invokes with this month explicitly and skips the deletes.
@@ -208,7 +209,7 @@ export default function AdminProgramsPage({ session }: { session: Session }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
           <button
             className="auth-btn"
-            disabled={rebuilding}
+            disabled={rebuilding || generatingNext}
             style={{ width: 'auto', padding: '8px 16px', marginTop: 0 }}
             onClick={async () => {
               const gen = programs.find(p => p.source === 'generated');
@@ -254,6 +255,47 @@ export default function AdminProgramsPage({ session }: { session: Session }) {
               Retry generation (month {retryMonth})
             </button>
           )}
+          {/* Generate NEXT month — the human override of the billing rule
+              (next months normally arrive only with a renewal). For a comp
+              account, a scheduled cancellation, a test user. Deletes nothing;
+              one month per click, via admin-generate-next-month. */}
+          {(() => {
+            const gen = programs.find(p => p.source === 'generated');
+            if (!gen) return null;
+            const nextMonth = (gen.generated_months || 1) + 1;
+            return (
+              <button
+                className="auth-btn"
+                disabled={generatingNext || rebuilding}
+                style={{ width: 'auto', padding: '8px 16px', marginTop: 0, background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--accent)' }}
+                onClick={async () => {
+                  if (!window.confirm(
+                    `Generate month ${nextMonth} of "${gen.name}" now?\n\n` +
+                    'Next months normally arrive with the athlete\'s renewal. This builds one now regardless of billing. ' +
+                    'Nothing is deleted.'
+                  )) return;
+                  setGeneratingNext(true);
+                  setRebuildNote('');
+                  const { data, error } = await supabase.functions.invoke('admin-generate-next-month', {
+                    body: { user_id: id },
+                  });
+                  setGeneratingNext(false);
+                  if (error || data?.error) {
+                    let msg = data?.error || error?.message || 'unknown error';
+                    if (error instanceof FunctionsHttpError) {
+                      const body = await error.context.json().catch(() => null);
+                      if (body?.error) msg = body.error;
+                    }
+                    setRebuildNote(`Month ${nextMonth} not started: ${msg}`);
+                  } else {
+                    setRebuildNote(`Month ${data.target_month} generation started. It takes about ten minutes — refresh to see the new month.`);
+                  }
+                }}
+              >
+                {generatingNext ? 'Starting…' : `Generate next month (month ${nextMonth})`}
+              </button>
+            );
+          })()}
           {rebuildNote && <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>{rebuildNote}</span>}
         </div>
       )}
