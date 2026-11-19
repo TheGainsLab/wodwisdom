@@ -147,19 +147,16 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
             <KnowledgeDiscuss signedIn={signedIn} noHistory />
           </div>
         ) : (
-          <div style={{
-            display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10,
-            padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 10,
-            background: 'var(--surface)', marginBottom: 20,
-          }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: 'var(--accent)', flexShrink: 0 }}>
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
-            </svg>
-            <span style={{ fontSize: 13.5, color: 'var(--text-dim)', lineHeight: 1.45, flex: 1, minWidth: 150 }}>
-              Answers from the research, in plain coaching terms.
-            </span>
-            <button className="paywall-btn-sm" onClick={() => navigate('/auth?signup=1&next=/knowledge')}>Create Free Account</button>
-          </div>
+          // No padlock, no button up here (founder, 2026-11-19): at the top
+          // of the page that row read as "this library is locked", when
+          // everything below is free to read. One quiet line says so and
+          // names what an account adds; the button waits at the bottom.
+          <p style={{ fontSize: 13.5, color: 'var(--text-dim)', lineHeight: 1.5, margin: '0 0 20px' }}>
+            Free to read, no account needed. Want to ask the research a question?{' '}
+            <Link to="/auth?signup=1&next=/knowledge" style={{ color: 'var(--accent)', fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap' }}>
+              Create a free account &rarr;
+            </Link>
+          </p>
         )}
 
         {/* My research — the ONE home of the member's saved conversations.
@@ -327,6 +324,18 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
             </div>
           )}
         </div>
+
+        {/* The account pitch, AFTER the visitor has seen the library. */}
+        {!signedIn && (
+          <div className="qa-cta-card">
+            <p className="qa-cta-text">
+              Ask the AI Research Assistant about any paper and get the answer in plain coaching terms. Free with an account.
+            </p>
+            <button className="feature-cta qa-cta-btn" onClick={() => navigate('/auth?signup=1&next=/knowledge')}>
+              Create Free Account
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

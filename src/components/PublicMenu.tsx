@@ -29,6 +29,9 @@ function menuLinks(signedIn: boolean, onLanding: boolean): MenuLink[] {
   ];
   if (signedIn) return links;
   return [
+    // Off the main page, "Home" leads the menu: the logo also goes there,
+    // but the menu is where people look (founder, 2026-11-19).
+    ...(onLanding ? [] : [{ label: 'Home', to: '/' }]),
     ...links,
     onLanding ? { label: 'Pricing', to: '#pricing', anchor: true } : { label: 'Pricing', to: '/pricing' },
     onLanding ? { label: 'FAQ', to: '#faq', anchor: true } : { label: 'FAQ', to: '/#faq' },
