@@ -6,7 +6,7 @@ import { EntitlementsProvider, useEntitlements } from './hooks/useEntitlements';
 import { markWelcomeSeen } from './lib/welcome';
 import { captureAcquisition } from './lib/acquisition';
 import { track, routePattern } from './lib/appEvents';
-import { isTrackedPublicPath, trackVisitor } from './lib/visitorEvents';
+import { isTrackedPublicPath, markBrowserAsAdmin, trackPageView } from './lib/visitorEvents';
 import BottomTabBar from './components/BottomTabBar';
 import InstallPrompt from './components/InstallPrompt';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -126,7 +126,7 @@ const NutritionFeaturePage = lazy(() => import('./pages/features/NutritionFeatur
 function VisitorPageViews() {
   const { pathname } = useLocation();
   useEffect(() => {
-    if (isTrackedPublicPath(pathname)) trackVisitor('page_view', { path: pathname.slice(0, 120) });
+    if (isTrackedPublicPath(pathname)) trackPageView(pathname);
   }, [pathname]);
   return null;
 }
@@ -274,7 +274,10 @@ function AuthenticatedApp({ session }: { session: Session }) {
   //   Engine                    → /engine    (the Engine setup is its intake)
   //   nothing / Coach / Research → /welcome  (the intake screen)
   // A paid route marks the welcome seen on arrival; the screen marks it on tap.
-  const { hasEntitlement, loading: entLoading } = useEntitlements(session.user.id);
+  const { hasEntitlement, isAdmin, loading: entLoading } = useEntitlements(session.user.id);
+  // An admin's browser is left out of the public-page traffic numbers, signed
+  // in or out, so the founder's own testing does not skew them.
+  useEffect(() => { if (isAdmin) markBrowserAsAdmin(); }, [isAdmin]);
   const welcomeCheckedFor = useRef<string | null>(null);
   useEffect(() => {
     const uid = session.user.id;

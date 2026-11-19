@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
+import TrafficSection from '../components/admin/TrafficSection';
 
 /**
  * /admin/reports — the reading room (reporting layer piece 3).
@@ -193,6 +194,8 @@ export default function AdminReportsPage({ session }: { session: Session }) {
                     </tbody>
                   </table>
                 </Section>
+
+                <TrafficSection />
 
                 <Section title="Behavior — last 7 days" sub="From the in-app event log (stage D, capturing from Jul 18, 2026). Counts grow as events flow; zeros before the first deploy are expected.">
                   {behavior ? (
