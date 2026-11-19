@@ -51,9 +51,10 @@ export default function GamesBar({ test, sex, unit, value, showLabel = true }: {
         <span className={`calc-bar-fill${pct >= 100 ? ' is-full' : ''}`} style={{ width: `${Math.min(pct, 100)}%` }} />
       </div>
       <div className="calc-bar-meta">
-        Games average {formatGamesValue(test, stat.mean, unit)} · {stat.n} athletes
+        {test.modelled ? 'Estimated Games average' : 'Games average'} {formatGamesValue(test, stat.mean, unit)} · {stat.n} athletes
       </div>
       {result.placementText && <div className="calc-bar-place">{result.placementText}</div>}
+      {test.modelled && <div className="calc-bar-note">{test.modelled}</div>}
       {stat.note && <div className="calc-bar-note">{stat.note}</div>}
     </div>
   );

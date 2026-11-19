@@ -16,8 +16,10 @@
  * Weights are stored in POUNDS, as supplied. A kilo entry is converted
  * before comparing; the data is never changed. Times are in seconds.
  *
- * Only measured results are here. The modelled 2,000 m / 5,000 m rows were
- * left out: the section promises real competition data.
+ * The 2,000 m and 5,000 m rows are MODELLED (founder, 2026-11-19: include
+ * them): each athlete's time is extrapolated from their measured 1,000 m,
+ * so they are estimates, not Games performances. A test with `modelled` set
+ * says so on its result.
  *
  * To add a test: one entry in GAMES_TESTS.
  */
@@ -51,6 +53,9 @@ export interface GamesTest {
   higherIsBetter: boolean;
   /** Lifts share their box with the ratio calculators. */
   liftKey?: LiftKey;
+  /** Set when the figures are estimates, not measured results; shown on the
+   *  result in place of nothing. */
+  modelled?: string;
   stats: Record<Sex, GamesStat>;
 }
 
@@ -102,6 +107,22 @@ export const GAMES_TESTS: GamesTest[] = [
     stats: {
       men: { n: 30, mean: 179.20, min: 168.90, max: 188.80 },
       women: { n: 25, mean: 206.07, min: 195.80, max: 216.90 },
+    },
+  },
+  {
+    id: 'row_2000m', label: '2,000 m row', group: 'rowing', kind: 'time', higherIsBetter: false,
+    modelled: 'Estimated from each athlete\'s 1,000 m result, not rowed in competition.',
+    stats: {
+      men: { n: 30, mean: 378.82, min: 357.04, max: 399.11 },
+      women: { n: 25, mean: 424.40, min: 403.24, max: 446.70 },
+    },
+  },
+  {
+    id: 'row_5000m', label: '5,000 m row', group: 'rowing', kind: 'time', higherIsBetter: false,
+    modelled: 'Estimated from each athlete\'s 1,000 m result, not rowed in competition.',
+    stats: {
+      men: { n: 30, mean: 1013.95, min: 955.67, max: 1068.27 },
+      women: { n: 25, mean: 1123.93, min: 1067.90, max: 1182.98 },
     },
   },
   {
@@ -198,13 +219,15 @@ export function scoreGamesTest(test: GamesTest, sex: Sex, value: number | null, 
     const span = `${fmt(stat.min)} to ${fmt(stat.max)}`;
     if (better(value, best)) {
       placement = 'beyond_best';
-      placementText = `Better than every Games athlete tested (${span}).`;
+      placementText = test.modelled
+        ? `Better than every estimated Games time (${span}).`
+        : `Better than every Games athlete tested (${span}).`;
     } else if (better(value, worst)) {
       placement = 'in_range';
-      placementText = `Inside the range of the Games field (${span}).`;
+      placementText = `Inside the ${test.modelled ? 'estimated ' : ''}range of the Games field (${span}).`;
     } else {
       placement = 'outside_range';
-      placementText = `Outside the range of the Games field (${span}).`;
+      placementText = `Outside the ${test.modelled ? 'estimated ' : ''}range of the Games field (${span}).`;
     }
   } else {
     placement = 'in_range';

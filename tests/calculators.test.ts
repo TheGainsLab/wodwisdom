@@ -182,13 +182,25 @@ const gamesTest = (id: string) => {
   return t;
 };
 
-test('games: the measured tests only, lifts first', () => {
+test('games: the tests, lifts first; only the two longer rows are modelled', () => {
   assert.deepEqual(GAMES_TESTS.map((t) => t.id), [
     'back_squat', 'front_squat', 'strict_press', 'deadlift', 'snatch', 'clean_jerk',
-    'row_1000m', 'handstand_hold', 'ring_muscle_ups_30',
+    'row_1000m', 'row_2000m', 'row_5000m', 'handstand_hold', 'ring_muscle_ups_30',
   ]);
-  // No modelled 2,000 m / 5,000 m rows.
-  assert.equal(GAMES_TESTS.filter((t) => t.group === 'rowing').length, 1);
+  assert.deepEqual(GAMES_TESTS.filter((t) => t.modelled).map((t) => t.id), ['row_2000m', 'row_5000m']);
+});
+
+test('games: the modelled rows score like the measured one and say they are estimates', () => {
+  const r2k = scoreGamesTest(gamesTest('row_2000m'), 'men', 420); // 7:00 vs 6:18.82
+  assert.ok(r2k);
+  near(r2k.pct * 100, 90.2, 0.1);
+  assert.equal(r2k.placementText, 'Outside the estimated range of the Games field (5:57 to 6:39.1).');
+  const r5k = scoreGamesTest(gamesTest('row_5000m'), 'women', parseTime('18:30'));
+  assert.ok(r5k);
+  near(r5k.pct * 100, 101.3, 0.1); // 1123.93 / 1110
+  assert.equal(r5k.placement, 'in_range');
+  assert.equal(formatTime(1013.95), '16:54');
+  assert.equal(scoreGamesTest(gamesTest('row_1000m'), 'men', 180)?.placementText, 'Inside the range of the Games field (2:48.9 to 3:08.8).');
 });
 
 test('games: every test has a mean, a count, and a way to place a result, for men and women', () => {

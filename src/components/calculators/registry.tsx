@@ -45,7 +45,7 @@ export const CALCULATOR_GROUPS: CalculatorGroup[] = [
       { id: 'your_lifts', render: () => <LiftsCard /> },
       {
         id: 'tests_rowing',
-        render: () => <TimedTestsCard group="rowing" title="Rowing" blurb="Your best 1,000 m on a rower, as minutes and seconds (for example 3:25)." />,
+        render: () => <TimedTestsCard group="rowing" title="Rowing" blurb="Your best times on a rower, as minutes and seconds (for example 3:25). The 1,000 m is measured; the 2,000 m and 5,000 m are estimated from it." />,
       },
       {
         id: 'tests_gymnastics',
