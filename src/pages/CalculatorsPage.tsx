@@ -53,6 +53,8 @@ export default function CalculatorsPage({ signedIn = false }: { signedIn?: boole
             <div className="calc-group-head">
               <h2 className="calc-group-title">{group.title}</h2>
               <p className="calc-group-intro">{group.intro}</p>
+              {group.source && <p className="calc-group-source">{group.source}</p>}
+              {group.controls?.()}
             </div>
             <div className="calc-grid">
               {group.calculators.map((c) => <Fragment key={c.id}>{c.render()}</Fragment>)}

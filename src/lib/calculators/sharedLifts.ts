@@ -20,6 +20,12 @@ export function setSharedLift(key: string, value: string): void {
   listeners.forEach((l) => l());
 }
 
+/** A page-wide choice (men / women, pounds / kilos) held the same way. */
+export function useSharedChoice<T extends string>(key: string, fallback: T): [T, (v: T) => void] {
+  const value = useSyncExternalStore(subscribe, () => values.get(key) ?? fallback, () => fallback) as T;
+  return [value, (v: T) => setSharedLift(key, v)];
+}
+
 /** [value, setValue] for one lift, kept in step across cards. */
 export function useSharedLift(key: string): [string, (v: string) => void] {
   const value = useSyncExternalStore(subscribe, () => values.get(key) ?? '', () => '');

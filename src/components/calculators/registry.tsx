@@ -1,14 +1,17 @@
 import type { ReactNode } from 'react';
-import { LIFT_RATIO_CALCULATORS } from '../../lib/calculators/liftRatios';
-import LiftRatioCard from './LiftRatioCard';
 import EnergySystemCard from './EnergySystemCard';
+import LiftsCard from './LiftsCard';
+import TimedTestsCard from './TimedTestsCard';
+import TestYourselfControls from './TestYourselfControls';
 
 /**
- * The calculators on /calculators, in page order, grouped under a heading.
+ * The sections of /calculators, in page order.
  *
- * To add one:
- *  - another lift ratio: add an entry to LIFT_RATIO_CALCULATORS
- *    (src/lib/calculators/liftRatios.ts) — it appears here on its own;
+ * To add something:
+ *  - another Games test: one entry in GAMES_TESTS
+ *    (src/lib/calculators/gamesBenchmarks.ts) — it appears in its card;
+ *  - another lift ratio: one entry in LIFT_RATIO_CALCULATORS
+ *    (src/lib/calculators/liftRatios.ts) — it appears under "Your ratios";
  *  - anything else: put the maths in src/lib/calculators/, build a card from
  *    the pieces in CalculatorParts.tsx, and add it to a group below.
  */
@@ -16,6 +19,10 @@ export interface CalculatorGroup {
   id: string;
   title: string;
   intro: string;
+  /** Switches that apply to every card in the group. */
+  controls?: () => ReactNode;
+  /** Small print under the intro (e.g. where the data comes from). */
+  source?: string;
   calculators: Array<{ id: string; render: () => ReactNode }>;
 }
 
@@ -29,12 +36,21 @@ export const CALCULATOR_GROUPS: CalculatorGroup[] = [
     ],
   },
   {
-    id: 'lifting',
-    title: 'Lifting ratios',
-    intro: 'How your Olympic lifts compare with your strength, and with each other. Enter a lift once and it fills in everywhere it is used.',
-    calculators: LIFT_RATIO_CALCULATORS.map((calc) => ({
-      id: calc.id,
-      render: () => <LiftRatioCard calc={calc} />,
-    })),
+    id: 'test_yourself',
+    title: 'Test yourself',
+    intro: 'Compare yourself using real data from live competition.',
+    source: 'CrossFit Games athletes, recent seasons.',
+    controls: () => <TestYourselfControls />,
+    calculators: [
+      { id: 'your_lifts', render: () => <LiftsCard /> },
+      {
+        id: 'tests_rowing',
+        render: () => <TimedTestsCard group="rowing" title="Rowing" blurb="Your best 1,000 m on a rower, as minutes and seconds (for example 3:25)." />,
+      },
+      {
+        id: 'tests_gymnastics',
+        render: () => <TimedTestsCard group="gymnastics" title="Gymnastics" blurb="Enter times as minutes and seconds (for example 1:05)." />,
+      },
+    ],
   },
 ];

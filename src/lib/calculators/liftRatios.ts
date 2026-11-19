@@ -22,7 +22,7 @@ export interface LiftRatioReading {
   detail: string;
 }
 
-export type LiftKey = 'snatch' | 'clean_jerk' | 'back_squat';
+export type LiftKey = 'back_squat' | 'front_squat' | 'strict_press' | 'deadlift' | 'snatch' | 'clean_jerk';
 
 export interface LiftRatioCalculator {
   id: string;
