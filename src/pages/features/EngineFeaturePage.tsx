@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import GainsLogo from '../../components/GainsLogo';
+import PublicMenu from '../../components/PublicMenu';
 import FeatureFooter from '../../components/FeatureFooter';
 import '../../features.css';
 import '../../landing.css';
@@ -214,6 +215,7 @@ export default function EngineFeaturePage({ signedIn = false }: { signedIn?: boo
             <a href="/#pricing">Pricing</a>
           </nav>
           <Link to="/auth" className="feature-signin-btn">Sign In</Link>
+          <PublicMenu signedIn={signedIn} />
         </div>
       </header>
 

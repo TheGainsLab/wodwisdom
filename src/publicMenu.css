@@ -1,0 +1,43 @@
+/* ===== Phone menu for the public pages — classes prefixed pm- ===== */
+/* Shown only where the headers hide their link row (see landing.css and
+   features.css, both at 768px). The panel hangs off the sticky header. */
+
+.pm-toggle {
+  display: none;
+  align-items: center; justify-content: center;
+  width: 42px; height: 42px; flex-shrink: 0;
+  background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+  color: var(--text); cursor: pointer;
+}
+.pm-toggle:hover { border-color: var(--accent); color: var(--accent); }
+
+.pm-backdrop { position: fixed; inset: 64px 0 0 0; background: rgba(0,0,0,.55); z-index: 98; }
+
+.pm-panel {
+  position: absolute; top: 100%; left: 0; right: 0; z-index: 99;
+  background: var(--bg, #09090b); border-bottom: 1px solid var(--border-light);
+  padding: 8px 16px 18px; display: flex; flex-direction: column;
+  box-shadow: 0 18px 40px rgba(0,0,0,.6);
+  max-height: calc(100dvh - 64px); overflow-y: auto;
+}
+.pm-link {
+  display: block; padding: 15px 8px; font-size: 17px; font-weight: 600;
+  color: var(--text); text-decoration: none; border-bottom: 1px solid var(--border);
+}
+.pm-link:active { color: var(--accent); }
+.pm-cta {
+  display: block; text-align: center; margin-top: 16px; padding: 15px 20px;
+  background: var(--accent); color: white; border-radius: 10px;
+  font-size: 16px; font-weight: 700; text-decoration: none;
+}
+
+@media (max-width: 768px) {
+  .pm-toggle { display: inline-flex; }
+  /* With the link row hidden, push Sign In and the menu to the right edge. */
+  .landing-header .landing-header-inner, .feature-header .feature-header-inner { gap: 10px; }
+  /* Two classes: must beat the headers' own margin-left on the button. */
+  .landing-header-inner .landing-signin-btn, .feature-header-inner .feature-signin-btn { margin-left: auto; }
+}
+@media (min-width: 769px) {
+  .pm-backdrop, .pm-panel { display: none; }
+}

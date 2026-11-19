@@ -19,11 +19,13 @@ import { supabase } from './supabase';
 type VisitorEvent = 'page_view' | 'calculator_used';
 
 /** Public surfaces whose signed-out page views are counted. Signed-in page
- *  views are already in app_events. */
-const TRACKED_PREFIXES = ['/calculators', '/qa', '/knowledge'];
+ *  views are already in app_events. The main page is tracked as exactly "/"
+ *  (the signed-out router shows it for any unknown path, which is not
+ *  counted). */
+const TRACKED_PREFIXES = ['/calculators', '/qa', '/knowledge', '/examples', '/pricing', '/features'];
 
 export function isTrackedPublicPath(pathname: string): boolean {
-  return TRACKED_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + '/'));
+  return pathname === '/' || TRACKED_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + '/'));
 }
 
 const VISIT_KEY = 'gl_visit_id';

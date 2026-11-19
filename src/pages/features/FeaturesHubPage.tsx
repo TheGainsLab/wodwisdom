@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import GainsLogo from '../../components/GainsLogo';
+import PublicMenu from '../../components/PublicMenu';
 import FeatureFooter from '../../components/FeatureFooter';
 import '../../features.css';
 
@@ -95,6 +96,7 @@ export default function FeaturesHubPage() {
             <Link to="/qa">Q&amp;A</Link>
           </nav>
           <Link to="/auth" className="feature-signin-btn">Sign In</Link>
+          <PublicMenu />
         </div>
       </header>
 
