@@ -3,31 +3,44 @@
  *
  * Two max efforts on the SAME machine — 30 seconds and a 10-minute time
  * trial — both as average watts. Ratio = 30-s watts ÷ 10-min watts.
- * Balanced = 2.6 (founder, 2026-11-18). Within 5% either way is balanced;
+ * Balanced = 2.2 (founder, 2026-11-19). Within 5% either way is balanced;
  * 5–10% above is slightly glycolytic, 5–10% below slightly oxidative; beyond
  * 10% is a glycolytic / oxidative bias. The formula only works on watts, so
  * metres and calories are converted first.
  *
- * NOTE: the Engine's own continuum (supabase/functions/_shared/
- * engine-continuum.ts) currently reads a balanced 30-s effort as ≈ 2.2× in
- * its native units, with 2.6× placed at 15 s. This public calculator uses
- * 2.6 by the founder's decision; change BALANCED_RATIO if the two are ever
- * brought in line.
+ * Why 2.2: the research figure of peak power ≈ 2.6× is a 10–15 s peak, so
+ * the Engine's continuum (supabase/functions/_shared/engine-continuum.ts)
+ * places 2.6× at 15 s and ≈ 2.2× at 30 s, where this base's median 30-s
+ * Echo effort (2.27×) sits. The calculator opened at 2.6 and was brought in
+ * line with the Engine. On the fan bikes calories are proportional to watts
+ * (below), so the Engine's calorie figure is the watts figure too.
  *
  * Conversions (Concept2's published formulas):
  *   pace → watts      watts = 2.80 ÷ pace³, pace in seconds per metre.
  *   BikeErg           its metres are counted at 2× the rower's for the same
  *                     power (its pace is per 1000 m), so halve them first.
- *   calories → watts  calories/hour = 4 × watts ÷ 1.1639 + 300 (the monitor's
- *                     formula). Confirmed for the rower; applied to the
- *                     SkiErg and BikeErg, which share the monitor — not
- *                     separately confirmed for those two.
- * Fan bikes (Assault, Echo) have no published conversion: watts only.
+ *                     Confirmed against Concept2's own pace calculator,
+ *                     which uses 500 for the rower/SkiErg and 1000 for the
+ *                     BikeErg with the one watts formula.
+ *   calories → watts  calories/hour = 4 × watts ÷ 1.1639 + 300. Concept2's
+ *                     calorie calculator confirms the 300/hour base and that
+ *                     every Performance Monitor uses one formula; the
+ *                     watts constant is from the monitor documentation.
+ *
+ * Fan bikes (founder's tested monitor tables, 2026-11-19 — RPM, watts and
+ * calories/minute, Echo 31–119 RPM and Assault 30–90 RPM): on both bikes
+ * calories/minute is PROPORTIONAL to watts, with no fixed offset —
+ *   Echo     calories/minute = watts ÷ 20      (max error 0.1 cal/min)
+ *   Assault  calories/minute = watts ÷ 24.75
+ * so a calorie ratio is a watts ratio. The two bikes differ (the Assault
+ * shows 15–19% more watts at the same RPM), hence one rule each. RPM is not
+ * offered: nobody enters it, and it has no clean formula (it would need the
+ * tables themselves).
  */
 
 import { bandFor, deviation, type Band } from './bands';
 
-export const BALANCED_RATIO = 2.6;
+export const BALANCED_RATIO = 2.2;
 export const SPRINT_SECONDS = 30;
 export const TRIAL_SECONDS = 600;
 
@@ -39,16 +52,21 @@ export interface EnergyMachine {
   units: EnergyUnit[];
   /** Displayed metres ÷ this = rower-equivalent metres. */
   distanceScale: number;
+  /** Fan bikes: watts per (calorie/minute) on the monitor — calories are
+   *  proportional to watts there. Absent on Concept2, whose monitor formula
+   *  has a fixed base. */
+  wattsPerCalPerMin?: number;
 }
 
 const C2_UNITS: EnergyUnit[] = ['watts', 'meters', 'calories'];
+const FAN_BIKE_UNITS: EnergyUnit[] = ['watts', 'calories'];
 
 export const ENERGY_MACHINES: EnergyMachine[] = [
   { id: 'c2_row_erg', label: 'Concept2 RowErg', units: C2_UNITS, distanceScale: 1 },
   { id: 'c2_bike_erg', label: 'Concept2 BikeErg', units: C2_UNITS, distanceScale: 2 },
   { id: 'c2_ski_erg', label: 'Concept2 SkiErg', units: C2_UNITS, distanceScale: 1 },
-  { id: 'assault_bike', label: 'Assault Bike', units: ['watts'], distanceScale: 1 },
-  { id: 'echo_bike', label: 'Echo Bike', units: ['watts'], distanceScale: 1 },
+  { id: 'assault_bike', label: 'Assault Bike', units: FAN_BIKE_UNITS, distanceScale: 1, wattsPerCalPerMin: 24.75 },
+  { id: 'echo_bike', label: 'Echo Bike', units: FAN_BIKE_UNITS, distanceScale: 1, wattsPerCalPerMin: 20 },
 ];
 
 export const UNIT_LABELS: Record<EnergyUnit, string> = {
@@ -67,8 +85,8 @@ const C2_CAL_BASE_PER_HOUR = 300;
 
 /** Average watts for an effort of `seconds`, from the number the athlete
  *  read off the monitor. Null when it cannot be converted (unit not offered
- *  on this machine, or a calorie count at or under the monitor's 300/hour
- *  base, which is no power at all). */
+ *  on this machine, or a Concept2 calorie count at or under the monitor's
+ *  300/hour base, which is no power at all). */
 export function toWatts(machine: EnergyMachine, unit: EnergyUnit, value: number, seconds: number): number | null {
   if (!(value > 0) || !(seconds > 0)) return null;
   if (!machine.units.includes(unit)) return null;
@@ -76,6 +94,9 @@ export function toWatts(machine: EnergyMachine, unit: EnergyUnit, value: number,
   if (unit === 'meters') {
     const pace = seconds / (value / machine.distanceScale); // seconds per rower-equivalent metre
     return C2_PACE_CONSTANT / Math.pow(pace, 3);
+  }
+  if (machine.wattsPerCalPerMin != null) {
+    return (value * 60 / seconds) * machine.wattsPerCalPerMin;
   }
   const calPerHour = value * 3600 / seconds;
   const watts = (calPerHour - C2_CAL_BASE_PER_HOUR) / C2_CAL_PER_WATT_HOUR;

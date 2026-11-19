@@ -21,7 +21,6 @@ export default function EnergySystemCard() {
   const [trial, setTrial] = useState('');
 
   const machine = machineById(machineId);
-  const wattsOnly = machine.units.length === 1;
 
   const changeMachine = (id: string) => {
     setMachineId(id);
@@ -56,11 +55,10 @@ export default function EnergySystemCard() {
           options={machine.units.map((u) => ({ value: u, label: UNIT_LABELS[u] }))}
         />
       </div>
-      {wattsOnly && (
-        <p className="calc-note">The {machine.label} is watts only for now: use the average watts shown on the monitor.</p>
-      )}
       {unit === 'calories' && (
-        <p className="calc-note">Whole calories are coarse over 30 seconds. Watts or meters give a more precise result.</p>
+        <p className="calc-note">
+          Whole calories are coarse over 30 seconds. {machine.units.includes('meters') ? 'Watts or meters give' : 'Watts give'} a more precise result.
+        </p>
       )}
       <div className="calc-fields">
         <NumberField

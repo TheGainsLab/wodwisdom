@@ -15,7 +15,8 @@
 
 .calc-card {
   background: var(--surface);
-  border: 1px solid var(--border-light);
+  /* Same outline as the research library's cards, so each block stands out. */
+  border: 1px solid rgba(255,255,255,.85);
   border-radius: 16px;
   padding: 22px 22px 24px;
 }

@@ -35,9 +35,9 @@ test('bands: decimal targets land on the right side of each edge', () => {
   assert.equal(bandFor(0.57, 0.60), 'on_target'); // exactly −5%
   assert.equal(bandFor(0.66, 0.60), 'above'); //     exactly +10%
   assert.equal(bandFor(0.54, 0.60), 'below'); //     exactly −10%
-  assert.equal(bandFor(2.73, 2.6), 'on_target');
-  assert.equal(bandFor(2.86, 2.6), 'above');
-  assert.equal(bandFor(2.34, 2.6), 'below');
+  assert.equal(bandFor(2.31, 2.2), 'on_target'); // exactly +5%
+  assert.equal(bandFor(2.42, 2.2), 'above'); //     exactly +10%
+  assert.equal(bandFor(1.98, 2.2), 'below'); //     exactly −10%
 });
 
 test('parsePositive: accepts numbers and thousands commas, rejects the rest', () => {
@@ -119,41 +119,75 @@ test('watts: Concept2 calories — cal/hour = 4·W/1.1639 + 300', () => {
 
 test('watts: watts pass through; fan bikes take nothing else', () => {
   assert.equal(toWatts(echo, 'watts', 412, 30), 412);
-  assert.equal(toWatts(echo, 'calories', 20, 30), null);
+  assert.equal(toWatts(echo, 'meters', 300, 30), null);
   assert.equal(toWatts(assault, 'meters', 300, 30), null);
-  assert.deepEqual(echo.units, ['watts']);
-  assert.deepEqual(assault.units, ['watts']);
+  assert.deepEqual(echo.units, ['watts', 'calories']);
+  assert.deepEqual(assault.units, ['watts', 'calories']);
 });
 
 test('machines: the five asked for, in order', () => {
   assert.deepEqual(ENERGY_MACHINES.map((m) => m.id), ['c2_row_erg', 'c2_bike_erg', 'c2_ski_erg', 'assault_bike', 'echo_bike']);
 });
 
-test('energy system: 2.6 is balanced; bands at 5% and 10%', () => {
-  assert.equal(BALANCED_RATIO, 2.6);
+test('watts: fan-bike calories are proportional to watts — Echo ÷20, Assault ÷24.75', () => {
+  // Rows from the founder's monitor tables (calories/minute against watts).
+  for (const [watts, calPerMin] of [[243, 12.2], [549, 27.5], [1030, 51.5], [1635, 81.8]]) {
+    near(toWatts(echo, 'calories', calPerMin, 60), watts, 2);
+  }
+  for (const [watts, calPerMin] of [[288, 11.6], [644, 26], [896, 36.2]]) {
+    near(toWatts(assault, 'calories', calPerMin, 60), watts, 2.5);
+  }
+  // Totals over the two efforts: 30 s at 20 cal, 10 min at 150 cal on an Echo.
+  near(toWatts(echo, 'calories', 20, 30), 800, 0.01); //   40 cal/min × 20
+  near(toWatts(echo, 'calories', 150, 600), 300, 0.01); // 15 cal/min × 20
+  // The same calories mean more watts on an Assault.
+  near(toWatts(assault, 'calories', 20, 30), 990, 0.01);
+});
+
+test('energy system: a fan-bike calorie ratio is the watts ratio', () => {
+  // Echo: 30 s for 22 cal (44/min), 10 min for 200 cal (20/min) → 2.2 exactly.
+  const cal = computeEnergySystem(echo, 'calories', 22, 200);
+  const w = computeEnergySystem(echo, 'watts', 880, 400);
+  assert.ok(cal.ok && w.ok);
+  near(cal.result.ratio, 2.2, 0.0001);
+  near(cal.result.ratio, w.result.ratio, 0.0001);
+  assert.equal(cal.result.reading.label, 'Balanced');
+  // The bike's constant cancels: the same calories give the same ratio on an Assault.
+  const a = computeEnergySystem(assault, 'calories', 22, 200);
+  assert.ok(a.ok);
+  near(a.result.ratio, 2.2, 0.0001);
+});
+
+test('energy system: 2.2 is balanced; bands at 5% and 10%', () => {
+  assert.equal(BALANCED_RATIO, 2.2);
   const label = (sprint: number, trial: number) => {
     const o = computeEnergySystem(echo, 'watts', sprint, trial);
     return o.ok ? o.result.reading.label : o.reason;
   };
-  assert.equal(label(520, 200), 'Balanced'); //            2.60
-  assert.equal(label(546, 200), 'Balanced'); //            2.73 (+5%)
-  assert.equal(label(494, 200), 'Balanced'); //            2.47 (−5%)
-  assert.equal(label(560, 200), 'Slightly glycolytic'); // 2.80 (+7.7%)
-  assert.equal(label(572, 200), 'Slightly glycolytic'); // 2.86 (+10%)
-  assert.equal(label(480, 200), 'Slightly oxidative'); //  2.40 (−7.7%)
-  assert.equal(label(468, 200), 'Slightly oxidative'); //  2.34 (−10%)
-  assert.equal(label(600, 200), 'Glycolytic bias'); //     3.00
-  assert.equal(label(440, 200), 'Oxidative bias'); //      2.20
+  assert.equal(label(440, 200), 'Balanced'); //            2.20
+  assert.equal(label(462, 200), 'Balanced'); //            2.31 (+5%)
+  assert.equal(label(418, 200), 'Balanced'); //            2.09 (−5%)
+  assert.equal(label(454, 200), 'Balanced'); //            2.27, this base's median
+  assert.equal(label(476, 200), 'Slightly glycolytic'); // 2.38 (+8.2%)
+  assert.equal(label(484, 200), 'Slightly glycolytic'); // 2.42 (+10%)
+  assert.equal(label(404, 200), 'Slightly oxidative'); //  2.02 (−8.2%)
+  assert.equal(label(396, 200), 'Slightly oxidative'); //  1.98 (−10%)
+  assert.equal(label(520, 200), 'Glycolytic bias'); //     2.60
+  assert.equal(label(380, 200), 'Oxidative bias'); //      1.90
 });
 
 test('energy system: metres are converted before dividing', () => {
-  // Row 30 s: 170 m → 509.5 W. Row 10 min: 2500 m → 202.5 W. Ratio 2.52.
-  const o = computeEnergySystem(row, 'meters', 170, 2500);
+  // Row 30 s: 162 m → 440.9 W. Row 10 min: 2500 m → 202.5 W. Ratio 2.18.
+  const o = computeEnergySystem(row, 'meters', 162, 2500);
   assert.ok(o.ok);
-  near(o.result.sprintWatts, 509.5, 1);
+  near(o.result.sprintWatts, 440.9, 1);
   near(o.result.trialWatts, 202.5);
-  near(o.result.ratio, 2.52, 0.01);
+  near(o.result.ratio, 2.18, 0.01);
   assert.equal(o.result.reading.label, 'Balanced');
+  // 170 m is 509.5 W: 2.52, well past balanced.
+  const fast = computeEnergySystem(row, 'meters', 170, 2500);
+  assert.ok(fast.ok);
+  assert.equal(fast.result.reading.label, 'Glycolytic bias');
 });
 
 test('energy system: incomplete, unconvertible and implausible inputs are refused', () => {
