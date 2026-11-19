@@ -13,13 +13,15 @@ export function CalcCard({ id, title, blurb, children }: { id: string; title: st
   );
 }
 
-export function NumberField({ id, label, value, onChange, suffix, placeholder }: {
+export function NumberField({ id, label, value, onChange, suffix, placeholder, inputMode = 'decimal' }: {
   id: string;
   label: string;
   value: string;
   onChange: (v: string) => void;
   suffix?: string;
   placeholder?: string;
+  /** 'text' for a time (m:ss needs the colon key). */
+  inputMode?: 'decimal' | 'text';
 }) {
   return (
     <label className="calc-field" htmlFor={id}>
@@ -29,7 +31,7 @@ export function NumberField({ id, label, value, onChange, suffix, placeholder }:
           id={id}
           className="calc-input"
           type="text"
-          inputMode="decimal"
+          inputMode={inputMode}
           autoComplete="off"
           placeholder={placeholder}
           value={value}
@@ -68,7 +70,9 @@ function markerPct(deviation: number): number {
   return ((clamped + 0.15) / 0.30) * 100;
 }
 
-export function ResultPanel({ ratio, target, deviation, band, label, detail, lowLabel, highLabel, children }: {
+export function ResultPanel({ title, ratio, target, deviation, band, label, detail, lowLabel, highLabel, children }: {
+  /** Shown above the number when several results share one card. */
+  title?: string;
   ratio: number;
   target: number;
   deviation: number;
@@ -84,6 +88,7 @@ export function ResultPanel({ ratio, target, deviation, band, label, detail, low
   const vsTarget = pct === 0 ? 'on target' : `${pct}% ${deviation < 0 ? 'below' : 'above'} target`;
   return (
     <div className="calc-result" role="status" aria-live="polite">
+      {title && <div className="calc-result-title">{title}</div>}
       <div className="calc-result-top">
         <div>
           <div className="calc-result-ratio">{ratio.toFixed(2)}</div>
@@ -98,6 +103,30 @@ export function ResultPanel({ ratio, target, deviation, band, label, detail, low
       <div className="calc-scale-ends" aria-hidden="true"><span>{lowLabel}</span><span>{highLabel}</span></div>
       {children}
       <p className="calc-result-detail">{detail}</p>
+    </div>
+  );
+}
+
+/** Two-or-more-way switch (men / women, lb / kg). */
+export function Segmented<T extends string>({ label, value, onChange, options }: {
+  label: string;
+  value: T;
+  onChange: (v: T) => void;
+  options: Array<{ value: T; label: string }>;
+}) {
+  return (
+    <div className="calc-seg" role="group" aria-label={label}>
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          className={`calc-seg-btn${o.value === value ? ' is-active' : ''}`}
+          aria-pressed={o.value === value}
+          onClick={() => onChange(o.value)}
+        >
+          {o.label}
+        </button>
+      ))}
     </div>
   );
 }

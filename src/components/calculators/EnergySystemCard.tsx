@@ -37,7 +37,7 @@ export default function EnergySystemCard() {
   return (
     <CalcCard
       id="energy_system"
-      title="Energy System Analysis"
+      title="Energy Systems Calculator"
       blurb={`Compare an all-out 30 seconds with a max-effort 10-minute time trial on the same machine. A balanced athlete's 30-second power is about ${BALANCED_RATIO}× their 10-minute power.`}
     >
       <div className="calc-fields">

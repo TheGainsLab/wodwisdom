@@ -163,3 +163,155 @@ test('energy system: incomplete, unconvertible and implausible inputs are refuse
   assert.deepEqual(computeEnergySystem(row, 'watts', 200, 500), { ok: false, reason: 'sprint_not_higher' });
   assert.deepEqual(computeEnergySystem(echo, 'meters', 300, 5000), { ok: false, reason: 'unconvertible' });
 });
+
+// ── Test yourself: Games benchmarks ─────────────────────────────────────────
+import {
+  GAMES_TESTS,
+  IMPLAUSIBLE_PCT,
+  formatGamesValue,
+  formatTime,
+  parseTime,
+  pctBucket,
+  scoreGamesTest,
+  toPounds,
+} from '../src/lib/calculators/gamesBenchmarks';
+
+const gamesTest = (id: string) => {
+  const t = GAMES_TESTS.find((x) => x.id === id);
+  assert.ok(t, `no Games test ${id}`);
+  return t;
+};
+
+test('games: the tests, lifts first; only the two longer rows are modelled', () => {
+  assert.deepEqual(GAMES_TESTS.map((t) => t.id), [
+    'back_squat', 'front_squat', 'strict_press', 'deadlift', 'snatch', 'clean_jerk',
+    'row_1000m', 'row_2000m', 'row_5000m', 'handstand_hold', 'ring_muscle_ups_30',
+  ]);
+  assert.deepEqual(GAMES_TESTS.filter((t) => t.modelled).map((t) => t.id), ['row_2000m', 'row_5000m']);
+});
+
+test('games: the modelled rows score like the measured one and say they are estimates', () => {
+  const r2k = scoreGamesTest(gamesTest('row_2000m'), 'men', 420); // 7:00 vs 6:18.82
+  assert.ok(r2k);
+  near(r2k.pct * 100, 90.2, 0.1);
+  assert.equal(r2k.placementText, 'Outside the estimated range of the Games field (5:57 to 6:39.1).');
+  const r5k = scoreGamesTest(gamesTest('row_5000m'), 'women', parseTime('18:30'));
+  assert.ok(r5k);
+  near(r5k.pct * 100, 101.3, 0.1); // 1123.93 / 1110
+  assert.equal(r5k.placement, 'in_range');
+  assert.equal(formatTime(1013.95), '16:54');
+  assert.equal(scoreGamesTest(gamesTest('row_1000m'), 'men', 180)?.placementText, 'Inside the range of the Games field (2:48.9 to 3:08.8).');
+});
+
+test('games: every test has a mean, a count, and a way to place a result, for men and women', () => {
+  for (const t of GAMES_TESTS) {
+    for (const sex of ['men', 'women'] as const) {
+      const s = t.stats[sex];
+      assert.ok(s.mean > 0 && s.n > 0, `${t.id} ${sex}`);
+      assert.ok((s.p25 != null && s.p75 != null) || (s.min != null && s.max != null), `${t.id} ${sex} placement`);
+      if (s.p25 != null && s.p75 != null) assert.ok(s.p25 < s.p75, `${t.id} ${sex} quartile order`);
+    }
+  }
+});
+
+test('games: the founder\'s example — a 300 lb front squat is 75% of the men\'s average', () => {
+  const r = scoreGamesTest(gamesTest('front_squat'), 'men', 300);
+  assert.ok(r);
+  near(r.pct * 100, 74.6, 0.1); // 300 / 402.1
+  assert.equal(Math.round(r.pct * 100), 75);
+  assert.equal(r.placement, 'lower');
+  assert.equal(r.placementText, 'Below the middle half of the Games field (383 lb to 416 lb).');
+});
+
+test('games: lifts place by quartile, men and women separately', () => {
+  const bs = gamesTest('back_squat');
+  assert.equal(scoreGamesTest(bs, 'men', 480)?.placement, 'middle'); //  471.3–500
+  assert.equal(scoreGamesTest(bs, 'men', 500)?.placement, 'top'); //     at P75
+  assert.equal(scoreGamesTest(bs, 'men', 471.3)?.placement, 'middle'); // at P25
+  assert.equal(scoreGamesTest(bs, 'men', 470)?.placement, 'lower');
+  assert.equal(scoreGamesTest(bs, 'women', 330)?.placement, 'top'); //   women's P75 is 323.8
+  near((scoreGamesTest(bs, 'women', 301.3)?.pct ?? 0) * 100, 100, 0.01);
+});
+
+test('games: a timed test flips the division — slower is a smaller percent', () => {
+  const row = gamesTest('row_1000m');
+  const slow = scoreGamesTest(row, 'men', 225); // 3:45 vs 2:59.2
+  assert.ok(slow);
+  near(slow.pct * 100, 79.6, 0.1);
+  assert.equal(slow.placement, 'outside_range');
+  assert.equal(slow.placementText, 'Outside the range of the Games field (2:48.9 to 3:08.8).');
+  assert.equal(scoreGamesTest(row, 'men', 180)?.placement, 'in_range');
+  const fast = scoreGamesTest(row, 'men', 165);
+  assert.ok(fast && fast.pct > 1);
+  assert.equal(fast.placement, 'beyond_best');
+});
+
+test('games: muscle-ups place by quartile with the fast end on top', () => {
+  const mu = gamesTest('ring_muscle_ups_30');
+  assert.equal(scoreGamesTest(mu, 'men', 130)?.placement, 'top'); //    faster than P25 2:19.27
+  assert.equal(scoreGamesTest(mu, 'men', 160)?.placement, 'middle');
+  assert.equal(scoreGamesTest(mu, 'men', 200)?.placement, 'lower'); //  slower than P75 3:02.86
+  assert.match(mu.stats.women.note ?? '', /28 of 39/);
+  assert.equal(mu.stats.men.note, undefined);
+});
+
+test('games: the handstand hold is a time where longer is better', () => {
+  const hs = gamesTest('handstand_hold');
+  const r = scoreGamesTest(hs, 'men', 45);
+  assert.ok(r);
+  near(r.pct * 100, 68.9, 0.1); // 45 / 65.3
+  assert.equal(r.placement, 'lower');
+  assert.equal(scoreGamesTest(hs, 'men', 80)?.placement, 'top');
+  assert.equal(scoreGamesTest(hs, 'women', 80)?.placement, 'middle'); // 1:13.75–1:51
+});
+
+test('games: kilos are converted before comparing, and shown as kilos', () => {
+  const fs = gamesTest('front_squat');
+  const lb = scoreGamesTest(fs, 'men', 300, 'lb');
+  const kg = scoreGamesTest(fs, 'men', toPounds(136.078, 'kg'), 'kg'); // 300 lb
+  assert.ok(lb && kg);
+  near(kg.pct, lb.pct, 0.0001);
+  assert.equal(formatGamesValue(fs, 402.1, 'kg'), '182 kg');
+  assert.equal(formatGamesValue(fs, 402.1, 'lb'), '402 lb');
+  assert.equal(kg.placementText, 'Below the middle half of the Games field (174 kg to 189 kg).');
+  assert.equal(toPounds(300, 'lb'), 300);
+});
+
+test('games: times parse only when complete, and format back', () => {
+  assert.equal(parseTime('3:45'), 225);
+  assert.equal(parseTime('0:45'), 45);
+  assert.equal(parseTime(' 2:59.2 '), 179.2);
+  assert.equal(parseTime('3:4'), null); //  half-typed
+  assert.equal(parseTime('3'), null);
+  assert.equal(parseTime('3:75'), null);
+  assert.equal(parseTime('abc'), null);
+  assert.equal(parseTime('0:00'), null);
+  assert.equal(formatTime(179.2), '2:59.2');
+  assert.equal(formatTime(65.3), '1:05.3');
+  assert.equal(formatTime(79), '1:19');
+  assert.equal(formatTime(188.8), '3:08.8');
+});
+
+test('games: missing input gives nothing; absurd input is flagged, not scored', () => {
+  const fs = gamesTest('front_squat');
+  assert.equal(scoreGamesTest(fs, 'men', null), null);
+  assert.equal(scoreGamesTest(fs, 'men', 0), null);
+  const typo = scoreGamesTest(fs, 'men', 3000);
+  assert.ok(typo && typo.pct > IMPLAUSIBLE_PCT);
+});
+
+test('games: usage buckets never carry the number', () => {
+  assert.equal(pctBucket(0.3), 'under_50');
+  assert.equal(pctBucket(0.5), '50_74');
+  assert.equal(pctBucket(0.75), '75_89');
+  assert.equal(pctBucket(0.9), '90_99');
+  assert.equal(pctBucket(1), '100_plus');
+  assert.equal(pctBucket(1.2), '100_plus');
+});
+
+test('games: lifts share their box with the ratio calculators', () => {
+  const liftKeys = new Set(GAMES_TESTS.filter((t) => t.group === 'lifts').map((t) => t.liftKey));
+  for (const c of LIFT_RATIO_CALCULATORS) {
+    assert.ok(liftKeys.has(c.liftAKey) && liftKeys.has(c.liftBKey), c.id);
+  }
+});

@@ -39,7 +39,7 @@ export default function CalculatorsPage({ signedIn = false }: { signedIn?: boole
       <section className="feature-hero" style={{ paddingBottom: 36 }}>
         <h1 className="feature-hero-title">Training Calculators</h1>
         <p className="feature-hero-sub">
-          Enter your numbers and see what they say about your training. Free, no account needed.
+          Enter your numbers and see what they say about your training.
         </p>
         <p className="calc-hero-cta">
           Want the full picture?{' '}
@@ -53,6 +53,8 @@ export default function CalculatorsPage({ signedIn = false }: { signedIn?: boole
             <div className="calc-group-head">
               <h2 className="calc-group-title">{group.title}</h2>
               <p className="calc-group-intro">{group.intro}</p>
+              {group.source && <p className="calc-group-source">{group.source}</p>}
+              {group.controls?.()}
             </div>
             <div className="calc-grid">
               {group.calculators.map((c) => <Fragment key={c.id}>{c.render()}</Fragment>)}

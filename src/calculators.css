@@ -15,7 +15,7 @@
 
 .calc-card {
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-light);
   border-radius: 16px;
   padding: 22px 22px 24px;
 }
@@ -29,8 +29,8 @@
 .calc-input {
   width: 100%;
   box-sizing: border-box;
-  background: var(--surface2);
-  border: 1px solid var(--border);
+  background: var(--bg, #09090b);
+  border: 1px solid rgba(255,255,255,.55);
   border-radius: 10px;
   color: var(--text);
   font-family: 'Outfit', sans-serif;
@@ -39,13 +39,19 @@
   outline: none;
   transition: border-color .15s;
 }
-.calc-input:focus { border-color: var(--accent); }
+.calc-input:hover { border-color: rgba(255,255,255,.8); }
+.calc-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+.calc-input::placeholder { color: var(--text-muted); }
 .calc-input-wrap .calc-input { padding-right: 46px; }
 .calc-input-suffix {
   position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
   color: var(--text-muted); font-size: 13px; pointer-events: none;
 }
-.calc-select { appearance: none; -webkit-appearance: none; cursor: pointer; }
+.calc-select {
+  appearance: none; -webkit-appearance: none; cursor: pointer; padding-right: 38px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23f0f0f5' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 14px center;
+}
 
 .calc-note { color: var(--text-dim); font-size: 13px; line-height: 1.5; margin: 0 0 12px; }
 .calc-warning {
@@ -55,9 +61,9 @@
 }
 
 .calc-result {
-  margin-top: 8px;
-  background: var(--surface2);
-  border: 1px solid var(--border);
+  margin-top: 16px;
+  background: var(--surface3);
+  border: 1px solid rgba(255,255,255,.3);
   border-radius: 12px;
   padding: 16px 16px 14px;
 }
@@ -76,9 +82,9 @@
 
 /* Five bands across ±15% of target; edges at ±5% and ±10% → 1:1:2:1:1. */
 .calc-scale { position: relative; display: flex; gap: 3px; margin: 16px 0 6px; }
-.calc-scale-seg { height: 6px; border-radius: 3px; background: var(--surface3); flex: 1; }
+.calc-scale-seg { height: 6px; border-radius: 3px; background: rgba(255,255,255,.14); flex: 1; }
 .calc-scale-seg:nth-child(3) { flex: 2; }
-.calc-scale-seg.is-active { background: var(--text-dim); }
+.calc-scale-seg.is-active { background: rgba(255,255,255,.6); }
 .calc-scale-marker {
   position: absolute; top: -4px; width: 3px; height: 14px; border-radius: 2px;
   background: var(--text); transform: translateX(-50%);
@@ -87,13 +93,64 @@
 
 .calc-result-watts { display: flex; gap: 18px; flex-wrap: wrap; color: var(--text-dim); font-size: 13.5px; margin-top: 12px; }
 .calc-result-watts strong { color: var(--text); }
-.calc-result-detail { color: var(--text); font-size: 14.5px; line-height: 1.6; margin: 12px 0 0; }
+.calc-result-detail { color: var(--text); font-size: 14.5px; line-height: 1.6; margin: 12px 0 0; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.14); }
 
 .calc-cta-title { font-size: 20px; font-weight: 700; letter-spacing: -.3px; margin: 0 0 10px; }
 .calc-cta-foot { font-size: 12.5px; color: var(--text-muted); margin: 14px 0 0; }
 
+/* ===== Test yourself: switches, lift grid, bars ===== */
+.calc-group-source { color: var(--text-muted); font-size: 12.5px; margin: 6px 0 0; }
+
+.calc-controls { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.calc-seg { display: inline-flex; border: 1px solid rgba(255,255,255,.55); border-radius: 10px; overflow: hidden; }
+.calc-seg-btn {
+  background: transparent; color: var(--text-dim); border: none; cursor: pointer;
+  font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 600; padding: 9px 16px;
+}
+.calc-seg-btn + .calc-seg-btn { border-left: 1px solid rgba(255,255,255,.3); }
+.calc-seg-btn.is-active { background: var(--text); color: var(--bg, #09090b); }
+
+.calc-fields-3 { grid-template-columns: repeat(3, 1fr); }
+
+.calc-sub {
+  font-size: 12px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase;
+  color: var(--text-dim); margin: 22px 0 10px; padding-top: 16px; border-top: 1px solid var(--border-light);
+}
+.calc-empty { color: var(--text-muted); font-size: 14px; line-height: 1.5; margin: 0; }
+.calc-result-title { font-size: 13px; font-weight: 700; color: var(--text-dim); margin-bottom: 10px; }
+.calc-result + .calc-result { margin-top: 12px; }
+.calc-sub + .calc-result { margin-top: 0; }
+
+.calc-bars { display: grid; gap: 12px; }
+.calc-bar-row {
+  background: var(--surface3); border: 1px solid rgba(255,255,255,.3);
+  border-radius: 12px; padding: 14px 16px;
+}
+.calc-bar-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.calc-bar-label { font-size: 15px; font-weight: 700; }
+.calc-bar-pct { font-size: 26px; font-weight: 800; letter-spacing: -.5px; line-height: 1; margin-left: auto; }
+.calc-bar-track {
+  display: block; height: 12px; border-radius: 6px; background: rgba(255,255,255,.14);
+  overflow: hidden; margin: 10px 0 8px;
+}
+.calc-bar-fill { display: block; height: 100%; border-radius: 6px; background: var(--accent); transition: width .25s ease; }
+.calc-bar-fill.is-full { background: #4ade80; }
+.calc-bar-meta { color: var(--text-dim); font-size: 13px; }
+.calc-bar-place { color: var(--text); font-size: 13.5px; line-height: 1.5; margin-top: 4px; }
+.calc-bar-note { color: var(--text-muted); font-size: 12.5px; line-height: 1.5; margin-top: 4px; }
+
+.calc-test-row { display: grid; grid-template-columns: minmax(0, 220px) 1fr; gap: 16px; align-items: start; }
+.calc-test-row + .calc-test-row { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--border-light); }
+.calc-test-row .calc-warning { margin: 0; align-self: center; }
+
+@media (max-width: 720px) {
+  .calc-fields-3 { grid-template-columns: 1fr 1fr; }
+  .calc-test-row { grid-template-columns: 1fr; gap: 10px; }
+}
+
 @media (max-width: 560px) {
   .calc-container { padding: 0 16px 64px; }
   .calc-fields { grid-template-columns: 1fr; }
+  .calc-fields-3 { grid-template-columns: 1fr 1fr; }
   .calc-card { padding: 18px 16px 20px; }
 }
