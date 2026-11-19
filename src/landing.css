@@ -135,6 +135,10 @@
 .lp-path p{color:var(--text-dim);font-size:15px;line-height:1.6;margin:0 0 22px}
 .lp-link{color:var(--accent);text-decoration:none;font-weight:700;font-size:15px}
 .lp-path .lp-link{margin-top:auto}
+.lp-path-link{text-decoration:none;color:inherit;transition:border-color .15s,transform .1s}
+.lp-path-link:hover{border-color:var(--accent)}
+.lp-path-link:active{transform:scale(.99)}
+#explore{scroll-margin-top:80px}
 .lp-band{margin-top:20px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:22px 24px;display:flex;flex-direction:column;gap:6px;align-items:center;text-align:center}
 .lp-proof{display:grid;grid-template-columns:1fr 1fr;gap:36px;align-items:center}
 .lp-evalcard{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:12px;padding:22px 24px}

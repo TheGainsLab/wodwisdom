@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import GainsLogo from './GainsLogo';
+import PublicMenu from './PublicMenu';
 
 /**
  * Shared pieces for the public Q&A library (/qa). The pages render in both
@@ -16,6 +17,9 @@ export function QAHeader({ signedIn }: { signedIn: boolean }) {
           <GainsLogo className="feature-brand-name" />
         </Link>
         <nav className="feature-nav">
+          <Link to="/knowledge">Research</Link>
+          <Link to="/calculators">Calculators</Link>
+          <Link to="/examples">Examples</Link>
           <Link to="/qa">Q&amp;A</Link>
           {!signedIn && <Link to="/features">Features</Link>}
           {!signedIn && <Link to="/pricing">Pricing</Link>}
@@ -25,6 +29,7 @@ export function QAHeader({ signedIn }: { signedIn: boolean }) {
         ) : (
           <Link to="/auth" className="feature-signin-btn">Sign In</Link>
         )}
+        <PublicMenu signedIn={signedIn} />
       </div>
     </header>
   );

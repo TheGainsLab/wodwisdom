@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import GainsLogo from '../../components/GainsLogo';
+import PublicMenu from '../../components/PublicMenu';
 import FeatureFooter from '../../components/FeatureFooter';
 import '../../features.css';
 
@@ -23,6 +24,7 @@ export default function NutritionFeaturePage() {
             <a href="/#pricing">Pricing</a>
           </nav>
           <Link to="/auth" className="feature-signin-btn">Sign In</Link>
+          <PublicMenu />
         </div>
       </header>
 

@@ -4,7 +4,7 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { useEntitlements } from '../hooks/useEntitlements';
 import Nav from '../components/Nav';
-import { MessageSquare, Trophy, Flame, Dumbbell, Apple, BookOpen, User, ChevronRight, Lock, Settings, Shield } from 'lucide-react';
+import { MessageSquare, Trophy, Flame, Dumbbell, Apple, BookOpen, Gauge, User, ChevronRight, Lock, Settings, Shield } from 'lucide-react';
 
 /**
  * HomePage — the persistent landing at `/` (chat moved to `/chat`).
@@ -138,6 +138,9 @@ export default function HomePage({ session }: { session: Session }) {
     // so the tile is never locked — the paywall lives on the asking, not
     // the reading. First in-app door to /knowledge (2026-10-21).
     { key: 'research', label: 'Research Library', sub: 'The science of training, in plain language.', to: '/knowledge', icon: <BookOpen size={20} />, locked: false, plan: '' },
+    // The free calculators (/calculators): open to every account, like the
+    // library. The in-app door to them (2026-11-19).
+    { key: 'calculators', label: 'Test Yourself', sub: 'Compare your lifts, engine, and gymnastics with athletes.', to: '/calculators', icon: <Gauge size={20} />, locked: false, plan: '' },
     { key: 'athletedata', label: 'Athlete Data', sub: 'Done the Open? Link it — free percentile breakdown.', to: '/athletedata', icon: <Trophy size={20} />, locked: false, plan: '' },
     // Pre-eval, the tile tells the truth about itself: a dot + "not
     // finished" (2026-10-08). The welcome card above says it loudly; the

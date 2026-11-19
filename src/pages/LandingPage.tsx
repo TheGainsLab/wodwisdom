@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import GainsLogo from '../components/GainsLogo';
+import PublicMenu from '../components/PublicMenu';
 import PricingPlans, { type PricingPlan, type PricingInterval } from '../components/PricingPlans';
 import '../landing.css';
 
@@ -72,6 +73,15 @@ export default function LandingPage() {
     return () => document.body.classList.remove('landing-body');
   }, []);
 
+  // Arriving at /#pricing or /#faq from another page's menu: the router does
+  // not scroll to a hash on its own.
+  const { hash } = useLocation();
+  useEffect(() => {
+    if (!hash) return;
+    const el = document.getElementById(hash.slice(1));
+    if (el) requestAnimationFrame(() => el.scrollIntoView());
+  }, [hash]);
+
   return (
     <div className="landing-page">
       {/* ===== Header ===== */}
@@ -81,11 +91,14 @@ export default function LandingPage() {
             <GainsLogo className="landing-brand-name" />
           </div>
           <nav className="landing-nav">
+            <Link to="/knowledge">Research</Link>
+            <Link to="/calculators">Calculators</Link>
+            <Link to="/examples">Examples</Link>
             <a href="#pricing">Pricing</a>
             <a href="#faq">FAQ</a>
-            <Link to="/examples">Examples</Link>
           </nav>
           <button className="landing-signin-btn" onClick={goToAuth}>Sign In</button>
+          <PublicMenu onLanding />
         </div>
       </header>
 
@@ -151,6 +164,33 @@ export default function LandingPage() {
             <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)' }}>Want both? Get All Access.</div>
             <span style={{ color: 'var(--text-dim)', fontSize: 15 }}>AI Programming + AI Year of the Engine for $49.99/month.</span>
             <a className="lp-link" href="#pricing" style={{ marginTop: 4 }}>Get All Access &rarr;</a>
+          </div>
+        </div>
+      </section>
+
+      {/* ===== Explore for free =====
+          The two things a visitor can do with no account (founder,
+          2026-11-19). Research first: it is a product; the calculators are
+          the free hook. No sign-up button here — both pages carry the
+          evaluation call to action, and the evaluation section is next. */}
+      <section id="explore" className="landing-explainer" style={{ borderTop: '1px solid var(--border)' }}>
+        <div className="landing-container">
+          <div className="lp-kicker">Explore for Free</div>
+          <h2 className="lp-h2">Start with the thinking behind the training.</h2>
+          <p style={{ ...bodyP, fontSize: 16, color: 'var(--text-muted)', maxWidth: '60ch', marginBottom: 34 }}>
+            No account needed. Read the research, or see how your numbers stack up.
+          </p>
+          <div className="lp-paths">
+            <Link className="lp-path lp-path-link" to="/knowledge">
+              <h3>Research Library</h3>
+              <p>The science of training, in plain language.</p>
+              <span className="lp-link">Browse the library &rarr;</span>
+            </Link>
+            <Link className="lp-path lp-path-link" to="/calculators">
+              <h3>Test Yourself</h3>
+              <p>Compare your lifts, engine, and gymnastics with athletes.</p>
+              <span className="lp-link">Try the calculators &rarr;</span>
+            </Link>
           </div>
         </div>
       </section>
@@ -237,8 +277,14 @@ export default function LandingPage() {
 
       <footer className="landing-footer">
         <GainsLogo />
-        {/* Visible on mobile too — the header nav is display:none under 640px. */}
-        <div style={{ marginTop: 10, display: 'flex', gap: 18, justifyContent: 'center' }}>
+        {/* Footer links, on every width. */}
+        <div style={{ marginTop: 10, display: 'flex', gap: '10px 18px', justifyContent: 'center', flexWrap: 'wrap' }}>
+          <Link to="/knowledge" style={{ color: 'var(--text-dim)', textDecoration: 'none', fontSize: 13, fontWeight: 500 }}>
+            Research Library
+          </Link>
+          <Link to="/calculators" style={{ color: 'var(--text-dim)', textDecoration: 'none', fontSize: 13, fontWeight: 500 }}>
+            Test Yourself
+          </Link>
           <Link to="/examples" style={{ color: 'var(--text-dim)', textDecoration: 'none', fontSize: 13, fontWeight: 500 }}>
             Real Examples
           </Link>
