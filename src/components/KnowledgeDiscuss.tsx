@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { DISCUSS_PAPER_ENDPOINT, getAuthHeaders, supabase } from '../lib/supabase';
 import { formatMarkdown } from '../lib/formatMarkdown';
 import { logKnowledgeEvent } from '../lib/knowledgeEvents';
 import { useEntitlements } from '../hooks/useEntitlements';
+import { AI_RESEARCH_CHECKOUT, AI_RESEARCH_PRICE, RESEARCH_FREE_QUESTIONS } from '../lib/pricingPlans';
 
 /**
  * Discuss this paper — the research chat panel on a knowledge entry page —
@@ -68,7 +69,7 @@ export default function KnowledgeDiscuss({ slug, signedIn, noHistory = false, do
   // (admin bypass included) and the meter decide what renders. INVARIANT:
   // never paywall an admin.
   const [used, setUsed] = useState<number | null>(null);
-  const [freeLimit, setFreeLimit] = useState(3);
+  const [freeLimit, setFreeLimit] = useState(RESEARCH_FREE_QUESTIONS);
   const { hasFeature, loading: entitlementsLoading } = useEntitlements();
   // Paid research access: the AI Research sub, or All Access (checked as
   // programming + engine together — no backfill rows for existing subs).
@@ -230,26 +231,31 @@ export default function KnowledgeDiscuss({ slug, signedIn, noHistory = false, do
       )}
 
       {locked ? (
-        // House paywall row (mirrors the main chat's paywall-bar-inner):
-        // small accent lock, one line, compact button. No oversized CTA —
-        // this sits inside a panel, not on a pricing page.
+        // The offer, said plainly (founder, 2026-11-20): the old row showed a
+        // padlock and "Answers from the research…" and named neither the
+        // free questions nor the price. Signed-out: an account gets the free
+        // questions. Free member over the pool: what unlimited costs, and
+        // that All Access includes it. One line, compact button — this sits
+        // inside a panel, not on a pricing page.
         <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10, padding: '2px 0' }}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: 'var(--accent)', flexShrink: 0 }}>
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
-          </svg>
           <span style={{ fontSize: 13.5, color: 'var(--text-dim)', lineHeight: 1.45, flex: 1, minWidth: 170 }}>
-            Answers from the research, in plain coaching terms.
+            {signedIn
+              ? `You've used your ${freeLimit} free questions. Unlimited research answers for ${AI_RESEARCH_PRICE.monthly}/month, or included with All Access.`
+              : `Create a free account to try the AI Research Assistant. ${freeLimit} questions free.`}
           </span>
           <button
             className="paywall-btn-sm"
             onClick={() => {
               logOnce();
               if (!signedIn) navigate(`/auth?signup=1&next=${authNext}`);
-              else navigate('/checkout');
+              else navigate(AI_RESEARCH_CHECKOUT);
             }}
           >
-            {signedIn ? 'Upgrade Now' : 'Create Free Account'}
+            {signedIn ? 'Get AI Research' : 'Create Free Account'}
           </button>
+          {signedIn && (
+            <Link to="/pricing" style={{ fontSize: 12.5, color: 'var(--text-dim)', fontWeight: 600 }}>See all plans</Link>
+          )}
         </div>
       ) : (
         <div className="input-row">
@@ -268,8 +274,11 @@ export default function KnowledgeDiscuss({ slug, signedIn, noHistory = false, do
         </div>
       )}
       {signedIn && !entitled && !locked && used !== null && (
-        <p style={{ fontSize: 11.5, color: 'var(--text-muted)', margin: '8px 0 0' }}>
-          {Math.max(freeLimit - used, 0)} of {freeLimit} free research questions left.
+        <p style={{ fontSize: 12.5, color: 'var(--text-muted)', margin: '8px 0 0', lineHeight: 1.5 }}>
+          {Math.max(freeLimit - used, 0)} of {freeLimit} free questions left ·{' '}
+          <Link to={AI_RESEARCH_CHECKOUT} style={{ color: 'var(--accent)', fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap' }}>
+            Unlimited for {AI_RESEARCH_PRICE.monthly}/month &rarr;
+          </Link>
         </p>
       )}
       {error && <p style={{ color: 'var(--accent)', fontSize: 12.5, margin: '8px 0 0' }}>{error}</p>}
