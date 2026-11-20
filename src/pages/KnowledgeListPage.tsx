@@ -7,6 +7,7 @@ import '../features.css';
 import '../qa.css';
 import { logKnowledgeEvent } from '../lib/knowledgeEvents';
 import { supabase } from '../lib/supabase';
+import { RESEARCH_FREE_QUESTIONS } from '../lib/pricingPlans';
 
 /**
  * "Schumann et al. (2022)" — card-level provenance. A card needs "real
@@ -131,51 +132,32 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
           Science for coaches and athletes.
         </p>
 
-        {/* ASK THE LIBRARY (founder's call, 2026-10-20 — the one-box is
-            gone): the page's only typed input is the question panel. It
-            owns its own composer, lifetime meter, and locked/upgrade row
-            (KnowledgeDiscuss in library mode, history never replayed).
-            Visitors with no account get the pitch row instead. */}
-        {signedIn ? (
-          <div style={{ marginBottom: 20 }}>
-            <div style={{
-              fontSize: 13, fontWeight: 700, letterSpacing: 0.4, textTransform: 'uppercase',
-              color: 'var(--accent)', marginBottom: 8,
-            }}>
-              AI Research Assistant
-            </div>
-            <KnowledgeDiscuss signedIn={signedIn} noHistory />
-          </div>
-        ) : (
-          // No padlock, no button up here (founder, 2026-11-19): at the top
-          // of the page that row read as "this library is locked", when
-          // everything below is free to read. One quiet line says so and
-          // names what an account adds; the button waits at the bottom.
-          <p style={{ fontSize: 13.5, color: 'var(--text-dim)', lineHeight: 1.5, margin: '0 0 20px' }}>
-            Free to read, no account needed. Want to ask the research a question?{' '}
-            <Link to="/auth?signup=1&next=/knowledge" style={{ color: 'var(--accent)', fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap' }}>
-              Create a free account &rarr;
-            </Link>
-          </p>
-        )}
-
-        {/* My research — the ONE home of the member's saved conversations.
-            Collapsed to a single header line by default: thread cards grow
-            with every paper questioned, and uncollapsed they'd become the
-            page's next clutter. */}
+        {/* My research — the ONE home of the member's saved conversations,
+            and the first thing on the page (founder, 2026-11-20: as a small
+            red line between the question box and the chips it looked out of
+            place and unimportant). A full-width bar, collapsed by default:
+            thread cards grow with every paper questioned, and uncollapsed
+            they'd become the page's next clutter. */}
         {signedIn && myThreads.length > 0 && (
-          <div style={{ marginBottom: 24 }}>
+          <div style={{ marginBottom: 22 }}>
             <button
               type="button"
               onClick={() => setMyResearchOpen((v) => !v)}
+              aria-expanded={myResearchOpen}
               style={{
-                display: 'block', width: '100%', textAlign: 'left', cursor: 'pointer',
-                background: 'transparent', border: 'none', padding: 0, fontFamily: 'inherit',
-                fontSize: 13, fontWeight: 700, letterSpacing: 0.4, textTransform: 'uppercase',
-                color: 'var(--accent)', marginBottom: myResearchOpen ? 8 : 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+                width: '100%', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
+                background: 'var(--surface)', border: '1px solid rgba(255,255,255,0.55)', borderRadius: 12,
+                padding: '13px 16px', color: 'var(--text)', marginBottom: myResearchOpen ? 8 : 0,
               }}
             >
-              My research ({myThreads.length}) {myResearchOpen ? '▾' : '▸'}
+              <span>
+                <span style={{ fontSize: 15, fontWeight: 700 }}>My research</span>
+                <span style={{ fontSize: 13.5, color: 'var(--text-dim)' }}>
+                  {' '}· {myThreads.length} saved {myThreads.length === 1 ? 'conversation' : 'conversations'}
+                </span>
+              </span>
+              <span aria-hidden="true" style={{ color: 'var(--text-dim)', fontSize: 14 }}>{myResearchOpen ? '▾' : '▸'}</span>
             </button>
             {myResearchOpen && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -245,12 +227,69 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
           </div>
         )}
 
+        {/* ASK THE LIBRARY (founder's call, 2026-10-20 — the one-box is
+            gone): the page's only typed input is the question panel. It
+            owns its own composer, lifetime meter, and locked/upgrade row
+            (KnowledgeDiscuss in library mode, history never replayed).
+            Visitors with no account get the pitch row instead. */}
+        {signedIn ? (
+          <div>
+            <div style={{
+              fontSize: 13, fontWeight: 700, letterSpacing: 0.4, textTransform: 'uppercase',
+              color: 'var(--accent)', marginBottom: 8,
+            }}>
+              AI Research Assistant
+            </div>
+            <KnowledgeDiscuss signedIn={signedIn} noHistory />
+          </div>
+        ) : (
+          // No padlock, no button up here (founder, 2026-11-19): at the top
+          // of the page a locked row read as "this library is locked", when
+          // everything below is free to read. One line, in the assistant's
+          // place, says what an account gets — including that it is three
+          // questions, so the counter is no surprise later (2026-11-20). The
+          // button waits at the bottom.
+          <Link
+            to="/auth?signup=1&next=/knowledge"
+            style={{ display: 'block', fontSize: 14.5, color: 'var(--text-dim)', lineHeight: 1.5, textDecoration: 'none' }}
+          >
+            <span style={{ color: 'var(--accent)', fontWeight: 700 }}>Create a free account</span>
+            {' '}to try the AI Research Assistant. {RESEARCH_FREE_QUESTIONS} questions free &rarr;
+          </Link>
+        )}
+
+        {/* Above the line: the assistant (needs an account). Below it:
+            browsing the papers (does not). */}
+        <hr style={{ border: 'none', borderTop: '1px solid var(--border-light)', margin: '22px 0 16px' }} />
+
         {/* Topic chips — the list's only filter, for every visitor (the
             founder's call: "people can either scroll or use the chips").
             The ten most common topics, tap to filter, tap again to clear.
             Cards and paper pages stay chip-free. */}
         {topTopics.length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, margin: '0 0 14px' }}>
+          <p style={{ fontSize: 13.5, color: 'var(--text-dim)', margin: '0 0 10px', lineHeight: 1.5 }}>
+            {activeTopic ? (
+              <>
+                <span style={{ color: 'var(--text)', fontWeight: 600 }}>Showing: {topicLabel(activeTopic)}</span>
+                {' '}·{' '}
+                <button
+                  type="button"
+                  onClick={() => { setActiveTopic(null); setShowAllPapers(false); }}
+                  style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit', fontSize: 'inherit', color: 'var(--accent)', fontWeight: 600 }}
+                >
+                  show all
+                </button>
+              </>
+            ) : (
+              <>
+                <span style={{ color: 'var(--text)', fontWeight: 600 }}>Browse by topic</span>
+                {' '}· tap one to filter the papers
+              </>
+            )}
+          </p>
+        )}
+        {topTopics.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, margin: '0 0 18px' }}>
             {topTopics.map((t) => {
               const active = activeTopic === t;
               return (
@@ -329,7 +368,7 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
         {!signedIn && (
           <div className="qa-cta-card">
             <p className="qa-cta-text">
-              Ask the AI Research Assistant about any paper and get the answer in plain coaching terms. Free with an account.
+              Ask the AI Research Assistant about any paper and get the answer in plain coaching terms. {RESEARCH_FREE_QUESTIONS} questions free with an account.
             </p>
             <button className="feature-cta qa-cta-btn" onClick={() => navigate('/auth?signup=1&next=/knowledge')}>
               Create Free Account

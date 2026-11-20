@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { PLANS, type PricingPlan, type PricingInterval } from '../lib/pricingPlans';
+import { AI_RESEARCH_PRICE, PLANS, type PricingPlan, type PricingInterval } from '../lib/pricingPlans';
 export type { PricingPlan, PricingInterval } from '../lib/pricingPlans';
 
 /** Plan copy and prices live in lib/pricingPlans.ts — one source for the
@@ -44,7 +44,7 @@ export default function PricingPlans({ onBuy, busyPlan = null }: {
           training ladder's 3-up grid. Included with All Access. */}
       <div className="lp-plan" style={{ marginTop: 18 }}>
         <h3 style={{ fontSize: 20, fontWeight: 800, margin: '0 0 6px' }}>AI Research</h3>
-        <div style={{ fontSize: 30, fontWeight: 800, margin: '8px 0 2px' }}>{interval === 'monthly' ? '$9.99' : '$24.99'}</div>
+        <div style={{ fontSize: 30, fontWeight: 800, margin: '8px 0 2px' }}>{AI_RESEARCH_PRICE[interval]}</div>
         <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 14 }}>{interval === 'monthly' ? 'per month' : 'per quarter'}</div>
         <p style={{ color: 'var(--text-dim)', fontSize: 15, margin: '0 0 20px' }}>Talk to the Research — AI answers from the research library, with citations — plus the AI Coach. Included with All Access.</p>
         <button className="landing-cta" style={{ marginTop: 'auto' }} onClick={() => onBuy('ai_research', interval)} disabled={busyPlan !== null}>
