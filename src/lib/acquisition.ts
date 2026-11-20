@@ -12,6 +12,8 @@
  * deploy day onward is attributable.
  */
 
+import { sourceFrom } from './visitorSource';
+
 const KEY = 'acquisition_v1';
 
 export interface Acquisition {
@@ -28,20 +30,10 @@ export function captureAcquisition(): void {
   try {
     if (localStorage.getItem(KEY)) return; // first touch wins
 
-    const params = new URLSearchParams(window.location.search);
-    const source = params.get('utm_source') ?? undefined;
-    const medium = params.get('utm_medium') ?? undefined;
-    const campaign = params.get('utm_campaign') ?? undefined;
-    const content = params.get('utm_content') ?? undefined;
-
-    // External referrer only — same-site navigation is noise.
-    let referrer: string | undefined;
-    if (document.referrer) {
-      try {
-        const ref = new URL(document.referrer);
-        if (ref.host !== window.location.host) referrer = ref.host;
-      } catch { /* unparseable referrer — skip */ }
-    }
+    // UTM tags + the external referrer's host (same-site navigation is
+    // noise). Shared with visit tracking so the two always agree.
+    const { source, medium, campaign, content, referrer } =
+      sourceFrom(window.location.search, document.referrer, window.location.host);
 
     // Nothing to record for a direct, untagged visit — leave the slot open
     // so a later tagged/referred visit can still claim first touch.

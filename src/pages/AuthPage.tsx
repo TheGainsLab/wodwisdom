@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { getAcquisition } from '../lib/acquisition';
+import { currentVisitId } from '../lib/visitorEvents';
 import TurnstileWidget, { TURNSTILE_ENABLED } from '../components/TurnstileWidget';
 
 export default function AuthPage() {
@@ -54,7 +55,7 @@ export default function AuthPage() {
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
-          options: { data: { full_name: name, acquisition: getAcquisition() }, emailRedirectTo: redirectTo, captchaToken },
+          options: { data: { full_name: name, acquisition: getAcquisition(), visit_id: currentVisitId() }, emailRedirectTo: redirectTo, captchaToken },
         });
         if (error) throw error;
         if (!data.session) {
