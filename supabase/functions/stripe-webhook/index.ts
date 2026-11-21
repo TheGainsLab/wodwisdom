@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { fetchWithTimeout } from "../_shared/fetch-with-timeout.ts";
 import { raiseEngineMonthsFromGrant } from "../_shared/engine-months-drip.ts";
 import { countPaidPeriods, ENGINE_MONTHS_CAP, entitledEngineMonths, lastUnlockIso, subscriptionCadence } from "../_shared/engine-entitlement.ts";
+import { archiveProgramsIfAccessEnded } from "../_shared/program-archive.ts";
 import { ALERT_EMAIL, buildCancelScheduledEmail, buildCancelUnscheduledEmail, buildGoodbyeEmail, buildRecoveryEmail, emailWrap, escapeHtml, logEmailSend, sendViaResend, unsubscribeUrl } from "../_shared/checkout-emails.ts";
 
 // ── Billing-events ledger (capture item A) ──────────────────────────────────
@@ -385,6 +386,16 @@ serve(async (req) => {
             }, { onConflict: "user_id,feature,source", ignoreDuplicates: true });
           }
 
+          // Programming archive (2026-11-21): a purchase that REPLACES a
+          // Programming plan with one that has no Programming ends the
+          // athlete's Programming access. Only here, after the grants — the
+          // delete above also runs when the new plan carries Programming, and
+          // archiving between the two would archive a paying athlete. The
+          // helper re-reads what they hold now and never throws.
+          if (!features.includes("programming")) {
+            await archiveProgramsIfAccessEnded(supa, userId);
+          }
+
           // Seed Engine month 1 at grant time (mirrors the gym-grant path).
           // The invoice.payment_succeeded +1 races this handler — it looks
           // the user up by stripe_customer_id, which is only stored HERE —
@@ -629,6 +640,15 @@ serve(async (req) => {
               }, { onConflict: "user_id,feature,source", ignoreDuplicates: true });
             }
 
+            // Programming archive (2026-11-21): a plan change that dropped
+            // Programming ends that access — archive their program(s). After
+            // the reconcile, never before; a no-op unless they now hold no
+            // Programming from any source and have a program to archive, so
+            // the renewals that also fire this event cost two reads.
+            if (!features.includes("programming")) {
+              await archiveProgramsIfAccessEnded(supa, userId);
+            }
+
           }
         } else if (["incomplete_expired", "unpaid", "canceled"].includes(status)) {
           // Terminal statuses: revoke entitlements sourced from this
@@ -656,6 +676,10 @@ serve(async (req) => {
               .delete()
               .eq("user_id", profiles[0].id)
               .eq("source", subscriptionId);
+            // Programming archive (2026-11-21). Runs on every re-emitted
+            // event like the revocation above; idempotent, and a no-op for
+            // someone who holds Programming through another subscription.
+            await archiveProgramsIfAccessEnded(supa, profiles[0].id);
           }
 
           // Ledger + alert: unpaid/incomplete_expired = INVOLUNTARY churn (the
@@ -749,6 +773,10 @@ serve(async (req) => {
             .eq("user_id", profiles[0].id)
             .eq("source", subscriptionId);
 
+          // Programming archive (2026-11-21): the subscription is over. The
+          // helper checks what they hold NOW, so the old subscription of
+          // someone who already bought a new plan archives nothing.
+          await archiveProgramsIfAccessEnded(supa, profiles[0].id);
         }
 
         // The fork that decides everything downstream: WHY did this sub end?
@@ -1057,6 +1085,7 @@ serve(async (req) => {
             .select("id, generated_months")
             .eq("user_id", payUserId)
             .eq("source", "generated")
+            .is("archived_at", null) // an archived program does not exist to billing (2026-11-21)
             .order("created_at", { ascending: false })
             .limit(1);
 

@@ -1332,7 +1332,8 @@ Deno.serve(async (req) => {
           .from("programs")
           .select("id", { count: "exact", head: true })
           .eq("user_id", user.id)
-          .eq("source", "generated");
+          .eq("source", "generated")
+          .is("archived_at", null); // an archived program does not block a new one (2026-11-21)
         if ((existingCount ?? 0) > 0) {
           return new Response(
             JSON.stringify({

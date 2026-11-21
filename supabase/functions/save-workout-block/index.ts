@@ -8,6 +8,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { inferTimeDomain } from "../_shared/time-domain.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
+import { ARCHIVED_PROGRAM_ERROR, isLogOfArchivedProgram, isProgramDayArchived } from "../_shared/program-archive.ts";
 import { computeMetconPower, type MetconBlockInput } from "../_shared/metcon-workcalc.ts";
 import { computeCardioPower } from "../_shared/cardio-power.ts";
 
@@ -167,7 +168,18 @@ Deno.serve(async (req) => {
         );
       }
       preExistingStatus = existing.status as "in_progress" | "completed";
-    } else {
+    }
+
+    // Archived programs are view only (2026-11-21): no new block saved
+    // against one of their days, and no edit to a session already logged.
+    if (logId ? await isLogOfArchivedProgram(supa, logId) : await isProgramDayArchived(supa, body.source_id ?? null)) {
+      return new Response(
+        JSON.stringify({ error: ARCHIVED_PROGRAM_ERROR, code: "PROGRAM_ARCHIVED" }),
+        { status: 409, headers: { ...cors, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!logId) {
       // Create a new in-progress log
       const workoutText = body.workout_text?.trim() || "";
       const workoutType = WORKOUT_TYPES.includes(

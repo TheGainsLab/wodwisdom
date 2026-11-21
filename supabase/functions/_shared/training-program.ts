@@ -90,6 +90,7 @@ export async function fetchAndFormatProgramContext(
     .from("programs")
     .select("id, name, program_version")
     .eq("user_id", userId)
+    .is("archived_at", null) // the AI Coach does not see archived programs (2026-11-21)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();

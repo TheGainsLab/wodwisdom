@@ -19,6 +19,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { fetchWithTimeout } from "../_shared/fetch-with-timeout.ts";
+import { loadArchiveCutoff } from "../_shared/program-archive.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -53,10 +54,21 @@ Deno.serve(async (req) => {
       .select("id, generated_months, program_version")
       .eq("user_id", targetUserId)
       .eq("source", "generated")
+      .is("archived_at", null)
       .order("created_at", { ascending: false })
       .limit(1);
     const program = programs?.[0];
-    if (!program) return json({ error: "No generated program for this user" }, 404);
+    if (!program) {
+      // Archived programs are view only (2026-11-21): never rebuilt. Say so,
+      // rather than "no program", when that is why there is nothing to rebuild.
+      const { count: archivedCount } = await supa
+        .from("programs").select("id", { count: "exact", head: true })
+        .eq("user_id", targetUserId).eq("source", "generated").not("archived_at", "is", null);
+      if ((archivedCount ?? 0) > 0) {
+        return json({ error: "This user's program is archived — an archived program cannot be rebuilt. Restore it first, or let the athlete build a new one." }, 409);
+      }
+      return json({ error: "No generated program for this user" }, 404);
+    }
 
     const month = typeof body.month === "number" && body.month >= 1
       ? body.month
@@ -108,8 +120,14 @@ Deno.serve(async (req) => {
     // Mackenzie rebuild, 2026-10-24). A rebuild WANTS a fresh eval from the
     // athlete's current profile; keeping the stale one both blocks the
     // trigger and would misrepresent the rebuilt month.
-    await supa.from("profile_evaluations").delete()
+    // Keyed by user + month NUMBER: for someone with an archived program,
+    // only the evaluation written since the archive is this month's — the
+    // archived program's month record survives (2026-11-21).
+    const archiveCutoff = await loadArchiveCutoff(supa, targetUserId);
+    let evalDel = supa.from("profile_evaluations").delete()
       .eq("user_id", targetUserId).eq("month_number", month);
+    if (archiveCutoff) evalDel = evalDel.gt("created_at", archiveCutoff);
+    await evalDel;
     await supa.from("programs")
       .update({ generated_months: Math.max(month - 1, 1) })
       .eq("id", program.id);

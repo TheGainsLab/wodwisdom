@@ -41,6 +41,7 @@ import {
   formatCoachStateViolationsForRetry,
 } from "./coach-state-audits.ts";
 import { persistCoachState } from "./persist-coach-state.ts";
+import { loadArchiveCutoff } from "./program-archive.ts";
 import { MODELS } from "./model-profiles.ts";
 
 // Pipeline-family key for spend attribution; falls back to the shared key.
@@ -215,12 +216,19 @@ export async function generateAndPersistCoachState(
   const athleteModelVersion = payload.athlete_model.version;
 
   if (!opts.force) {
-    const { data: cached } = await supa
+    // Programming archive (2026-11-21): a coach state written before the
+    // athlete's programs were archived is the judgment behind the program
+    // they left — never reused, even when their profile has not changed.
+    // A returner's fresh evaluation is a fresh judgment. Null = never archived.
+    const archiveCutoff = await loadArchiveCutoff(supa, userId).catch(() => null);
+    let cachedQuery = supa
       .from("coach_states")
       .select("version, coach_state")
       .eq("user_id", userId)
       .eq("athlete_model_version", athleteModelVersion)
-      .eq("coach_state_builder_version", COACH_STATE_BUILDER_VERSION)
+      .eq("coach_state_builder_version", COACH_STATE_BUILDER_VERSION);
+    if (archiveCutoff) cachedQuery = cachedQuery.gt("created_at", archiveCutoff);
+    const { data: cached } = await cachedQuery
       .order("version", { ascending: false })
       .limit(1)
       .maybeSingle<CachedRow>();

@@ -9,6 +9,7 @@
  */
 
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { archivedProgramDayIds, withoutArchivedDays } from "./program-archive.ts";
 
 export interface WorkoutLogRow {
   id: string;
@@ -461,7 +462,10 @@ function formatEngineSession(session: EngineSessionRow): string {
 export async function fetchAndFormatRecentHistory(
   supa: SupabaseClient,
   userId: string,
-  options?: { days?: number; maxLines?: number }
+  // hideArchivedPrograms (2026-11-21): drop sessions of an ARCHIVED program.
+  // Set by the AI Coach only — the training log, workout review and nutrition
+  // analysis keep reading every session. Engine sessions are never affected.
+  options?: { days?: number; maxLines?: number; hideArchivedPrograms?: boolean }
 ): Promise<string> {
   const days = options?.days ?? 14;
   const { data: profileRow } = await supa
@@ -475,10 +479,10 @@ export async function fetchAndFormatRecentHistory(
     .toLocaleDateString('en-CA', { timeZone: userTz });
 
   // Fetch regular workout logs and Engine sessions in parallel
-  const [{ data: logs }, { data: engineSessions }] = await Promise.all([
+  const [{ data: allLogs }, { data: engineSessions }] = await Promise.all([
     supa
       .from("workout_logs")
-      .select("id, workout_date, workout_text, workout_type")
+      .select("id, workout_date, workout_text, workout_type, source_id")
       .eq("user_id", userId)
       .gte("workout_date", cutoffStr)
       .order("workout_date", { ascending: false }),
@@ -490,6 +494,11 @@ export async function fetchAndFormatRecentHistory(
       .gte("date", cutoffStr)
       .order("date", { ascending: false }),
   ]);
+
+  let logs = allLogs as Array<WorkoutLogRow & { source_id?: string | null }> | null;
+  if (options?.hideArchivedPrograms && logs && logs.length > 0) {
+    logs = withoutArchivedDays(logs, await archivedProgramDayIds(supa, logs.map((l) => l.source_id)));
+  }
 
   const hasLogs = logs && (logs as WorkoutLogRow[]).length > 0;
   const hasEngine = engineSessions && (engineSessions as EngineSessionRow[]).length > 0;

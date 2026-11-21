@@ -129,6 +129,7 @@ Deno.serve(async (_req) => {
           .select("id, generated_months, program_version")
           .eq("user_id", userId)
           .eq("source", "generated")
+          .is("archived_at", null) // archived programs do not exist to the drip (2026-11-21)
           .order("created_at", { ascending: false })
           .limit(1);
 

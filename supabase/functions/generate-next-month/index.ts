@@ -16,6 +16,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
+import { isArchived, loadArchiveCutoff } from "../_shared/program-archive.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -91,7 +92,7 @@ Deno.serve(async (req) => {
     if (reqProgramId) {
       const { data, error } = await supa
         .from("programs")
-        .select("id, generated_months, source, program_version")
+        .select("id, generated_months, source, program_version, archived_at")
         .eq("id", reqProgramId)
         .eq("user_id", userId)
         .maybeSingle();
@@ -101,6 +102,14 @@ Deno.serve(async (req) => {
           { status: 404, headers: { ...cors, "Content-Type": "application/json" } }
         );
       }
+      // Archived programs are view only (2026-11-21): no caller — athlete,
+      // admin, webhook or cron — may add a month to one.
+      if (isArchived(data)) {
+        return new Response(
+          JSON.stringify({ error: "This program is archived — it cannot get a new month. Build a new program instead." }),
+          { status: 409, headers: { ...cors, "Content-Type": "application/json" } }
+        );
+      }
       program = data;
     } else {
       const { data } = await supa
@@ -108,6 +117,7 @@ Deno.serve(async (req) => {
         .select("id, generated_months, source, program_version")
         .eq("user_id", userId)
         .eq("source", "generated")
+        .is("archived_at", null) // a returner has no program: first-gen at Month 1 (2026-11-21)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -335,10 +345,18 @@ Deno.serve(async (req) => {
         if (evaluationId) {
           await supa.from("profile_evaluations").delete().eq("id", evaluationId).then(() => {}, () => {});
         }
-        await Promise.allSettled([
-          supa.from("training_evaluations").delete().eq("user_id", userId).eq("month_number", targetMonth),
-          supa.from("nutrition_evaluations").delete().eq("user_id", userId).eq("month_number", targetMonth),
-        ]);
+        // These are keyed by user + month NUMBER, and a returner's new
+        // program reuses month numbers their archived program already has.
+        // Only rows written since the archive are this attempt's to remove —
+        // the archived program's month records must survive (2026-11-21).
+        const archiveCutoff = await loadArchiveCutoff(supa, userId);
+        let trainingDel = supa.from("training_evaluations").delete().eq("user_id", userId).eq("month_number", targetMonth);
+        let nutritionDel = supa.from("nutrition_evaluations").delete().eq("user_id", userId).eq("month_number", targetMonth);
+        if (archiveCutoff) {
+          trainingDel = trainingDel.gt("created_at", archiveCutoff);
+          nutritionDel = nutritionDel.gt("created_at", archiveCutoff);
+        }
+        await Promise.allSettled([trainingDel, nutritionDel]);
       }
       return new Response(
         JSON.stringify({ error: "Failed to start program generation" }),

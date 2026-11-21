@@ -5,6 +5,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
+import { ARCHIVED_PROGRAM_ERROR, isLogOfArchivedProgram } from "../_shared/program-archive.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -92,6 +93,15 @@ Deno.serve(async (req) => {
     if (!log) {
       return new Response(JSON.stringify({ error: "Not authorized" }), {
         status: 403,
+        headers: { ...cors, "Content-Type": "application/json" },
+      });
+    }
+
+    // Archived programs are view only (2026-11-21): their sessions stay in
+    // the training log exactly as they were logged.
+    if (await isLogOfArchivedProgram(supa, log.id)) {
+      return new Response(JSON.stringify({ error: ARCHIVED_PROGRAM_ERROR, code: "PROGRAM_ARCHIVED" }), {
+        status: 409,
         headers: { ...cors, "Content-Type": "application/json" },
       });
     }

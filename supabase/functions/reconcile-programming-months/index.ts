@@ -46,6 +46,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { fetchWithTimeout } from "../_shared/fetch-with-timeout.ts";
 import { getTierStatus } from "../_shared/tier-status.ts";
+import { RETURNER_BUILD_WAIT_DAYS, returnerStillHasTheButton } from "../_shared/program-archive.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -263,12 +264,45 @@ async function reconcileOne(
     .select("id, generated_months, program_version")
     .eq("user_id", userId)
     .eq("source", "generated")
+    .is("archived_at", null) // an archived program is not a delivery (2026-11-21)
     .order("created_at", { ascending: false })
     .limit(1);
   const latest = progs?.[0] ?? null;
   const delivered = latest ? (latest.generated_months as number | null) || 1 : 0;
 
   if (delivered >= entitled) return "healthy";
+
+  // --- RETURNER (founder, 2026-11-21): no active program but an archived
+  // one — they left and came back, and they start again at Month 1 from a
+  // FRESH evaluation. Their profile is usually complete, so without this the
+  // heal below would build that month from numbers they have not looked at
+  // since they left, the day after they pay. They own the Generate button for
+  // RETURNER_BUILD_WAIT_DAYS from the start of this subscription; after that a
+  // paid month must not evaporate on silence, and the first-gen heal below
+  // runs (it runs its own fresh evaluation). Someone with no archived
+  // program is not a returner and is handled exactly as before.
+  if (delivered === 0) {
+    const { count: archivedCount } = await supa
+      .from("programs")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("source", "generated")
+      .not("archived_at", "is", null);
+    if ((archivedCount ?? 0) > 0) {
+      const startSec = (sub.start_date as number | undefined) ?? (sub.created as number | undefined);
+      const startMs = typeof startSec === "number" ? startSec * 1000 : null;
+      if (returnerStillHasTheButton(startMs)) {
+        const ageDays = startMs == null ? null : (Date.now() - startMs) / MS_PER_DAY;
+        return {
+          user_id: userId,
+          email,
+          reason: `returner:awaiting_athlete:${ageDays == null ? "unknown_start" : `${ageDays.toFixed(1)}d`}_of_${RETURNER_BUILD_WAIT_DAYS}d`,
+          delivered,
+          entitled,
+        };
+      }
+    }
+  }
 
   // --- Cadence guard: paid-behind is only healable when the NEXT month is
   // actually due — >= 28 days since the last month was DELIVERED (the month-N

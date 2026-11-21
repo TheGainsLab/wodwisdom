@@ -77,6 +77,7 @@ Deno.serve(async (req) => {
         .select("id, program_version, created_at, generated_months")
         .eq("user_id", userId)
         .eq("source", "generated")
+        .is("archived_at", null) // an archived program is not "their program" (2026-11-21)
         .order("created_at", { ascending: false })
         .limit(1);
       const latest = progs?.[0];

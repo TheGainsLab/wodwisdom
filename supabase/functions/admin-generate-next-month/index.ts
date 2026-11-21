@@ -64,10 +64,20 @@ Deno.serve(async (req) => {
       .select("id, generated_months, program_version")
       .eq("user_id", targetUserId)
       .eq("source", "generated")
+      .is("archived_at", null)
       .order("created_at", { ascending: false })
       .limit(1);
     const program = programs?.[0];
-    if (!program) return json({ error: "No generated program for this user — there is no month to follow" }, 404);
+    if (!program) {
+      // Archived programs are view only (2026-11-21): no new months.
+      const { count: archivedCount } = await supa
+        .from("programs").select("id", { count: "exact", head: true })
+        .eq("user_id", targetUserId).eq("source", "generated").not("archived_at", "is", null);
+      if ((archivedCount ?? 0) > 0) {
+        return json({ error: "This user's program is archived — an archived program gets no new months. Restore it first, or let the athlete build a new one." }, 409);
+      }
+      return json({ error: "No generated program for this user — there is no month to follow" }, 404);
+    }
     const targetMonth = (program.generated_months || 1) + 1;
 
     // One generation at a time per athlete: a second click while a job is

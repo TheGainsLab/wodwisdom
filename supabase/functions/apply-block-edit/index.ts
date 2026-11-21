@@ -14,6 +14,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
+import { ARCHIVED_PROGRAM_ERROR, isProgramDayArchived } from "../_shared/program-archive.ts";
 import {
   applyBlockProposal,
   loadOwnedBlock,
@@ -72,7 +73,16 @@ Deno.serve(async (req) => {
 
     // apply — verify the block still belongs to this athlete before writing.
     const owned = await loadOwnedBlock(supa, logRow.block_id as string, user.id);
-    if (!owned) return json({ error: "Block not found" }, cors, 404);
+    if (!owned) {
+      // loadOwnedBlock also refuses a block in an archived program (view
+      // only, 2026-11-21) — say that, rather than "not found".
+      const { data: blk } = await supa
+        .from("program_blocks_v2").select("program_workout_id").eq("id", logRow.block_id as string).maybeSingle();
+      if (await isProgramDayArchived(supa, blk?.program_workout_id as string | undefined)) {
+        return json({ error: ARCHIVED_PROGRAM_ERROR, code: "PROGRAM_ARCHIVED" }, cors, 409);
+      }
+      return json({ error: "Block not found" }, cors, 404);
+    }
 
     const proposal = logRow.proposal as BlockPrescription;
     await applyBlockProposal(supa, logRow.block_id as string, proposal);
