@@ -64,6 +64,9 @@ interface SigRow {
   time_domain?: string | null; format?: string | null;
   archetype?: string | null; rationale?: string | null; measured?: Measured | null;
   status?: string; created_at?: string;
+  /** Echo of the draft response's context (prompt hash, model id); present
+   *  only when the weights were drafted in this editing session. */
+  draft_context?: unknown;
 }
 interface Baseline { demand: Weights; discrimination: Weights; stimulus: Weights; measured: Measured | null }
 interface MeasuredLib {
@@ -241,7 +244,7 @@ export default function AdminSignaturesPage({ session }: { session: Session }) {
           gates: sig.gates ?? [], time_domain: sig.time_domain ?? null,
           format: sig.format ?? null, archetype: sig.archetype ?? null,
           rationale: sig.rationale ?? null, measured: d.measured ?? null,
-          drafted_model: 'sonnet',
+          drafted_model: 'sonnet', draft_context: d.draft_context ?? undefined,
         });
         setBulkLog((l) => [...l.slice(0, -1), `✓ ${b.name}`]);
       } catch (e) {
@@ -278,6 +281,7 @@ export default function AdminSignaturesPage({ session }: { session: Session }) {
       archetype: sig.archetype ?? sel.archetype,
       rationale: sig.rationale ?? sel.rationale,
       measured: (out.measured as Measured | null) ?? sel.measured,
+      draft_context: out.draft_context ?? sel.draft_context,
     };
     setSel(next);
     if (!baseline) setBaseline(snapshot(next)); // first draft anchors the baseline
@@ -305,7 +309,7 @@ export default function AdminSignaturesPage({ session }: { session: Session }) {
       gates: sel.gates, time_domain: sel.time_domain ?? null, format: sel.format ?? null,
       archetype: sel.archetype ?? null, rationale: sel.rationale ?? null,
       measured: sel.measured ?? null, drafted_model: 'sonnet',
-      loads_women: split.loads,
+      loads_women: split.loads, draft_context: sel.draft_context,
     };
     if (statusAction === 'reject') { await invokeSig({ action: 'reject', id: sel.id }); }
     else {

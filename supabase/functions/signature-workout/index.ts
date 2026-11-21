@@ -70,9 +70,12 @@ import {
   type ObservedMedianRow,
 } from "../_shared/fixtures/open-observed-medians.ts";
 import {
+  buildDraftContext,
   claimEvidence,
   DEFAULT_PROVENANCE,
   draftSignature,
+  parseDraftContext,
+  withDraftContext,
   parseWorkout,
   evidenceHashesFor,
   extractJson,
@@ -364,6 +367,10 @@ Deno.serve(async (req) => {
       const signature = await draftSignature(workout, library, measured, ANTHROPIC_API_KEY!);
       return json({
         signature, measured, measured_library: library,
+        // What the judge was shown (prompt hash, model id; the admin path
+        // passes no precedents). The client echoes this back on save so it
+        // lands in provenance.draft — draft and save are separate requests.
+        draft_context: await buildDraftContext("admin", []),
         drafted_model: "sonnet",
         loads_women_invalid: loadsWomenInvalid,
         loads_women_applied: loadsWomenApplied,
@@ -375,6 +382,9 @@ Deno.serve(async (req) => {
       const sigErrors = validateSignature(fields as Partial<SignatureDraft>, false);
       if (sigErrors.length > 0) return json({ error: sigErrors.join("; ") }, 422);
       const id = typeof body.id === "string" ? body.id : null;
+      // Echoed from the draft response; absent when the weights were not
+      // (re)drafted in this editing session — the stored context then stands.
+      const draftCtx = parseDraftContext(body.draft_context);
       let existingRow: { workout_hash: string | null; provenance: unknown; source: string; name: string } | null = null;
       if (id) {
         const { data } = await supa
@@ -398,9 +408,12 @@ Deno.serve(async (req) => {
         if (!existing) return json({ error: "NOT_FOUND" }, 404);
         const hashChanged = !!fields.workout_hash && !!existing.workout_hash &&
           fields.workout_hash !== existing.workout_hash;
-        fields.provenance = staleMarkProvenance(
-          (existing.provenance ?? DEFAULT_PROVENANCE) as Record<string, { kind?: string }>,
-          hashChanged,
+        fields.provenance = withDraftContext(
+          staleMarkProvenance(
+            (existing.provenance ?? DEFAULT_PROVENANCE) as Record<string, { kind?: string }>,
+            hashChanged,
+          ),
+          draftCtx,
         );
         const { data, error } = await supa
           .from("workout_signatures")
@@ -434,7 +447,11 @@ Deno.serve(async (req) => {
         }
         const { data, error } = await supa
           .from("workout_signatures")
-          .update({ ...fields, provenance: DEFAULT_PROVENANCE, updated_at: new Date().toISOString() })
+          .update({
+            ...fields,
+            provenance: withDraftContext(DEFAULT_PROVENANCE, draftCtx),
+            updated_at: new Date().toISOString(),
+          })
           .eq("id", existing.id).select().single();
         if (error) return json({ error: error.message }, 500);
         const hashes = (data.evidence_hashes ?? []) as string[];
@@ -450,7 +467,11 @@ Deno.serve(async (req) => {
       }
       const { data, error } = await supa
         .from("workout_signatures")
-        .insert({ ...fields, status: "draft", provenance: DEFAULT_PROVENANCE })
+        .insert({
+          ...fields,
+          status: "draft",
+          provenance: withDraftContext(DEFAULT_PROVENANCE, draftCtx),
+        })
         .select().single();
       if (error) return json({ error: error.message }, 500);
       const newHashes = (data.evidence_hashes ?? []) as string[];
@@ -488,6 +509,14 @@ Deno.serve(async (req) => {
           fields.provenance = staleMarkProvenance(
             (existing.provenance ?? DEFAULT_PROVENANCE) as Record<string, { kind?: string }>,
             !!existing.workout_hash && fields.workout_hash !== existing.workout_hash,
+          );
+        }
+        // A re-draft made in the editor and approved in one step.
+        const draftCtx = parseDraftContext(body.draft_context);
+        if (draftCtx) {
+          fields.provenance = withDraftContext(
+            fields.provenance ?? existing.provenance ?? DEFAULT_PROVENANCE,
+            draftCtx,
           );
         }
         Object.assign(update, fields, { approved_at: new Date().toISOString() });

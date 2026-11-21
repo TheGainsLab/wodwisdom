@@ -18,7 +18,17 @@ import {
   processClaimedJobs,
   type QueueJob,
 } from "./signature-draft-queue.ts";
-import { evidenceHashesFor, type SignatureDraft } from "./signature-draft-core.ts";
+import {
+  buildDraftAsk,
+  buildDraftContext,
+  DRAFT_MODEL,
+  draftPromptHash,
+  evidenceHashesFor,
+  parseDraftContext,
+  type SignatureDraft,
+  type SignatureExemplar,
+  withDraftContext,
+} from "./signature-draft-core.ts";
 import type { BlockPrescription } from "./v2-output-schema.ts";
 
 // ── Generic chainable supabase fake ──────────────────────────────────────
@@ -435,4 +445,84 @@ Deno.test("worker: lost drainer lease stops the batch and requeues the remainder
   // The claim-charged attempt is refunded: these jobs were never drafted.
   assertEquals(queueMarks[1].attempts, 0);
   assertEquals(queueMarks[2].attempts, 0);
+});
+
+// ── Draft context (provenance.draft) ─────────────────────────────────────
+
+Deno.test("draft ask: the framing text is pinned byte for byte", () => {
+  const ask = buildDraftAsk(
+    { block_type: "metcon", movements: [{ movement: "Row", calories: 12 }] } as unknown as BlockPrescription,
+    { expected_rel_iqr: 0.3 },
+    null,
+    [{ name: "x", demand: { midline: 100 }, discrimination: null, stimulus: null, gates: [] }],
+  );
+  assertEquals(
+    ask,
+    'Tag this workout:\n\n{\n  "block_type": "metcon",\n  "movements": [\n    {\n      "movement": "Row",\n      "calories": 12\n    }\n  ]\n}' +
+      "\n\nMEASURED CONTEXT (condition your judgments on these — they outrank your priors):\n" +
+      'Leaderboard facts (general Open population): {"expected_rel_iqr":0.3} — capped_frac = share that never finished (ranked by reps where the clock bit); pile_at_score/pile_share = the measured wall (whether it is a gate is the mechanism call); expected_rel_iqr = typical relative spread for this duration and scoring class.' +
+      "\n\nRATIFIED PRECEDENTS (reviewed signatures of similar workouts — consistency anchors, NOT answers; this workout's own structure governs):\n" +
+      '[{"name":"x","demand":{"midline":100},"discrimination":null,"stimulus":null,"gates":[]}]',
+  );
+});
+
+Deno.test("draft context: built, round-trips through a client, bad shapes refused", async () => {
+  const ctx = await buildDraftContext("admin", []);
+  assertEquals(/^[0-9a-f]{16}$/.test(ctx.prompt_hash), true);
+  assertEquals(ctx.prompt_hash, await draftPromptHash()); // stable within a build
+  assertEquals(ctx.model, DRAFT_MODEL);
+  assertEquals(parseDraftContext(JSON.parse(JSON.stringify(ctx))), ctx);
+  assertEquals(parseDraftContext(undefined), null);
+  assertEquals(parseDraftContext({ ...ctx, prompt_hash: "nope" }), null);
+  assertEquals(parseDraftContext({ ...ctx, path: "elsewhere" }), null);
+  assertEquals(parseDraftContext({ ...ctx, precedent_ids: [1] }), null);
+  assertEquals(parseDraftContext({ ...ctx, drafted_at: "not a date" }), null);
+  // No context → provenance unchanged; a stored context survives a null.
+  assertEquals(withDraftContext({ demand: { kind: "editorial" } }, null), { demand: { kind: "editorial" } });
+  assertEquals(withDraftContext({ draft: ctx }, null), { draft: ctx });
+});
+
+Deno.test("worker: records what the judge was shown; precedent ids never reach the prompt", async () => {
+  // deno-lint-ignore no-explicit-any
+  const inserted: any[] = [];
+  let shown: SignatureExemplar[] = [];
+  const precedent = {
+    id: "11111111-1111-1111-1111-111111111111",
+    name: "22.3",
+    archetype: "gymnastics ladder with cap",
+    time_domain: "medium",
+    format: "for_time",
+    demand: { gymnastics_pulling: 100 },
+    discrimination: null,
+    stimulus: null,
+    gates: [],
+  };
+  const { client } = fakeSupa({
+    "workout_signatures.select": (q) =>
+      q.args.overlaps ? { data: [], error: null } : { data: [precedent], error: null },
+    "workout_signatures.insert": (q) => {
+      inserted.push(q.row);
+      return { data: { id: "sig1" }, error: null };
+    },
+    "signature_evidence.update": ok,
+    "signature_draft_queue.update": ok,
+    "signature_duration_curve.select": ok,
+  });
+  const stats = await processClaimedJobs(client, [await structureJob()], {
+    draftFn: (_w, _l, _m, ex) => {
+      shown = ex;
+      return stubDraft();
+    },
+    measureFn: measuredStub,
+    apiKey: "test",
+  });
+  assertEquals(stats.done, 1);
+  const { id: _id, ...withoutId } = precedent;
+  assertEquals(JSON.stringify(shown), JSON.stringify([withoutId]));
+  const draft = inserted[0].provenance.draft;
+  assertEquals(draft.path, "queue");
+  assertEquals(draft.model, DRAFT_MODEL);
+  assertEquals(draft.prompt_hash, await draftPromptHash());
+  assertEquals(draft.precedent_ids, [precedent.id]);
+  assertEquals(inserted[0].provenance.demand, { kind: "editorial" });
 });
