@@ -48,6 +48,7 @@ jobs:
             supabase/functions/_shared/signature-cohort-select_test.ts \
             supabase/functions/_shared/signature-hash_test.ts \
             supabase/functions/_shared/signature-distance_test.ts \
+            supabase/functions/_shared/signature-program-variation_test.ts \
             supabase/functions/_shared/fixtures/open-observed-medians_test.ts \
             supabase/functions/_shared/compute-block-benchmark_test.ts \
             supabase/functions/_shared/signature-gate-splice_test.ts
