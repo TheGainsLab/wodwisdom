@@ -140,6 +140,16 @@ export interface SignatureLike {
   time_domain?: string | null;
   workout?: {
     time_cap_seconds?: number | null;
+    /** Rendered header text ("21-15-9 for time (7-min cap)"). */
+    block_scheme?: string | null;
+    /** The typed format the header is rendered from (generated blocks). */
+    scheme_format?: {
+      format?: string | null;
+      minutes?: number | null;
+      rounds?: number | null;
+      work_seconds?: number | null;
+      rest_seconds?: number | null;
+    } | null;
     movements?: Array<{ movement?: string | null }> | null;
   } | null;
   measured?: { median_seconds?: number | null } | null;
