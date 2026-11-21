@@ -41,6 +41,7 @@ import {
   triggerDraftWorker,
 } from "../_shared/signature-draft-queue.ts";
 import { markUserNotesConsumed } from "../_shared/coach-notes.ts";
+import { isArchived, isProgramArchived, loadArchiveCutoff } from "../_shared/program-archive.ts";
 import { buildProgramEvidenceContext } from "../_shared/program-evidence.ts";
 import { buildTrainingDesignInput } from "../_shared/training-design-input.ts";
 import { type SkeletonOutput } from "../_shared/v3-output-schema.ts";
@@ -224,6 +225,10 @@ async function stagePayloadBuilding(
     includeEvaluations: true,
     monthNumber,
     includeEngineTraining: true,
+    // A NEW program for someone whose programs were archived is built from an
+    // evaluation run since the archive, or not at all (founder, 2026-11-21).
+    // Appends and week fills keep today's soft contract.
+    requireFreshEvaluation: rs.continuation.programId == null && rs.weeklyFill == null,
   });
   console.log(
     `[generate-program-v3] payload built (days_per_week=${payload.training_context.days_per_week} competition_linked=${payload.competition != null} vocabulary_size=${payload.vocabulary.length} engine_evidence=${payload.engine_training != null})`,
@@ -286,8 +291,14 @@ async function stageCoachState(
   const review = typeof coachState.month_in_review === "string" ? coachState.month_in_review.trim() : "";
   if (review) {
     try {
-      await supa.from("training_evaluations").delete()
+      // Keyed by user + month NUMBER: a returner's new Month 1 must not wipe
+      // the review their archived program's Month 1 left behind. Only rows
+      // written since the archive belong to this program (2026-11-21).
+      const archiveCutoff = await loadArchiveCutoff(supa, job.user_id);
+      let staleReview = supa.from("training_evaluations").delete()
         .eq("user_id", job.user_id).eq("month_number", monthNumber);
+      if (archiveCutoff) staleReview = staleReview.gt("created_at", archiveCutoff);
+      await staleReview;
       const { error: reviewErr } = await supa.from("training_evaluations").insert({
         user_id: job.user_id,
         analysis: review,
@@ -922,6 +933,11 @@ async function stageSaving(
   //  - first-cycle fresh: create the shell now so the dispatcher always saves in
   //    append mode and the program_months marker can dedup every case.
   let programId = rs.continuation.programId ?? rs.programId ?? null;
+  // The program was archived while this job ran (access ended mid-build):
+  // an archived program gets no new week or month (2026-11-21).
+  if (rs.continuation.programId && await isProgramArchived(supa, rs.continuation.programId)) {
+    throw new Error("[generate-program-v3] program was archived during generation; nothing saved");
+  }
   let createdShell = false;
   if (!programId) {
     const { data: shell, error: shellErr } = await supa
@@ -1220,9 +1236,10 @@ Deno.serve(async (req) => {
     if (reqFillWeek != null) {
       if (!isServiceCall || !reqProgramId) return jsonErr(400, "Bad Request", "fill_week needs a service call with program_id.");
       const { data: prog } = await supa
-        .from("programs").select("id, generated_months, weekly_mode, program_version")
+        .from("programs").select("id, generated_months, weekly_mode, program_version, archived_at")
         .eq("id", reqProgramId).eq("user_id", userId).maybeSingle();
       if (!prog) return jsonErr(404, "Program not found");
+      if (isArchived(prog)) return jsonErr(409, "PROGRAM_ARCHIVED", "This program is archived — it gets no new weeks.");
       if (prog.program_version !== "v3" || !prog.weekly_mode) return jsonErr(400, "Bad Request", "Not a weekly v3 program.");
       const monthNumber = reqMonthNumber ?? (prog.generated_months || 1);
       const { data: activeJob } = await supa
@@ -1249,11 +1266,15 @@ Deno.serve(async (req) => {
     if (reqProgramId) {
       const { data: prog } = await supa
         .from("programs")
-        .select("id, generated_months, program_version")
+        .select("id, generated_months, program_version, archived_at")
         .eq("id", reqProgramId)
         .eq("user_id", userId)
         .maybeSingle();
       if (!prog) return jsonErr(404, "Program not found");
+      // Archived programs are view only (2026-11-21).
+      if (isArchived(prog)) {
+        return jsonErr(409, "PROGRAM_ARCHIVED", "This program is archived — it cannot get a new month. Build a new program instead.");
+      }
       if (prog.program_version !== "v3") {
         return jsonErr(400, "Bad Request", "Continuation requires a v3 program.");
       }
@@ -1271,6 +1292,28 @@ Deno.serve(async (req) => {
       }
     } else {
       monthNumber = isServiceCall ? (reqMonthNumber ?? 1) : 1;
+      // RETURNER (founder, 2026-11-21): someone whose programs were archived
+      // builds a new one only from an evaluation run SINCE the archive — the
+      // one they left behind describes an athlete who has been away. Athlete
+      // callers only: the service first-gen (generate-next-month) runs its own
+      // fresh evaluation just before calling here, and the payload builder
+      // refuses to read an old one either way.
+      if (!isServiceCall) {
+        const archiveCutoff = await loadArchiveCutoff(supa, userId);
+        if (archiveCutoff) {
+          const { data: freshEval } = await supa
+            .from("profile_evaluations")
+            .select("id")
+            .eq("user_id", userId)
+            .eq("status", "complete")
+            .gt("created_at", archiveCutoff)
+            .limit(1)
+            .maybeSingle();
+          if (!freshEval) {
+            return jsonErr(409, "EVALUATION_REQUIRED", "Run your evaluation first — your new program is built from it.");
+          }
+        }
+      }
     }
 
     // ── Concurrency guard (Sep '26): a user fired three generations in 20

@@ -20,6 +20,7 @@ import {
   type MovementsRow,
 } from "../_shared/build-movements-context.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
+import { ARCHIVED_PROGRAM_ERROR, isArchived } from "../_shared/program-archive.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -218,7 +219,7 @@ Deno.serve(async (req) => {
 
     const { data: program, error: pErr } = await supa
       .from("programs")
-      .select("id, user_id")
+      .select("id, user_id, archived_at")
       .eq("id", program_id)
       .single();
 
@@ -226,6 +227,13 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({ error: "Program not found or not authorized" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    // Archived programs are view only (2026-11-21).
+    if (isArchived(program)) {
+      return new Response(
+        JSON.stringify({ error: ARCHIVED_PROGRAM_ERROR, code: "PROGRAM_ARCHIVED" }),
+        { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 

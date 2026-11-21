@@ -33,6 +33,8 @@ interface ScheduledEntry {
   week_num: number;
   day_num: number;
   program_name: string;
+  /** A past calendar entry of an archived program: shown, view only. */
+  archived: boolean;
 }
 
 // A completed Engine session, surfaced on the calendar as a completed day.
@@ -126,7 +128,7 @@ interface SchedJoinRow {
     program_id: string;
     week_num: number;
     day_num: number;
-    programs: { name: string } | null;
+    programs: { name: string; archived_at?: string | null } | null;
   } | null;
 }
 
@@ -509,6 +511,11 @@ export default function TrainingLogPage({ session }: { session: Session }) {
   const [navOpen, setNavOpen] = useState(false);
   const [logs, setLogs] = useState<WorkoutLog[]>([]);
   const [scheduled, setScheduled] = useState<ScheduledEntry[]>([]);
+  // Archived programs (2026-11-21): their sessions stay on the calendar and
+  // in analytics under their original dates, but are view only — no editing
+  // a logged session, no scheduling one of their days. Days = program day ids.
+  const [archivedProgramIds, setArchivedProgramIds] = useState<Set<string>>(new Set());
+  const [archivedDayIds, setArchivedDayIds] = useState<Set<string>>(new Set());
   const [engineSessions, setEngineSessions] = useState<EngineSession[]>([]);
   const [activities, setActivities] = useState<AthleteActivity[]>([]);
   const [engineScheduled, setEngineScheduled] = useState<EngineSchedEntry[]>([]);
@@ -631,6 +638,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
   const [editSaving, setEditSaving] = useState(false);
 
   const startEdit = (entry: WorkoutLogEntry) => {
+    if (isArchivedLog(entry.log_id)) return; // archived sessions are view only
     setEditingEntryId(entry.id);
     setEditFields({
       weight: entry.weight != null ? String(entry.weight) : '',
@@ -713,10 +721,11 @@ export default function TrainingLogPage({ session }: { session: Session }) {
   // Forward-looking scheduled days (both sources) for the calendar overlay.
   // Re-run after a calendar-first add/remove so the grid + day-detail update.
   const fetchSchedules = useCallback(async () => {
+    const today = localDateString();
     const [{ data: sched }, { data: engSched }] = await Promise.all([
       supabase
         .from('training_schedule')
-        .select('id, scheduled_date, program_workout_id, program_workouts!inner(program_id, week_num, day_num, programs!inner(name))')
+        .select('id, scheduled_date, program_workout_id, program_workouts!inner(program_id, week_num, day_num, programs!inner(name, archived_at))')
         .eq('user_id', session.user.id)
         .not('program_workout_id', 'is', null),
       supabase
@@ -737,9 +746,14 @@ export default function TrainingLogPage({ session }: { session: Session }) {
           week_num: pw.week_num,
           day_num: pw.day_num,
           program_name: pw.programs?.name ?? 'Program',
+          archived: !!pw.programs?.archived_at,
         };
       })
-      .filter((r): r is ScheduledEntry => r !== null);
+      .filter((r): r is ScheduledEntry => r !== null)
+      // A day of an archived program is never upcoming: the archive removes
+      // its future calendar entries, and any that slipped through are not
+      // shown. Past ones stay as a record of what was planned.
+      .filter((r) => !r.archived || r.scheduled_date < today);
     setScheduled(schedRows);
     // Sequence-identity: routes address program positions, so resolve each
     // scheduled catalog day to its (earliest) position in the user's current
@@ -784,6 +798,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
           .from('programs')
           .select('id, name')
           .eq('user_id', session.user.id)
+          .is('archived_at', null) // an archived program's days cannot be scheduled
           .order('created_at', { ascending: false });
         const programList = ((progs as { id: string; name: string }[]) || []);
         if (programList.length) {
@@ -938,6 +953,17 @@ export default function TrainingLogPage({ session }: { session: Session }) {
       setLogs(logRows);
 
       await fetchSchedules();
+
+      // Which program days belong to an archived program (view only).
+      const { data: archProgs } = await supabase
+        .from('programs').select('id').eq('user_id', session.user.id).not('archived_at', 'is', null);
+      const archIds = ((archProgs as { id: string }[] | null) ?? []).map((p) => p.id);
+      if (archIds.length) {
+        const { data: archDays } = await supabase
+          .from('program_workouts').select('id').in('program_id', archIds).limit(5000);
+        setArchivedProgramIds(new Set(archIds));
+        setArchivedDayIds(new Set(((archDays as { id: string }[] | null) ?? []).map((d) => d.id)));
+      }
 
       // Completed Engine sessions → completed days on the same calendar.
       const { data: engRows } = await supabase
@@ -1134,6 +1160,12 @@ export default function TrainingLogPage({ session }: { session: Session }) {
     return m;
   }, [scheduled]);
   const logById = useMemo(() => new Map(logs.map(l => [l.id, l])), [logs]);
+  // Sessions logged against a day of an archived program — shown, not editable.
+  const archivedLogIds = useMemo(
+    () => new Set(logs.filter(l => !!l.source_id && archivedDayIds.has(l.source_id)).map(l => l.id)),
+    [logs, archivedDayIds],
+  );
+  const isArchivedLog = (logId: string | null | undefined) => !!logId && archivedLogIds.has(logId);
   // Blocks completed per date (numerator only — a date can hold blocks from
   // several workouts, so no denominator). Shown on in-progress cells.
   const blockCounts = useMemo(() => {
@@ -1763,15 +1795,17 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                         <div className="wc-day-scheduled">
                           <div className="wc-day-scheduled-label">
                             <Calendar size={13} />
-                            Scheduled · {s.program_name} · Wk {s.week_num} Day {s.day_num}
+                            {s.archived ? 'Archived' : 'Scheduled'} · {s.program_name} · Wk {s.week_num} Day {s.day_num}
                           </div>
-                          <button type="button" className="wc-day-ghost-btn wc-day-ghost-btn--icon" onClick={() => handleUnschedule(s.id)} aria-label="Remove from calendar"><X size={13} /></button>
+                          {!s.archived && (
+                            <button type="button" className="wc-day-ghost-btn wc-day-ghost-btn--icon" onClick={() => handleUnschedule(s.id)} aria-label="Remove from calendar"><X size={13} /></button>
+                          )}
                         </div>
                         <div className="wc-day-sched-actions">
                           <button type="button" className={`wc-day-ghost-btn${previewOpen.has(s.id) ? ' wc-day-ghost-btn--active' : ''}`} onClick={() => togglePreview(s.id)} aria-expanded={previewOpen.has(s.id)}>
                             <ChevronDown size={13} style={{ transform: previewOpen.has(s.id) ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} /> Preview
                           </button>
-                          <button type="button" className="wc-day-scheduled-open" onClick={() => navigate(`/day/${s.program_workout_id}`)}>Start</button>
+                          <button type="button" className="wc-day-scheduled-open" onClick={() => navigate(`/day/${s.program_workout_id}`)}>{s.archived ? 'View' : 'Start'}</button>
                         </div>
                         {previewOpen.has(s.id) && <SchedulePreview workoutId={s.program_workout_id} />}
                       </div>
@@ -1929,6 +1963,9 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                                 {schedNote && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>· {schedNote}</span>}
                               </div>
                             </div>
+                            {isArchivedLog(log.id) ? (
+                              <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--text-muted)', flexShrink: 0, padding: '4px 0' }}>Archived · view only</span>
+                            ) : (
                             <button
                               onClick={() => navigate('/workout/start', { state: { edit_log_id: log.id } })}
                               style={{
@@ -1940,6 +1977,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                             >
                               Edit
                             </button>
+                            )}
                           </div>
                           {dateBlocks.length > 0 ? (
                         dateBlocks.map((block, i) => {
@@ -2172,7 +2210,12 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                         return (
                           <div key={p.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 16px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
-                              <div style={{ fontSize: 13, fontWeight: 500 }}>{p.name || 'Untitled program'}</div>
+                              <div style={{ fontSize: 13, fontWeight: 500 }}>
+                                {p.name || 'Untitled program'}
+                                {archivedProgramIds.has(p.id) && (
+                                  <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', color: 'var(--text-muted)', border: '1px solid var(--border)', borderRadius: 999, padding: '1px 7px' }}>Archived</span>
+                                )}
+                              </div>
                               <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{new Date(p.created_at).toLocaleDateString()}</div>
                             </div>
                             {/* Equal-width grid so a wrapped second row lines up
@@ -2265,6 +2308,9 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                             return (
                               <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
                                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
+                                  {isArchivedLog(log.id) ? (
+                                    <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--text-muted)', padding: '4px 0' }}>Archived · view only</span>
+                                  ) : (
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -2279,6 +2325,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                                   >
                                     Edit Workout
                                   </button>
+                                  )}
                                 </div>
                                 {logBlocks.length > 0 ? (
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -2435,7 +2482,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                                                     <button onClick={() => deleteEntry(entry.id)} disabled={editSaving} style={{ padding: '2px 6px', fontSize: 11, background: 'transparent', color: 'var(--danger, #e74c3c)', border: 'none', cursor: 'pointer' }}>Delete</button>
                                                   </div>
                                                 ) : (
-                                                <span key={ei} onClick={(ev) => { ev.stopPropagation(); startEdit(entry); }} style={{ fontSize: 12, color: 'var(--text-dim)', background: 'var(--surface2)', padding: '3px 8px', borderRadius: 4, cursor: 'pointer' }} title="Click to edit">
+                                                <span key={ei} onClick={(ev) => { ev.stopPropagation(); startEdit(entry); }} style={{ fontSize: 12, color: 'var(--text-dim)', background: 'var(--surface2)', padding: '3px 8px', borderRadius: 4, cursor: isArchivedLog(entry.log_id) ? 'default' : 'pointer' }} title={isArchivedLog(entry.log_id) ? 'Archived program · view only' : 'Click to edit'}>
                                                   {formatMovementName(entry.movement)}
                                                   {entry.reps != null && ` x${entry.reps}`}
                                                   {entry.weight != null && ` @${entry.weight}${entry.weight_unit}`}
@@ -2744,7 +2791,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                                     {e.isPR && (
                                       <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.5, background: 'var(--accent)', color: '#fff', padding: '1px 5px', borderRadius: 3 }}>PR</span>
                                     )}
-                                    <button onClick={(ev) => { ev.stopPropagation(); startEdit(e); }} style={{ padding: '1px 6px', fontSize: 11, background: 'transparent', color: 'var(--text-muted)', border: 'none', cursor: 'pointer', opacity: 0.6 }} title="Edit">
+                                    <button hidden={isArchivedLog(e.log_id)} onClick={(ev) => { ev.stopPropagation(); startEdit(e); }} style={{ padding: '1px 6px', fontSize: 11, background: 'transparent', color: 'var(--text-muted)', border: 'none', cursor: 'pointer', opacity: 0.6 }} title="Edit">
                                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
                                     </button>
                                   </div>
@@ -3067,7 +3114,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                                     {e.faults_observed && e.faults_observed.length > 0 && (
                                       <span className="tl-set-detail" style={{ color: 'var(--danger, #e74c3c)', fontSize: 11 }}>{e.faults_observed.join(', ')}</span>
                                     )}
-                                    <button onClick={(ev) => { ev.stopPropagation(); startEdit(e); }} style={{ padding: '1px 6px', fontSize: 11, background: 'transparent', color: 'var(--text-muted)', border: 'none', cursor: 'pointer', opacity: 0.6 }} title="Edit">
+                                    <button hidden={isArchivedLog(e.log_id)} onClick={(ev) => { ev.stopPropagation(); startEdit(e); }} style={{ padding: '1px 6px', fontSize: 11, background: 'transparent', color: 'var(--text-muted)', border: 'none', cursor: 'pointer', opacity: 0.6 }} title="Edit">
                                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
                                     </button>
                                   </div>
@@ -3219,7 +3266,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                           {e.isPR && (
                             <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.5, background: 'var(--accent)', color: '#fff', padding: '1px 5px', borderRadius: 3 }}>PR</span>
                           )}
-                          <button onClick={(ev) => { ev.stopPropagation(); startEdit(e); }} style={{ marginLeft: 'auto', padding: '1px 6px', fontSize: 11, background: 'transparent', color: 'var(--text-muted)', border: 'none', cursor: 'pointer', opacity: 0.6 }} title="Edit">
+                          <button hidden={isArchivedLog(e.log_id)} onClick={(ev) => { ev.stopPropagation(); startEdit(e); }} style={{ marginLeft: 'auto', padding: '1px 6px', fontSize: 11, background: 'transparent', color: 'var(--text-muted)', border: 'none', cursor: 'pointer', opacity: 0.6 }} title="Edit">
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
                           </button>
                         </div>

@@ -19,6 +19,8 @@ interface ProgramSummary {
   subscription_start: string | null;
   created_at: string;
   workout_count: number;
+  /** Set when the program is archived (view only for the athlete). */
+  archived_at?: string | null;
 }
 
 interface Workout {
@@ -141,6 +143,47 @@ export default function AdminProgramsPage({ session }: { session: Session }) {
   const [expandedMonths, setExpandedMonths] = useState<Record<number, boolean>>({ 1: true });
   const [showMeta, setShowMeta] = useState(false);
 
+  // Archive / Restore (2026-11-21). An archived program is view only for the
+  // athlete and invisible to generation, billing and the scheduled jobs.
+  const [archiveBusy, setArchiveBusy] = useState(false);
+  const [archiveNote, setArchiveNote] = useState('');
+  // Bumped after an archive/restore so the list and the open program reload.
+  const [reloadKey, setReloadKey] = useState(0);
+
+  // The program the rebuild / next-month actions act on: the latest
+  // UNARCHIVED generated one (the list is newest first). None = no actions.
+  const activeGenerated = programs.find(p => p.source === 'generated' && !p.archived_at);
+
+  const archiveProgram = async (p: { id: string; name: string }) => {
+    if (!window.confirm(
+      `Archive "${p.name}"?\n\n` +
+      'The athlete loses this as their current program. They can still open it to look back, but not log or change it.\n' +
+      'They get their free evaluation back, and any days of this program on their calendar from today on are removed.\n' +
+      'To train again they run a new evaluation and build a new program from Month 1.'
+    )) return;
+    setArchiveBusy(true);
+    setArchiveNote('');
+    const { error } = await supabase.rpc('admin_archive_program', { p_program_id: p.id });
+    setArchiveBusy(false);
+    if (error) setArchiveNote(`Not archived: ${error.message}`);
+    else { setArchiveNote('Program archived.'); setReloadKey(k => k + 1); }
+  };
+
+  const restoreProgram = async (p: { id: string; name: string }) => {
+    if (!window.confirm(
+      `Restore "${p.name}"?\n\n` +
+      'It becomes the athlete\'s current program again, with logging and new weeks and months.\n' +
+      'This is refused if they already have an active program — archive that one first.\n' +
+      'Calendar entries removed when it was archived are not put back.'
+    )) return;
+    setArchiveBusy(true);
+    setArchiveNote('');
+    const { error } = await supabase.rpc('admin_restore_program', { p_program_id: p.id });
+    setArchiveBusy(false);
+    if (error) setArchiveNote(`Not restored: ${error.message}`);
+    else { setArchiveNote('Program restored.'); setReloadKey(k => k + 1); }
+  };
+
   // Load program list
   useEffect(() => {
     if (!id) return;
@@ -151,7 +194,7 @@ export default function AdminProgramsPage({ session }: { session: Session }) {
       else if (Array.isArray(data)) setPrograms(data);
       setLoadingList(false);
     })();
-  }, [id]);
+  }, [id, reloadKey]);
 
   // Auto-select first program if none in the URL
   useEffect(() => {
@@ -180,7 +223,7 @@ export default function AdminProgramsPage({ session }: { session: Session }) {
       setExpandedMonths({ 1: true });
       setShowMeta(false);
     })();
-  }, [id, programId]);
+  }, [id, programId, reloadKey]);
 
   // Group workouts: month → (week → days)
   const grouped = useMemo(() => {
@@ -205,14 +248,14 @@ export default function AdminProgramsPage({ session }: { session: Session }) {
           regeneration human-gated; this makes operating the gate one click).
           Deletes the latest generated program's current month and regenerates
           it from the athlete's CURRENT profile via admin-rebuild-month. */}
-      {!loadingList && programs.some(p => p.source === 'generated') && (
+      {!loadingList && activeGenerated && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
           <button
             className="auth-btn"
             disabled={rebuilding || generatingNext}
             style={{ width: 'auto', padding: '8px 16px', marginTop: 0 }}
             onClick={async () => {
-              const gen = programs.find(p => p.source === 'generated');
+              const gen = activeGenerated;
               if (!gen) return;
               if (!window.confirm(
                 `Rebuild month ${gen.generated_months} of "${gen.name}" from the athlete's CURRENT profile?\n\n` +
@@ -260,7 +303,7 @@ export default function AdminProgramsPage({ session }: { session: Session }) {
               account, a scheduled cancellation, a test user. Deletes nothing;
               one month per click, via admin-generate-next-month. */}
           {(() => {
-            const gen = programs.find(p => p.source === 'generated');
+            const gen = activeGenerated;
             if (!gen) return null;
             const nextMonth = (gen.generated_months || 1) + 1;
             return (
@@ -344,6 +387,11 @@ export default function AdminProgramsPage({ session }: { session: Session }) {
                     <span>· {p.workout_count} wk</span>
                     <span>· {formatDate(p.created_at)}</span>
                   </div>
+                  {p.archived_at && (
+                    <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--text-muted)', marginTop: 2 }}>
+                      Archived {formatDate(p.archived_at)}
+                    </div>
+                  )}
                 </button>
               );
             })}
@@ -374,7 +422,26 @@ export default function AdminProgramsPage({ session }: { session: Session }) {
                     <span>{detail.program.generated_months} month{detail.program.generated_months !== 1 ? 's' : ''} built</span>
                     {detail.program.gym_name && <><span>·</span><span>{detail.program.gym_name}</span></>}
                     {!detail.program.committed && <><span>·</span><span style={{ color: 'var(--text-muted)' }}>Draft</span></>}
+                    {detail.program.archived_at && (
+                      <><span>·</span><span style={{ fontWeight: 700, textTransform: 'uppercase', color: 'var(--text)' }}>Archived {formatDate(detail.program.archived_at)}</span></>
+                    )}
                   </div>
+                  {/* Archive / Restore. Only AI-generated programs are ever
+                      archived; the database refuses a restore while the
+                      athlete has another active program and says so. */}
+                  {(detail.program.archived_at || detail.program.source === 'generated') && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 10, flexWrap: 'wrap' }}>
+                      <button
+                        className="auth-btn"
+                        disabled={archiveBusy || rebuilding || generatingNext}
+                        style={{ width: 'auto', padding: '6px 14px', marginTop: 0, fontSize: 12, background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)' }}
+                        onClick={() => detail.program.archived_at ? restoreProgram(detail.program) : archiveProgram(detail.program)}
+                      >
+                        {archiveBusy ? 'Working…' : detail.program.archived_at ? 'Restore program' : 'Archive program'}
+                      </button>
+                      {archiveNote && <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>{archiveNote}</span>}
+                    </div>
+                  )}
                 </div>
 
                 {/* Month tree */}

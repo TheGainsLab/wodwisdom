@@ -16,6 +16,7 @@ import { fetchAndFormatRecentHistory, formatDate, localDateAnchor, relativeDayMa
 import { buildConditioningState } from "../_shared/conditioning-state.ts";
 import { buildActivityChatContext, fetchOutsideTraining } from "../_shared/athlete-activities.ts";
 import { fetchAndFormatProgramContext } from "../_shared/training-program.ts";
+import { isArchived, isSinceArchive, loadArchiveCutoff } from "../_shared/program-archive.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { fetchWithTimeout } from "../_shared/fetch-with-timeout.ts";
 import {
@@ -1019,9 +1020,14 @@ Deno.serve(async (req) => {
       let workout = workoutRow;
       if (workoutRow) {
         const { data: owner } = await supa
-          .from("programs").select("id").eq("id", workoutRow.program_id).eq("user_id", user.id).maybeSingle();
+          .from("programs").select("id, archived_at").eq("id", workoutRow.program_id).eq("user_id", user.id).maybeSingle();
         if (!owner) {
           console.warn(`[chat] workout ${workout_id} is not in a program owned by ${user.id}; ignoring day scope`);
+          workout = null;
+        } else if (isArchived(owner)) {
+          // The AI Coach does not see archived programs (2026-11-21): a day of
+          // one gets no day context and no edit tool, as if no day were given.
+          console.log(`[chat] workout ${workout_id} is in an archived program; ignoring day scope`);
           workout = null;
         }
       }
@@ -1103,14 +1109,21 @@ Deno.serve(async (req) => {
     let coachLetterContext = "";
     if (userTier !== "free_trial") {
       try {
-        const { data: csRow } = await supa
-          .from("coach_states")
-          .select("coach_state")
-          .eq("user_id", user.id)
-          .order("version", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (csRow?.coach_state) {
+        // Programming archive (2026-11-21): a letter written before the
+        // athlete's programs were archived is the judgment behind the program
+        // they left — the coach does not speak from it. A fresh evaluation
+        // writes a new one. No cut-off (never archived) keeps today's read.
+        const [{ data: csRow }, archiveCutoff] = await Promise.all([
+          supa
+            .from("coach_states")
+            .select("coach_state, created_at")
+            .eq("user_id", user.id)
+            .order("version", { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+          loadArchiveCutoff(supa, user.id),
+        ]);
+        if (csRow?.coach_state && isSinceArchive(csRow.created_at as string | null, archiveCutoff)) {
           coachLetterContext = renderCoachStateForChat(csRow.coach_state as CoachState, {
             closing: (userTier === "ai_programming" || userTier === "all_access")
               ? "adjustment-rules"
@@ -1130,6 +1143,7 @@ Deno.serve(async (req) => {
           .from("programs")
           .select("id, name")
           .eq("user_id", user.id)
+          .is("archived_at", null) // the AI Coach does not see archived programs (2026-11-21)
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
@@ -1283,7 +1297,9 @@ Deno.serve(async (req) => {
               input: searchQuery,
             }),
           }, 10_000).then((r) => r.json()),
-      shouldFetchHistory ? fetchAndFormatRecentHistory(supa, user.id) : Promise.resolve(""),
+      // hideArchivedPrograms: sessions of an archived program stay out of the
+      // coach's view (2026-11-21). Engine sessions are untouched.
+      shouldFetchHistory ? fetchAndFormatRecentHistory(supa, user.id, { hideArchivedPrograms: true }) : Promise.resolve(""),
       shouldFetchProgram ? fetchAndFormatProgramContext(supa, user.id) : Promise.resolve(""),
       (competitorId && !isMeta)
         ? fetchTier4Bundle(competitorId, { include: ["competency", "signature", "power_profile"] }).catch((e) => {

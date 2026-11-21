@@ -71,6 +71,7 @@ import {
   zonesTouched,
 } from "./engine-spectrum.ts";
 import { checkEntitlement } from "./entitlements.ts";
+import { loadArchiveCutoff } from "./program-archive.ts";
 
 // ============================================================
 // Payload types
@@ -688,6 +689,15 @@ export interface BuildWriterPayloadOptions {
    * are untouched. Defaults to false.
    */
   includeEngineTraining?: boolean;
+  /**
+   * Programming archive (2026-11-21). Only matters for an athlete with a
+   * cut-off (athlete_profiles.programs_archived_at): the build THROWS when no
+   * complete evaluation exists since the archive, instead of going ahead
+   * without one. Set by the generator for a NEW program only — a returner
+   * builds from a fresh evaluation or not at all. Defaults to false (an old
+   * evaluation is still never read; the payload just carries none).
+   */
+  requireFreshEvaluation?: boolean;
 }
 
 export async function buildWriterPayload(
@@ -699,6 +709,11 @@ export async function buildWriterPayload(
   const includeEvaluations = options.includeEvaluations ?? false;
   const monthNumber = options.monthNumber ?? 1;
   const includeEngineTraining = options.includeEngineTraining ?? false;
+  // Programming archive cut-off (2026-11-21): null for anyone never archived.
+  // When set, evaluations and logs from before it belong to an archived
+  // program and are not read below. Its own read so a failure degrades to
+  // "no cut-off" rather than failing the payload.
+  const archiveCutoff = await loadArchiveCutoff(supa, userId);
 
   // 1. Athlete profile row — hard requirement.
   const { data: profile, error: profileErr } = await supa
@@ -767,8 +782,9 @@ export async function buildWriterPayload(
   // entry movements matched by block_id with the legacy block_label
   // fallback (same matching the Training Log page uses). Soft-fails.
   try {
-    const { data: logRows } = await supa
-      .from("workout_logs").select("id").eq("user_id", userId).limit(200);
+    let logQuery = supa.from("workout_logs").select("id").eq("user_id", userId);
+    if (archiveCutoff) logQuery = logQuery.gt("created_at", archiveCutoff);
+    const { data: logRows } = await logQuery.limit(200);
     const logIds = ((logRows ?? []) as Array<{ id: string }>).map((l) => l.id);
     if (logIds.length > 0) {
       const [{ data: blocks }, { data: entries }] = await Promise.all([
@@ -836,12 +852,14 @@ export async function buildWriterPayload(
   let training_evaluation: string | null = null;
   if (includeEvaluations) {
     try {
-      const { data: pe } = await supa
+      let peQuery = supa
         .from("profile_evaluations")
         .select("analysis")
         .eq("user_id", userId)
         .eq("status", "complete")
-        .not("analysis", "is", null)
+        .not("analysis", "is", null);
+      if (archiveCutoff) peQuery = peQuery.gt("created_at", archiveCutoff);
+      const { data: pe } = await peQuery
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -849,14 +867,23 @@ export async function buildWriterPayload(
     } catch (err) {
       console.warn(`[build-writer-payload] profile_evaluations read failed for ${userId}:`, err);
     }
+    // A returner's NEW program: no evaluation since the archive is a hard
+    // stop, not the usual soft null (founder, 2026-11-21).
+    if (archiveCutoff && options.requireFreshEvaluation && !profile_evaluation) {
+      throw new Error(
+        "Run your evaluation first — your new program is built from it. (No evaluation since your previous program was archived.)",
+      );
+    }
 
     if (monthNumber >= 2) {
       try {
-        const { data: te } = await supa
+        let teQuery = supa
           .from("training_evaluations")
           .select("analysis")
           .eq("user_id", userId)
-          .not("analysis", "is", null)
+          .not("analysis", "is", null);
+        if (archiveCutoff) teQuery = teQuery.gt("created_at", archiveCutoff);
+        const { data: te } = await teQuery
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
@@ -941,7 +968,7 @@ export async function buildWriterPayload(
   // are no logs → the Model stays intake-based, no-penalty). Window is relative
   // to NOW (current training picture).
   const todayISO = new Date().toISOString().slice(0, 10);
-  const trainingSummary = await buildTrainingSummary(supa, userId, todayISO);
+  const trainingSummary = await buildTrainingSummary(supa, userId, todayISO, archiveCutoff);
   // Athlete-logged outside training (best-effort; null when none) — becomes
   // the Model's outside_training facts section for CoachState's load/recovery
   // judgment. Never a capability source.

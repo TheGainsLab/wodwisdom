@@ -46,7 +46,8 @@ async function runTick(supa: SupabaseClient): Promise<void> {
       .from("programs")
       .select("id, user_id, generated_months")
       .eq("weekly_mode", true)
-      .eq("committed", true);
+      .eq("committed", true)
+      .is("archived_at", null); // an archived program gets no new weeks (2026-11-21)
 
     for (const prog of (programs ?? []) as Array<{ id: string; user_id: string; generated_months: number | null }>) {
       const pid = prog.id as string;

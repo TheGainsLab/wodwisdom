@@ -222,15 +222,21 @@ export async function buildTrainingSummary(
   supa: SupabaseClient,
   userId: string,
   asOf: string,
+  // Programming archive (2026-11-21): when set, only logs created after this
+  // moment count — a returner's new program is not built on the training of
+  // the one they left. Null/omitted = no filter (everyone never archived).
+  loggedAfter: string | null = null,
 ): Promise<TrainingSummary> {
   const cutoff = new Date(Date.parse(asOf) - TRAINING_WINDOW_DAYS * 86400_000)
     .toISOString().slice(0, 10);
   try {
-    const { data, error } = await supa
+    let query = supa
       .from("workout_log_entries")
       .select("movement, reps, weight, weight_unit, rpe, sets, workout_log_blocks(rpe), workout_logs!inner(user_id, workout_date)")
       .eq("workout_logs.user_id", userId)
       .gte("workout_logs.workout_date", cutoff);
+    if (loggedAfter) query = query.gt("workout_logs.created_at", loggedAfter);
+    const { data, error } = await query;
     if (error) throw error;
     const entries: RawLogEntry[] = (data ?? []).map((raw) => {
       const r = raw as Record<string, unknown>;

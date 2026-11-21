@@ -10,6 +10,7 @@ import { useEntitlements } from '../hooks/useEntitlements';
 import Nav from '../components/Nav';
 import { formatMarkdown } from '../lib/formatMarkdown';
 import { ATHLETEDATA_PUBLIC_TIER } from '../lib/featureFlags';
+import { isSinceArchive, sinceArchive } from '../lib/programArchive';
 
 // ============================================================
 // Defensive shape normalizers for LLM-emitted v2 output.
@@ -755,8 +756,11 @@ export default function AthletePage({ session }: { session: Session }) {
   const [cyclePlanOpen, setCyclePlanOpen] = useState(false);
   // Returner pause: set by the stripe webhook on a re-subscribe; the athlete
   // reviews their numbers and taps Build (which clears it server-side).
-  const [resumePending, setResumePending] = useState(false);
-  const [resumeBuildState, setResumeBuildState] = useState<'idle' | 'building' | 'error'>('idle');
+  // Programming archive (2026-11-21): the moment this athlete's programs were
+  // last archived (their Programming access ended), or null. A returner
+  // starts again like a new subscriber, so only an evaluation run AFTER this
+  // counts as "ready" and enables Generate. Older ones stay in the history.
+  const [programsArchivedAt, setProgramsArchivedAt] = useState<string | null>(null);
   // TDEE override is no longer edited here (the TDEE card was removed from the
   // profile — to be reintegrated under Nutrition later). Kept so the saved value
   // round-trips through load/save and isn't lost.
@@ -804,6 +808,12 @@ export default function AthletePage({ session }: { session: Session }) {
 
   // Evaluation history
   const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
+  // The evaluations that count now: all of them for someone never archived,
+  // only those run since the archive for a returner.
+  const currentEvaluations = sinceArchive(evaluations, programsArchivedAt);
+  // Someone whose programs were archived at some point. Only changes copy
+  // and gating while they have no evaluation since then.
+  const isReturner = !!programsArchivedAt;
   const [trainingEvaluations, setTrainingEvaluations] = useState<TrainingEvaluation[]>([]);
   const [nutritionEvaluations, setNutritionEvaluations] = useState<NutritionEvaluation[]>([]);
   const [expandedEvalId, setExpandedEvalId] = useState<string | null>(null);
@@ -911,7 +921,7 @@ export default function AthletePage({ session }: { session: Session }) {
     Promise.all([
       supabase
         .from('athlete_profiles')
-        .select('lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender, tdee_override, days_per_week, session_length_minutes, injuries_constraints, goal, eval_credits_remaining, competition_athlete_id, competition_athlete_label, coaching_intake_raw, injuries_structured, injuries_constraints_hash, injuries_avoidance_confirmed, programming_resume_pending_at, athletic_reviewed_at, t3_intro_seen_at')
+        .select('lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender, tdee_override, days_per_week, session_length_minutes, injuries_constraints, goal, eval_credits_remaining, competition_athlete_id, competition_athlete_label, coaching_intake_raw, injuries_structured, injuries_constraints_hash, injuries_avoidance_confirmed, programs_archived_at, athletic_reviewed_at, t3_intro_seen_at')
         .eq('user_id', session.user.id)
         .maybeSingle(),
       supabase
@@ -933,6 +943,7 @@ export default function AthletePage({ session }: { session: Session }) {
         .select('id')
         .eq('user_id', session.user.id)
         .eq('source', 'generated')
+        .is('archived_at', null) // an archived program is not "their program"
         .limit(1),
       // Generation already in flight? (30-min heartbeat window matches the
       // server-side concurrency guard — a crashed job goes quiet and stops
@@ -955,7 +966,7 @@ export default function AthletePage({ session }: { session: Session }) {
         setGenerateLoading(true);
         void pollGenerationJob(jobRes.data.id);
       }
-      setResumePending(!!profileRes.data?.programming_resume_pending_at);
+      setProgramsArchivedAt((profileRes.data as { programs_archived_at?: string | null } | null)?.programs_archived_at ?? null);
       if (!profileRes.data) {
         setIsNewUser(true);
         setT3IntroSeenAt(null);
@@ -1796,59 +1807,14 @@ export default function AthletePage({ session }: { session: Session }) {
               </div>
             ) : (
               <>
-                {/* Returner welcome-back banner — the stripe webhook paused this
-                    re-subscriber's next month (resume-pending) so it builds from
-                    numbers they've just reviewed, not the profile they left
-                    behind. Build calls generate-next-month (continuation path —
-                    appends month N+1 to their existing program; the first-gen
-                    button below stays hidden since a program exists) and the
-                    server clears the flag on kickoff. */}
-                {resumePending && hasGeneratedProgram && (
-                  <div className="workout-review-section" style={{ border: '1px solid var(--accent)', borderRadius: 12, padding: 18, marginBottom: 16 }}>
-                    <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 6 }}>Welcome back 👋</div>
-                    {resumeBuildState === 'building' ? (
-                      <p style={{ fontSize: 13, color: 'var(--text-dim)', margin: 0 }}>
-                        Building your next month from your numbers — it'll appear in <a href="/programs" style={{ color: 'var(--accent)' }}>your programs</a> in a few minutes.
-                      </p>
-                    ) : (
-                      <>
-                        <p style={{ fontSize: 13, color: 'var(--text-dim)', margin: '0 0 12px' }}>
-                          Your next training month gets built from the numbers below. Take a minute to review them — update anything that changed while you were away — then build.
-                        </p>
-                        <button
-                          type="button"
-                          className="auth-btn"
-                          onClick={async () => {
-                            setResumeBuildState('building');
-                            // Unsaved profile edits ride along: save first so the
-                            // generation reads what the athlete just confirmed.
-                            if (isDirty) await saveProfile();
-                            const { error } = await supabase.functions.invoke('generate-next-month', { body: {} });
-                            // Success keeps the banner in its 'building' state; the
-                            // server cleared the flag, so next page load it's gone.
-                            if (error) setResumeBuildState('error');
-                          }}
-                          style={{ maxWidth: 260 }}
-                        >
-                          Build my next month
-                        </button>
-                        {resumeBuildState === 'error' && (
-                          <div className="auth-error" style={{ display: 'block', marginTop: 10 }}>
-                            Couldn't start the build — try again in a minute, or just leave it: your month builds automatically within a few days either way.
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                )}
                 {/* Evaluation Status Card — first-class entry point for the free Tier 2 evaluation.
                     Four states based on tier completeness + evaluation existence + current analysis run. */}
                 {(() => {
-                  const hasEvaluation = evaluations.length > 0;
+                  const hasEvaluation = currentEvaluations.length > 0;
                   const hasEvalCredit = isAdmin || evalCreditsRemaining > 0;
                   const canRun = savedStatus.canRunEval && hasEvalCredit;
                   const running = analysisLoading === 'profile';
-                  const latestEval = evaluations[0];
+                  const latestEval = currentEvaluations[0];
                   if (running) {
                     return (
                       <div className="settings-card" style={{ borderColor: 'var(--accent)', background: 'var(--accent-glow)' }}>
@@ -1957,8 +1923,15 @@ export default function AthletePage({ session }: { session: Session }) {
                                 {canRun ? 'Free AI Evaluation · Ready to run' : 'Free AI Evaluation'}
                               </div>
                               <div style={{ fontSize: 15, fontWeight: 600 }}>
-                                {canRun ? 'Your profile is ready — run your free evaluation' : 'Run your free evaluation'}
+                                {isReturner
+                                  ? 'Welcome back — run a new evaluation to start your new program'
+                                  : canRun ? 'Your profile is ready — run your free evaluation' : 'Run your free evaluation'}
                               </div>
+                              {isReturner && (
+                                <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>
+                                  Update anything that changed while you were away first. Your earlier evaluations are still in your history below.
+                                </div>
+                              )}
                               <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>Takes 20–30 seconds. You'll get a personalized breakdown of your strengths, weaknesses, and priorities.</div>
                             </div>
                             <button
@@ -2299,7 +2272,7 @@ export default function AthletePage({ session }: { session: Session }) {
                   // eval → step 3 → Generate; before this the card stayed open
                   // and the Generate line sent people to step 3 first.
                   held={
-                    !isAdmin && hasFeature('programming') && evaluations.length === 0 && !savedStatus.tier3.complete
+                    !isAdmin && hasFeature('programming') && currentEvaluations.length === 0 && !savedStatus.tier3.complete
                       ? 'Run your evaluation first — Step 3 opens after it.'
                       : undefined
                   }
@@ -2811,12 +2784,14 @@ export default function AthletePage({ session }: { session: Session }) {
                   // skipping it buys the athlete nothing and costs them the
                   // chance to see and correct the coach's read before tokens
                   // are spent. Client-side only; admins bypass for test flows.
-                  const evalMissing = !isAdmin && evaluations.length === 0;
+                  // After an archive only an evaluation run since then counts —
+                  // for admins too: the server refuses the build otherwise.
+                  const evalMissing = currentEvaluations.length === 0 && (!isAdmin || isReturner);
                   const disabled = generateLoading || tierBlocked || evalMissing;
                   // Evaluation first, then step 3 — the same order the cards
                   // enforce (step 3 is held until an evaluation exists).
                   const genTitle = evalMissing
-                    ? 'Run your evaluation first — your program is built from it.'
+                    ? (isReturner ? 'Run a new evaluation first — your new program is built from it.' : 'Run your evaluation first — your program is built from it.')
                     : tierBlocked
                       ? 'Complete Step 3 to Generate.'
                       : undefined;
@@ -2899,7 +2874,9 @@ export default function AthletePage({ session }: { session: Session }) {
                       )}
                       {!tierBlocked && evalMissing && (
                         <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -6 }}>
-                          Run your free evaluation first — your program is built from it.
+                          {isReturner
+                            ? 'Run a new evaluation first — your new program is built from it. Your earlier program is kept under Archived programs.'
+                            : 'Run your free evaluation first — your program is built from it.'}
                         </span>
                       )}
                     </div>
@@ -2932,11 +2909,17 @@ export default function AthletePage({ session }: { session: Session }) {
                   {(() => {
                     // Group all evaluations by month_number
                     type EvalEntry = { id: string; analysis?: string; created_at: string; month_number?: number; profile_snapshot?: any };
-                    const byMonth = new Map<number, { date: string; profile?: EvalEntry; training?: EvalEntry; nutrition?: EvalEntry }>();
+                    // A returner's new program reuses month numbers the archived
+                    // one already has, so months are grouped per program era:
+                    // evaluations from before the archive never merge with (or
+                    // hide behind) the new ones, and are labelled as earlier.
+                    const byMonth = new Map<string, { m: number; earlier: boolean; date: string; profile?: EvalEntry; training?: EvalEntry; nutrition?: EvalEntry }>();
 
                     const ensureMonth = (m: number, created_at: string) => {
-                      if (!byMonth.has(m)) byMonth.set(m, { date: created_at });
-                      return byMonth.get(m)!;
+                      const earlier = !isSinceArchive(created_at, programsArchivedAt);
+                      const key = `${earlier ? 'earlier' : 'current'}:${m}`;
+                      if (!byMonth.has(key)) byMonth.set(key, { m, earlier, date: created_at });
+                      return byMonth.get(key)!;
                     };
 
                     // Queries return newest-first. Keep the first-seen row per
@@ -2958,16 +2941,21 @@ export default function AthletePage({ session }: { session: Session }) {
                       if (!month.nutrition) month.nutrition = ev as EvalEntry;
                     }
 
-                    const months = Array.from(byMonth.keys()).sort((a, b) => b - a); // Most recent first
+                    // Current program first, then the earlier one; newest month first in each.
+                    const months = Array.from(byMonth.keys()).sort((a, b) => {
+                      const ga = byMonth.get(a)!, gb = byMonth.get(b)!;
+                      if (ga.earlier !== gb.earlier) return ga.earlier ? 1 : -1;
+                      return gb.m - ga.m;
+                    });
 
                     return (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                        {months.map(m => {
-                          const group = byMonth.get(m)!;
+                        {months.map(key => {
+                          const group = byMonth.get(key)!;
                           return (
-                            <div key={m}>
-                              <h3 style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', marginBottom: 10 }}>
-                                Month {m} — {formatDate(group.date)}
+                            <div key={key}>
+                              <h3 style={{ fontSize: 13, fontWeight: 700, color: group.earlier ? 'var(--text-dim)' : 'var(--accent)', marginBottom: 10 }}>
+                                Month {group.m} — {formatDate(group.date)}{group.earlier ? ' · Earlier program' : ''}
                               </h3>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                                 {(['profile', 'training', 'nutrition'] as const).map(kind => {
@@ -3024,7 +3012,7 @@ export default function AthletePage({ session }: { session: Session }) {
                                     CURRENT program, so it renders only on the newest month.
                                     Ends with the adjustment map: a statement of how changes
                                     work, not an invitation to renegotiate the cycle. */}
-                                {m === months[0] && cyclePlan && (
+                                {key === months[0] && !group.earlier && cyclePlan && (
                                   <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
                                     <button
                                       type="button"

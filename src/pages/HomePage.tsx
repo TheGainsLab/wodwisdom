@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { useEntitlements } from '../hooks/useEntitlements';
 import Nav from '../components/Nav';
 import { MessageSquare, Trophy, Flame, Dumbbell, Apple, BookOpen, Gauge, User, ChevronRight, Lock, Settings, Shield } from 'lucide-react';
+import { isSinceArchive } from '../lib/programArchive';
 
 /**
  * HomePage — the persistent landing at `/` (chat moved to `/chat`).
@@ -33,7 +34,6 @@ export default function HomePage({ session }: { session: Session }) {
   const [hasProgram, setHasProgram] = useState(false);
   const [hasEngineProgram, setHasEngineProgram] = useState(false);
   const [hasCompetitionLink, setHasCompetitionLink] = useState(false);
-  const [resumePending, setResumePending] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const hasProgramming = isAdmin || hasFeature('programming');
@@ -49,14 +49,15 @@ export default function HomePage({ session }: { session: Session }) {
       setLoading(true);
       try {
         const [progRes, profileRes, evalRes] = await Promise.all([
-          supabase.from('programs').select('id').eq('user_id', session.user.id).neq('committed', false).limit(1),
-          supabase.from('athlete_profiles').select('lifts, skills, conditioning, age, gender, bodyweight, athletic_reviewed_at, competition_athlete_id, programming_resume_pending_at, engine_program_version').eq('user_id', session.user.id).maybeSingle(),
-          supabase.from('profile_evaluations').select('id').eq('user_id', session.user.id).limit(1),
+          // Archived programs (2026-11-21) are kept to look back on but are not
+          // "a program": a returner sees what a new subscriber sees.
+          supabase.from('programs').select('id').eq('user_id', session.user.id).neq('committed', false).is('archived_at', null).limit(1),
+          supabase.from('athlete_profiles').select('lifts, skills, conditioning, age, gender, bodyweight, athletic_reviewed_at, competition_athlete_id, programs_archived_at, engine_program_version').eq('user_id', session.user.id).maybeSingle(),
+          supabase.from('profile_evaluations').select('id, created_at').eq('user_id', session.user.id).order('created_at', { ascending: false }).limit(1),
         ]);
         if (cancelled) return;
         if (profileRes.data) {
-          const d = profileRes.data as { lifts?: Record<string, unknown>; skills?: Record<string, unknown>; conditioning?: Record<string, unknown>; age?: number | null; gender?: string | null; bodyweight?: number | null; athletic_reviewed_at?: string | null; competition_athlete_id?: string | null; programming_resume_pending_at?: string | null; engine_program_version?: string | null };
-          setResumePending(!!d.programming_resume_pending_at);
+          const d = profileRes.data as { lifts?: Record<string, unknown>; skills?: Record<string, unknown>; conditioning?: Record<string, unknown>; age?: number | null; gender?: string | null; bodyweight?: number | null; athletic_reviewed_at?: string | null; competition_athlete_id?: string | null; programs_archived_at?: string | null; engine_program_version?: string | null };
           setHasEngineProgram(!!d.engine_program_version);
           const hasLifts = d.lifts && Object.values(d.lifts).some((v) => typeof v === 'number' && v > 0);
           const hasSkills = d.skills && Object.values(d.skills).some((v) => v && v !== 'none');
@@ -66,7 +67,10 @@ export default function HomePage({ session }: { session: Session }) {
           setProfileReviewed(!!d.athletic_reviewed_at);
           setHasCompetitionLink(!!d.competition_athlete_id);
         }
-        setHasEvaluation(!!(evalRes.data && evalRes.data.length > 0));
+        // After an archive only an evaluation run since then counts.
+        const latestEval = evalRes.data?.[0] as { created_at?: string } | undefined;
+        const archivedAt = (profileRes.data as { programs_archived_at?: string | null } | null)?.programs_archived_at ?? null;
+        setHasEvaluation(!!latestEval && isSinceArchive(latestEval.created_at, archivedAt));
         setHasProgram(!!(progRes.data && progRes.data.length > 0));
       } finally {
         if (!cancelled) setLoading(false);
@@ -88,15 +92,11 @@ export default function HomePage({ session }: { session: Session }) {
   // evaluation stay one tile away. Programming / All Access keep this card:
   // the evaluation is required for a program.
   const engineOnly = !isAdmin && hasEngine && !hasProgramming;
-  const showWelcomeCard = !hasEvaluation && !resumePending && !engineOnly;
+  const showWelcomeCard = !hasEvaluation && !engineOnly;
 
   // ── Context card: the single most relevant next action. ──
   const primary = ((): { kicker?: string; title: string; body: string; cta: string; to: string } | null => {
     if (showWelcomeCard) return null; // the welcome card is the hero
-    // Returner pause outranks everything: their paid month is waiting on them.
-    if (resumePending && hasProgram) {
-      return { title: 'Welcome back — build your next month', body: 'Your next training month is paid for and waiting. Review your numbers on your profile, then tap Build my next month.', cta: 'Review & build', to: '/profile' };
-    }
     if (hasProgramming && !hasProgram) {
       // The most expensive stall in the funnel: paid, evaluated, never
       // generated. Product named in the kicker, outcome named on the button,

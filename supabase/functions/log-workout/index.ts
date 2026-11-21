@@ -7,6 +7,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { inferTimeDomain } from "../_shared/time-domain.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
+import { ARCHIVED_PROGRAM_ERROR, isLogOfArchivedProgram, isProgramDayArchived } from "../_shared/program-archive.ts";
 import { computeMetconPower, type MetconBlockInput } from "../_shared/metcon-workcalc.ts";
 import { computeCardioPower } from "../_shared/cardio-power.ts";
 import { hashWorkoutText } from "../_shared/signature-hash.ts";
@@ -177,6 +178,14 @@ Deno.serve(async (req) => {
           headers: { ...cors, "Content-Type": "application/json" },
         });
       }
+      // Archived programs are view only (2026-11-21): a session already
+      // logged against one is not rewritten.
+      if (await isLogOfArchivedProgram(supa, existingLogId)) {
+        return new Response(JSON.stringify({ error: ARCHIVED_PROGRAM_ERROR, code: "PROGRAM_ARCHIVED" }), {
+          status: 409,
+          headers: { ...cors, "Content-Type": "application/json" },
+        });
+      }
 
       const { error: updErr } = await supa
         .from("workout_logs")
@@ -206,6 +215,14 @@ Deno.serve(async (req) => {
 
       log = { id: existingLogId };
     } else {
+      // Archived programs are view only (2026-11-21): no new session
+      // against one of their days.
+      if (await isProgramDayArchived(supa, source_id)) {
+        return new Response(JSON.stringify({ error: ARCHIVED_PROGRAM_ERROR, code: "PROGRAM_ARCHIVED" }), {
+          status: 409,
+          headers: { ...cors, "Content-Type": "application/json" },
+        });
+      }
       const { data: newLog, error: logErr } = await supa
         .from("workout_logs")
         .insert({

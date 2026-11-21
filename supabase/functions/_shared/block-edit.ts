@@ -39,6 +39,7 @@ import { computeBlockBenchmark } from "./compute-block-benchmark.ts";
 import { composeBlockScheme } from "./compose-block-scheme.ts";
 import { blockSchemeFormatProblems } from "./audits.ts";
 import { normalizeGender } from "./metcon-workcalc.ts";
+import { isArchived } from "./program-archive.ts";
 
 // ---------------------------------------------------------------------------
 // Day blocks — what the coach may reference
@@ -96,7 +97,9 @@ function rowToMovement(m: any): MovementPrescription {
 }
 
 /** Load one block as a BlockPrescription, verifying it belongs to `userId`'s
- *  program. Returns null when missing or not owned. */
+ *  program. Returns null when missing, not owned, or in an ARCHIVED program —
+ *  archived programs are view only, so no edit can be proposed against or
+ *  applied to one (2026-11-21). */
 export async function loadOwnedBlock(
   supa: SupabaseClient,
   blockId: string,
@@ -113,8 +116,9 @@ export async function loadOwnedBlock(
     .from("program_workouts").select("id, program_id").eq("id", block.program_workout_id).maybeSingle();
   if (!workout) return null;
   const { data: program } = await supa
-    .from("programs").select("id, user_id").eq("id", workout.program_id).maybeSingle();
+    .from("programs").select("id, user_id, archived_at").eq("id", workout.program_id).maybeSingle();
   if (!program || program.user_id !== userId) return null;
+  if (isArchived(program)) return null;
 
   const { data: movementRows } = await supa
     .from("program_movements_v2")

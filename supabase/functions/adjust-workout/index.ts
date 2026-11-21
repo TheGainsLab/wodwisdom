@@ -25,6 +25,7 @@ import {
 } from "../_shared/build-writer-payload.ts";
 import { buildRecentLoadLine, fetchOutsideTraining } from "../_shared/athlete-activities.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
+import { ARCHIVED_PROGRAM_ERROR, isArchived } from "../_shared/program-archive.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -137,10 +138,12 @@ async function handleDayAdjust(
 
   const { data: program, error: pErr } = await supa
     .from("programs")
-    .select("id, user_id")
+    .select("id, user_id, archived_at")
     .eq("id", workout.program_id)
     .single();
   if (pErr || !program || program.user_id !== user.id) return json({ error: "Not authorized" }, cors, 403);
+  // Archived programs are view only (2026-11-21).
+  if (isArchived(program)) return json({ error: ARCHIVED_PROGRAM_ERROR, code: "PROGRAM_ARCHIVED" }, cors, 409);
 
   const { data: adjacentWorkouts } = await supa
     .from("program_workouts")
@@ -295,8 +298,10 @@ async function handleBlockPropose(
 
   const { data: workout } = await supa.from("program_workouts").select("id, program_id").eq("id", block.program_workout_id).single();
   if (!workout) return json({ error: "Workout not found" }, cors, 404);
-  const { data: program } = await supa.from("programs").select("id, user_id").eq("id", workout.program_id).single();
+  const { data: program } = await supa.from("programs").select("id, user_id, archived_at").eq("id", workout.program_id).single();
   if (!program || program.user_id !== user.id) return json({ error: "Not authorized" }, cors, 403);
+  // Archived programs are view only (2026-11-21).
+  if (isArchived(program)) return json({ error: ARCHIVED_PROGRAM_ERROR, code: "PROGRAM_ARCHIVED" }, cors, 409);
 
   const { count: priorUses } = await supa
     .from("ai_edit_log")

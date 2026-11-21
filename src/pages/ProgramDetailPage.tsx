@@ -11,7 +11,8 @@ import { loadCoachNotes, type CoachNote } from '../lib/coachNotes';
 import WorkoutBlocksDisplay, { BlockContent } from '../components/WorkoutBlocksDisplay';
 import { BlockCoachingBody, coachingForBlockType, formatReviewMarkdown, CHEVRON_DOWN, type ReviewBlock } from '../components/reviewCoaching';
 import { useWorkoutReview } from '../lib/useWorkoutReview';
-import BlockLog, { type DayLogController, loggedMovementNames, blockFullyLogged, isLoggableBlock, isRowLoggerBlock } from '../components/blockLog';
+import BlockLog, { type DayLogController, type SavedBlockSnapshot, loggedMovementNames, blockFullyLogged, isLoggableBlock, isRowLoggerBlock } from '../components/blockLog';
+import { formatArchiveDate } from '../lib/programArchive';
 import { formatMovementName } from '../lib/movementName';
 
 interface ProgramBlock {
@@ -245,7 +246,12 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
     program_version?: string;
     month_plan?: unknown;
     weekly_mode?: boolean | null;
+    archived_at?: string | null;
   } | null>(null);
+  // Archived program (2026-11-21): kept to look back on, view only. Nothing
+  // on this page that logs, edits, schedules or builds is offered — the
+  // server refuses those anyway; this is about not showing dead buttons.
+  const archived = !!program?.archived_at;
   const [allWorkouts, setAllWorkouts] = useState<ProgramWorkout[]>([]);
   // The week in progress = the latest WRITTEN week of the program (outline
   // weeks don't count). Only this week carries the "tell your coach" box;
@@ -481,7 +487,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
   // timed out after the server created the job): the button loads in its
   // true state and polling resumes. Clears the poller on unmount.
   useEffect(() => {
-    if (!program?.id) return;
+    if (!program?.id || program.archived_at) return; // nothing builds on an archived program
     let cancelled = false;
     (async () => {
       if (generatingNextMonth) return;
@@ -524,7 +530,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
     setLoading(true);
     const { data: prog, error: progErr } = await supabase
       .from('programs')
-      .select('id, name, source, generated_months, program_version, month_plan, weekly_mode')
+      .select('id, name, source, generated_months, program_version, month_plan, weekly_mode, archived_at')
       .eq('id', id)
       .eq('user_id', session.user.id)
       .single();
@@ -701,7 +707,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
 
   const handleNameChange = async (newName: string) => {
     const trimmed = newName.trim() || 'Untitled Program';
-    if (!id || !program || trimmed === program.name) return;
+    if (!id || !program || archived || trimmed === program.name) return;
     const { error } = await supabase.from('programs').update({ name: trimmed }).eq('id', id).eq('user_id', session.user.id);
     if (!error) setProgram(p => p ? { ...p, name: trimmed } : null);
   };
@@ -810,7 +816,11 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
           </button>
           {program ? (
-            editingProgramName ? (
+            archived ? (
+              <h1 className="program-detail-name-input" style={{ margin: 0, background: 'none', border: 'none' }}>
+                <GainsName name={program.name} />
+              </h1>
+            ) : editingProgramName ? (
               <input
                 type="text"
                 className="program-detail-name-input"
@@ -845,6 +855,12 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
               </div>
             ) : (
               <>
+                {archived && (
+                  <div style={{ margin: '0 0 12px', padding: '12px 14px', border: '1px solid var(--border)', borderRadius: 10, background: 'var(--surface2)', fontSize: 13.5, color: 'var(--text-dim)', lineHeight: 1.5 }}>
+                    <strong style={{ color: 'var(--text)' }}>Archived program. View only.</strong>{' '}
+                    Archived {formatArchiveDate(program.archived_at)}. Everything you logged is still here and in your training log.
+                  </div>
+                )}
                 {workouts.length > 0 && (
                   <div className="program-progress">
                     <div className="program-progress-header">
@@ -859,14 +875,14 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                     </div>
                   </div>
                 )}
-                {program?.weekly_mode && (
+                {program?.weekly_mode && !archived && (
                   <div style={{ margin: '10px 0 2px', padding: '10px 14px', border: '1px dashed var(--border)', borderRadius: 10, fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.5 }}>
                     <strong style={{ color: 'var(--text)' }}>This is a starting point.</strong> Week 1 is written; the weeks after it are written one at a time from how you train and what you tell your coach. Your next week is written once you&rsquo;ve logged something on each day of this one, or 7 days in, whichever comes first. Tell your coach what you&rsquo;d change and next week is written from it.
                   </div>
                 )}
                 {/* "Tell your coach" notes live under each week's days; this is
                     only the reminder that some exist, with the list behind it. */}
-                {coachNotes.length > 0 && (
+                {coachNotes.length > 0 && !archived && (
                   <div style={{ margin: '10px 0 4px' }}>
                     <button type="button" onClick={() => setNotesOpen((o) => !o)}
                       style={{ background: 'none', border: 'none', padding: 0, fontFamily: 'inherit', fontSize: 13, color: 'var(--text-dim)', cursor: 'pointer' }}>
@@ -886,7 +902,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                     card. Founder copy ("Built for you. Not by yourself.").
                     Sits above the coach's notes so the order on first open
                     is: how this works → why it looks like this → Week 1. */}
-                {program.source === 'generated' && programIntroSeenAt === null && (
+                {program.source === 'generated' && programIntroSeenAt === null && !archived && (
                   <div style={{ background: 'var(--surface)', border: '1px solid var(--accent)', borderRadius: 12, padding: '18px 16px', marginBottom: 14 }}>
                     <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>
                       Before you jump in — a few things worth knowing.
@@ -1029,7 +1045,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                           <span style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 600 }}>
                             {(() => { const c = coachNotes.filter((n) => n.week_num === week.weekNum).length; return c > 0 ? `${c} note${c === 1 ? '' : 's'} · ` : ''; })()}
                             {week.days.every((d) => d.status === 'outline')
-                              ? `written when you finish week ${week.weekNum - 1} ${weekOpen ? '▲' : '▼'}`
+                              ? `${archived ? 'not written' : `written when you finish week ${week.weekNum - 1}`} ${weekOpen ? '▲' : '▼'}`
                               : `${doneCount}/${week.days.length} logged ${weekOpen ? '▲' : '▼'}`}
                           </span>
                         </button>
@@ -1037,7 +1053,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                           const first = skeletonDay(week.days[0]);
                           return (
                             <div style={{ padding: '10px 14px 2px', fontSize: 12.5, color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                              Tentative.{first?.weekFocus ? <span style={{ color: 'var(--text-dim)' }}> {first.weekFocus}.</span> : null}
+                              {archived ? 'Outline only — this week was never written.' : 'Tentative.'}{first?.weekFocus ? <span style={{ color: 'var(--text-dim)' }}> {first.weekFocus}.</span> : null}
                             </div>
                           );
                         })()}
@@ -1062,7 +1078,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                                       </div>
                                       <div className="program-day-summary-lines">
                                         <div className="program-day-summary-line">
-                                          <span className="program-day-summary-text">{parts.length ? parts.join(' · ') : (sk?.day_intent ?? 'Written once you log each day of the week before, or 7 days in.')}</span>
+                                          <span className="program-day-summary-text">{parts.length ? parts.join(' · ') : (sk?.day_intent ?? (archived ? 'Not written.' : 'Written once you log each day of the week before, or 7 days in.'))}</span>
                                         </div>
                                       </div>
                                     </div>
@@ -1179,12 +1195,14 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                                   <polyline points="9 6 15 12 9 18" />
                                 </svg>
                               </button>
-                              <DayScheduleControl
-                                entry={scheduleByWorkout.get(w.id)}
-                                takenDates={takenProgramDates}
-                                onPick={(dateStr) => scheduleDay(w.id, dateStr)}
-                                onClear={() => unscheduleDay(w.id)}
-                              />
+                              {!archived && (
+                                <DayScheduleControl
+                                  entry={scheduleByWorkout.get(w.id)}
+                                  takenDates={takenProgramDates}
+                                  onPick={(dateStr) => scheduleDay(w.id, dateStr)}
+                                  onClear={() => unscheduleDay(w.id)}
+                                />
+                              )}
                               </div>
                               {isExpanded && (
                                 <div className="program-day-body">
@@ -1194,6 +1212,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                                         blocks={v3BlocksByWorkout.get(w.id) ?? []}
                                         sourceId={w.id}
                                         workoutText={v3BlocksToProse(v3BlocksByWorkout.get(w.id) ?? [])}
+                                        readOnly={archived}
                                         onUpdateMovement={updateMovementField}
                                         onUpdateBlock={updateBlockField}
                                         onAddMovement={addMovementToBlock}
@@ -1219,7 +1238,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                                     )}
                                   </div>
                                   <div className="program-day-actions">
-                                    {(() => {
+                                    {!archived && (() => {
                                       // For v3, generate a v1-style prose representation from the
                                       // structured blocks so the existing Coach + Start flows work
                                       // unchanged. Include v3_blocks in state for future v3-native
@@ -1280,7 +1299,8 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                           const isOutlineWeek = week.days.every((d) => d.status === 'outline');
                           if (isOutlineWeek) return null;
                           const weekNotes = coachNotes.filter((n) => n.week_num === week.weekNum && (n.program_id == null || n.program_id === id));
-                          if (week.weekNum !== currentNotesWeek) {
+                          if (archived && weekNotes.length === 0) return null;
+                          if (archived || week.weekNum !== currentNotesWeek) {
                             return <CoachNotesBox readOnly notes={weekNotes} programId={id ?? null} weekNum={week.weekNum} onChange={() => {}} />;
                           }
                           return (
@@ -1303,7 +1323,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                     });
                   })()}
                 </div>
-                {isGenerated && isAdmin && (
+                {isGenerated && isAdmin && !archived && (
                   <div style={{ marginTop: 24, padding: '16px', background: 'var(--surface2)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div>
                       <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>
@@ -1469,6 +1489,9 @@ interface V3DayViewProps {
   workoutText?: string;
   // When present (the day page), each block renders its type-specific log UI.
   logging?: DayLogController;
+  // Archived program (2026-11-21): view only. No Edit, no Log, no coaching
+  // request; what was logged is shown as plain text under each block.
+  readOnly?: boolean;
   // Rendered between the intent row and the blocks (the day page passes its
   // "Ask the coach" bar here — the chat itself lives below the blocks, and
   // this is the always-visible sign on that door).
@@ -1613,11 +1636,11 @@ function DayScheduleControl({ entry, takenDates, onPick, onClear }: {
   );
 }
 
-export function V3DayView({ blocks, sourceId, workoutText, logging, onUpdateMovement, onUpdateBlock, onAddMovement, onRemoveMovement, ...ai }: V3DayViewProps) {
+export function V3DayView({ blocks, sourceId, workoutText, logging, readOnly, onUpdateMovement, onUpdateBlock, onAddMovement, onRemoveMovement, ...ai }: V3DayViewProps) {
   // One review per day, lazily generated when any "Coach ▾" / intent / sources opens.
   const { review, loading, error, generate } = useWorkoutReview(sourceId ?? null, workoutText ?? '');
   const [intentOpen, setIntentOpen] = useState(false);
-  const canCoach = !!sourceId && !!(workoutText && workoutText.trim());
+  const canCoach = !readOnly && !!sourceId && !!(workoutText && workoutText.trim());
 
   if (!blocks.length) {
     return (
@@ -1661,6 +1684,7 @@ export function V3DayView({ blocks, sourceId, workoutText, logging, onUpdateMove
           coachingError={error}
           onEnsureCoaching={generate}
           logging={logging}
+          readOnly={readOnly}
           {...ai}
         />
       ))}
@@ -1669,7 +1693,7 @@ export function V3DayView({ blocks, sourceId, workoutText, logging, onUpdateMove
   );
 }
 
-function V3BlockCard({ block, onUpdateMovement, onUpdateBlock, onAddMovement, onRemoveMovement, canCoach, coaching, coachingLoading, coachingError, onEnsureCoaching, logging }: {
+function V3BlockCard({ block, onUpdateMovement, onUpdateBlock, onAddMovement, onRemoveMovement, canCoach, coaching, coachingLoading, coachingError, onEnsureCoaching, logging, readOnly }: {
   block: ProgramBlockV2;
   onUpdateMovement?: (movementId: string, patch: Partial<ProgramMovementV2>) => Promise<void>;
   onUpdateBlock?: (blockId: string, patch: Partial<ProgramBlockV2>) => Promise<void>;
@@ -1681,6 +1705,7 @@ function V3BlockCard({ block, onUpdateMovement, onUpdateBlock, onAddMovement, on
   coachingError?: string | null;
   onEnsureCoaching?: () => void;
   logging?: DayLogController;
+  readOnly?: boolean;
 }) {
   const displayLabel = BLOCK_DISPLAY[block.block_type] ?? block.block_type;
 
@@ -1706,7 +1731,7 @@ function V3BlockCard({ block, onUpdateMovement, onUpdateBlock, onAddMovement, on
   // logged work — nobody edits them, so no action row at all (AI Edit and
   // Coach already exclude them below).
   const NON_EDITABLE_TYPES = ['warm-up', 'cool-down', 'mobility', 'active-recovery'];
-  const canEdit = !!onUpdateMovement && !NON_EDITABLE_TYPES.includes(block.block_type);
+  const canEdit = !readOnly && !!onUpdateMovement && !NON_EDITABLE_TYPES.includes(block.block_type);
 
   // Block-level scheme ("Every 90s for 12 min (8 sets)"), editable in edit mode.
   const [scheme, setScheme] = useState(block.block_scheme ?? '');
@@ -1726,10 +1751,11 @@ function V3BlockCard({ block, onUpdateMovement, onUpdateBlock, onAddMovement, on
   const savedSnap = logging?.savedSnapshot?.(block.sort_order) ?? null;
   const loggedNames = loggedMovementNames(savedSnap);
   const fullyLogged = !!logging && logging.isSaved(block.sort_order) && blockFullyLogged(block, savedSnap);
-  const isLogged = fullyLogged && !editing;
+  // View only: a logged block stays open so its results can be read.
+  const isLogged = fullyLogged && !editing && !readOnly;
   // The card owns the log panel's open state and renders its "Log" / "Edit
   // log" toggle in the header row (rightmost, after Edit and Coach).
-  const showLog = !!logging && isLoggableBlock(block.block_type) && !editing;
+  const showLog = !readOnly && !!logging && isLoggableBlock(block.block_type) && !editing;
   const [logPanelOpen, setLogPanelOpen] = useState(false);
   // Rows-as-logger: while the log panel is open (strength/skills/accessory),
   // BlockLog renders the movement rows itself — hide the card's own copy.
@@ -1910,6 +1936,8 @@ function V3BlockCard({ block, onUpdateMovement, onUpdateBlock, onAddMovement, on
 
       {showLog && <BlockLog block={block} controller={logging!} coaching={coaching ?? null} open={logPanelOpen} onOpenChange={setLogPanelOpen} />}
 
+      {readOnly && savedSnap && <LoggedResultSummary snap={savedSnap} units={logging?.userUnits ?? 'lbs'} />}
+
       {showCoach && coachOpen && (
         <div className="block-coach-body" style={{ marginTop: 10 }}>
           {coaching ? (
@@ -1923,6 +1951,35 @@ function V3BlockCard({ block, onUpdateMovement, onUpdateBlock, onAddMovement, on
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/** What was logged for a block, as plain text — the view-only rendering used
+ *  for a day of an archived program (no log panel, nothing to edit). */
+function LoggedResultSummary({ snap, units }: { snap: SavedBlockSnapshot; units: 'lbs' | 'kg' }) {
+  const head: string[] = [];
+  if (snap.score) head.push(`Score: ${snap.score}${snap.capped ? ' (capped)' : ''}`);
+  if (snap.rx) head.push('Rx');
+  if (snap.rpe != null) head.push(`RPE ${snap.rpe}`);
+  const lines = snap.entries.map((e) => {
+    if (e.completed === false) return `${e.movement}: not done${e.skip_reason ? ` (${e.skip_reason})` : ''}`;
+    const parts: string[] = [];
+    if (e.reps != null) parts.push(`${e.reps} reps`);
+    if (e.hold_seconds != null) parts.push(`${e.hold_seconds}s`);
+    if (e.distance != null) parts.push(`${e.distance}`);
+    if (e.calories != null) parts.push(`${e.calories} cal`);
+    if (e.weight != null) parts.push(`${e.weight} ${units}`);
+    if (e.rpe != null) parts.push(`RPE ${e.rpe}`);
+    return `${e.movement}${e.set_number != null ? ` · set ${e.set_number}` : ''}${parts.length ? `: ${parts.join(' · ')}` : ''}`;
+  });
+  if (head.length === 0 && lines.length === 0 && !snap.notes) return null;
+  return (
+    <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px solid var(--border)', fontSize: 12.5, color: 'var(--text-dim)', lineHeight: 1.55 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 4 }}>What you logged</div>
+      {head.length > 0 && <div style={{ color: 'var(--text)' }}>{head.join(' · ')}</div>}
+      {lines.map((l, i) => <div key={i}>{l}</div>)}
+      {snap.notes && <div style={{ fontStyle: 'italic', marginTop: 4 }}>{snap.notes}</div>}
     </div>
   );
 }

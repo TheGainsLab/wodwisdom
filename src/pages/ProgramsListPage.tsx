@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { useEntitlements } from '../hooks/useEntitlements';
 import Nav from '../components/Nav';
 import { Plus, Zap, Brain, Calendar } from 'lucide-react';
+import { isSinceArchive } from '../lib/programArchive';
 
 interface Program {
   id: string;
@@ -14,11 +15,16 @@ interface Program {
   workout_count?: number;
   generated_months?: number;
   month_counts?: Record<number, number>;
+  archived_at?: string | null;
 }
 
 export default function ProgramsListPage({ session }: { session: Session }) {
   const navigate = useNavigate();
   const [programs, setPrograms] = useState<Program[]>([]);
+  // Archived programs (2026-11-21): kept to look back on, view only. They
+  // sit behind a link under the list and never count as "having a program".
+  const [archivedPrograms, setArchivedPrograms] = useState<Program[]>([]);
+  const [showArchived, setShowArchived] = useState(false);
   const [loading, setLoading] = useState(true);
   const [navOpen, setNavOpen] = useState(false);
   const [hasProfile, setHasProfile] = useState(false);
@@ -37,18 +43,18 @@ export default function ProgramsListPage({ session }: { session: Session }) {
       const [progData, profileRes, evalRes] = await Promise.all([
         supabase
           .from('programs')
-          .select('id, name, created_at, source, generated_months, program_workouts(month_number)')
+          .select('id, name, created_at, source, generated_months, archived_at, program_workouts(month_number)')
           .eq('user_id', session.user.id)
           .neq('committed', false)
           .order('created_at', { ascending: false }),
         supabase
           .from('athlete_profiles')
-          .select('lifts, skills, conditioning')
+          .select('lifts, skills, conditioning, programs_archived_at')
           .eq('user_id', session.user.id)
           .maybeSingle(),
         supabase
           .from('profile_evaluations')
-          .select('id')
+          .select('id, created_at')
           .eq('user_id', session.user.id)
           .order('created_at', { ascending: false })
           .limit(1),
@@ -63,10 +69,13 @@ export default function ProgramsListPage({ session }: { session: Session }) {
         setHasProfile(!!(hasLifts || hasSkills || hasConditioning));
       }
 
-      setHasEvaluation(!!(evalRes.data && evalRes.data.length > 0));
+      // After an archive only an evaluation run since then counts — a
+      // returner is sent to run a fresh one, like a new subscriber.
+      const latestEval = evalRes.data?.[0] as { created_at?: string } | undefined;
+      setHasEvaluation(!!latestEval && isSinceArchive(latestEval.created_at, profileRes.data?.programs_archived_at));
 
       if (progData.data) {
-        setPrograms(progData.data.map((p: any) => {
+        const all: Program[] = progData.data.map((p: any) => {
           const rows: { month_number?: number }[] = p.program_workouts ?? [];
           const monthCounts: Record<number, number> = {};
           for (const r of rows) {
@@ -78,7 +87,9 @@ export default function ProgramsListPage({ session }: { session: Session }) {
             workout_count: rows.length,
             month_counts: monthCounts,
           };
-        }));
+        });
+        setPrograms(all.filter((p) => !p.archived_at));
+        setArchivedPrograms(all.filter((p) => !!p.archived_at));
       }
     } catch (err) {
       console.error('[ProgramsListPage] Failed to load:', err);
@@ -378,6 +389,51 @@ export default function ProgramsListPage({ session }: { session: Session }) {
                   >
                     <Plus size={16} /> Add Program
                   </button>
+                )}
+              </div>
+            )}
+
+            {/* Archived programs — a quiet link, shown only when there are
+                any, whatever the athlete currently subscribes to (someone
+                who has left still gets to look back). View only: the cards
+                open the program and carry no actions. */}
+            {!loading && archivedPrograms.length > 0 && (
+              <div style={{ marginTop: 24 }}>
+                <button
+                  type="button"
+                  onClick={() => setShowArchived((v) => !v)}
+                  aria-expanded={showArchived}
+                  style={{ background: 'none', border: 'none', padding: 0, color: 'var(--text-dim)', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'underline' }}
+                >
+                  {showArchived ? 'Hide archived programs' : `Archived programs (${archivedPrograms.length})`}
+                </button>
+                {showArchived && (
+                  <div className="history-list" style={{ marginTop: 12 }}>
+                    {archivedPrograms.map((p) => {
+                      const months = Object.keys(p.month_counts || {}).map(Number).filter((m) => m >= 1).sort((a, b) => a - b);
+                      const monthsLabel = months.length === 0
+                        ? ''
+                        : months.length === 1
+                          ? `Month ${months[0]}`
+                          : `Months ${months[0]}–${months[months.length - 1]}`;
+                      return (
+                        <div
+                          key={p.id}
+                          className="history-item"
+                          style={{ borderLeft: '3px solid var(--border)' }}
+                          onClick={() => navigate(`/programs/${p.id}`)}
+                        >
+                          <div className="history-item-header" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <span className="history-question">{p.name}</span>
+                            {monthsLabel && <span className="history-time">{monthsLabel}</span>}
+                          </div>
+                          <div className="history-answer" style={{ padding: '8px 18px 14px', fontSize: 12, color: 'var(--text-dim)' }}>
+                            {formatDate(p.created_at)} to {formatDate(p.archived_at!)} · Archived · View only
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 )}
               </div>
             )}

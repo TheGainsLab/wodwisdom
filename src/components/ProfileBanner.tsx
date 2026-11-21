@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useEntitlements } from '../hooks/useEntitlements';
 import { getTierStatus } from '../utils/tier-status';
+import { isSinceArchive } from '../lib/programArchive';
 import { X } from 'lucide-react';
 
 // v2 (2026-10-08): timestamped dismissal that expires after 7 days — the
@@ -56,17 +57,25 @@ export default function ProfileBanner({ userId }: Props) {
       const [profileRes, evalRes] = await Promise.all([
         supabase
           .from('athlete_profiles')
-          .select('lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender, athletic_reviewed_at')
+          .select('lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender, athletic_reviewed_at, programs_archived_at')
           .eq('user_id', userId)
           .maybeSingle(),
         supabase
           .from('profile_evaluations')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', userId),
+          .select('id, created_at')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(1),
       ]);
       if (cancelled) return;
       const tier = getTierStatus(profileRes.data);
-      const hasEvaluation = (evalRes.count ?? 0) > 0;
+      // After a program archive (2026-11-21) only an evaluation run since
+      // then counts — a returner is prompted to run a fresh one.
+      const latestEval = evalRes.data?.[0] as { created_at?: string } | undefined;
+      const hasEvaluation = !!latestEval && isSinceArchive(
+        latestEval.created_at,
+        (profileRes.data as { programs_archived_at?: string | null } | null)?.programs_archived_at,
+      );
       if (tier.tier2.complete && hasEvaluation) {
         setShouldShow(false);
       } else {

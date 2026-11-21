@@ -87,6 +87,7 @@ export async function loadUpcomingProgrammingWeek(supa: SupabaseClient, userId: 
     .select("id")
     .eq("user_id", userId)
     .eq("committed", true)
+    .is("archived_at", null) // an archived program has no upcoming week (2026-11-21)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
