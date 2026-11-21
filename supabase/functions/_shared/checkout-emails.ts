@@ -251,7 +251,18 @@ export function buildCancelScheduledEmail(args: {
   const html = emailWrap(
     greeting(args.fullName) +
     `<p>Confirming: your subscription is set to end${lapse ? ` on <strong>${lapse}</strong>` : " at the end of your billing period"}, and you won't be charged again. Until then, nothing changes — you have full access, so every training day between now and then is yours.</p>` +
-    `<p>After that, your account stays put: your training history, PRs, and program position are all saved. If you ever come back, you'll pick up exactly where you left off — not from zero.</p>` +
+    (() => {
+      switch (returnKind(args.plan)) {
+        case "programming":
+          return `<p>After that, your account stays put. ${PROGRAMMING_RETURN}</p>`;
+        case "both":
+          return `<p>After that, your account stays put. ${PROGRAMMING_RETURN} Your Engine position is saved too, and you pick that up where you left off.</p>`;
+        case "engine":
+          return `<p>After that, your account stays put: your training history, PRs, and program position are all saved. If you ever come back, you'll pick up exactly where you left off — not from zero.</p>`;
+        default:
+          return `<p>After that, your account stays put: your training history and PRs are saved, and they'll be here if you ever come back.</p>`;
+      }
+    })() +
     CANCEL_REPLY_LINE,
   );
   return { subject, html };
@@ -268,6 +279,26 @@ export function buildCancelUnscheduledEmail(args: { fullName: string | null }): 
   return { subject, html };
 }
 
+// ── What coming back looks like, by product (2026-11-21) ────────────────────
+// AI Programming: when access ends the program is ARCHIVED — kept to look
+// back on, but a returner starts a new program from a fresh evaluation. The
+// old copy promised "your spot in the program" to everyone, which is no
+// longer true for Programming. The Engine is unchanged for now: an Engine
+// returner really does resume where they were (its reset is a later build —
+// revisit this wording then). Any other plan, or a plan we could not read,
+// gets a sentence that is true for both.
+type ReturnKind = "programming" | "engine" | "both" | "other";
+
+function returnKind(plan: string | null | undefined): ReturnKind {
+  if (plan === "all_access") return "both";
+  if (plan === "programming") return "programming";
+  if (plan === "engine") return "engine";
+  return "other";
+}
+
+const PROGRAMMING_RETURN =
+  "Your training history and PRs stay on your account, and the program you were on is kept so you can look back at it. If you come back, you start a new program, built from a fresh evaluation of where you are then.";
+
 /** Goodbye when the subscription actually ends. Two forks: voluntary
  *  (they scheduled it) vs involuntary (dunning exhausted → auto-cancel). */
 export function buildGoodbyeEmail(args: {
@@ -275,14 +306,21 @@ export function buildGoodbyeEmail(args: {
   plan: string | null;
   involuntary: boolean;
 }): { subject: string; html: string } {
+  const kind = returnKind(args.plan);
   const link = `${planLink(args.plan)}?utm_source=gainslab_email&utm_medium=email&utm_campaign=${args.involuntary ? "card_failed_comeback" : "goodbye_comeback"}`;
-  const button = `<p><a href="${link}" style="display:inline-block;background:#0074d4;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600">${args.involuntary ? "Resubscribe and pick up where you left off" : "Come back anytime"}</a></p>`;
+  const button = `<p><a href="${link}" style="display:inline-block;background:#0074d4;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600">${args.involuntary ? (kind === "engine" ? "Resubscribe and pick up where you left off" : "Resubscribe") : "Come back anytime"}</a></p>`;
   if (args.involuntary) {
     const subject = "Your card declined — your progress is safe";
     const html = emailWrap(
       greeting(args.fullName) +
       `<p>Your renewal didn't go through — the card on file was declined and the automatic retries couldn't recover it, so your access paused today. That's the only thing that happened; nothing was lost.</p>` +
-      `<p>Your training history, PRs, and program position are all saved. Resubscribe with a working card and you're back at your next training day the moment it goes through:</p>` +
+      (kind === "programming"
+        ? `<p>${PROGRAMMING_RETURN} Resubscribe with a working card and you can run that evaluation and build it the same day:</p>`
+        : kind === "both"
+        ? `<p>${PROGRAMMING_RETURN} Your Engine position is saved too. Resubscribe with a working card and you can build the new program the same day, and the Engine picks up where you left off:</p>`
+        : kind === "engine"
+        ? `<p>Your training history, PRs, and program position are all saved. Resubscribe with a working card and you're back at your next training day the moment it goes through:</p>`
+        : `<p>Your training history and PRs are saved. Resubscribe with a working card and your access is back the moment it goes through:</p>`) +
       button +
       `<p>If the decline looks wrong on your end, just reply. We read all incoming emails.</p>`,
     );
@@ -292,7 +330,13 @@ export function buildGoodbyeEmail(args: {
   const html = emailWrap(
     greeting(args.fullName) +
     `<p>Your subscription wrapped up today, as scheduled. Thanks for training with us.</p>` +
-    `<p>Everything you built is saved on your account — history, PRs, and your spot in the program. If you return next month or next year, you'll start from where you actually are, not from day 1.</p>` +
+    (kind === "programming"
+      ? `<p>${PROGRAMMING_RETURN}</p>`
+      : kind === "both"
+      ? `<p>${PROGRAMMING_RETURN} Your Engine position is saved too, and you pick that up where you left off.</p>`
+      : kind === "engine"
+      ? `<p>Everything you built is saved on your account — history, PRs, and your spot in the program. If you return next month or next year, you'll start from where you actually are, not from day 1.</p>`
+      : `<p>Everything you logged is saved on your account, history and PRs included, and it'll be here if you return next month or next year.</p>`) +
     `<p>The door's open anytime:</p>` +
     button,
   );

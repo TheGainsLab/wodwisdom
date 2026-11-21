@@ -31,11 +31,14 @@ export default function ProgramReviewPage({ session }: { session: Session }) {
     setLoading(true);
     const { data: prog } = await supabase
       .from('programs')
-      .select('name')
+      .select('name, archived_at')
       .eq('id', id)
       .eq('user_id', session.user.id)
       .single();
     if (prog) setProgramName(prog.name);
+    // Archived programs are view only (2026-11-21): nothing to analyze or
+    // modify here — back to the program.
+    if (prog?.archived_at) { navigate(`/programs/${id}`, { replace: true }); return; }
 
     const { data: mod } = await supabase
       .from('program_modifications')
