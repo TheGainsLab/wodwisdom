@@ -162,3 +162,17 @@ export function nextWeekToFill(
   }
   return null;
 }
+
+/**
+ * The weeks a fill stage hands on to the audits and the save.
+ *
+ * A month build accumulates: every week written so far plus the new one. A
+ * WEEK JOB hands on ONLY the week it just wrote — the earlier weeks it loaded
+ * (priorWrittenWeeks) are there for the writer to progress from and are
+ * already saved. Passing them on re-saved them: every week fill inserted a
+ * second copy of each earlier week's days (2026-11-20 and 2026-11-21, two
+ * subscribers, week 1 listed twice on the program page).
+ */
+export function weeksToCarryForward<W>(isWeekJob: boolean, priorWeeks: W[], justWritten: W): W[] {
+  return isWeekJob ? [justWritten] : [...priorWeeks, justWritten];
+}
