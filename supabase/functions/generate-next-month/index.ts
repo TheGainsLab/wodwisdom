@@ -16,6 +16,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
+import { returnerStartsFresh } from "../_shared/returner.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -63,6 +64,8 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     let reqProgramId: string | null = body?.program_id ?? null;
+    // An admin or service caller that NAMES the program means that program.
+    const programNamedByCaller = reqProgramId != null;
     // SECURITY: never take the user id from the request body. Service callers
     // (cron / webhook / migration) are identified by the verified
     // x-webhook-user-id header (under the service key) above; frontend callers
@@ -73,12 +76,15 @@ Deno.serve(async (req) => {
     // Server-to-server callers (cron/webhook) authenticate sub-calls with the
     // service key + x-webhook-user-id; a frontend caller forwards its user token.
     const serviceMode = !userToken;
+    // A returner's fresh start runs its sub-calls as the service (see below).
+    let actAsService = serviceMode;
     const subHeaders = (): Record<string, string> => {
       const h: Record<string, string> = {
         "Content-Type": "application/json",
         Authorization: authToken.startsWith("Bearer ") ? authToken : `Bearer ${authToken}`,
       };
-      if (serviceMode && userId) h["x-webhook-user-id"] = userId;
+      if (actAsService) h.Authorization = `Bearer ${SUPABASE_SERVICE_KEY}`;
+      if (actAsService && userId) h["x-webhook-user-id"] = userId;
       return h;
     };
 
@@ -137,9 +143,33 @@ Deno.serve(async (req) => {
     const requestedMonth = serviceMode && Number.isInteger(body?.month_number) && body.month_number >= 1
       ? (body.month_number as number)
       : null;
-    const targetMonth = requestedMonth ?? (program ? (program.generated_months || 1) + 1 : 1);
-    const appendToProgramId = isV3 ? reqProgramId : null;
-    const mode = !program ? "firstgen" : isV3 ? "append" : "migrate";
+    // RETURNER FRESH START (2026-11-21): a re-subscriber whose last month is
+    // more than 30 days old starts a NEW program at month 1 instead of having
+    // the next month appended to a program they left behind (Mason King would
+    // have come back to "Month 4" having trained three days of month 1). The
+    // old program stays as history. Not when the caller names a program or a
+    // month — that is an admin acting deliberately. See _shared/returner.ts.
+    let freshStart = false;
+    if (program && !programNamedByCaller && requestedMonth == null) {
+      const [{ data: resumeRow }, { data: lastMonth }] = await Promise.all([
+        supa.from("athlete_profiles").select("programming_resume_pending_at").eq("user_id", userId).maybeSingle(),
+        supa.from("program_months").select("created_at").eq("program_id", program.id)
+          .order("created_at", { ascending: false }).limit(1).maybeSingle(),
+      ]);
+      freshStart = returnerStartsFresh(
+        resumeRow?.programming_resume_pending_at as string | null | undefined,
+        lastMonth?.created_at as string | null | undefined,
+      );
+    }
+    // The fresh start's month-1 evaluation is part of the subscription, like a
+    // continuation's: run the sub-calls as the service so it neither spends
+    // nor needs the athlete's one free evaluation credit. userId is already
+    // verified (JWT or the service header) above.
+    if (freshStart) actAsService = true;
+
+    const targetMonth = freshStart ? 1 : (requestedMonth ?? (program ? (program.generated_months || 1) + 1 : 1));
+    const appendToProgramId = freshStart ? null : (isV3 ? reqProgramId : null);
+    const mode = freshStart ? "fresh" : !program ? "firstgen" : isV3 ? "append" : "migrate";
     console.log(`[generate-next-month] user=${userId} mode=${mode} targetMonth=${targetMonth} latestVersion=${program?.program_version ?? "none"}`);
 
     // 2. Rate limit — only for normal v3 APPEND (guards against the cron firing
