@@ -1008,11 +1008,23 @@ Deno.serve(async (req) => {
     let editContext: BlockEditContext | null = null;
     let editDayBlocks: DayBlockRef[] = [];
     if (workout_id) {
-      const { data: workout } = await supa
+      const { data: workoutRow } = await supa
         .from("program_workouts")
         .select("id, week_num, day_num, workout_text, program_id")
         .eq("id", workout_id)
         .single();
+      // OWNERSHIP: this runs under the service key, so the day must be checked
+      // against the asker. Without it, any signed-in user who knew a workout id
+      // could pull another athlete's day into their chat (found 2026-11-21).
+      let workout = workoutRow;
+      if (workoutRow) {
+        const { data: owner } = await supa
+          .from("programs").select("id").eq("id", workoutRow.program_id).eq("user_id", user.id).maybeSingle();
+        if (!owner) {
+          console.warn(`[chat] workout ${workout_id} is not in a program owned by ${user.id}; ignoring day scope`);
+          workout = null;
+        }
+      }
       if (workout) {
         contextType = "workout";
         contextId = workout.id;

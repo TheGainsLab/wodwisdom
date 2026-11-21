@@ -36,6 +36,8 @@
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { runResequence } from "../_shared/run-resequence.ts";
 import { requireCronKey } from "../_shared/cron-auth.ts";
+import { checkEntitlement } from "../_shared/entitlements.ts";
+import { restartAtFor, sinceRestart } from "../_shared/engine-restart.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -69,8 +71,20 @@ async function runTick(supa: SupabaseClient): Promise<void> {
         // Position + overrides are program-scoped (the athlete may have switched
         // programs; positions are reused across programs). Resolve their program.
         const { data: prof } = await supa
-          .from("athlete_profiles").select("engine_program_version").eq("user_id", uid).maybeSingle();
-        const version = (prof?.engine_program_version as string) ?? "main_5day";
+          .from("athlete_profiles").select("engine_program_version, engine_restarts").eq("user_id", uid).maybeSingle();
+        // No program chosen (never set up, or reset) or no Engine access:
+        // nothing to sequence. Both used to reach a paid generation — the
+        // fallback was main_5day, and access was never checked.
+        if (typeof prof?.engine_program_version !== "string" || prof.engine_program_version.trim() === "") {
+          results.push({ user: uid, action: "skip", reason: "no Engine program chosen" });
+          continue;
+        }
+        if (!(await checkEntitlement(supa, uid, "engine"))) {
+          results.push({ user: uid, action: "skip", reason: "no Engine access" });
+          continue;
+        }
+        const version = prof.engine_program_version as string;
+        const restartAt = restartAtFor(prof.engine_restarts, version);
 
         // "Block consumed" = the athlete has completed EVERY position that
         // currently has an override. Order-agnostic, so it's correct for curated
@@ -79,11 +93,14 @@ async function runTick(supa: SupabaseClient): Promise<void> {
         // the cron won't regenerate until the athlete works through them.
         // Completed SEQUENCE positions (sequence-identity: sessions record
         // sequence_position; overrides key on true sequence positions).
-        const { data: doneRows } = await supa
+        // Sessions from before the athlete's last restart of this program are
+        // not progress (the app's own rule; see _shared/engine-restart.ts).
+        const { data: doneRowsAll } = await supa
           .from("engine_workout_sessions")
-          .select("sequence_position")
+          .select("sequence_position, created_at")
           .eq("user_id", uid).eq("completed", true).eq("program_version", version)
           .not("sequence_position", "is", null);
+        const doneRows = sinceRestart(doneRowsAll ?? [], restartAt);
         const completedSeqs = new Set<number>((doneRows ?? []).map((r) => r.sequence_position as number));
         const maxCompletedSeq = completedSeqs.size ? Math.max(...completedSeqs) : 0;
 

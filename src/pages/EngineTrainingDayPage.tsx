@@ -650,9 +650,16 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
           loadUserProgress(),
           getWorkoutSessionByDay(dayNumber),
         ]);
+        // No program chosen yet: setup lives on the Engine dashboard. A direct
+        // link to a day used to fall through to the 5-day program and let the
+        // athlete train and save sessions with no program set.
+        if (!progress?.engine_program_version) {
+          navigate('/engine', { replace: true });
+          return;
+        }
         setCurrentDay(progress?.engine_current_day ?? 1);
         setMonthsUnlocked(progress?.engine_months_unlocked ?? 1);
-        const version = progress?.engine_program_version ?? 'main_5day';
+        const version = progress.engine_program_version;
         setProgramVersion(version);
         setPreviousSession(!!prevSession);
 

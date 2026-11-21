@@ -30,6 +30,7 @@ import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supa
 import { requireCronKey } from "../_shared/cron-auth.ts";
 import { fetchWithTimeout } from "../_shared/fetch-with-timeout.ts";
 import { nextWeekToFill } from "../_shared/weekly-fill.ts";
+import { checkEntitlement } from "../_shared/entitlements.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -50,6 +51,13 @@ async function runTick(supa: SupabaseClient): Promise<void> {
     for (const prog of (programs ?? []) as Array<{ id: string; user_id: string; generated_months: number | null }>) {
       const pid = prog.id as string;
       try {
+        // ACCESS: a week is only written for someone who can still use it.
+        // Without this the clock gate kept writing weeks 2-4, at full
+        // generation cost, for a subscriber who had left (found 2026-11-21).
+        if (!(await checkEntitlement(supa, prog.user_id, "programming"))) {
+          results.push({ program: pid, action: "skip", reason: "no programming access" });
+          continue;
+        }
         const month = prog.generated_months || 1;
         const { data: days } = await supa
           .from("program_workouts")
