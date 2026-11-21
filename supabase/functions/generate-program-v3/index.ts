@@ -33,7 +33,7 @@ import { isBarbellMetconMovement } from "../_shared/metcon-variety-audits.ts";
 import { trimWriterMovementAnnotations } from "../_shared/movement-name-repair.ts";
 import { buildStratifiedMetconExamples } from "../_shared/metcon-examples.ts";
 import { composeMetconsForSlots } from "../_shared/compose-metcons.ts";
-import { builtFromOf, classifyNotesForReplan, loadMonthStore, profileDrift, type MonthStore } from "../_shared/weekly-fill.ts";
+import { builtFromOf, classifyNotesForReplan, loadMonthStore, profileDrift, weeksToCarryForward, type MonthStore } from "../_shared/weekly-fill.ts";
 import { formatAuditFailuresForLog, logGenerationAudit } from "../_shared/generation-audit-log.ts";
 import {
   enqueueSignatureDraftsForWeeks,
@@ -718,7 +718,9 @@ async function stageFillWeek(
       metconBlock.block_notes = m.stimulus_note.trim().slice(0, 500);
     }
   }
-  const weeks = [...priorWeeks, wk];
+  // A week job carries forward ONLY the week it wrote: the earlier weeks are
+  // already saved, and saving them again duplicated their days.
+  const weeks = weeksToCarryForward(rs.weeklyFill != null, priorWeeks, wk);
   // Weekly mode: only week 1 is written now; the rest are outline until the
   // athlete trains it (weekly cron).
   const next: Stage = (rs.weekly || weekNum >= 4) ? "benchmark_audit" : (`fill_week_${weekNum + 1}` as Stage);

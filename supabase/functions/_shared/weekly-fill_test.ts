@@ -1,6 +1,6 @@
 // deno test supabase/functions/_shared/weekly-fill_test.ts --no-check
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { builtFromOf, nextWeekToFill, profileDrift } from "./weekly-fill.ts";
+import { builtFromOf, nextWeekToFill, profileDrift, weeksToCarryForward } from "./weekly-fill.ts";
 
 const five = () => 5;
 const three = () => 3;
@@ -61,4 +61,18 @@ Deno.test("profile drift: days first, then goal, then session length", () => {
 
 Deno.test("profile drift: no stored built_from (older months) → never re-plans on profile", () => {
   assertEquals(profileDrift(null, builtFromOf({ days_per_week: 3, goal_text: null })), []);
+});
+
+// A week job must hand on only the week it wrote. Handing on the earlier weeks
+// too made the save insert them again (week 1 listed twice, 2026-11-21).
+Deno.test("week job: only the week just written goes on to the save", () => {
+  const w1 = { week_num: 1 }, w2 = { week_num: 2 }, w3 = { week_num: 3 };
+  assertEquals(weeksToCarryForward(true, [w1], w2), [w2]);
+  assertEquals(weeksToCarryForward(true, [w1, w2], w3), [w3]);
+});
+
+Deno.test("month build: weeks accumulate as before", () => {
+  const w1 = { week_num: 1 }, w2 = { week_num: 2 };
+  assertEquals(weeksToCarryForward(false, [], w1), [w1]);
+  assertEquals(weeksToCarryForward(false, [w1], w2), [w1, w2]);
 });
