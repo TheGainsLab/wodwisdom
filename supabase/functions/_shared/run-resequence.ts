@@ -25,6 +25,8 @@ import { formatReaches } from "./engine-continuum-reaches.ts";
 import { buildOtherTrainingLoadBlock } from "./athlete-activities.ts";
 import { loadUpcomingProgrammingWeek } from "./programming-week.ts";
 import { buildCoachNotesBlock, markNotesConsumed } from "./coach-notes.ts";
+import { checkEntitlement } from "./entitlements.ts";
+import { restartAtFor, sinceRestart } from "./engine-restart.ts";
 import { formatDayTypeCatalogue, loadDayTypeCatalogue } from "./engine-catalogue.ts";
 import { parseProposal, type ProposedDay, validateProposal } from "./engine-sequence.ts";
 import { computeReadyDayTypes, missingPrerequisites, sequencerGate, thinDataNote, typeCapsForBlock, validateWeekRules, type WeekRuleDay } from "./engine-readiness.ts";
@@ -153,10 +155,23 @@ export async function runResequence(
   // so "the next N positions" must come from the mapping, not currentDay+i.
   const { data: prof } = await supa
     .from("athlete_profiles")
-    .select("engine_program_version, age, engine_goal, engine_current_day")
+    .select("engine_program_version, age, engine_goal, engine_current_day, engine_restarts")
     .eq("user_id", userId)
     .maybeSingle();
-  const version = (prof?.engine_program_version as string) ?? "main_5day";
+  // No program chosen (never set up, or reset): nothing to sequence. This used
+  // to fall back to main_5day and generate for an athlete with no program.
+  if (typeof prof?.engine_program_version !== "string" || prof.engine_program_version.trim() === "") {
+    console.log(`[run-resequence] user=${userId} skip: no Engine program chosen`);
+    return { status: "skipped", reason: "no Engine program chosen" };
+  }
+  // ACCESS: never spend a generation on someone who can no longer train it.
+  if (!(await checkEntitlement(supa, userId, "engine"))) {
+    console.log(`[run-resequence] user=${userId} skip: no Engine access`);
+    return { status: "skipped", reason: "no Engine access" };
+  }
+  const version = prof.engine_program_version as string;
+  // Progress counts from the athlete's last restart of THIS program.
+  const restartAt = restartAtFor(prof?.engine_restarts, version);
   const athleteAge = typeof prof?.age === "number" && prof.age > 0 ? prof.age : null;
   const athleteGoal = typeof prof?.engine_goal === "string" && prof.engine_goal.trim() !== ""
     ? prof.engine_goal.trim().slice(0, 500)
@@ -171,11 +186,12 @@ export async function runResequence(
   // which days come next. Curated programs (hyrox/vo2) map NON-monotonic
   // catalog days, so "next" must be walked in program_sequence_order, never
   // by catalog day number.
-  const { data: doneRows } = await supa
+  const { data: doneRowsAll } = await supa
     .from("engine_workout_sessions")
-    .select("program_day_number, sequence_position")
+    .select("program_day_number, sequence_position, created_at")
     .eq("user_id", userId).eq("completed", true).eq("program_version", version)
     .not("program_day_number", "is", null);
+  const doneRows = sinceRestart(doneRowsAll ?? [], restartAt);
   const completedDays = new Set<number>((doneRows ?? []).map((r) => r.program_day_number as number));
   const highestCompleted = completedDays.size ? Math.max(...completedDays) : 0;
   const currentDay = highestCompleted + 1;
