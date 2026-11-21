@@ -23,7 +23,7 @@ export default function DayPage(_props: { session: Session }) {
   const [navOpen, setNavOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [blocks, setBlocks] = useState<ProgramBlockV2[]>([]);
-  const [meta, setMeta] = useState<{ week_num: number; day_num: number; month_number?: number | null; program_id: string; program_name: string } | null>(null);
+  const [meta, setMeta] = useState<{ week_num: number; day_num: number; month_number?: number | null; program_id: string; program_name: string; archived: boolean } | null>(null);
   // Bumped when the AI Coach applies a block edit — re-runs the day fetch.
   const [reloadKey, setReloadKey] = useState(0);
   // The coach bar's target: wraps the chat so a tap can scroll + focus it.
@@ -37,7 +37,7 @@ export default function DayPage(_props: { session: Session }) {
       const [{ data: wkRow }, { data: blockRows }] = await Promise.all([
         supabase
           .from('program_workouts')
-          .select('week_num, day_num, month_number, program_id, programs:programs!inner(name, generated_months)')
+          .select('week_num, day_num, month_number, program_id, programs:programs!inner(name, generated_months, archived_at)')
           .eq('id', workoutId)
           .maybeSingle(),
         supabase
@@ -48,10 +48,13 @@ export default function DayPage(_props: { session: Session }) {
       ]);
       if (!active) return;
       if (wkRow) {
-        const d = wkRow as unknown as { week_num: number; day_num: number; month_number?: number; program_id: string; programs?: { name?: string; generated_months?: number } };
+        const d = wkRow as unknown as { week_num: number; day_num: number; month_number?: number; program_id: string; programs?: { name?: string; generated_months?: number; archived_at?: string | null } };
         setMeta({
           week_num: d.week_num, day_num: d.day_num, program_id: d.program_id,
           program_name: d.programs?.name ?? 'Program',
+          // Archived program (2026-11-21): this day is view only — no
+          // logging, no edits, no coach chat scoped to it.
+          archived: !!d.programs?.archived_at,
           // Month shown only when the program actually spans months — a
           // single-month program's "Mo 1" would be noise.
           month_number: (d.programs?.generated_months ?? 1) > 1 ? (d.month_number || 1) : null,
@@ -231,6 +234,8 @@ export default function DayPage(_props: { session: Session }) {
 
   if (!workoutId) { navigate('/training-log', { replace: true }); return null; }
 
+  const archived = !!meta?.archived;
+
   const title = meta
     ? `${meta.program_name} · ${meta.month_number ? `Mo ${meta.month_number} ` : ''}Wk ${meta.week_num} Day ${meta.day_num}`
     : 'Training Day';
@@ -264,16 +269,23 @@ export default function DayPage(_props: { session: Session }) {
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
                   Back to program
                 </button>
+                {archived && (
+                  <div style={{ margin: '0 0 12px', padding: '12px 14px', border: '1px solid var(--border)', borderRadius: 10, background: 'var(--surface2)', fontSize: 13.5, color: 'var(--text-dim)', lineHeight: 1.5 }}>
+                    <strong style={{ color: 'var(--text)' }}>Archived program. View only.</strong>{' '}
+                    This day can&apos;t be logged or changed. Anything you logged is shown under each block.
+                  </div>
+                )}
                 <V3DayView
                   blocks={blocks}
                   sourceId={workoutId}
                   workoutText={workoutText}
                   logging={logController}
-                  onUpdateMovement={updateMovementField}
-                  onUpdateBlock={updateBlockField}
-                  onAddMovement={addMovementToBlock}
-                  onRemoveMovement={removeMovementFromBlock}
-                  coachBar={
+                  readOnly={archived}
+                  onUpdateMovement={archived ? undefined : updateMovementField}
+                  onUpdateBlock={archived ? undefined : updateBlockField}
+                  onAddMovement={archived ? undefined : addMovementToBlock}
+                  onRemoveMovement={archived ? undefined : removeMovementFromBlock}
+                  coachBar={archived ? undefined :
                     /* The always-visible sign on the chat's door (founder,
                        2026-10-10: "people might not be aware that the AI
                        coach exists inside the day"). One line under the
@@ -304,9 +316,11 @@ export default function DayPage(_props: { session: Session }) {
                 />
 
                 {/* Ask the AI Coach about this day — the day is passed as context. */}
-                <div ref={chatRef}>
-                  <CoachChat session={_props.session} workoutId={workoutId ?? null} onDayChanged={() => setReloadKey(k => k + 1)} />
-                </div>
+                {!archived && (
+                  <div ref={chatRef}>
+                    <CoachChat session={_props.session} workoutId={workoutId ?? null} onDayChanged={() => setReloadKey(k => k + 1)} />
+                  </div>
+                )}
 
                 {/* Done — the day auto-completes as each block is saved; this
                     just leaves. (Log a block via its own Save on the card.) */}
@@ -315,7 +329,7 @@ export default function DayPage(_props: { session: Session }) {
                   style={{ width: '100%', marginTop: 20, background: 'var(--surface2)', color: 'var(--text)' }}
                   onClick={() => meta ? navigate(`/programs/${meta.program_id}`) : navigate('/training-log')}
                 >
-                  Done
+                  {archived ? 'Back' : 'Done'}
                 </button>
               </>
             )}
