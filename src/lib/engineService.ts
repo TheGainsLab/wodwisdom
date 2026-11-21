@@ -5,6 +5,7 @@
 
 import { supabase } from './supabase';
 import { translateSwitchPosition, type SwitchMappingRow } from '../../supabase/functions/_shared/engine-switch.ts';
+export { isCurrentPassSession } from '../../supabase/functions/_shared/engine-restart.ts';
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -246,7 +247,13 @@ export async function loadDayOverride(
     .select('engine_program_version')
     .eq('user_id', uid)
     .maybeSingle();
-  const version = prof?.engine_program_version ?? 'main_5day';
+  // No program chosen (never set up, or reset when access ended): no day to serve.
+  if (!prof?.engine_program_version) return null;
+  const version = prof.engine_program_version;
+  // LIVE rows only, and that is enforced by the table's row policy, not here
+  // (2026-11-21): a day archived by an Engine reset is invisible to the
+  // athlete's own session, so this app — and any older copy of it still open
+  // in a browser — can never be served one. Same for every override read below.
   const { data: ov } = await supabase
     .from('engine_user_day_overrides')
     .select('engine_workout_id, reason')

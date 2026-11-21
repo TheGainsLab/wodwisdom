@@ -21,6 +21,8 @@ import { getCorsHeaders } from "../_shared/cors.ts";
 import type { CatalogEngineDay } from "../_shared/engine-block-resolve.ts";
 import { type EngineCurve, type PdCurvePoint } from "../_shared/engine-continuum.ts";
 import { CATALOG_PROGRAM } from "../_shared/engine-continuum-io.ts";
+import { resetCutoff } from "../_shared/engine-reset.ts";
+import { restartAtFor } from "../_shared/engine-restart.ts";
 import { applyRocketB, dayTargets, type DayTargets, deliveredPaceFloor, previousFromSnapshot, type SegmentTarget } from "../_shared/engine-targets.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -36,7 +38,9 @@ async function loadDay(supa: SupabaseClient, userId: string, body: { workout_id?
     return { workout: (data as WorkoutRow | null) ?? null, position: null };
   }
   const position = typeof body.position === "number" ? body.position : currentDay;
-  const { data: ov } = await supa.from("engine_user_day_overrides").select("engine_workout_id").eq("user_id", userId).eq("program_version", version).eq("sequence_position", position).maybeSingle();
+  const { data: ov } = await supa.from("engine_user_day_overrides").select("engine_workout_id").eq("user_id", userId).eq("program_version", version).eq("sequence_position", position)
+    .is("archived_at", null) // a day retired by an Engine reset is history, never served (2026-11-21)
+    .maybeSingle();
   if (ov?.engine_workout_id) {
     const { data } = await supa.from("engine_workouts").select(SEL).eq("id", ov.engine_workout_id).maybeSingle();
     if (data) return { workout: data as WorkoutRow, position };
@@ -51,14 +55,14 @@ async function loadDay(supa: SupabaseClient, userId: string, body: { workout_id?
 /** The preceding Rocket Races A session's actual pace, or null. Mirrors the day
  *  page's findPrecedingRocketRacesA: a 30-position window, effective type per
  *  position = override ?? catalogue, nearest A wins. */
-async function findPrecedingRocketA(supa: SupabaseClient, userId: string, version: string, position: number): Promise<{ position: number; pace: number } | null> {
+async function findPrecedingRocketA(supa: SupabaseClient, userId: string, version: string, position: number, restartAt: string | null): Promise<{ position: number; pace: number } | null> {
   const { data: map } = await supa.from("engine_program_mapping").select("engine_workout_day_number, program_sequence_order")
     .eq("engine_program_id", version).lt("program_sequence_order", position).order("program_sequence_order", { ascending: false }).limit(30);
   const window = (map ?? []) as Array<{ engine_workout_day_number: number; program_sequence_order: number }>;
   if (!window.length) return null;
   const positions = window.map((m) => m.program_sequence_order);
   const [{ data: ovs }, { data: cat }] = await Promise.all([
-    supa.from("engine_user_day_overrides").select("sequence_position, engine_workouts(day_type)").eq("user_id", userId).eq("program_version", version).in("sequence_position", positions),
+    supa.from("engine_user_day_overrides").select("sequence_position, engine_workouts(day_type)").eq("user_id", userId).eq("program_version", version).is("archived_at", null).in("sequence_position", positions),
     supa.from("engine_workouts").select("day_number, day_type").eq("program_type", CATALOG_PROGRAM).in("day_number", window.map((m) => m.engine_workout_day_number)),
   ]);
   const ovType = new Map<number, string>();
@@ -69,8 +73,11 @@ async function findPrecedingRocketA(supa: SupabaseClient, userId: string, versio
   const catType = new Map(((cat ?? []) as Array<{ day_number: number; day_type: string }>).map((w) => [w.day_number, w.day_type]));
   const a = window.find((m) => (ovType.get(m.program_sequence_order) ?? catType.get(m.engine_workout_day_number)) === "rocket_races_a");
   if (!a) return null;
+  // Only an A raced since the athlete's last restart of this program (their
+  // own restart, or an Engine reset) — the day page's rule (2026-11-21).
   const { data: sess } = await supa.from("engine_workout_sessions").select("actual_pace").eq("user_id", userId).eq("program_version", version)
-    .eq("sequence_position", a.program_sequence_order).eq("completed", true).order("created_at", { ascending: false }).limit(1).maybeSingle();
+    .eq("sequence_position", a.program_sequence_order).eq("completed", true).gt("created_at", restartAt ?? "1970-01-01T00:00:00Z")
+    .order("created_at", { ascending: false }).limit(1).maybeSingle();
   const pace = sess?.actual_pace != null ? Number(sess.actual_pace) : null;
   return pace && pace > 0 ? { position: a.program_sequence_order, pace } : null;
 }
@@ -96,7 +103,7 @@ Deno.serve(async (req) => {
     }
 
     const { data: profile } = await supa.from("athlete_profiles")
-      .select("engine_program_version, engine_current_day, engine_targets_v2, engine_curve")
+      .select("engine_program_version, engine_current_day, engine_targets_v2, engine_curve, engine_reset_at, engine_restarts")
       .eq("user_id", userId).maybeSingle();
     const version = (profile?.engine_program_version as string | null) ?? "main_5day";
     const currentDay = (profile?.engine_current_day as number | null) ?? 1;
@@ -114,13 +121,17 @@ Deno.serve(async (req) => {
     const trial = trialRows.find((t) => t.modality === modality && (t.units ?? "") === (units ?? "") && t.calculated_rpm != null) ?? null;
 
     const since28 = new Date(Date.now() - 28 * 86400000).toISOString().slice(0, 10);
+    // Engine reset (2026-11-21): pacing starts fresh after a reset, so the
+    // two "recent sessions" reads below never reach back past it (someone who
+    // returns within the month must not inherit their old delivered pace).
+    const sinceReset = resetCutoff(profile?.engine_reset_at) ?? "1970-01-01T00:00:00Z";
     const [{ data: curveRows }, { data: metric }, { data: prevSess }, { data: recent }] = await Promise.all([
       supa.from("engine_pd_curves").select("r, seconds, k_effort").eq("modality", modality).eq("units", units ?? ""),
       supa.from("engine_user_performance_metrics").select("rolling_avg_ratio").eq("user_id", userId).eq("day_type", workout.day_type).eq("modality", modality).maybeSingle(),
       supa.from("engine_workout_sessions").select("targets, date").eq("user_id", userId).eq("modality", modality).eq("units", units ?? "")
-        .not("targets", "is", null).gte("date", new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10)).order("date", { ascending: false }).limit(1).maybeSingle(),
+        .not("targets", "is", null).gt("created_at", sinceReset).gte("date", new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10)).order("date", { ascending: false }).limit(1).maybeSingle(),
       // the delivered-pace floor: what the athlete has recently delivered on this day type and machine
-      supa.from("engine_workout_sessions").select("actual_pace").eq("user_id", userId).eq("completed", true).eq("day_type", workout.day_type).eq("modality", modality).eq("units", units ?? "").gte("date", since28),
+      supa.from("engine_workout_sessions").select("actual_pace").eq("user_id", userId).eq("completed", true).eq("day_type", workout.day_type).eq("modality", modality).eq("units", units ?? "").gt("created_at", sinceReset).gte("date", since28),
     ]);
     const deliveredFloor = deliveredPaceFloor(((recent ?? []) as Array<{ actual_pace: number | null }>).map((r) => (r.actual_pace != null ? Number(r.actual_pace) : null)));
     const machineCurve: PdCurvePoint[] | null = curveRows && curveRows.length >= 2 ? (curveRows as Array<{ r: number; seconds: number }>).map((p) => ({ r: Number(p.r), seconds: Number(p.seconds) })) : null;
@@ -147,7 +158,7 @@ Deno.serve(async (req) => {
     // preceding position whose effective type (override ?? catalogue) is A.
     let rocketA: { position: number; pace: number } | null = null;
     if (workout.day_type === "rocket_races_b" && position != null) {
-      const a = await findPrecedingRocketA(supa, userId, version, position);
+      const a = await findPrecedingRocketA(supa, userId, version, position, restartAtFor(profile?.engine_restarts, version));
       if (a) {
         rocketA = a;
         targets = applyRocketB(targets, a.pace, trial?.calculated_rpm != null ? Number(trial.calculated_rpm) : null);

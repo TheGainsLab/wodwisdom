@@ -107,7 +107,8 @@ async function runTick(supa: SupabaseClient): Promise<void> {
         const { data: ovs } = await supa
           .from("engine_user_day_overrides")
           .select("sequence_position")
-          .eq("user_id", uid).eq("program_version", version);
+          .eq("user_id", uid).eq("program_version", version)
+          .is("archived_at", null); // days retired by an Engine reset are history, not the current block (2026-11-21)
         const overridePositions = (ovs ?? []).map((o) => o.sequence_position as number);
         const maxOverrideSeq = overridePositions.length ? Math.max(...overridePositions) : 0;
 
@@ -146,6 +147,7 @@ async function runTick(supa: SupabaseClient): Promise<void> {
               .from("engine_user_day_overrides")
               .delete()
               .eq("user_id", uid).eq("program_version", version)
+              .is("archived_at", null)
               .in("sequence_position", stale);
           }
         }

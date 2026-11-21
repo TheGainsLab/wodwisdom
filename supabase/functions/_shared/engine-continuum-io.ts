@@ -15,6 +15,7 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { type CatalogEngineDay } from "./engine-block-resolve.ts";
 import { prescriptionFromCatalog } from "./engine-continuum-prescription.ts";
+import { overrideForSession, type OverrideRecord, resetCutoff, sinceReset } from "./engine-reset.ts";
 import {
   type ContinuumSessionInput,
   CURVE_VERSION,
@@ -87,6 +88,14 @@ const CATALOG_SEL = "id, program_type, day_number, day_type, phase, month, block
 /**
  * Compute (and by default write) one athlete's continuum. Returns null when
  * the athlete has no completed Engine sessions.
+ *
+ * ENGINE RESET (2026-11-21): for an athlete whose Engine was reset when their
+ * access ended, only sessions and time trials logged AFTER the reset
+ * (athlete_profiles.engine_reset_at) are replayed — the reset clears the
+ * curve so Day 1's time trial sets a fresh baseline, and replaying the old
+ * sessions would rebuild the old curve on the next daily refresh. Older
+ * sessions keep the continuum columns they already carry. Returns null until
+ * the returner logs a session.
  */
 export async function computeAthleteContinuum(
   supa: SupabaseClient,
@@ -96,34 +105,40 @@ export async function computeAthleteContinuum(
 ): Promise<AthleteContinuum | null> {
   const [sessRes, trialRes, ovRes, profRes] = await Promise.all([
     supa.from("engine_workout_sessions").select(SESSION_SEL).eq("user_id", userId).eq("completed", true).order("date").order("created_at"),
-    supa.from("engine_time_trials").select("modality, units, calculated_rpm, date").eq("user_id", userId).not("calculated_rpm", "is", null),
-    supa.from("engine_user_day_overrides").select("sequence_position, program_version, engine_workout_id").eq("user_id", userId),
-    supa.from("athlete_profiles").select("user_id, engine_program_version, engine_curve").eq("user_id", userId).maybeSingle(),
+    supa.from("engine_time_trials").select("modality, units, calculated_rpm, date, created_at").eq("user_id", userId).not("calculated_rpm", "is", null),
+    // Archived rows INCLUDED: this is the one reader that reconstructs what a
+    // past session prescribed (see overrideForSession).
+    supa.from("engine_user_day_overrides").select("sequence_position, program_version, engine_workout_id, created_at, archived_at").eq("user_id", userId),
+    supa.from("athlete_profiles").select("user_id, engine_program_version, engine_curve, engine_reset_at").eq("user_id", userId).maybeSingle(),
   ]);
   for (const [name, res] of [["sessions", sessRes], ["time_trials", trialRes], ["overrides", ovRes], ["profile", profRes]] as const) {
     if (res.error) throw new Error(`[engine-continuum-io] ${name} read failed for ${userId}: ${res.error.message}`);
   }
-  const sessions = (sessRes.data ?? []) as unknown as SessionRow[];
+  const profile = profRes.data as { engine_program_version?: string | null; engine_curve?: StoredCurve | null; engine_reset_at?: unknown } | null;
+  const resetAt = resetCutoff(profile?.engine_reset_at);
+  const sessions = sinceReset((sessRes.data ?? []) as unknown as SessionRow[], resetAt);
   if (sessions.length === 0) return null;
-  const profile = profRes.data as { engine_program_version?: string | null; engine_curve?: StoredCurve | null } | null;
 
-  const trials: TrialInput[] = ((trialRes.data ?? []) as Array<{ modality: string; units: string | null; calculated_rpm: number; date: string }>)
+  const trials: TrialInput[] = sinceReset((trialRes.data ?? []) as Array<{ modality: string; units: string | null; calculated_rpm: number; date: string; created_at: string | null }>, resetAt)
     .map((t) => ({ modality: t.modality, units: t.units, pace: Number(t.calculated_rpm), date: t.date }));
 
-  // Prescriptions: the sequencer's override at that position wins; else the
-  // catalog day for the session's program. One batched read per kind.
-  const overrideByKey = new Map<string, string>();
-  for (const o of (ovRes.data ?? []) as Array<{ sequence_position: number; program_version: string; engine_workout_id: string }>) {
-    overrideByKey.set(`${o.program_version}|${o.sequence_position}`, o.engine_workout_id);
-  }
+  // Prescriptions: the sequenced day that was LIVE at that position when the
+  // session was logged wins; else the catalog day for the session's program.
+  // Matched by time, not by position alone (2026-11-21): a day archived by an
+  // Engine reset still explains its session, and a day written later at the
+  // same position is never attributed to an old session. One batched read per kind.
+  const overrides = (ovRes.data ?? []) as OverrideRecord[];
   const fallbackVersion = profile?.engine_program_version ?? "main_5day";
+  const overrideBySession = new Map<string, string>();
   const overrideIds = new Set<string>();
   const catalogDays = new Set<number>();
   for (const s of sessions) {
     const version = s.program_version ?? fallbackVersion;
-    const ov = s.sequence_position != null ? overrideByKey.get(`${version}|${s.sequence_position}`) : undefined;
-    if (ov) overrideIds.add(ov);
-    else if (s.program_day != null) catalogDays.add(s.program_day);
+    const ov = overrideForSession({ program_version: version, sequence_position: s.sequence_position, created_at: s.created_at }, overrides)?.engine_workout_id;
+    if (ov) {
+      overrideBySession.set(s.id, ov);
+      overrideIds.add(ov);
+    } else if (s.program_day != null) catalogDays.add(s.program_day);
   }
   // Catalogue content lives under CATALOG_PROGRAM for EVERY program: a variant
   // program's mapping points at main_5day day numbers (fixed 2026-11-17 —
@@ -140,8 +155,7 @@ export async function computeAthleteContinuum(
   }
 
   const inputs: Array<ContinuumSessionInput & { id: string }> = sessions.map((s) => {
-    const version = s.program_version ?? fallbackVersion;
-    const ov = s.sequence_position != null ? overrideByKey.get(`${version}|${s.sequence_position}`) : undefined;
+    const ov = overrideBySession.get(s.id);
     const day = ov ? catalogById.get(ov) ?? null : s.program_day != null ? catalogByDay.get(s.program_day) ?? null : null;
     const wd = s.workout_data ?? {};
     const n = (k: string) => (typeof wd[k] === "number" ? (wd[k] as number) : null);
