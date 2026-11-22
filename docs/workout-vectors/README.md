@@ -111,3 +111,35 @@ For a single new workout
   five drafts to match the first judge's noise at three.
 - Fact sheets do not yet state a "partition any way" rule where a workout
   has one.
+
+## Self-checks (no outside data)
+
+Raw sheets, drafts and vectors for each check are in the `test-*` folders.
+
+### Known edits and dose response (`test-edits/`, first judge, three drafts)
+
+One change was made to each of six workouts; the base and the edit were never
+shown to the same judge. Pass mark set beforehand: the named axis moves the
+expected way by more than 3 points.
+
+| Edit | What moved | Result |
+|---|---|---|
+| Deadlift 185 to 275 lb | Strength +7, aerobic -4 | Pass |
+| 8 min to 16 min | Aerobic +8, anaerobic -10 | Pass |
+| 10 min to 5 min | Anaerobic +17, aerobic -12 | Pass |
+| 3 minutes' rest added | Anaerobic +7 | Pass |
+| Rowing swapped for pull-ups | Gymnastics pulling +18, aerobic -7 | Pass |
+| Burpees added to a wall-ball-only workout | Mixed-modal +15, squat cycling -10 | Pass |
+
+Stepped series: clean load 75 to 255 lb moved powerlifting strength
+0, 4, 8, 17, 19 and aerobic 19, 15, 12, 7, 8. Duration 4 to 30 minutes moved
+aerobic 6, 18, 22, 28, 29 and anaerobic 29, 16, 9, 6, 6, with every other
+axis flat within 3 points. Both flatten at the top end.
+
+Fourteen workouts from the first batch were mixed in as padding and landed
+5.2 from their first-run vectors on average (worst 7.0).
+
+Limit: the edits and expected directions were chosen by the same kind of
+model that does the judging. This shows consistent response to load,
+duration, rest and movement changes, not that the size of each response is
+right.

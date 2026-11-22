@@ -1,0 +1,213 @@
+{
+ "t151": {
+  "format": "amrap",
+  "duration_seconds": 600,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Wall-Ball Shot",
+    "reps": 20,
+    "load_lb": 20,
+    "load_x_bodyweight": 0.11
+   },
+   {
+    "order": 2,
+    "movement": "Burpee",
+    "reps": 10
+   }
+  ]
+ },
+ "t152": {
+  "format": "amrap",
+  "duration_seconds": 600,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Clean",
+    "reps": 6,
+    "load_lb": 75,
+    "load_x_bodyweight": 0.4
+   },
+   {
+    "order": 2,
+    "movement": "Burpee",
+    "reps": 10
+   }
+  ]
+ },
+ "t153": {
+  "format": "for_time",
+  "time_cap_seconds": 900,
+  "reps_are": "whole workout",
+  "rest": "60 seconds built in",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Thruster",
+    "reps": 50,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 2,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps": 50,
+    "rest_after_seconds": 60
+   },
+   {
+    "order": 3,
+    "movement": "Thruster",
+    "reps": 35,
+    "load_lb": 135,
+    "load_x_bodyweight": 0.73
+   },
+   {
+    "order": 4,
+    "movement": "Bar Muscle-up",
+    "reps": 35
+   }
+  ]
+ },
+ "t154": {
+  "format": "amrap",
+  "duration_seconds": 720,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Deadlift",
+    "reps": 10,
+    "load_lb": 185,
+    "load_x_bodyweight": 1.0
+   },
+   {
+    "order": 2,
+    "movement": "Box Jump",
+    "reps": 15
+   }
+  ]
+ },
+ "t155": {
+  "format": "amrap",
+  "duration_seconds": 600,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Bar-Facing Burpee",
+    "reps": 60
+   },
+   {
+    "order": 2,
+    "movement": "Overhead Squat",
+    "reps": 30,
+    "load_lb": 120,
+    "load_x_bodyweight": 0.65
+   },
+   {
+    "order": 3,
+    "movement": "Ring Muscle-up",
+    "reps": 10
+   }
+  ]
+ },
+ "t156": {
+  "format": "for_time",
+  "time_cap_seconds": 1200,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Toes-to-Bar",
+    "reps": 25
+   },
+   {
+    "order": 2,
+    "movement": "Double-Under",
+    "reps": 50
+   },
+   {
+    "order": 3,
+    "movement": "Clean",
+    "reps": 15,
+    "load_lb": 135,
+    "load_x_bodyweight": 0.73
+   },
+   {
+    "order": 4,
+    "movement": "Toes-to-Bar",
+    "reps": 25
+   },
+   {
+    "order": 5,
+    "movement": "Double-Under",
+    "reps": 50
+   },
+   {
+    "order": 6,
+    "movement": "Clean",
+    "reps": 13,
+    "load_lb": 185,
+    "load_x_bodyweight": 1.0
+   },
+   {
+    "order": 7,
+    "movement": "Toes-to-Bar",
+    "reps": 25
+   },
+   {
+    "order": 8,
+    "movement": "Double-Under",
+    "reps": 50
+   },
+   {
+    "order": 9,
+    "movement": "Clean",
+    "reps": 11,
+    "load_lb": 225,
+    "load_x_bodyweight": 1.21
+   },
+   {
+    "order": 10,
+    "movement": "Toes-to-Bar",
+    "reps": 25
+   },
+   {
+    "order": 11,
+    "movement": "Double-Under",
+    "reps": 50
+   },
+   {
+    "order": 12,
+    "movement": "Clean",
+    "reps": 9,
+    "load_lb": 275,
+    "load_x_bodyweight": 1.48
+   },
+   {
+    "order": 13,
+    "movement": "Toes-to-Bar",
+    "reps": 25
+   },
+   {
+    "order": 14,
+    "movement": "Double-Under",
+    "reps": 50
+   },
+   {
+    "order": 15,
+    "movement": "Clean",
+    "reps": 7,
+    "load_lb": 315,
+    "load_x_bodyweight": 1.7
+   }
+  ]
+ }
+}

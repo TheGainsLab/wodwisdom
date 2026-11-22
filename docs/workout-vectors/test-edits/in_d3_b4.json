@@ -1,0 +1,205 @@
+{
+ "t341": {
+  "format": "amrap",
+  "duration_seconds": 720,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Row",
+    "calories": 15
+   },
+   {
+    "order": 2,
+    "movement": "Thruster",
+    "reps": 10,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 3,
+    "movement": "Burpee",
+    "reps": 10
+   }
+  ]
+ },
+ "t342": {
+  "format": "for_time",
+  "time_cap_seconds": 780,
+  "reps_are": "whole workout",
+  "rest": "180 seconds built in",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Row",
+    "calories": 30
+   },
+   {
+    "order": 2,
+    "movement": "Thruster",
+    "reps": 30,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51,
+    "rest_after_seconds": 180
+   },
+   {
+    "order": 3,
+    "movement": "Row",
+    "calories": 30
+   },
+   {
+    "order": 4,
+    "movement": "Thruster",
+    "reps": 30,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   }
+  ]
+ },
+ "t343": {
+  "format": "for_time",
+  "time_cap_seconds": 1200,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Box Jump",
+    "reps": 30
+   },
+   {
+    "order": 2,
+    "movement": "Clean and Jerk",
+    "reps": 15,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 3,
+    "movement": "Box Jump",
+    "reps": 30
+   },
+   {
+    "order": 4,
+    "movement": "Clean and Jerk",
+    "reps": 15,
+    "load_lb": 135,
+    "load_x_bodyweight": 0.73
+   },
+   {
+    "order": 5,
+    "movement": "Box Jump",
+    "reps": 30
+   },
+   {
+    "order": 6,
+    "movement": "Clean and Jerk",
+    "reps": 10,
+    "load_lb": 185,
+    "load_x_bodyweight": 1.0
+   },
+   {
+    "order": 7,
+    "movement": "Pistol",
+    "reps": 30
+   },
+   {
+    "order": 8,
+    "movement": "Clean and Jerk",
+    "reps": 10,
+    "load_lb": 225,
+    "load_x_bodyweight": 1.21
+   },
+   {
+    "order": 9,
+    "movement": "Pistol",
+    "reps": 30
+   },
+   {
+    "order": 10,
+    "movement": "Clean and Jerk",
+    "reps": 5,
+    "load_lb": 275,
+    "load_x_bodyweight": 1.48
+   },
+   {
+    "order": 11,
+    "movement": "Pistol",
+    "reps": 30
+   },
+   {
+    "order": 12,
+    "movement": "Clean and Jerk",
+    "reps": 5,
+    "load_lb": 315,
+    "load_x_bodyweight": 1.7
+   }
+  ]
+ },
+ "t344": {
+  "format": "amrap",
+  "duration_seconds": 960,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Wall-Ball Shot",
+    "reps": 10,
+    "load_lb": 20,
+    "load_x_bodyweight": 0.11
+   },
+   {
+    "order": 2,
+    "movement": "Toes-to-Bar",
+    "reps": 10
+   },
+   {
+    "order": 3,
+    "movement": "Row",
+    "calories": 10
+   }
+  ]
+ },
+ "t345": {
+  "format": "amrap",
+  "duration_seconds": 600,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Clean",
+    "reps": 6,
+    "load_lb": 115,
+    "load_x_bodyweight": 0.62
+   },
+   {
+    "order": 2,
+    "movement": "Burpee",
+    "reps": 10
+   }
+  ]
+ },
+ "t346": {
+  "format": "amrap",
+  "duration_seconds": 300,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Burpee",
+    "reps": 12
+   },
+   {
+    "order": 2,
+    "movement": "KB Swing",
+    "reps": 15,
+    "load_lb": 53,
+    "load_x_bodyweight": 0.29
+   }
+  ]
+ }
+}

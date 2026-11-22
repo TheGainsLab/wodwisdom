@@ -1,0 +1,252 @@
+{
+ "t221": {
+  "format": "for_time",
+  "time_cap_seconds": 1200,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Box Jump",
+    "reps": 30
+   },
+   {
+    "order": 2,
+    "movement": "Clean and Jerk",
+    "reps": 15,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 3,
+    "movement": "Box Jump",
+    "reps": 30
+   },
+   {
+    "order": 4,
+    "movement": "Clean and Jerk",
+    "reps": 15,
+    "load_lb": 135,
+    "load_x_bodyweight": 0.73
+   },
+   {
+    "order": 5,
+    "movement": "Box Jump",
+    "reps": 30
+   },
+   {
+    "order": 6,
+    "movement": "Clean and Jerk",
+    "reps": 10,
+    "load_lb": 185,
+    "load_x_bodyweight": 1.0
+   },
+   {
+    "order": 7,
+    "movement": "Pistol",
+    "reps": 30
+   },
+   {
+    "order": 8,
+    "movement": "Clean and Jerk",
+    "reps": 10,
+    "load_lb": 225,
+    "load_x_bodyweight": 1.21
+   },
+   {
+    "order": 9,
+    "movement": "Pistol",
+    "reps": 30
+   },
+   {
+    "order": 10,
+    "movement": "Clean and Jerk",
+    "reps": 5,
+    "load_lb": 275,
+    "load_x_bodyweight": 1.48
+   },
+   {
+    "order": 11,
+    "movement": "Pistol",
+    "reps": 30
+   },
+   {
+    "order": 12,
+    "movement": "Clean and Jerk",
+    "reps": 5,
+    "load_lb": 315,
+    "load_x_bodyweight": 1.7
+   }
+  ]
+ },
+ "t222": {
+  "format": "amrap",
+  "duration_seconds": 1320,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Thruster",
+    "reps": 8,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 2,
+    "movement": "Pull-up",
+    "reps": 8
+   },
+   {
+    "order": 3,
+    "movement": "Row",
+    "calories": 12
+   }
+  ]
+ },
+ "t223": {
+  "format": "amrap",
+  "duration_seconds": 300,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Burpee",
+    "reps": 12
+   },
+   {
+    "order": 2,
+    "movement": "KB Swing",
+    "reps": 15,
+    "load_lb": 53,
+    "load_x_bodyweight": 0.29
+   }
+  ]
+ },
+ "t224": {
+  "format": "amrap",
+  "duration_seconds": 600,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Clean",
+    "reps": 6,
+    "load_lb": 155,
+    "load_x_bodyweight": 0.84
+   },
+   {
+    "order": 2,
+    "movement": "Burpee",
+    "reps": 10
+   }
+  ]
+ },
+ "t225": {
+  "format": "for_time",
+  "time_cap_seconds": 900,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Dumbbell Snatch",
+    "reps": 21,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 2,
+    "movement": "Lateral Burpee Over Dumbbell",
+    "reps": 21
+   },
+   {
+    "order": 3,
+    "movement": "Dumbbell Snatch",
+    "reps": 21,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 4,
+    "movement": "Lateral Burpee Over Dumbbell",
+    "reps": 21
+   },
+   {
+    "order": 5,
+    "movement": "Dumbbell Snatch",
+    "reps": 15,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 6,
+    "movement": "Lateral Burpee Over Dumbbell",
+    "reps": 15
+   },
+   {
+    "order": 7,
+    "movement": "Dumbbell Snatch",
+    "reps": 15,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 8,
+    "movement": "Lateral Burpee Over Dumbbell",
+    "reps": 15
+   },
+   {
+    "order": 9,
+    "movement": "Dumbbell Snatch",
+    "reps": 9,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 10,
+    "movement": "Lateral Burpee Over Dumbbell",
+    "reps": 9
+   },
+   {
+    "order": 11,
+    "movement": "Dumbbell Snatch",
+    "reps": 9,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 12,
+    "movement": "Lateral Burpee Over Dumbbell",
+    "reps": 9
+   }
+  ]
+ },
+ "t226": {
+  "format": "amrap",
+  "duration_seconds": 720,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Row",
+    "calories": 15
+   },
+   {
+    "order": 2,
+    "movement": "Thruster",
+    "reps": 10,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 3,
+    "movement": "Burpee",
+    "reps": 10
+   }
+  ]
+ }
+}

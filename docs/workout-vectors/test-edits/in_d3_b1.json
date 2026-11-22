@@ -1,0 +1,145 @@
+{
+ "t311": {
+  "format": "amrap",
+  "duration_seconds": 480,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Thruster",
+    "reps": 8,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 2,
+    "movement": "Pull-up",
+    "reps": 8
+   },
+   {
+    "order": 3,
+    "movement": "Row",
+    "calories": 12
+   }
+  ]
+ },
+ "t312": {
+  "format": "amrap",
+  "duration_seconds": 720,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Deadlift",
+    "reps": 10,
+    "load_lb": 185,
+    "load_x_bodyweight": 1.0
+   },
+   {
+    "order": 2,
+    "movement": "Box Jump",
+    "reps": 15
+   }
+  ]
+ },
+ "t313": {
+  "format": "amrap",
+  "duration_seconds": 600,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Clean",
+    "reps": 6,
+    "load_lb": 255,
+    "load_x_bodyweight": 1.38
+   },
+   {
+    "order": 2,
+    "movement": "Burpee",
+    "reps": 10
+   }
+  ]
+ },
+ "t314": {
+  "format": "for_time",
+  "time_cap_seconds": 2400,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Thruster",
+    "reps": 90,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 2,
+    "movement": "Double-Under",
+    "reps": 350
+   }
+  ]
+ },
+ "t315": {
+  "format": "for_time",
+  "time_cap_seconds": 900,
+  "reps_are": "whole workout",
+  "rest": "60 seconds built in",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Thruster",
+    "reps": 50,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 2,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps": 50,
+    "rest_after_seconds": 60
+   },
+   {
+    "order": 3,
+    "movement": "Thruster",
+    "reps": 35,
+    "load_lb": 135,
+    "load_x_bodyweight": 0.73
+   },
+   {
+    "order": 4,
+    "movement": "Bar Muscle-up",
+    "reps": 35
+   }
+  ]
+ },
+ "t316": {
+  "format": "amrap",
+  "duration_seconds": 480,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Wall-Ball Shot",
+    "reps": 10,
+    "load_lb": 20,
+    "load_x_bodyweight": 0.11
+   },
+   {
+    "order": 2,
+    "movement": "Toes-to-Bar",
+    "reps": 10
+   },
+   {
+    "order": 3,
+    "movement": "Row",
+    "calories": 10
+   }
+  ]
+ }
+}
