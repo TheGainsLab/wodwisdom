@@ -14,35 +14,24 @@
  * count derived from Stripe's own invoice list is independent of event order,
  * retries and labels: the write is always "raise to entitled, never above".
  *
+ *
+ * 2026-11-22: the Engine count is now taken over the person's whole history
+ * (./paid-periods.ts: entitledEngineMonthsFromPeriods). entitledEngineMonths
+ * below remains the per-subscription arithmetic — the quarterly Programming
+ * drip in monthly-generation-cron still uses it.
+ *
  * Pure functions, no I/O — unit-tested without a DB or Stripe.
  */
 
 export const ENGINE_MONTHS_CAP = 36;
 const MS_PER_DAY = 86_400_000;
 
-export interface InvoiceLike {
-  billing_reason?: string | null;
-  amount_paid?: number | null;
-}
-
-/**
- * Does this paid invoice buy a NEW period? create (first), cycle (renewal),
- * and an update ONLY when it charged real money (founder policy 2026-10-05:
- * a €0 plan flip paid by proration credit is the same month, not a new one).
- * The first invoice of a Checkout subscription arrives as `subscription_update`
- * with amount_paid > 0, so it counts — as it should.
- */
-export function billsNewPeriod(inv: InvoiceLike): boolean {
-  const r = inv.billing_reason;
-  return r === "subscription_create" ||
-    r === "subscription_cycle" ||
-    (r === "subscription_update" && (inv.amount_paid ?? 0) > 0);
-}
-
-/** Number of paid periods across a subscription's paid invoices. */
-export function countPaidPeriods(invoices: InvoiceLike[]): number {
-  return invoices.filter(billsNewPeriod).length;
-}
+// "Is this paid invoice a new period?" is no longer answered here. The label
+// rule that lived in this file (create, cycle, and any update that charged
+// money) counted every paid plan change as a period; it was replaced on
+// 2026-11-22 by the one rule in ./paid-periods.ts (classifyPaidInvoices /
+// decidePeriod), which every caller now uses. What stays here is the cadence
+// and the per-subscription month arithmetic.
 
 export type Cadence = "monthly" | "quarterly";
 

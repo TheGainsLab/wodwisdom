@@ -1,30 +1,15 @@
 // deno test supabase/functions/_shared/engine-entitlement_test.ts --no-check
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import {
-  billsNewPeriod, countPaidPeriods, entitledEngineMonths, ENGINE_MONTHS_CAP, lastUnlockIso, subscriptionCadence,
+  entitledEngineMonths, ENGINE_MONTHS_CAP, lastUnlockIso, subscriptionCadence,
 } from "./engine-entitlement.ts";
 
 const DAY = 86_400_000;
 
-Deno.test("billsNewPeriod: create and cycle always count; update only when it charged money", () => {
-  assertEquals(billsNewPeriod({ billing_reason: "subscription_create", amount_paid: 4499 }), true);
-  assertEquals(billsNewPeriod({ billing_reason: "subscription_cycle", amount_paid: 4499 }), true);
-  // The first invoice of a Checkout subscription — the 2026-11-08 incident shape.
-  assertEquals(billsNewPeriod({ billing_reason: "subscription_update", amount_paid: 4499 }), true);
-  // A €0 plan flip paid by proration credit is NOT a new period.
-  assertEquals(billsNewPeriod({ billing_reason: "subscription_update", amount_paid: 0 }), false);
-  assertEquals(billsNewPeriod({ billing_reason: "manual", amount_paid: 999 }), false);
-  assertEquals(billsNewPeriod({}), false);
-});
-
-Deno.test("countPaidPeriods ignores non-period invoices", () => {
-  assertEquals(countPaidPeriods([
-    { billing_reason: "subscription_update", amount_paid: 4499 },
-    { billing_reason: "subscription_cycle", amount_paid: 4499 },
-    { billing_reason: "subscription_update", amount_paid: 0 },
-  ]), 2);
-  assertEquals(countPaidPeriods([]), 0);
-});
+// The two tests that stood here pinned the old label rule (billsNewPeriod /
+// countPaidPeriods: "a paid subscription_update is always a new period").
+// That rule was replaced on 2026-11-22; its tests, with the same invoice
+// shapes, are in paid-periods_test.ts.
 
 Deno.test("subscriptionCadence", () => {
   const mk = (interval: string, interval_count: number) => ({ items: { data: [{ price: { recurring: { interval, interval_count } } }] } });
