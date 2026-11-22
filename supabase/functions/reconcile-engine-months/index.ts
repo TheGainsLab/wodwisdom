@@ -23,12 +23,14 @@
  *   1. Fetch the user's active Stripe subscription.
  *   2. Determine cadence: 1-month interval = monthly; 3-month or
  *      quarterly interval = quarterly.
- *   3. Count successful invoices on this subscription = N.
- *   4. Compute entitled months:
- *        monthly:   N (one unlock per paid invoice)
- *        quarterly: (N - 1) * 3 + months_into_current_quarter
- *                   where months_into_current_quarter ∈ {1,2,3} based
- *                   on days since current_period_start (the drip).
+ *   3. Gather the person's paid periods: the paid_periods record (whole
+ *      history, refunds marked) merged with this subscription's paid
+ *      invoices; the one rule in _shared/paid-periods.ts says which are
+ *      new periods (2026-11-22).
+ *   4. Compute entitled months: 1 per monthly period, 3 per quarterly one,
+ *      Engine plans only — except the quarter in progress, which gives
+ *      months_into_current_quarter ∈ {1,2,3} by days since
+ *      current_period_start (the drip).
  *   5. Cap at 36 (matches webhook/cron).
  *   6. If correct > current_unlocked, raise to correct. Otherwise no-op.
  *   7. Set engine_months_unlocked_last_at so the cron's next drip
@@ -43,7 +45,8 @@
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { fetchWithTimeout } from "../_shared/fetch-with-timeout.ts";
-import { countPaidPeriods, ENGINE_MONTHS_CAP, entitledEngineMonths, lastUnlockIso, subscriptionCadence } from "../_shared/engine-entitlement.ts";
+import { ENGINE_MONTHS_CAP, lastUnlockIso, subscriptionCadence } from "../_shared/engine-entitlement.ts";
+import { entitledEngineMonthsFromPeriods, loadPaidPeriods, mergePeriods } from "../_shared/paid-periods.ts";
 import { ALERT_EMAIL, emailWrap, escapeHtml, sendViaResend } from "../_shared/checkout-emails.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -270,18 +273,24 @@ async function reconcileOne(
   );
   if (!invResp.ok) throw new Error(`stripe invoices ${invResp.status}`);
   const invData = await invResp.json();
-  // Only invoices that billed a NEW period count toward entitlement — the
-  // shared predicate (engine-entitlement.ts) keeps this sweep, the webhook
-  // and the cron in lockstep.
-  const paidInvoiceCount = countPaidPeriods(invData.data ?? []);
-  if (paidInvoiceCount === 0) {
-    return { user_id: userId, email: profile.email, before: currentUnlocked, after: currentUnlocked, reason: "no_paid_invoices" };
-  }
-
-  // Entitled months by cadence (shared math).
-  const ent = entitledEngineMonths(cadence, paidInvoiceCount, sub.current_period_start as number | undefined);
+  // WHAT HAS BEEN PAID FOR (2026-11-22): the months of every counted,
+  // unrefunded period that included the Engine, across the person's whole
+  // history. Periods come from the record (paid_periods: every subscription
+  // and customer record, refunds marked) merged with this subscription's own
+  // invoice list, by invoice id — see mergePeriods for why both are read and
+  // when the list half can be retired. The one rule for "is this a new
+  // period" (_shared/paid-periods.ts) keeps this sweep, the webhook and the
+  // cron in lockstep.
+  const recordRows = await loadPaidPeriods(supa, userId, profile.stripe_customer_id);
+  const merged = mergePeriods(recordRows, invData.data ?? [], sub);
+  const ent = entitledEngineMonthsFromPeriods(merged.periods, sub);
   if (!ent) {
     return { user_id: userId, email: profile.email, before: currentUnlocked, after: currentUnlocked, reason: "missing_period_start" };
+  }
+  // Kept name: the count of periods behind the figure (it appears in reasons).
+  const paidInvoiceCount = ent.periods;
+  if (paidInvoiceCount === 0 || ent.entitled === 0) {
+    return { user_id: userId, email: profile.email, before: currentUnlocked, after: currentUnlocked, reason: "no_paid_invoices" };
   }
   const entitled = Math.min(ent.entitled, ENGINE_MONTHS_CAP);
   const monthsIntoCurrentQuarter = ent.monthsIntoCurrentQuarter;

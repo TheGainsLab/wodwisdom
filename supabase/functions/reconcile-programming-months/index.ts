@@ -47,6 +47,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { fetchWithTimeout } from "../_shared/fetch-with-timeout.ts";
 import { getTierStatus } from "../_shared/tier-status.ts";
 import { RETURNER_BUILD_WAIT_DAYS, returnerStillHasTheButton } from "../_shared/program-archive.ts";
+import { loadPaidPeriods, mergePeriods } from "../_shared/paid-periods.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -240,7 +241,15 @@ async function reconcileOne(
     15_000,
   );
   if (!invResp.ok) throw new Error(`stripe invoices ${invResp.status}`);
-  const paidInvoiceCount: number = ((await invResp.json()).data ?? []).length;
+  // PAID PERIODS, by the one rule in _shared/paid-periods.ts (2026-11-22) —
+  // the same answer the webhook and the Engine recount give. This sweep used
+  // to count every paid invoice (.length), so a plan change inside a period,
+  // even a 0.00 one, read as another month owed and was "healed" a month the
+  // webhook had rightly declined. Per subscription, as before; the record is
+  // read so a refunded period is left out and the 15-day window sees the
+  // person's periods under other subscriptions.
+  const recordRows = await loadPaidPeriods(supa, userId, profile.stripe_customer_id);
+  const paidInvoiceCount: number = mergePeriods(recordRows, (await invResp.json()).data ?? [], sub).subscriptionCounted;
   if (paidInvoiceCount === 0) {
     return { user_id: userId, email, reason: "no_paid_invoices" };
   }

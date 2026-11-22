@@ -2,7 +2,12 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { fetchWithTimeout } from "../_shared/fetch-with-timeout.ts";
 import { raiseEngineMonthsFromGrant } from "../_shared/engine-months-drip.ts";
-import { countPaidPeriods, ENGINE_MONTHS_CAP, entitledEngineMonths, lastUnlockIso, subscriptionCadence } from "../_shared/engine-entitlement.ts";
+import { ENGINE_MONTHS_CAP, lastUnlockIso, subscriptionCadence } from "../_shared/engine-entitlement.ts";
+import {
+  buildPeriodRow, decidePeriod, entitledEngineMonthsFromPeriods, invoiceCadence, invoiceFeatures, loadPaidPeriods,
+  mergePeriods, monthsReleased, type PaidPeriodRow, recordPaidPeriod, rowStart, toPaidInvoice,
+} from "../_shared/paid-periods.ts";
+import { featuresFromMetadata, PLAN_ENTITLEMENTS } from "../_shared/plan-entitlements.ts";
 import { archiveProgramsIfAccessEnded } from "../_shared/program-archive.ts";
 import { resetEngineIfAccessEnded } from "../_shared/engine-reset.ts";
 import { ALERT_EMAIL, buildCancelScheduledEmail, buildCancelUnscheduledEmail, buildGoodbyeEmail, buildRecoveryEmail, emailWrap, escapeHtml, logEmailSend, sendViaResend, unsubscribeUrl } from "../_shared/checkout-emails.ts";
@@ -81,6 +86,33 @@ async function fetchInvoiceCanonical(invoiceId: string): Promise<any | null> {
   }
 }
 
+/** The invoice a charge paid, or null. The event payload is tried first; a
+ *  dialect that no longer carries charge.invoice falls back to the plain
+ *  API's answer (the same reason fetchInvoiceCanonical exists). Null when
+ *  neither says — the caller then treats the refund as unrecorded. */
+// deno-lint-ignore no-explicit-any
+async function chargeInvoiceId(charge: any): Promise<string | null> {
+  // deno-lint-ignore no-explicit-any
+  const read = (c: any): string | null => {
+    const v = c?.invoice;
+    if (typeof v === "string" && v !== "") return v;
+    if (v && typeof v.id === "string") return v.id;
+    return null;
+  };
+  const fromEvent = read(charge);
+  if (fromEvent || !charge?.id) return fromEvent;
+  try {
+    const r = await fetchWithTimeout(`https://api.stripe.com/v1/charges/${charge.id}`, {
+      headers: { "Authorization": "Basic " + btoa(STRIPE_SECRET_KEY + ":") },
+    }, 15_000);
+    if (r.ok) return read(await r.json());
+    console.error(`[webhook] charge re-fetch failed (${r.status}) for ${charge.id}`);
+  } catch (e) {
+    console.error(`[webhook] charge re-fetch error for ${charge.id}:`, e);
+  }
+  return null;
+}
+
 // ── Churn-alert dossier ─────────────────────────────────────────────────────
 // A bare "subscription went unpaid for cus_xxx" tells the founder nothing.
 // These helpers assemble who / plan+products / subscribed+tenure / admin link
@@ -137,19 +169,7 @@ const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 const STRIPE_SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY");
 const STRIPE_WEBHOOK_SECRET = Deno.env.get("STRIPE_WEBHOOK_SECRET");
 
-// Fallback plan → entitlements mapping (used if price metadata is missing)
-const PLAN_ENTITLEMENTS: Record<string, string[]> = {
-  coach: ["ai_chat"],
-  nutrition: ["nutrition"],
-  coach_nutrition: ["ai_chat", "nutrition"],
-  engine: ["engine", "ai_chat", "nutrition"],
-  programming: ["programming", "ai_chat", "nutrition"],
-  all_access: ["ai_chat", "programming", "engine", "nutrition", "research_chat"],
-  // AI Research ($9.99): the knowledge sub — Talk to the Research plus the
-  // methodology AI Coach chat. ai_chat rides along so chat treats these
-  // subscribers as coach_standalone (20/day), matching the research cap.
-  ai_research: ["research_chat", "ai_chat"],
-};
+// PLAN_ENTITLEMENTS and featuresFromMetadata live in _shared/plan-entitlements.ts.
 
 const cryptoKey = await crypto.subtle.importKey(
   "raw",
@@ -220,15 +240,6 @@ async function getSubscriptionEntitlements(subscriptionId: string): Promise<{ pl
   }
 
   return { plan, features: [] };
-}
-
-// Resolve a feature list from price/subscription metadata. `entitlements` (a
-// comma list) wins; otherwise the `plan` name maps through PLAN_ENTITLEMENTS.
-function featuresFromMetadata(meta: Record<string, string> | undefined | null): string[] {
-  if (!meta) return [];
-  if (meta.entitlements) return meta.entitlements.split(",").map(s => s.trim()).filter(Boolean);
-  if (meta.plan && PLAN_ENTITLEMENTS[meta.plan]) return PLAN_ENTITLEMENTS[meta.plan];
-  return [];
 }
 
 // Features a single invoice line grants, resolved from its price metadata.
@@ -952,25 +963,78 @@ serve(async (req) => {
         // truth for Engine content access.
         console.log(`[webhook] Subscription payment: customer=${customerId}, subscription=${subscriptionId}, billing_reason=${invoice.billing_reason}`);
 
-        // A NEW paid period is billed by subscription_create (the first
-        // invoice), subscription_cycle (a renewal), or a subscription_update
-        // THAT CHARGED REAL MONEY (founder policy, 2026-10-05: an anchor-
-        // reset upgrade that bills a fresh month — proration credit netted
-        // out, card actually charged — buys that period for every feature
-        // on the new plan). A €0 update is NOT a new period: that's a plan
-        // flip paid entirely by proration credit, the exact shape that
-        // minted 3 phantom Engine months in the 2026-10-05 incident — and
-        // repeat flippers stay blocked, because after the first flip the
-        // accumulated credit covers the next invoices, zeroing amount_paid.
-        // reconcile-engine-months applies the SAME predicate when it
-        // recounts invoices — the two must agree or the nightly sweep
-        // re-mints what this gate blocks.
-        const billsNewPeriod =
-          invoice.billing_reason === "subscription_create" ||
-          invoice.billing_reason === "subscription_cycle" ||
-          (invoice.billing_reason === "subscription_update" && (invoice.amount_paid ?? 0) > 0);
-        if (!billsNewPeriod) {
-          console.log(`[webhook] invoice ${invoice.id}: billing_reason=${invoice.billing_reason} amount_paid=${invoice.amount_paid} bills no new period — skipping drip/generation advancement`);
+        // One Stripe read, for every paid subscription invoice: the
+        // subscription (cadence, period start) and its paid invoices. It used
+        // to be made further down, only for plans with Programming or the
+        // Engine; the rule below needs the invoice list to answer at all
+        // ("is this the subscription's first paid invoice?"), so it moved up.
+        // deno-lint-ignore no-explicit-any
+        let stripeSub: any = null;
+        // deno-lint-ignore no-explicit-any
+        let subInvoices: any[] | null = null;
+        let stripeWhy = "";
+        try {
+          const [subResp, invResp] = await Promise.all([
+            fetchWithTimeout(`https://api.stripe.com/v1/subscriptions/${subscriptionId}`, {
+              headers: { "Authorization": "Basic " + btoa(STRIPE_SECRET_KEY + ":") },
+            }, 15_000),
+            fetchWithTimeout(`https://api.stripe.com/v1/invoices?subscription=${subscriptionId}&status=paid&limit=100`, {
+              headers: { "Authorization": "Basic " + btoa(STRIPE_SECRET_KEY + ":") },
+            }, 15_000),
+          ]);
+          if (subResp.ok && invResp.ok) {
+            stripeSub = await subResp.json();
+            subInvoices = (await invResp.json()).data ?? [];
+          } else {
+            stripeWhy = `stripe ${subResp.status}/${invResp.status}`;
+          }
+        } catch (e) {
+          stripeWhy = `stripe error: ${(e as Error).message}`;
+        }
+        // The invoice being paid belongs in its own subscription's list even
+        // if the list call answered a moment before it showed up there.
+        // deno-lint-ignore no-explicit-any
+        if (subInvoices && !subInvoices.some((i: any) => i?.id === invoice.id)) subInvoices = [invoice, ...subInvoices];
+
+        // IS THIS A NEW PAID PERIOD? One rule, in _shared/paid-periods.ts
+        // (founder decisions, 2026-11-22), for both products: a renewal; the
+        // first paid invoice of its subscription (by position — Checkout labels
+        // it subscription_update — and at amount 0 too); or a plan change that
+        // charged money at least 15 days after the person's last counted
+        // period began. This replaces the inline copy that counted EVERY paid
+        // plan change (three changes in two days bought three months). The
+        // nightly recounts apply the same function, so they cannot re-mint
+        // what this gate declines.
+        // The person's earlier periods come from the record (paid_periods) —
+        // by account and by customer id; a DB read, no Stripe call.
+        const knownPayer = await resolveByCustomer(supa, customerId);
+        let recordRows: PaidPeriodRow[] = await loadPaidPeriods(supa, knownPayer.user_id, customerId);
+        // deno-lint-ignore no-explicit-any
+        const listIds = new Set<string>((subInvoices ?? []).map((i: any) => i?.id));
+        const priorStarts = recordRows
+          .filter((r) => r.counts && r.stripe_invoice_id !== invoice.id && !listIds.has(r.stripe_invoice_id))
+          .map((r) => rowStart(r))
+          .filter((n): n is number => n != null);
+        const decision = decidePeriod(toPaidInvoice(invoice), priorStarts, subInvoices ? subInvoices.map(toPaidInvoice) : null);
+
+        // THE RECORD: every paid subscription invoice gets its row, counted or
+        // not. Never throws and never blocks what follows (recordPaidPeriod
+        // logs a failed write loudly and returns null).
+        const recordThisInvoice = (userId: string | null, features: Set<string> | null) => {
+          const embedded = invoiceFeatures(invoice);
+          const has = (f: string) => features ? features.has(f) : (embedded?.includes(f) ?? false);
+          return recordPaidPeriod(supa, buildPeriodRow(invoice, decision, {
+            userId,
+            cadence: invoiceCadence(invoice) ?? (stripeSub ? subscriptionCadence(stripeSub) : null) ?? "other",
+            includesEngine: has("engine"),
+            includesProgramming: has("programming"),
+            source: "webhook",
+          }));
+        };
+
+        if (!decision.counts) {
+          await recordThisInvoice(knownPayer.user_id, null);
+          console.log(`[webhook] invoice ${invoice.id}: billing_reason=${invoice.billing_reason} amount_paid=${invoice.amount_paid} is not a new period (${decision.reason}) — skipping drip/generation advancement`);
           break;
         }
 
@@ -1028,6 +1092,9 @@ serve(async (req) => {
           } catch { /* fall through to break */ }
         }
         if (!payUserId) {
+          // Recorded without an account (found later by its customer id).
+          // What it included is read from the invoice's own price metadata.
+          await recordThisInvoice(null, null);
           console.warn(`[webhook] invoice ${invoice.id}: no user found for customer ${customerId} (by id or email) — relying on daily reconcilers`);
           break;
         }
@@ -1065,40 +1132,27 @@ serve(async (req) => {
         }
         console.log(`[webhook] invoice ${invoice.id} billing_reason=${invoice.billing_reason} advancing=[${[...advance].join(",")}]`);
 
-        // One Stripe read for both branches below: the subscription (cadence,
-        // period start) and its paid invoices (how many periods have been
-        // bought). paidPeriods === 1 is the robust "this is the subscription's
-        // first paid invoice" signal — billing_reason is NOT: Checkout labels
-        // first invoices subscription_update (2026-11-08 Engine double-grant).
-        let stripeSub: any = null;
-        let paidPeriods: number | null = null;
-        let stripeWhy = "";
-        if (advance.has("programming") || advance.has("engine")) {
-          try {
-            const [subResp, invResp] = await Promise.all([
-              fetchWithTimeout(`https://api.stripe.com/v1/subscriptions/${subscriptionId}`, {
-                headers: { "Authorization": "Basic " + btoa(STRIPE_SECRET_KEY + ":") },
-              }, 15_000),
-              fetchWithTimeout(`https://api.stripe.com/v1/invoices?subscription=${subscriptionId}&status=paid&limit=100`, {
-                headers: { "Authorization": "Basic " + btoa(STRIPE_SECRET_KEY + ":") },
-              }, 15_000),
-            ]);
-            if (subResp.ok && invResp.ok) {
-              stripeSub = await subResp.json();
-              paidPeriods = countPaidPeriods(((await invResp.json()).data ?? []));
-            } else {
-              stripeWhy = `stripe ${subResp.status}/${invResp.status}`;
-            }
-          } catch (e) {
-            stripeWhy = `stripe error: ${(e as Error).message}`;
-          }
-        }
+        // The account was only just resolved (a first payment racing the
+        // checkout event): read the record again by account, so a returner's
+        // periods under earlier customer records are in the count below.
+        if (knownPayer.user_id !== payUserId) recordRows = await loadPaidPeriods(supa, payUserId, customerId);
+        // Record this period with the account and the products it billed.
+        const storedRow = await recordThisInvoice(payUserId, advance);
+        if (storedRow) recordRows = [...recordRows.filter((r) => r.stripe_invoice_id !== storedRow.stripe_invoice_id), storedRow];
+
+        // The person's periods: the record plus this subscription's own
+        // invoices (see mergePeriods for why both, and when the second half
+        // can go). paidPeriods is the PER-SUBSCRIPTION number — it must stay
+        // per subscription: "first paid period of this subscription" is what
+        // tells a brand-new subscription from a renewal below.
+        const merged = mergePeriods(recordRows, subInvoices, stripeSub);
+        const paidPeriods: number | null = subInvoices ? merged.subscriptionCounted : null;
         // First paid period on this subscription. Falls back to the label only
         // when Stripe could not be read (then subscription_create is at least
         // never a false positive).
         const isFirstPaidPeriod = paidPeriods != null
           ? paidPeriods === 1
-          : invoice.billing_reason === "subscription_create";
+          : decision.reason === "first_of_subscription";
 
         // Programming users: trigger next month generation
         if (advance.has("programming")) {
@@ -1189,13 +1243,16 @@ serve(async (req) => {
           let target: number | null = null;
           let lastAt: string | null = null;
           let why = stripeWhy;
-          if (stripeSub && paidPeriods != null) {
+          if (stripeSub && subInvoices) {
+            // Months of every counted, unrefunded period that included the
+            // Engine, across the person's history (2026-11-22) — the quarterly
+            // drip on the current quarter only.
             const cadence = subscriptionCadence(stripeSub);
-            const ent = cadence ? entitledEngineMonths(cadence, paidPeriods, stripeSub.current_period_start) : null;
-            if (cadence && ent) {
+            const ent = cadence ? entitledEngineMonthsFromPeriods(merged.periods, stripeSub) : null;
+            if (cadence && ent && ent.entitled > 0) {
               target = ent.entitled;
               lastAt = lastUnlockIso(cadence, stripeSub.current_period_start, ent.monthsIntoCurrentQuarter);
-              why = `${cadence}:inv=${paidPeriods}:entitled=${ent.entitled}`;
+              why = `${cadence}:periods=${ent.periods}:sub=${paidPeriods}:entitled=${ent.entitled}`;
             } else {
               why = cadence ? `no_paid_periods` : `unsupported_interval`;
             }
@@ -1242,7 +1299,41 @@ serve(async (req) => {
           .select("id")
           .eq("stripe_customer_id", customerId)
           .limit(1);
-        if (!refundProfiles || refundProfiles.length === 0) break;
+
+        // THE RECORD (2026-11-22). A FULL refund takes the period's months
+        // back and marks its row, so no recount hands them back (the nightly
+        // sweep used to, within a day: Stripe leaves a refunded invoice
+        // "paid"). A partial refund lowers nothing.
+        const chargeAmount = typeof charge.amount === "number" ? charge.amount : 0;
+        const fullyRefunded = charge.refunded === true ||
+          (chargeAmount > 0 && (charge.amount_refunded ?? 0) >= chargeAmount);
+        const refundedInvoiceId = fullyRefunded ? await chargeInvoiceId(charge) : null;
+        let refundedRow: PaidPeriodRow | null = null;
+        if (refundedInvoiceId) {
+          const { data: rr, error: rrErr } = await supa
+            .from("paid_periods").select("*").eq("stripe_invoice_id", refundedInvoiceId).maybeSingle();
+          if (rrErr) console.error(`[webhook] Refund: paid_periods read failed for invoice ${refundedInvoiceId}: ${rrErr.message}`);
+          refundedRow = (rr as PaidPeriodRow | null) ?? null;
+        }
+        // Marks the row and lowers the months in ONE database call, once: a
+        // row already refunded changes nothing, so a re-delivered event cannot
+        // take a second month. The months taken back are the ones the period
+        // had released (a quarter refunded in its first month: one, not three).
+        const applyRecordedRefund = async (row: PaidPeriodRow, userId: string | null) => {
+          const lowerBy = monthsReleased({ months: row.months, cadence: row.cadence, startedSec: rowStart(row) });
+          const { data: out, error: outErr } = await supa.rpc("refund_paid_period", {
+            p_invoice_id: row.stripe_invoice_id, p_lower_by: lowerBy, p_user_id: userId,
+          });
+          if (outErr) console.error(`[webhook] Refund: refund_paid_period FAILED for invoice ${row.stripe_invoice_id}: ${outErr.message}`);
+          else console.log(`[webhook] Refund: invoice ${row.stripe_invoice_id} recorded: ${JSON.stringify(out)}`);
+        };
+
+        if (!refundProfiles || refundProfiles.length === 0) {
+          // A charge under a customer record no profile points at any more (an
+          // earlier subscription): the row still knows whose it is.
+          if (refundedRow) await applyRecordedRefund(refundedRow, null);
+          break;
+        }
         const refundUserId = refundProfiles[0].id;
 
         console.log(`[webhook] Refund: customer=${customerId}, user=${refundUserId}, charge=${charge.id}, amount_refunded=${charge.amount_refunded}`);
@@ -1261,6 +1352,32 @@ serve(async (req) => {
           `Refund: ${refundProfile?.email ?? customerId}`,
           [`Refunded ${((charge.amount_refunded ?? 0) / 100).toFixed(2)} ${String(charge.currency ?? "usd").toUpperCase()} to <strong>${escapeHtml(refundProfile?.email ?? String(customerId))}</strong>.`],
         );
+
+        if (!fullyRefunded) {
+          console.log(`[webhook] Refund: charge ${charge.id} is partly refunded (${charge.amount_refunded} of ${charge.amount}) — no months taken back`);
+          break;
+        }
+        if (refundedRow) {
+          await applyRecordedRefund(refundedRow, refundUserId);
+          break;
+        }
+
+        // NO RECORD ROW for this invoice (it was paid before the record
+        // existed and history is not loaded yet): the months are handled as
+        // they always were, below. One addition — a stub row marked refunded,
+        // so the recounts leave this invoice out and stop handing the month
+        // back. The stub never counts for anything itself.
+        if (refundedInvoiceId) {
+          await recordPaidPeriod(supa, {
+            stripe_invoice_id: refundedInvoiceId, user_id: refundUserId,
+            customer_email: refundProfile?.email ?? null, stripe_customer_id: customerId, stripe_subscription_id: null,
+            paid_at: null, period_start: null, period_end: null,
+            amount_paid: chargeAmount || null, currency: charge.currency ?? null, billing_reason: null,
+            cadence: "other", includes_engine: false, includes_programming: false,
+            counts: false, count_reason: "refunded_unrecorded", months: 0,
+            refunded_at: new Date().toISOString(), source: "webhook",
+          });
+        }
 
         // Only decrement if the user currently has an active Engine
         // entitlement. Refund-after-cancel cases: the entitlement is already

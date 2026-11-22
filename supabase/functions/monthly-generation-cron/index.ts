@@ -12,7 +12,8 @@
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { fetchWithTimeout } from "../_shared/fetch-with-timeout.ts";
-import { countPaidPeriods, ENGINE_MONTHS_CAP, entitledEngineMonths, lastUnlockIso, subscriptionCadence } from "../_shared/engine-entitlement.ts";
+import { ENGINE_MONTHS_CAP, entitledEngineMonths, lastUnlockIso, subscriptionCadence } from "../_shared/engine-entitlement.ts";
+import { entitledEngineMonthsFromPeriods, loadPaidPeriods, mergePeriods, type MergedPeriods } from "../_shared/paid-periods.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -96,6 +97,7 @@ Deno.serve(async (_req) => {
       if (typeof periodStartSec !== "number") continue;
 
       let paidInvoiceCount = 0;
+      let merged: MergedPeriods | null = null;
       try {
         const invResp = await fetchWithTimeout(
           `https://api.stripe.com/v1/invoices?customer=${profile.stripe_customer_id}&subscription=${sub.id}&status=paid&limit=100`,
@@ -104,9 +106,15 @@ Deno.serve(async (_req) => {
         );
         if (invResp.ok) {
           const invData = await invResp.json();
-          // LOCKSTEP with stripe-webhook and reconcile-engine-months: the
-          // shared predicate decides which invoices bought a new period.
-          paidInvoiceCount = countPaidPeriods(invData.data ?? []);
+          // LOCKSTEP with stripe-webhook and the reconcilers: the one rule
+          // in _shared/paid-periods.ts decides which invoices are a new
+          // period (2026-11-22). paidInvoiceCount is THIS subscription's
+          // counted periods — the Programming drip below is per subscription.
+          // The Engine branch counts the person's whole history instead (the
+          // paid_periods record merged with this list; see mergePeriods).
+          const recordRows = await loadPaidPeriods(supa, userId, profile.stripe_customer_id);
+          merged = mergePeriods(recordRows, invData.data ?? [], sub);
+          paidInvoiceCount = merged.subscriptionCounted;
         }
       } catch {
         continue; // skip on error
@@ -180,14 +188,18 @@ Deno.serve(async (_req) => {
           .maybeSingle();
         const currentUnlocked = athleteProfile?.engine_months_unlocked ?? 0;
 
-        const entitled = Math.min(entitledMonths, ENGINE_MONTHS_CAP);
+        // Engine months: every counted, unrefunded period that included the
+        // Engine, across the person's history; the drip on this quarter only.
+        // Not computable → raise nothing.
+        const engineEnt = merged ? entitledEngineMonthsFromPeriods(merged.periods, sub) : null;
+        const entitled = Math.min(engineEnt?.entitled ?? 0, ENGINE_MONTHS_CAP);
 
         if (entitled > currentUnlocked) {
           // Anchor last_at to when the most recent unlock SHOULD have happened
           // so the next drip lands on time. Diagnostic only — cron doesn't
           // read last_at anymore.
           const lastAtIso = lastUnlockIso("quarterly", periodStartSec, monthsIntoCurrentQuarter);
-          results.push(`Engine: raising user ${userId} from ${currentUnlocked} to ${entitled} (inv=${paidInvoiceCount}, into_quarter=${monthsIntoCurrentQuarter})`);
+          results.push(`Engine: raising user ${userId} from ${currentUnlocked} to ${entitled} (periods=${engineEnt?.periods ?? 0}, sub=${paidInvoiceCount}, into_quarter=${monthsIntoCurrentQuarter})`);
 
           await supa
             .from("athlete_profiles")
