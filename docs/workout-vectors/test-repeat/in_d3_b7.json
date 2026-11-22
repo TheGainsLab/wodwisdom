@@ -1,0 +1,160 @@
+{
+ "r371": {
+  "format": "amrap",
+  "duration_seconds": 600,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Bar-Facing Burpee",
+    "reps": 60
+   },
+   {
+    "order": 2,
+    "movement": "Overhead Squat",
+    "reps": 30,
+    "load_lb": 120,
+    "load_x_bodyweight": 0.65
+   },
+   {
+    "order": 3,
+    "movement": "Ring Muscle-up",
+    "reps": 10
+   }
+  ]
+ },
+ "r372": {
+  "format": "for_time",
+  "time_cap_seconds": 720,
+  "reps_are": "whole workout",
+  "rest": "180 seconds built in",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Snatch",
+    "reps": 30,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 2,
+    "movement": "Bar-Facing Burpee",
+    "reps": 36,
+    "rest_after_seconds": 180
+   },
+   {
+    "order": 3,
+    "movement": "Bar Muscle-up",
+    "reps": 30
+   },
+   {
+    "order": 4,
+    "movement": "Bar-Facing Burpee",
+    "reps": 36
+   }
+  ]
+ },
+ "r373": {
+  "format": "for_time",
+  "time_cap_seconds": 1200,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Thruster",
+    "reps": 105,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 2,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps": 105
+   }
+  ]
+ },
+ "r374": {
+  "format": "amrap",
+  "duration_seconds": 900,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Push-up",
+    "reps": 12
+   },
+   {
+    "order": 2,
+    "movement": "Box Jump",
+    "reps": 15
+   },
+   {
+    "order": 3,
+    "movement": "Deadlift",
+    "reps": 9,
+    "load_lb": 155,
+    "load_x_bodyweight": 0.84
+   }
+  ]
+ },
+ "r375": {
+  "format": "amrap",
+  "duration_seconds": 420,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Snatch",
+    "reps": 10,
+    "load_lb": 75,
+    "load_x_bodyweight": 0.4
+   },
+   {
+    "order": 2,
+    "movement": "Bar Muscle-up",
+    "reps": 3
+   }
+  ]
+ },
+ "r376": {
+  "format": "amrap",
+  "duration_seconds": 840,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Row",
+    "calories": 60
+   },
+   {
+    "order": 2,
+    "movement": "Toes-to-Bar",
+    "reps": 50
+   },
+   {
+    "order": 3,
+    "movement": "Wall-Ball Shot",
+    "reps": 40,
+    "load_lb": 20,
+    "load_x_bodyweight": 0.11
+   },
+   {
+    "order": 4,
+    "movement": "Clean",
+    "reps": 30,
+    "load_lb": 135,
+    "load_x_bodyweight": 0.73
+   },
+   {
+    "order": 5,
+    "movement": "Ring Muscle-up",
+    "reps": 20
+   }
+  ]
+ }
+}

@@ -1,0 +1,157 @@
+{
+ "r231": {
+  "format": "amrap",
+  "duration_seconds": 1200,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Clean",
+    "reps": 5,
+    "load_lb": 145,
+    "load_x_bodyweight": 0.78
+   },
+   {
+    "order": 2,
+    "movement": "Toes-to-Bar",
+    "reps": 10
+   },
+   {
+    "order": 3,
+    "movement": "Wall-Ball Shot",
+    "reps": 15,
+    "load_lb": 20,
+    "load_x_bodyweight": 0.11
+   }
+  ]
+ },
+ "r232": {
+  "format": "amrap",
+  "duration_seconds": 900,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Row",
+    "calories": 19
+   },
+   {
+    "order": 2,
+    "movement": "Wall-Ball Shot",
+    "reps": 19,
+    "load_lb": 20,
+    "load_x_bodyweight": 0.11
+   }
+  ]
+ },
+ "r233": {
+  "format": "amrap",
+  "duration_seconds": 600,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Shoulder to Overhead",
+    "reps": 5,
+    "load_lb": 115,
+    "load_x_bodyweight": 0.62
+   },
+   {
+    "order": 2,
+    "movement": "Deadlift",
+    "reps": 10,
+    "load_lb": 115,
+    "load_x_bodyweight": 0.62
+   },
+   {
+    "order": 3,
+    "movement": "Box Jump",
+    "reps": 15
+   }
+  ]
+ },
+ "r234": {
+  "format": "amrap",
+  "duration_minutes": 10.0,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Snatch",
+    "reps": 30,
+    "load_kg": 34.0,
+    "load_x_bodyweight": 0.4
+   },
+   {
+    "order": 2,
+    "movement": "Snatch",
+    "reps": 30,
+    "load_kg": 61.2,
+    "load_x_bodyweight": 0.73
+   },
+   {
+    "order": 3,
+    "movement": "Snatch",
+    "reps": 30,
+    "load_kg": 74.8,
+    "load_x_bodyweight": 0.89
+   },
+   {
+    "order": 4,
+    "movement": "Snatch",
+    "reps_pattern": "as many as possible in the time remaining",
+    "load_kg": 95.3,
+    "load_x_bodyweight": 1.13
+   }
+  ]
+ },
+ "r235": {
+  "format": "amrap",
+  "duration_seconds": 900,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Deadlift",
+    "reps": 9,
+    "load_lb": 155,
+    "load_x_bodyweight": 0.84
+   },
+   {
+    "order": 2,
+    "movement": "Push-up",
+    "reps": 12
+   },
+   {
+    "order": 3,
+    "movement": "Box Jump",
+    "reps": 15
+   }
+  ]
+ },
+ "r236": {
+  "format": "amrap",
+  "duration_seconds": 420,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Snatch",
+    "reps": 10,
+    "load_lb": 75,
+    "load_x_bodyweight": 0.4
+   },
+   {
+    "order": 2,
+    "movement": "Bar Muscle-up",
+    "reps": 3
+   }
+  ]
+ }
+}

@@ -1,0 +1,25 @@
+{
+ "format": "amrap",
+ "duration_seconds": 1200,
+ "reps_are": "per round",
+ "rest": "none",
+ "movements": [
+  {
+   "order": 1,
+   "movement": "Toes-to-Bar",
+   "reps": 8
+  },
+  {
+   "order": 2,
+   "movement": "DB Clean and Jerk",
+   "reps": 10,
+   "load_lb": 50,
+   "load_x_bodyweight": 0.27
+  },
+  {
+   "order": 3,
+   "movement": "Row",
+   "calories": 14
+  }
+ ]
+}

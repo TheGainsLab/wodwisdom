@@ -1,0 +1,286 @@
+{
+ "r261": {
+  "format": "amrap",
+  "duration_seconds": 900,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Wall-Ball Shot",
+    "reps": 19,
+    "load_lb": 20,
+    "load_x_bodyweight": 0.11
+   },
+   {
+    "order": 2,
+    "movement": "Row",
+    "calories": 19
+   }
+  ]
+ },
+ "r262": {
+  "format": "for_time",
+  "time_cap_seconds": 720,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Pull-up",
+    "reps": 21
+   },
+   {
+    "order": 2,
+    "movement": "Double-Under",
+    "reps": 42
+   },
+   {
+    "order": 3,
+    "movement": "Thruster",
+    "reps": 21,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 4,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps": 18
+   },
+   {
+    "order": 5,
+    "movement": "Double-Under",
+    "reps": 36
+   },
+   {
+    "order": 6,
+    "movement": "Thruster",
+    "reps": 18,
+    "load_lb": 115,
+    "load_x_bodyweight": 0.62
+   },
+   {
+    "order": 7,
+    "movement": "Bar Muscle-up",
+    "reps": 15
+   },
+   {
+    "order": 8,
+    "movement": "Double-Under",
+    "reps": 30
+   },
+   {
+    "order": 9,
+    "movement": "Thruster",
+    "reps": 15,
+    "load_lb": 135,
+    "load_x_bodyweight": 0.73
+   }
+  ]
+ },
+ "r263": {
+  "format": "amrap",
+  "duration_seconds": 900,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Push-up",
+    "reps": 12
+   },
+   {
+    "order": 2,
+    "movement": "Box Jump",
+    "reps": 15
+   },
+   {
+    "order": 3,
+    "movement": "Deadlift",
+    "reps": 9,
+    "load_lb": 155,
+    "load_x_bodyweight": 0.84
+   }
+  ]
+ },
+ "r264": {
+  "format": "for_time",
+  "time_cap_seconds": 1440,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps": 18
+   },
+   {
+    "order": 2,
+    "movement": "Snatch",
+    "reps": 18,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 3,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps": 21
+   },
+   {
+    "order": 4,
+    "movement": "Snatch",
+    "reps": 15,
+    "load_lb": 135,
+    "load_x_bodyweight": 0.73
+   },
+   {
+    "order": 5,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps": 24
+   },
+   {
+    "order": 6,
+    "movement": "Snatch",
+    "reps": 12,
+    "load_lb": 185,
+    "load_x_bodyweight": 1.0
+   },
+   {
+    "order": 7,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps": 27
+   },
+   {
+    "order": 8,
+    "movement": "Snatch",
+    "reps": 9,
+    "load_lb": 225,
+    "load_x_bodyweight": 1.21
+   },
+   {
+    "order": 9,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps": 30
+   },
+   {
+    "order": 10,
+    "movement": "Snatch",
+    "reps": 6,
+    "load_lb": 245,
+    "load_x_bodyweight": 1.32
+   },
+   {
+    "order": 11,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps": 33
+   },
+   {
+    "order": 12,
+    "movement": "Snatch",
+    "reps": 3,
+    "load_lb": 265,
+    "load_x_bodyweight": 1.43
+   }
+  ]
+ },
+ "r265": {
+  "format": "amrap",
+  "duration_seconds": 240,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Thruster",
+    "reps": 15,
+    "load_lb": 100,
+    "load_x_bodyweight": 0.54
+   },
+   {
+    "order": 2,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps": 15
+   }
+  ]
+ },
+ "r266": {
+  "format": "amrap",
+  "duration_seconds": 480,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Deadlift",
+    "reps": 10,
+    "load_lb": 135,
+    "load_x_bodyweight": 0.73
+   },
+   {
+    "order": 2,
+    "movement": "Box Jump",
+    "reps": 15
+   },
+   {
+    "order": 3,
+    "movement": "Deadlift",
+    "reps": 15,
+    "load_lb": 185,
+    "load_x_bodyweight": 1.0
+   },
+   {
+    "order": 4,
+    "movement": "Box Jump",
+    "reps": 15
+   },
+   {
+    "order": 5,
+    "movement": "Deadlift",
+    "reps": 20,
+    "load_lb": 225,
+    "load_x_bodyweight": 1.21
+   },
+   {
+    "order": 6,
+    "movement": "Box Jump",
+    "reps": 15
+   },
+   {
+    "order": 7,
+    "movement": "Deadlift",
+    "reps": 25,
+    "load_lb": 275,
+    "load_x_bodyweight": 1.48
+   },
+   {
+    "order": 8,
+    "movement": "Box Jump",
+    "reps": 15
+   },
+   {
+    "order": 9,
+    "movement": "Deadlift",
+    "reps": 30,
+    "load_lb": 315,
+    "load_x_bodyweight": 1.7
+   },
+   {
+    "order": 10,
+    "movement": "Box Jump",
+    "reps": 15
+   },
+   {
+    "order": 11,
+    "movement": "Deadlift",
+    "reps": 35,
+    "load_lb": 365,
+    "load_x_bodyweight": 1.97
+   },
+   {
+    "order": 12,
+    "movement": "Box Jump",
+    "reps": 15
+   }
+  ]
+ }
+}

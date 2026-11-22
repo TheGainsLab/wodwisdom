@@ -1,0 +1,237 @@
+{
+ "r161": {
+  "format": "for_time",
+  "time_cap_seconds": 900,
+  "reps_are": "whole workout",
+  "rest": "60 seconds built in",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Barbell Thruster",
+    "reps": 50,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 2,
+    "movement": "C2B Pull-ups",
+    "reps": 50,
+    "rest_after_seconds": 60
+   },
+   {
+    "order": 3,
+    "movement": "Barbell Thruster",
+    "reps": 35,
+    "load_lb": 135,
+    "load_x_bodyweight": 0.73
+   },
+   {
+    "order": 4,
+    "movement": "Muscle-up (bar)",
+    "reps": 35
+   }
+  ]
+ },
+ "r162": {
+  "format": "for_time",
+  "time_cap_seconds": 840,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Double-Under",
+    "reps": 200
+   },
+   {
+    "order": 2,
+    "movement": "Overhead Squat",
+    "reps": 40,
+    "load_lb": 115,
+    "load_x_bodyweight": 0.62
+   },
+   {
+    "order": 3,
+    "movement": "Double-Under",
+    "reps": 200
+   },
+   {
+    "order": 4,
+    "movement": "Ring Muscle-up",
+    "reps": 24
+   },
+   {
+    "order": 5,
+    "movement": "Double-Under",
+    "reps": 200
+   },
+   {
+    "order": 6,
+    "movement": "Dumbbell Snatch",
+    "reps": 40,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 7,
+    "movement": "Double-Under",
+    "reps": 200
+   },
+   {
+    "order": 8,
+    "movement": "Bar Muscle-up",
+    "reps": 24
+   }
+  ]
+ },
+ "r163": {
+  "format": "for_time",
+  "time_cap_seconds": 900,
+  "reps_are": "whole workout",
+  "rest": "120 seconds built in",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Front Squat",
+    "reps": 15,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 2,
+    "movement": "Toes-to-Bar",
+    "reps": 30
+   },
+   {
+    "order": 3,
+    "movement": "Thruster",
+    "reps": 15,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51,
+    "rest_after_seconds": 60
+   },
+   {
+    "order": 4,
+    "movement": "Front Squat",
+    "reps": 15,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 5,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps": 30
+   },
+   {
+    "order": 6,
+    "movement": "Thruster",
+    "reps": 15,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51,
+    "rest_after_seconds": 60
+   },
+   {
+    "order": 7,
+    "movement": "Front Squat",
+    "reps": 15,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 8,
+    "movement": "Bar Muscle-up",
+    "reps": 30
+   },
+   {
+    "order": 9,
+    "movement": "Thruster",
+    "reps": 15,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   }
+  ]
+ },
+ "r164": {
+  "format": "amrap",
+  "duration_seconds": 300,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Clean",
+    "reps": 1,
+    "load_lb": 165,
+    "load_x_bodyweight": 0.89
+   },
+   {
+    "order": 2,
+    "movement": "Jerk",
+    "reps": 1,
+    "load_lb": 165,
+    "load_x_bodyweight": 0.89
+   }
+  ]
+ },
+ "r165": {
+  "format": "amrap",
+  "duration_seconds": 600,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Snatch",
+    "reps": 30,
+    "load_lb": 75,
+    "load_x_bodyweight": 0.4
+   },
+   {
+    "order": 2,
+    "movement": "Snatch",
+    "reps": 30,
+    "load_lb": 135,
+    "load_x_bodyweight": 0.73
+   },
+   {
+    "order": 3,
+    "movement": "Snatch",
+    "reps": 30,
+    "load_lb": 165,
+    "load_x_bodyweight": 0.89
+   },
+   {
+    "order": 4,
+    "movement": "Snatch",
+    "reps_pattern": "as many as possible in the time remaining",
+    "load_lb": 210,
+    "load_x_bodyweight": 1.13
+   }
+  ]
+ },
+ "r166": {
+  "format": "amrap",
+  "duration_seconds": 900,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Lateral Burpee Over Dumbbell",
+    "reps_pattern": "ascending each round: 3, 6, 9, 12 and so on, adding 3 every round until time runs out"
+   },
+   {
+    "order": 2,
+    "movement": "DB Clean and Jerk",
+    "reps_pattern": "ascending each round: 3, 6, 9, 12 and so on, adding 3 every round until time runs out",
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 3,
+    "movement": "Walking Lunge",
+    "distance_ft": 30
+   }
+  ]
+ }
+}

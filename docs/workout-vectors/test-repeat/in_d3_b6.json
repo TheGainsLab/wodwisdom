@@ -1,0 +1,290 @@
+{
+ "r361": {
+  "format": "amrap",
+  "duration_seconds": 420,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Clean and Jerk",
+    "reps_pattern": "ascending each round: 3, 6, 9, 12 and so on, adding 3 every round until time runs out",
+    "load_lb": 135,
+    "load_x_bodyweight": 0.73
+   },
+   {
+    "order": 2,
+    "movement": "Toes-to-Bar",
+    "reps_pattern": "ascending each round: 3, 6, 9, 12 and so on, adding 3 every round until time runs out"
+   }
+  ]
+ },
+ "r362": {
+  "format": "for_time",
+  "time_cap_seconds": 1200,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Dumbbell Snatch",
+    "reps": 10,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 2,
+    "movement": "Burpee Box Jump-Over",
+    "reps": 15
+   },
+   {
+    "order": 3,
+    "movement": "Dumbbell Snatch",
+    "reps": 20,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 4,
+    "movement": "Burpee Box Jump-Over",
+    "reps": 15
+   },
+   {
+    "order": 5,
+    "movement": "Dumbbell Snatch",
+    "reps": 30,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 6,
+    "movement": "Burpee Box Jump-Over",
+    "reps": 15
+   },
+   {
+    "order": 7,
+    "movement": "Dumbbell Snatch",
+    "reps": 40,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 8,
+    "movement": "Burpee Box Jump-Over",
+    "reps": 15
+   },
+   {
+    "order": 9,
+    "movement": "Dumbbell Snatch",
+    "reps": 50,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 10,
+    "movement": "Burpee Box Jump-Over",
+    "reps": 15
+   }
+  ]
+ },
+ "r363": {
+  "format": "for_time",
+  "time_cap_seconds": 2400,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Thruster",
+    "reps": 90,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 2,
+    "movement": "Double-Under",
+    "reps": 350
+   }
+  ]
+ },
+ "r364": {
+  "format": "amrap",
+  "duration_seconds": 480,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Handstand Push-up",
+    "reps_pattern": "ascending each round: 3, 6, 9, 12 and so on, adding 3 every round until time runs out"
+   },
+   {
+    "order": 2,
+    "movement": "Clean",
+    "reps_pattern": "3 per round for rounds 1 to 3, 6 for rounds 4 to 6, 9 for rounds 7 to 9, adding 3 every third round",
+    "load_lb": 185,
+    "load_x_bodyweight": 1.0
+   }
+  ]
+ },
+ "r365": {
+  "format": "for_time",
+  "time_cap_seconds": 900,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Dumbbell Snatch",
+    "reps": 21,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 2,
+    "movement": "Lateral Burpee Over Dumbbell",
+    "reps": 21
+   },
+   {
+    "order": 3,
+    "movement": "Dumbbell Snatch",
+    "reps": 21,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 4,
+    "movement": "Lateral Burpee Over Dumbbell",
+    "reps": 21
+   },
+   {
+    "order": 5,
+    "movement": "Dumbbell Snatch",
+    "reps": 15,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 6,
+    "movement": "Lateral Burpee Over Dumbbell",
+    "reps": 15
+   },
+   {
+    "order": 7,
+    "movement": "Dumbbell Snatch",
+    "reps": 15,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 8,
+    "movement": "Lateral Burpee Over Dumbbell",
+    "reps": 15
+   },
+   {
+    "order": 9,
+    "movement": "Dumbbell Snatch",
+    "reps": 9,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 10,
+    "movement": "Lateral Burpee Over Dumbbell",
+    "reps": 9
+   },
+   {
+    "order": 11,
+    "movement": "Dumbbell Snatch",
+    "reps": 9,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 12,
+    "movement": "Lateral Burpee Over Dumbbell",
+    "reps": 9
+   }
+  ]
+ },
+ "r366": {
+  "format": "for_time",
+  "time_cap_seconds": 1440,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps": 18
+   },
+   {
+    "order": 2,
+    "movement": "Snatch",
+    "reps": 18,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 3,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps": 21
+   },
+   {
+    "order": 4,
+    "movement": "Snatch",
+    "reps": 15,
+    "load_lb": 135,
+    "load_x_bodyweight": 0.73
+   },
+   {
+    "order": 5,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps": 24
+   },
+   {
+    "order": 6,
+    "movement": "Snatch",
+    "reps": 12,
+    "load_lb": 185,
+    "load_x_bodyweight": 1.0
+   },
+   {
+    "order": 7,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps": 27
+   },
+   {
+    "order": 8,
+    "movement": "Snatch",
+    "reps": 9,
+    "load_lb": 225,
+    "load_x_bodyweight": 1.21
+   },
+   {
+    "order": 9,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps": 30
+   },
+   {
+    "order": 10,
+    "movement": "Snatch",
+    "reps": 6,
+    "load_lb": 245,
+    "load_x_bodyweight": 1.32
+   },
+   {
+    "order": 11,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps": 33
+   },
+   {
+    "order": 12,
+    "movement": "Snatch",
+    "reps": 3,
+    "load_lb": 265,
+    "load_x_bodyweight": 1.43
+   }
+  ]
+ }
+}

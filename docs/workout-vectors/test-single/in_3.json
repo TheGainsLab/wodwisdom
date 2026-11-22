@@ -1,0 +1,20 @@
+{
+ "format": "amrap",
+ "duration_seconds": 420,
+ "reps_are": "whole workout",
+ "rest": "none",
+ "movements": [
+  {
+   "order": 1,
+   "movement": "Thruster",
+   "reps_pattern": "ascending each round: 3, 6, 9, 12 and so on, adding 3 every round until time runs out",
+   "load_lb": 100,
+   "load_x_bodyweight": 0.54
+  },
+  {
+   "order": 2,
+   "movement": "Chest-to-Bar Pull-up",
+   "reps_pattern": "ascending each round: 3, 6, 9, 12 and so on, adding 3 every round until time runs out"
+  }
+ ]
+}

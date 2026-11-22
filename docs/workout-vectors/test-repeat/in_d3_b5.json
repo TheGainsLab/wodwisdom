@@ -1,0 +1,273 @@
+{
+ "r351": {
+  "format": "amrap",
+  "duration_minutes": 10.0,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Snatch",
+    "reps": 30,
+    "load_kg": 34.0,
+    "load_x_bodyweight": 0.4
+   },
+   {
+    "order": 2,
+    "movement": "Snatch",
+    "reps": 30,
+    "load_kg": 61.2,
+    "load_x_bodyweight": 0.73
+   },
+   {
+    "order": 3,
+    "movement": "Snatch",
+    "reps": 30,
+    "load_kg": 74.8,
+    "load_x_bodyweight": 0.89
+   },
+   {
+    "order": 4,
+    "movement": "Snatch",
+    "reps_pattern": "as many as possible in the time remaining",
+    "load_kg": 95.3,
+    "load_x_bodyweight": 1.13
+   }
+  ]
+ },
+ "r352": {
+  "format": "for_time",
+  "time_cap_seconds": 960,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Burpee Over the Bar",
+    "reps": 24
+   },
+   {
+    "order": 2,
+    "movement": "Clean",
+    "reps": 24,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 3,
+    "movement": "Burpee Over the Bar",
+    "reps": 24
+   },
+   {
+    "order": 4,
+    "movement": "Thruster",
+    "reps": 24,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 5,
+    "movement": "Burpee Over the Bar",
+    "reps": 24
+   },
+   {
+    "order": 6,
+    "movement": "Clean",
+    "reps": 24,
+    "load_lb": 115,
+    "load_x_bodyweight": 0.62
+   },
+   {
+    "order": 7,
+    "movement": "Burpee Over the Bar",
+    "reps": 24
+   },
+   {
+    "order": 8,
+    "movement": "Thruster",
+    "reps": 24,
+    "load_lb": 115,
+    "load_x_bodyweight": 0.62
+   },
+   {
+    "order": 9,
+    "movement": "Burpee Over the Bar",
+    "reps": 24
+   },
+   {
+    "order": 10,
+    "movement": "Clean",
+    "reps": 24,
+    "load_lb": 135,
+    "load_x_bodyweight": 0.73
+   },
+   {
+    "order": 11,
+    "movement": "Burpee Over the Bar",
+    "reps": 24
+   },
+   {
+    "order": 12,
+    "movement": "Thruster",
+    "reps": 24,
+    "load_lb": 135,
+    "load_x_bodyweight": 0.73
+   }
+  ]
+ },
+ "r353": {
+  "format": "amrap",
+  "duration_seconds": 840,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Ring Muscle-up",
+    "reps": 7
+   },
+   {
+    "order": 2,
+    "movement": "Wall-Ball Shot",
+    "reps": 50,
+    "load_lb": 20,
+    "load_x_bodyweight": 0.11
+   },
+   {
+    "order": 3,
+    "movement": "Double-Under",
+    "reps": 100
+   }
+  ]
+ },
+ "r354": {
+  "format": "amrap",
+  "duration_seconds": 900,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Lateral Burpee Over Dumbbell",
+    "reps_pattern": "ascending each round: 3, 6, 9, 12 and so on, adding 3 every round until time runs out"
+   },
+   {
+    "order": 2,
+    "movement": "DB Clean and Jerk",
+    "reps_pattern": "ascending each round: 3, 6, 9, 12 and so on, adding 3 every round until time runs out",
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 3,
+    "movement": "Walking Lunge",
+    "distance_ft": 30
+   }
+  ]
+ },
+ "r355": {
+  "format": "for_time",
+  "time_cap_seconds": 540,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Deadlift",
+    "reps": 21,
+    "load_lb": 225,
+    "load_x_bodyweight": 1.21
+   },
+   {
+    "order": 2,
+    "movement": "Handstand Push-up",
+    "reps": 21
+   },
+   {
+    "order": 3,
+    "movement": "Deadlift",
+    "reps": 15,
+    "load_lb": 225,
+    "load_x_bodyweight": 1.21
+   },
+   {
+    "order": 4,
+    "movement": "Handstand Push-up",
+    "reps": 15
+   },
+   {
+    "order": 5,
+    "movement": "Deadlift",
+    "reps": 9,
+    "load_lb": 225,
+    "load_x_bodyweight": 1.21
+   },
+   {
+    "order": 6,
+    "movement": "Handstand Push-up",
+    "reps": 9
+   },
+   {
+    "order": 7,
+    "movement": "Deadlift",
+    "reps": 21,
+    "load_lb": 315,
+    "load_x_bodyweight": 1.7
+   },
+   {
+    "order": 8,
+    "movement": "Handstand Walk",
+    "distance_ft": 50
+   },
+   {
+    "order": 9,
+    "movement": "Deadlift",
+    "reps": 15,
+    "load_lb": 315,
+    "load_x_bodyweight": 1.7
+   },
+   {
+    "order": 10,
+    "movement": "Handstand Walk",
+    "distance_ft": 50
+   },
+   {
+    "order": 11,
+    "movement": "Deadlift",
+    "reps": 9,
+    "load_lb": 315,
+    "load_x_bodyweight": 1.7
+   },
+   {
+    "order": 12,
+    "movement": "Handstand Walk",
+    "distance_ft": 50
+   }
+  ]
+ },
+ "r356": {
+  "format": "amrap",
+  "duration_seconds": 900,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Wall Walk",
+    "reps": 3
+   },
+   {
+    "order": 2,
+    "movement": "Dumbbell Snatch",
+    "reps": 12,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 3,
+    "movement": "Box Jump-Over",
+    "reps": 15
+   }
+  ]
+ }
+}

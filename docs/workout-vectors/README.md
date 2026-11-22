@@ -143,3 +143,21 @@ Limit: the edits and expected directions were chosen by the same kind of
 model that does the judging. This shows consistent response to load,
 duration, rest and movement changes, not that the size of each response is
 right.
+
+### Repeat run, rewording, one sheet per call (`test-repeat/`, `test-single/`)
+
+Pass mark set beforehand: within 10 of the original vector.
+
+- **Repeat run.** All 48 workouts re-judged with fresh judges and new
+  shuffles. Each landed 4.9 from its first vector on average, worst 7.3;
+  none over 10. The 1,128 pair distances correlate at 0.98 between the two
+  runs and differ by 2.5 on average. This also serves as the identical-twin
+  check: the same sheet under a new code gives the same vector.
+- **Rewording.** Six sheets rewritten with the same content: round order
+  rotated (2), movement names changed (2), kilograms and minutes instead of
+  pounds and seconds (2). Distances to the originals 2.0 to 8.0; all pass.
+- **One sheet per call.** Eight workouts judged alone, three drafts each.
+  They landed 5.7 from the batched vectors on average (worst 7.3), with no
+  axis leaning more than 1 point. Judged alone the drafts agree a little
+  more closely (spread 5.1 against 7.3), so batching added some noise but
+  no bias.

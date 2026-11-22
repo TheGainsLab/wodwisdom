@@ -1,0 +1,22 @@
+{
+ "format": "amrap",
+ "duration_seconds": 300,
+ "reps_are": "per round",
+ "rest": "none",
+ "movements": [
+  {
+   "order": 1,
+   "movement": "Clean",
+   "reps": 1,
+   "load_lb": 165,
+   "load_x_bodyweight": 0.89
+  },
+  {
+   "order": 2,
+   "movement": "Jerk",
+   "reps": 1,
+   "load_lb": 165,
+   "load_x_bodyweight": 0.89
+  }
+ ]
+}

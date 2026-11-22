@@ -1,0 +1,234 @@
+{
+ "r281": {
+  "format": "amrap",
+  "duration_seconds": 480,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Handstand Push-up",
+    "reps_pattern": "ascending each round: 3, 6, 9, 12 and so on, adding 3 every round until time runs out"
+   },
+   {
+    "order": 2,
+    "movement": "Clean",
+    "reps_pattern": "3 per round for rounds 1 to 3, 6 for rounds 4 to 6, 9 for rounds 7 to 9, adding 3 every third round",
+    "load_lb": 185,
+    "load_x_bodyweight": 1.0
+   }
+  ]
+ },
+ "r282": {
+  "format": "for_time",
+  "time_cap_seconds": 900,
+  "reps_are": "whole workout",
+  "rest": "120 seconds built in",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Front Squat",
+    "reps": 15,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 2,
+    "movement": "Toes-to-Bar",
+    "reps": 30
+   },
+   {
+    "order": 3,
+    "movement": "Thruster",
+    "reps": 15,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51,
+    "rest_after_seconds": 60
+   },
+   {
+    "order": 4,
+    "movement": "Front Squat",
+    "reps": 15,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 5,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps": 30
+   },
+   {
+    "order": 6,
+    "movement": "Thruster",
+    "reps": 15,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51,
+    "rest_after_seconds": 60
+   },
+   {
+    "order": 7,
+    "movement": "Front Squat",
+    "reps": 15,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 8,
+    "movement": "Bar Muscle-up",
+    "reps": 30
+   },
+   {
+    "order": 9,
+    "movement": "Thruster",
+    "reps": 15,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   }
+  ]
+ },
+ "r283": {
+  "format": "for_time",
+  "time_cap_seconds": 720,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Dumbbell Squat",
+    "reps": 55,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 2,
+    "movement": "Bar-Facing Burpee",
+    "reps": 55
+   }
+  ]
+ },
+ "r284": {
+  "format": "for_time",
+  "time_cap_seconds": 1200,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Dumbbell Snatch",
+    "reps": 10,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 2,
+    "movement": "Burpee Box Jump-Over",
+    "reps": 15
+   },
+   {
+    "order": 3,
+    "movement": "Dumbbell Snatch",
+    "reps": 20,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 4,
+    "movement": "Burpee Box Jump-Over",
+    "reps": 15
+   },
+   {
+    "order": 5,
+    "movement": "Dumbbell Snatch",
+    "reps": 30,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 6,
+    "movement": "Burpee Box Jump-Over",
+    "reps": 15
+   },
+   {
+    "order": 7,
+    "movement": "Dumbbell Snatch",
+    "reps": 40,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 8,
+    "movement": "Burpee Box Jump-Over",
+    "reps": 15
+   },
+   {
+    "order": 9,
+    "movement": "Dumbbell Snatch",
+    "reps": 50,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 10,
+    "movement": "Burpee Box Jump-Over",
+    "reps": 15
+   }
+  ]
+ },
+ "r285": {
+  "format": "amrap",
+  "duration_seconds": 1200,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Row",
+    "distance_m": 300
+   },
+   {
+    "order": 2,
+    "movement": "Deadlift",
+    "reps": 10,
+    "load_lb": 185,
+    "load_x_bodyweight": 1.0
+   },
+   {
+    "order": 3,
+    "movement": "Double-Under",
+    "reps": 50
+   }
+  ]
+ },
+ "r286": {
+  "format": "amrap",
+  "duration_minutes": 13.0,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Deadlift",
+    "reps": 55,
+    "load_kg": 102.1,
+    "load_x_bodyweight": 1.21
+   },
+   {
+    "order": 2,
+    "movement": "Wall-Ball Shot",
+    "reps": 55,
+    "load_kg": 9.1,
+    "load_x_bodyweight": 0.11
+   },
+   {
+    "order": 3,
+    "movement": "Row",
+    "calories": 55
+   },
+   {
+    "order": 4,
+    "movement": "Handstand Push-up",
+    "reps": 55
+   }
+  ]
+ }
+}

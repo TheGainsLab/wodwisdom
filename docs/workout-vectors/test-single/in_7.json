@@ -1,0 +1,25 @@
+{
+ "format": "for_time",
+ "time_cap_seconds": 1200,
+ "reps_are": "whole workout",
+ "rest": "none",
+ "movements": [
+  {
+   "order": 1,
+   "movement": "Ring Muscle-up",
+   "reps": 40
+  },
+  {
+   "order": 2,
+   "movement": "Row",
+   "calories": 80
+  },
+  {
+   "order": 3,
+   "movement": "Wall-Ball Shot",
+   "reps": 120,
+   "load_lb": 20,
+   "load_x_bodyweight": 0.11
+  }
+ ]
+}

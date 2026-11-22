@@ -1,0 +1,52 @@
+{
+ "format": "for_time",
+ "time_cap_seconds": 840,
+ "reps_are": "whole workout",
+ "rest": "none",
+ "movements": [
+  {
+   "order": 1,
+   "movement": "Double-Under",
+   "reps": 200
+  },
+  {
+   "order": 2,
+   "movement": "Overhead Squat",
+   "reps": 40,
+   "load_lb": 115,
+   "load_x_bodyweight": 0.62
+  },
+  {
+   "order": 3,
+   "movement": "Double-Under",
+   "reps": 200
+  },
+  {
+   "order": 4,
+   "movement": "Ring Muscle-up",
+   "reps": 24
+  },
+  {
+   "order": 5,
+   "movement": "Double-Under",
+   "reps": 200
+  },
+  {
+   "order": 6,
+   "movement": "Dumbbell Snatch",
+   "reps": 40,
+   "load_lb": 50,
+   "load_x_bodyweight": 0.27
+  },
+  {
+   "order": 7,
+   "movement": "Double-Under",
+   "reps": 200
+  },
+  {
+   "order": 8,
+   "movement": "Bar Muscle-up",
+   "reps": 24
+  }
+ ]
+}

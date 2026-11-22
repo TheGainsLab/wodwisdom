@@ -1,0 +1,258 @@
+{
+ "r311": {
+  "format": "amrap",
+  "duration_seconds": 900,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Deadlift",
+    "reps": 9,
+    "load_lb": 155,
+    "load_x_bodyweight": 0.84
+   },
+   {
+    "order": 2,
+    "movement": "Push-up",
+    "reps": 12
+   },
+   {
+    "order": 3,
+    "movement": "Box Jump",
+    "reps": 15
+   }
+  ]
+ },
+ "r312": {
+  "format": "amrap",
+  "duration_seconds": 600,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Double-Under",
+    "reps": 30
+   },
+   {
+    "order": 2,
+    "movement": "Snatch",
+    "reps": 15,
+    "load_lb": 75,
+    "load_x_bodyweight": 0.4
+   }
+  ]
+ },
+ "r313": {
+  "format": "for_time",
+  "time_cap_seconds": 600,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Deadlift",
+    "reps": 100,
+    "load_lb": 225,
+    "load_x_bodyweight": 1.21
+   },
+   {
+    "order": 2,
+    "movement": "Bar-Facing Burpee",
+    "reps": 100
+   }
+  ]
+ },
+ "r314": {
+  "format": "for_time",
+  "time_cap_seconds": 900,
+  "reps_are": "whole workout",
+  "rest": "120 seconds built in",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Front Squat",
+    "reps": 15,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 2,
+    "movement": "Toes-to-Bar",
+    "reps": 30
+   },
+   {
+    "order": 3,
+    "movement": "Thruster",
+    "reps": 15,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51,
+    "rest_after_seconds": 60
+   },
+   {
+    "order": 4,
+    "movement": "Front Squat",
+    "reps": 15,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 5,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps": 30
+   },
+   {
+    "order": 6,
+    "movement": "Thruster",
+    "reps": 15,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51,
+    "rest_after_seconds": 60
+   },
+   {
+    "order": 7,
+    "movement": "Front Squat",
+    "reps": 15,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 8,
+    "movement": "Bar Muscle-up",
+    "reps": 30
+   },
+   {
+    "order": 9,
+    "movement": "Thruster",
+    "reps": 15,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   }
+  ]
+ },
+ "r315": {
+  "format": "for_time",
+  "time_cap_seconds": 720,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Wall-Ball Shot",
+    "reps": 20,
+    "load_lb": 20,
+    "load_x_bodyweight": 0.11
+   },
+   {
+    "order": 2,
+    "movement": "Box Jump-Over",
+    "reps": 18
+   },
+   {
+    "order": 3,
+    "movement": "Wall-Ball Shot",
+    "reps": 30,
+    "load_lb": 20,
+    "load_x_bodyweight": 0.11
+   },
+   {
+    "order": 4,
+    "movement": "Box Jump-Over",
+    "reps": 18
+   },
+   {
+    "order": 5,
+    "movement": "Wall-Ball Shot",
+    "reps": 40,
+    "load_lb": 20,
+    "load_x_bodyweight": 0.11
+   },
+   {
+    "order": 6,
+    "movement": "Med Ball Box Step",
+    "reps": 18,
+    "load_lb": 20,
+    "load_x_bodyweight": 0.11
+   },
+   {
+    "order": 7,
+    "movement": "Wall-Ball Shot",
+    "reps": 66,
+    "load_lb": 20,
+    "load_x_bodyweight": 0.11
+   },
+   {
+    "order": 8,
+    "movement": "Med Ball Box Step",
+    "reps": 18,
+    "load_lb": 20,
+    "load_x_bodyweight": 0.11
+   },
+   {
+    "order": 9,
+    "movement": "Wall-Ball Shot",
+    "reps": 40,
+    "load_lb": 20,
+    "load_x_bodyweight": 0.11
+   },
+   {
+    "order": 10,
+    "movement": "Box Jump-Over",
+    "reps": 18
+   },
+   {
+    "order": 11,
+    "movement": "Wall-Ball Shot",
+    "reps": 30,
+    "load_lb": 20,
+    "load_x_bodyweight": 0.11
+   },
+   {
+    "order": 12,
+    "movement": "Box Jump-Over",
+    "reps": 18
+   },
+   {
+    "order": 13,
+    "movement": "Wall-Ball Shot",
+    "reps": 20,
+    "load_lb": 20,
+    "load_x_bodyweight": 0.11
+   }
+  ]
+ },
+ "r316": {
+  "format": "for_time",
+  "time_cap_seconds": 900,
+  "reps_are": "whole workout",
+  "rest": "60 seconds built in",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Thruster",
+    "reps": 50,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 2,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps": 50,
+    "rest_after_seconds": 60
+   },
+   {
+    "order": 3,
+    "movement": "Thruster",
+    "reps": 35,
+    "load_lb": 135,
+    "load_x_bodyweight": 0.73
+   },
+   {
+    "order": 4,
+    "movement": "Bar Muscle-up",
+    "reps": 35
+   }
+  ]
+ }
+}

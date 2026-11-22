@@ -1,0 +1,154 @@
+{
+ "r241": {
+  "format": "amrap",
+  "duration_seconds": 840,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Row",
+    "calories": 60
+   },
+   {
+    "order": 2,
+    "movement": "Toes-to-Bar",
+    "reps": 50
+   },
+   {
+    "order": 3,
+    "movement": "Wall-Ball Shot",
+    "reps": 40,
+    "load_lb": 20,
+    "load_x_bodyweight": 0.11
+   },
+   {
+    "order": 4,
+    "movement": "Clean",
+    "reps": 30,
+    "load_lb": 135,
+    "load_x_bodyweight": 0.73
+   },
+   {
+    "order": 5,
+    "movement": "Ring Muscle-up",
+    "reps": 20
+   }
+  ]
+ },
+ "r242": {
+  "format": "amrap",
+  "duration_seconds": 1200,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Toes-to-Bar",
+    "reps": 8
+   },
+   {
+    "order": 2,
+    "movement": "DB Clean and Jerk",
+    "reps": 10,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 3,
+    "movement": "Row",
+    "calories": 14
+   }
+  ]
+ },
+ "r243": {
+  "format": "amrap",
+  "duration_seconds": 600,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Double-Under",
+    "reps": 30
+   },
+   {
+    "order": 2,
+    "movement": "Snatch",
+    "reps": 15,
+    "load_lb": 75,
+    "load_x_bodyweight": 0.4
+   }
+  ]
+ },
+ "r244": {
+  "format": "amrap",
+  "duration_seconds": 420,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Clean and Jerk",
+    "reps_pattern": "ascending each round: 3, 6, 9, 12 and so on, adding 3 every round until time runs out",
+    "load_lb": 135,
+    "load_x_bodyweight": 0.73
+   },
+   {
+    "order": 2,
+    "movement": "Toes-to-Bar",
+    "reps_pattern": "ascending each round: 3, 6, 9, 12 and so on, adding 3 every round until time runs out"
+   }
+  ]
+ },
+ "r245": {
+  "format": "for_time",
+  "time_cap_seconds": 900,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Wall Walk",
+    "reps": 55
+   },
+   {
+    "order": 2,
+    "movement": "Double-Under",
+    "reps": 550
+   }
+  ]
+ },
+ "r246": {
+  "format": "amrap",
+  "duration_seconds": 780,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Deadlift",
+    "reps": 55,
+    "load_lb": 225,
+    "load_x_bodyweight": 1.21
+   },
+   {
+    "order": 2,
+    "movement": "Wall-Ball Shot",
+    "reps": 55,
+    "load_lb": 20,
+    "load_x_bodyweight": 0.11
+   },
+   {
+    "order": 3,
+    "movement": "Row",
+    "calories": 55
+   },
+   {
+    "order": 4,
+    "movement": "Handstand Push-up",
+    "reps": 55
+   }
+  ]
+ }
+}
