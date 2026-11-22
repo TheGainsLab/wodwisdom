@@ -399,6 +399,7 @@ export async function runResequence(
       .from("engine_user_day_overrides")
       .select("sequence_position, engine_workout_id")
       .eq("user_id", userId).eq("program_version", version)
+      .is("archived_at", null) // days retired by an Engine reset belong to an earlier pass (2026-11-21)
       .in("sequence_position", positions);
     const ovByPos = new Map((prevOvs ?? []).map((o) => [o.sequence_position as number, o.engine_workout_id as string]));
     const catalogDayByPos = new Map(mapping.filter((m) => positions.includes(m.seq) && !ovByPos.has(m.seq)).map((m) => [m.seq, m.day]));
@@ -603,12 +604,20 @@ export async function runResequence(
         .select("id").single();
       if (wErr || !wrow) throw new Error(wErr?.message ?? "insert engine_workouts failed");
 
+      // One LIVE override per position. Replace, not upsert (2026-11-21): the
+      // uniqueness is now a partial index (live rows only) so a new day can sit
+      // at a position that holds a day archived by an Engine reset, and a
+      // partial index cannot be an ON CONFLICT target through the API.
+      // Archived rows are never touched here.
+      const { error: dErr } = await supa
+        .from("engine_user_day_overrides")
+        .delete()
+        .eq("user_id", userId).eq("program_version", version).eq("sequence_position", position)
+        .is("archived_at", null);
+      if (dErr) throw new Error(dErr.message);
       const { error: oErr } = await supa
         .from("engine_user_day_overrides")
-        .upsert(
-          { user_id: userId, program_version: version, sequence_position: position, engine_workout_id: wrow.id, reason: day.reason, updated_at: new Date().toISOString() },
-          { onConflict: "user_id,program_version,sequence_position" },
-        );
+        .insert({ user_id: userId, program_version: version, sequence_position: position, engine_workout_id: wrow.id, reason: day.reason });
       if (oErr) throw new Error(oErr.message);
 
       placed.push({ position, day_type: day.day_type, reason: day.reason });

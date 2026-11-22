@@ -4,6 +4,7 @@ import { fetchWithTimeout } from "../_shared/fetch-with-timeout.ts";
 import { raiseEngineMonthsFromGrant } from "../_shared/engine-months-drip.ts";
 import { countPaidPeriods, ENGINE_MONTHS_CAP, entitledEngineMonths, lastUnlockIso, subscriptionCadence } from "../_shared/engine-entitlement.ts";
 import { archiveProgramsIfAccessEnded } from "../_shared/program-archive.ts";
+import { resetEngineIfAccessEnded } from "../_shared/engine-reset.ts";
 import { ALERT_EMAIL, buildCancelScheduledEmail, buildCancelUnscheduledEmail, buildGoodbyeEmail, buildRecoveryEmail, emailWrap, escapeHtml, logEmailSend, sendViaResend, unsubscribeUrl } from "../_shared/checkout-emails.ts";
 
 // ── Billing-events ledger (capture item A) ──────────────────────────────────
@@ -395,6 +396,13 @@ serve(async (req) => {
           if (!features.includes("programming")) {
             await archiveProgramsIfAccessEnded(supa, userId);
           }
+          // Engine reset (2026-11-21): the same rule for the Engine — a
+          // purchase that replaces an Engine plan with one that has no Engine
+          // ends that access. After the grants, never before, and only when
+          // the new plan lacks `engine`.
+          if (!features.includes("engine")) {
+            await resetEngineIfAccessEnded(supa, userId);
+          }
 
           // Seed Engine month 1 at grant time (mirrors the gym-grant path).
           // The invoice.payment_succeeded +1 races this handler — it looks
@@ -648,6 +656,13 @@ serve(async (req) => {
             if (!features.includes("programming")) {
               await archiveProgramsIfAccessEnded(supa, userId);
             }
+            // Engine reset (2026-11-21): a plan change that dropped the
+            // Engine ends that access. Same placement as the archive; on a
+            // renewal of a plan without the Engine it is two reads and a
+            // reset call that finds nothing to change.
+            if (!features.includes("engine")) {
+              await resetEngineIfAccessEnded(supa, userId);
+            }
 
           }
         } else if (["incomplete_expired", "unpaid", "canceled"].includes(status)) {
@@ -680,6 +695,10 @@ serve(async (req) => {
             // event like the revocation above; idempotent, and a no-op for
             // someone who holds Programming through another subscription.
             await archiveProgramsIfAccessEnded(supa, profiles[0].id);
+            // Engine reset (2026-11-21): same guarantees — a no-op for
+            // someone who holds the Engine from any other source, and for
+            // someone already reset, so a re-emitted event changes nothing.
+            await resetEngineIfAccessEnded(supa, profiles[0].id);
           }
 
           // Ledger + alert: unpaid/incomplete_expired = INVOLUNTARY churn (the
@@ -777,6 +796,10 @@ serve(async (req) => {
           // helper checks what they hold NOW, so the old subscription of
           // someone who already bought a new plan archives nothing.
           await archiveProgramsIfAccessEnded(supa, profiles[0].id);
+          // Engine reset (2026-11-21): the Engine is reset the moment access
+          // ends, so a returner starts at Day 1 from the setup screen. Checks
+          // what they hold NOW; never throws.
+          await resetEngineIfAccessEnded(supa, profiles[0].id);
         }
 
         // The fork that decides everything downstream: WHY did this sub end?
@@ -1082,7 +1105,7 @@ serve(async (req) => {
           // Find the user's most recent generated program
           const { data: programs } = await supa
             .from("programs")
-            .select("id, generated_months")
+            .select("id, generated_months, created_at")
             .eq("user_id", payUserId)
             .eq("source", "generated")
             .is("archived_at", null) // an archived program does not exist to billing (2026-11-21)
@@ -1091,25 +1114,32 @@ serve(async (req) => {
 
           if (programs && programs.length > 0) {
             const program = programs[0];
-            // RETURNER PAUSE: the first paid invoice of a NEW subscription from
-            // a user who already has a generated program is a re-subscriber.
-            // Their next month must not be built from a profile they haven't
-            // looked at since they left — so instead of generating, flag
-            // resume-pending. The Athlete page shows the welcome-back banner +
-            // "Build my next month" (which clears the flag via
-            // generate-next-month), and the daily reconciler auto-generates
-            // after 7 days of silence so a paid month never silently
-            // evaporates. Renewals (2nd+ paid period) are untouched. Detected
-            // by paid-period COUNT, not billing_reason — the label check
-            // silently never fired for Checkout subscriptions (2026-11-09).
-            if (isFirstPaidPeriod) {
-              console.log(`[webhook] Returner detected (first paid period on ${subscriptionId} + existing program) — pausing generation for user ${payUserId}`);
-              await supa
-                .from("athlete_profiles")
-                .upsert(
-                  { user_id: payUserId, programming_resume_pending_at: new Date().toISOString() },
-                  { onConflict: "user_id" }
-                );
+            // FIRST PAID PERIOD WITH A PROGRAM ALREADY THERE (2026-11-21). This
+            // used to be the "returner pause": flag resume-pending and wait for
+            // a "Build my next month" tap. A returner no longer reaches here —
+            // their program was archived when access ended, so they have no
+            // active program and build a new one themselves. Who does reach it:
+            //   * a new subscriber who built Month 1 before this invoice event
+            //     landed (events are not ordered, and a delivery can be
+            //     retried late). The program was created under THIS
+            //     subscription, so this invoice is the payment for the month
+            //     they already have: nothing to build.
+            //   * an athlete with a live program from before this subscription
+            //     (an active subscriber who started a second subscription
+            //     through checkout, or a comped athlete who started paying).
+            //     Pausing them was wrong — nothing is waiting on a tap. It is
+            //     a paid period like any other: build the next month.
+            // When Stripe could not be read the subscription's start is
+            // unknown; build nothing and leave it to the daily reconciler.
+            const subStartSec = (stripeSub?.start_date ?? stripeSub?.created ?? null) as number | null;
+            const programCreatedMs = Date.parse(String(program.created_at ?? ""));
+            const paysForExistingMonth = isFirstPaidPeriod && (
+              typeof subStartSec !== "number" ||
+              !Number.isFinite(programCreatedMs) ||
+              programCreatedMs >= subStartSec * 1000
+            );
+            if (paysForExistingMonth) {
+              console.log(`[webhook] First paid period on ${subscriptionId}: program ${program.id} was built under this subscription (or its start is unknown) — this invoice pays for the month already delivered, nothing to build`);
             } else {
               const nextMonth = (program.generated_months || 1) + 1;
               console.log(`[webhook] Triggering month ${nextMonth} generation for program ${program.id}`);

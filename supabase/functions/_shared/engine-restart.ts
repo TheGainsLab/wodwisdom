@@ -23,3 +23,24 @@ export function sinceRestart<R extends { created_at?: string | null }>(rows: R[]
   const cut = Date.parse(restartAt);
   return rows.filter((r) => typeof r.created_at === "string" && Date.parse(r.created_at) > cut);
 }
+
+/**
+ * Is this session part of the athlete's CURRENT pass through their program —
+ * the chosen program, logged since its last restart? The Training Log uses
+ * it to decide whether a logged session can link to its day page: day pages
+ * address positions in the current program, so a session from another
+ * program, from before a restart, or (no program chosen — the Engine was
+ * reset when access ended, 2026-11-21) any session at all would open the
+ * wrong day or the setup screen. The session's result is shown either way.
+ */
+export function isCurrentPassSession(
+  s: { program_version?: string | null; created_at?: string | null },
+  programId: string | null | undefined,
+  restartAt: string | null | undefined,
+): boolean {
+  if (!programId || s.program_version !== programId) return false;
+  if (!restartAt) return true;
+  const cut = Date.parse(restartAt);
+  if (!Number.isFinite(cut)) return true;
+  return typeof s.created_at === "string" && Date.parse(s.created_at) > cut;
+}

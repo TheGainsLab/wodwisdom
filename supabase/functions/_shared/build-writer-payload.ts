@@ -1160,6 +1160,7 @@ async function fetchEngineTraining(
       .select("sequence_position, engine_workout_id")
       .eq("user_id", userId)
       .eq("program_version", track)
+      .is("archived_at", null) // days retired by an Engine reset are history, not the block ahead (2026-11-21)
       .gte("sequence_position", startPos)
       .order("sequence_position");
     const ids = (ovs ?? []).map((o) => o.engine_workout_id as string).filter(Boolean);

@@ -8,7 +8,7 @@ import MetconsTab from '../components/MetconsTab';
 import WorkoutCalendar from '../components/WorkoutCalendar';
 import { Sparkline } from '../components/progress/ProgressCards';
 import { useEntitlements } from '../hooks/useEntitlements';
-import { loadUserProgress, getWorkoutsForProgram, getProgramMapping } from '../lib/engineService';
+import { loadUserProgress, getWorkoutsForProgram, getProgramMapping, getProgramRestartAt, isCurrentPassSession } from '../lib/engineService';
 import { listActivities, deleteActivity, activityImageUrl, type AthleteActivity } from '../lib/activitiesService';
 import { scheduleProgramDay, scheduleEngineDay, unschedule } from '../lib/trainingSchedule';
 import { localDateString } from '../lib/localDate';
@@ -53,6 +53,8 @@ interface EngineSession {
   average_heart_rate: number | null;
   peak_heart_rate: number | null;
   perceived_exertion: number | null;
+  program_version: string | null;
+  created_at: string | null;
 }
 
 // A scheduled (future) Engine day on the calendar. engine_workout_id points at
@@ -526,6 +528,10 @@ export default function TrainingLogPage({ session }: { session: Session }) {
   const [poolLoaded, setPoolLoaded] = useState(false);
   const [programPool, setProgramPool] = useState<ProgramPoolDay[]>([]);
   const [enginePool, setEnginePool] = useState<EnginePoolDay[]>([]);
+  // The athlete's current Engine program and when they last restarted it.
+  // program === null: none chosen (never set up, or the Engine was reset when
+  // access ended) — nothing can be scheduled or opened until setup.
+  const [enginePass, setEnginePass] = useState<{ program: string | null; restartAt: string | null } | null>(null);
   const [selProgramId, setSelProgramId] = useState<string | null>(null);
   const [scheduleError, setScheduleError] = useState<string | null>(null);
   // ── RPE correction on a logged Engine session (Sep '26, Dennis: a mistyped
@@ -968,12 +974,19 @@ export default function TrainingLogPage({ session }: { session: Session }) {
       // Completed Engine sessions → completed days on the same calendar.
       const { data: engRows } = await supabase
         .from('engine_workout_sessions')
-        .select('id, date, program_day_number, sequence_position, day_type, modality, units, actual_pace, total_output, performance_ratio, average_heart_rate, peak_heart_rate, perceived_exertion')
+        .select('id, date, program_day_number, sequence_position, day_type, modality, units, actual_pace, total_output, performance_ratio, average_heart_rate, peak_heart_rate, perceived_exertion, program_version, created_at')
         .eq('user_id', session.user.id)
         .eq('completed', true)
         .order('date', { ascending: false })
         .limit(400);
       setEngineSessions((engRows as EngineSession[]) || []);
+      // Which of those belong to the current pass (see isCurrentPassSession).
+      loadUserProgress()
+        .then(async (p) => {
+          const program = p?.engine_program_version ?? null;
+          setEnginePass({ program, restartAt: program ? await getProgramRestartAt(program) : null });
+        })
+        .catch(() => setEnginePass(null));
 
       // Athlete-logged outside activities (advisory context) on the same calendar.
       listActivities(400).then(setActivities).catch(() => {});
@@ -1903,7 +1916,11 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                           ) : (
                             <div className="wc-day-detail-text">Completed — no metrics recorded.</div>
                           )}
-                          {e.sequence_position != null && (
+                          {/* Open → the day page, which addresses the CURRENT program. Only
+                              for a session of the current pass; an older one (another
+                              program, before a restart, or before an Engine reset) shows
+                              its result here and has no day page to open. */}
+                          {e.sequence_position != null && enginePass != null && isCurrentPassSession(e, enginePass.program, enginePass.restartAt) && (
                             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
                               <button
                                 type="button"
@@ -2145,7 +2162,18 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                                   {canEngine && !engineTaken && (
                                     <div style={{ marginBottom: 4 }}>
                                       <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.5, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 6 }}>Engine</div>
-                                      {enginePool.length === 0 ? (
+                                      {enginePass != null && enginePass.program == null ? (
+                                        <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+                                          Set up your Engine first, then you can add its days here.{' '}
+                                          <button
+                                            type="button"
+                                            onClick={() => navigate('/engine')}
+                                            style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', padding: 0, fontSize: 'inherit' }}
+                                          >
+                                            Set up the Engine
+                                          </button>
+                                        </div>
+                                      ) : enginePool.length === 0 ? (
                                         <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>No unlocked Engine days.</div>
                                       ) : (
                                         <div className="day-schedule-quickpick" style={{ position: 'static', maxHeight: '50vh', overflowY: 'auto' }}>

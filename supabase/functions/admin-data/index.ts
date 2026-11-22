@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
+import { resetEngineIfAccessEnded } from "../_shared/engine-reset.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -138,6 +139,12 @@ Deno.serve(async (req) => {
               .eq("source", "admin")
               .eq("feature", "engine");
             if (deleteErr) return json({ error: deleteErr.message }, 500);
+            // Engine reset (2026-11-21): if that was their last Engine grant
+            // (no subscription behind it) their access has ended — reset the
+            // Engine, as the billing path does. Checks what they hold now, so
+            // revoking a comp from a paying subscriber resets nothing. Never
+            // throws; a failed reset is logged and the revoke still stands.
+            await resetEngineIfAccessEnded(supa, user_id);
           } else {
             return json({ error: "Invalid value, use grant or revoke" }, 400);
           }

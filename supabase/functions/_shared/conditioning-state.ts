@@ -25,6 +25,7 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { type AnalyticsSession, type AnalyticsTrial, computeEngineAnalytics, formatEngineAnalytics } from "./engine-analytics.ts";
 import { computeAthleteContinuum, loadCurves, type PdCurves, type StoredCurve } from "./engine-continuum-io.ts";
+import { resetCutoff, sinceReset } from "./engine-reset.ts";
 import { ECHO_BIKE_CAL_CURVE_V1, type EngineCurve, formatCurveForPrompt, type PdCurvePoint, type ReplayResult, summarizeCurve, type TrialInput } from "./engine-continuum.ts";
 
 // ─── Competency-graph metadata (taxonomy, not judgment) ──────────────────────
@@ -368,14 +369,17 @@ export async function buildContinuumBlock(supa: SupabaseClient, userId: string, 
   }
   // The stored curve (daily tick / admin button / a successful earlier refresh).
   const [{ data: prof }, { data: sess }, { data: tts }, loaded] = await Promise.all([
-    supa.from("athlete_profiles").select("engine_curve").eq("user_id", userId).maybeSingle(),
-    supa.from("engine_workout_sessions").select("date, modality, units, continuum_effort_s, continuum_sustain, continuum_evidence").eq("user_id", userId).eq("completed", true),
-    supa.from("engine_time_trials").select("modality, units, calculated_rpm, date").eq("user_id", userId).not("calculated_rpm", "is", null),
+    supa.from("athlete_profiles").select("engine_curve, engine_reset_at").eq("user_id", userId).maybeSingle(),
+    supa.from("engine_workout_sessions").select("date, modality, units, continuum_effort_s, continuum_sustain, continuum_evidence, created_at").eq("user_id", userId).eq("completed", true),
+    supa.from("engine_time_trials").select("modality, units, calculated_rpm, date, created_at").eq("user_id", userId).not("calculated_rpm", "is", null),
     curves ? Promise.resolve(curves) : loadCurves(supa).catch(() => ({} as PdCurves)),
   ]);
   const stored = (prof as { engine_curve?: StoredCurve | null } | null)?.engine_curve ?? null;
   if (!stored?.nodes) return EMPTY_CONTINUUM;
-  const rows = (sess ?? []) as Array<{ date: string; modality: string | null; units: string | null; continuum_effort_s: number | null; continuum_sustain: number | null; continuum_evidence: string | null }>;
+  // Engine reset (2026-11-21): the stored curve of a reset athlete is built
+  // from sessions and trials since the reset only; describe it with the same.
+  const resetAt = resetCutoff((prof as { engine_reset_at?: unknown } | null)?.engine_reset_at);
+  const rows = sinceReset((sess ?? []) as Array<{ date: string; modality: string | null; units: string | null; continuum_effort_s: number | null; continuum_sustain: number | null; continuum_evidence: string | null; created_at: string | null }>, resetAt);
   // summarizeCurve reads date / evidence / effort_seconds / sustain only
   const results = rows.map((x) => ({
     date: x.date,
@@ -384,7 +388,7 @@ export async function buildContinuumBlock(supa: SupabaseClient, userId: string, 
     evidence: (x.continuum_evidence ?? "no_curve") as ReplayResult["sessions"][number]["evidence"],
   })) as unknown as ReplayResult["sessions"];
   const machines = rows.map((x) => `${x.modality ?? "unknown"}|${x.units ?? ""}`);
-  const trials: TrialInput[] = ((tts ?? []) as Array<{ modality: string; units: string | null; calculated_rpm: number; date: string }>)
+  const trials: TrialInput[] = sinceReset((tts ?? []) as Array<{ modality: string; units: string | null; calculated_rpm: number; date: string; created_at: string | null }>, resetAt)
     .map((t) => ({ modality: t.modality, units: t.units, pace: Number(t.calculated_rpm), date: t.date }));
   const curve: EngineCurve = { version: stored.version, nodes: stored.nodes, flags: stored.flags ?? [], as_of: stored.as_of ?? null, awaiting_right_anchor: stored.awaiting_right_anchor ?? false };
   const regions = summarizeCurve(curve, results);

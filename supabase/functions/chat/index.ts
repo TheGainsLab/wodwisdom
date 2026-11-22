@@ -290,6 +290,7 @@ async function buildEngineCoachingContext(
     .eq("user_id", userId)
     .eq("program_version", programVersion)
     .eq("sequence_position", scopedSeq)
+    .is("archived_at", null) // a day retired by an Engine reset is history, never served (2026-11-21)
     .maybeSingle();
   const overrideWorkoutId = scopedOverride?.engine_workout_id ?? null;
 
@@ -379,6 +380,7 @@ async function buildEngineCoachingContext(
         .select("sequence_position, engine_workout_id")
         .eq("user_id", userId)
         .eq("program_version", programVersion)
+        .is("archived_at", null)
         .in("sequence_position", upcomingPositions),
     ]);
 
@@ -631,6 +633,7 @@ async function buildEngineAthleteCard(
         .select("sequence_position, engine_workout_id")
         .eq("user_id", userId)
         .eq("program_version", programVersion)
+        .is("archived_at", null)
         .in("sequence_position", upcoming.map((m) => m.program_sequence_order)),
     ]);
     const typeByDay = new Map((ws ?? []).map((w) => [w.day_number as number, w.day_type as string]));
