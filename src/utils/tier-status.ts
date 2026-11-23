@@ -100,7 +100,11 @@ export function hydrateEquipment(
   const src = raw ?? {};
   const reviewed = Object.keys(src).length > 0;
   const out: Record<string, boolean> = {};
-  for (const k of ALL_EQUIPMENT_KEYS) out[k] = reviewed ? src[k] === true : true;
+  // A reviewed record that simply lacks a key means "never unticked": the
+  // profile page shows that item TICKED (equipment[key] ?? true). Reading it
+  // as missing banned every movement that needs it while the athlete's screen
+  // said they had it (2026-11-23). Only an explicit false is "don't have".
+  for (const k of ALL_EQUIPMENT_KEYS) out[k] = reviewed ? src[k] !== false : true;
   return out;
 }
 

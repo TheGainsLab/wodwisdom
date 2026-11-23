@@ -140,6 +140,9 @@ export interface MetconComposerInputs {
   skills: Record<string, string | null>;
   /** 1RMs by canonical key — null when unknown. */
   lifts: Record<string, number | null>;
+  /** The unit the 1RMs are in. Was labelled "lbs" for everyone, so a kilo
+   *  athlete's 100 kg was read as 100 lb when sizing loads (2026-11-23). */
+  units?: "lbs" | "kg";
   /** Conditioning benchmarks (mile time, 2k row, bike cals...) — null fine. */
   conditioning_benchmarks: Record<string, string | number | null>;
   /** Age / recovery context line, e.g. "masters 52, conservative stance". */
@@ -373,7 +376,7 @@ export function buildComposerUserMessage(inputs: MetconComposerInputs): string {
   parts.push(`EQUIPMENT (true = available):\n${JSON.stringify(inputs.equipment)}`);
   parts.push(`DO NOT PROGRAM (hard bans):\n${JSON.stringify(inputs.do_not_program)}`);
   parts.push(`SKILL TIERS:\n${JSON.stringify(inputs.skills)}`);
-  parts.push(`1RM LIFTS (lbs; null = unknown):\n${JSON.stringify(inputs.lifts)}`);
+  parts.push(`1RM LIFTS (${inputs.units === "kg" ? "kg" : "lbs"}; null = unknown). Give every load in ${inputs.units === "kg" ? "kg" : "lbs"}:\n${JSON.stringify(inputs.lifts)}`);
   parts.push(`CONDITIONING BENCHMARKS:\n${JSON.stringify(inputs.conditioning_benchmarks)}`);
   parts.push(
     `PREVIOUS CYCLE'S METCONS (NEVER re-serve any of these):\n` +

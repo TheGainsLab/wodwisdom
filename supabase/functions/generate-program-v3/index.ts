@@ -598,6 +598,7 @@ async function stageMetcons(
     do_not_program: tdi.do_not_program,
     skills: payload.skills,
     lifts: tdi.lifts,
+    units: payload.basics.units === "kg" ? "kg" : "lbs",
     conditioning_benchmarks: payload.conditioning,
     athlete_context: [
       payload.basics.age ? `age ${payload.basics.age}` : "",
@@ -689,7 +690,7 @@ async function stageFillWeek(
   // under monthly generation, so today's prompt is byte-identical. The
   // weekly cron is where this pays off.
   const evidence = await buildProgramEvidenceContext(
-    supa, job.user_id, rs.continuation.programId ?? null, weekNum,
+    supa, job.user_id, rs.continuation.programId ?? null, weekNum, rs.continuation.monthNumber,
   );
   const wk = await callWeekFill(payload, skeleton, weekNum, priorWeeks, evidence, PACK, weekMetcons);
   // Render every header from scheme_format + rows BEFORE audits/benchmarks —

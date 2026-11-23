@@ -304,15 +304,17 @@ Deno.test("profileStaticFromRow tolerates junk / missing JSONB", () => {
   assertEquals(s.lifts.deadlift, null); // non-number rejected
   assertEquals(s.skills.hspu, null); // not in whitelist
   assertEquals(s.conditioning["1k_row"], null); // empty string rejected
-  assertEquals(s.equipment.rower, false); // non-true rejected
+  // Only an explicit false means "don't have" (2026-11-23): the profile page
+  // shows anything else as ticked, so the generator must read it as owned.
+  assertEquals(s.equipment.rower, true);
   assertEquals(s.units, null); // invalid unit
 });
 
 Deno.test("profileStaticFromRow: EMPTY equipment record = unreviewed = fully equipped", () => {
   // An athlete who never did the equipment review must not read as "owns
   // nothing" — empty/null records hydrate to all-true (the form's default),
-  // while any NON-empty record stays authoritative (missing keys = false,
-  // covered by the tests above).
+  // while in a NON-empty record only an explicit false is "don't have"
+  // (a missing key is shown ticked on the profile page, so it is owned).
   const base = {
     age: null, height: null, bodyweight: null, gender: null, units: "lbs",
     lifts: {}, skills: {}, conditioning: {},
@@ -504,3 +506,16 @@ Deno.test("v2 skill flags: unset when inputs are missing; backwards-kipping fire
   const m2 = buildAthleteModel(backwards, null);
   assertEquals(m2.derived_metrics.dynamic_pulling_ahead_of_strict, true);
 });
+
+Deno.test("equipment: a reviewed record that lacks a key means OWNED, matching the profile screen", () => {
+  // The screen draws equipment[key] ?? true. One real record had 18 of 20
+  // keys; the two it lacked were shown ticked and banned by the generator.
+  const eq = hydrateEquipment({ rower: true, barbell: true, jump_rope: false });
+  assertEquals(eq.jump_rope, false); // explicitly unticked
+  assertEquals(eq.bands, true); // never unticked
+  assertEquals(eq.blocks, true);
+  const blocked = computeEquipmentBlockedMovements(eq);
+  assert(blocked.includes("Double-Unders"));
+  assert(!blocked.includes("Bench Press")); // bench was never unticked
+});
+

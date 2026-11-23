@@ -609,7 +609,7 @@ function RowLogger({ block, controller, coaching, label, type, showWeight, onSav
             {st.claim === 'mod' && st.expanded && t.map((m) => (
               <div key={m.id}>
                 {t.length > 1 && <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-dim)', marginTop: 6 }}>{formatMovementName(m.movement)}</div>}
-                <EditableRows m={m} rows={rows[m.id] ?? []} showWeight={showWeight} units={controller.userUnits} onRow={(i, p) => setRow(m.id, i, p)} schemeRounds={schemeRoundsFor(block, block.movements.indexOf(m))} />
+                <EditableRows m={m} rows={rows[m.id] ?? []} showWeight={showWeight} units={m.weight_unit || controller.userUnits} onRow={(i, p) => setRow(m.id, i, p)} schemeRounds={schemeRoundsFor(block, block.movements.indexOf(m))} />
               </div>
             ))}
             <div style={{ marginTop: 8 }}>
@@ -743,7 +743,7 @@ function MetconLog({ block, controller, coaching, onSaved }: {
               <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 13, fontWeight: 600, flex: 1, minWidth: 0 }}>{formatMovementName(m.movement)}</span>
                 {m.weight != null && (
-                  <input style={{ ...inputStyle, width: 72 }} inputMode="decimal" placeholder={controller.userUnits}
+                  <input style={{ ...inputStyle, width: 72 }} inputMode="decimal" placeholder={m.weight_unit || controller.userUnits}
                     value={a.weight} onChange={e => setActuals(p => ({ ...p, [m.id]: { ...p[m.id], weight: e.target.value } }))} />
                 )}
                 <input style={{ ...inputStyle, width: 72 }} inputMode="decimal" placeholder={unit}
