@@ -12,6 +12,7 @@
  */
 
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { loadTrainedDayLogs } from "./day-trained.ts";
 
 export interface EvidenceMovement {
   movement: string;
@@ -117,17 +118,12 @@ export async function loadProgramEvidence(
   const days = (pw ?? []) as Array<{ id: string; week_num: number; day_num: number }>;
   if (days.length === 0) return [];
 
-  const { data: logs } = await supa
-    .from("workout_logs")
-    .select("id, source_id, workout_date, status")
-    .eq("user_id", userId)
-    .eq("source_type", "program")
-    .eq("status", "completed")
-    .in("source_id", days.map((d) => d.id));
-  const logByDay = new Map<string, { id: string; workout_date: string | null }>();
-  for (const l of (logs ?? []) as Array<{ id: string; source_id: string; workout_date: string | null }>) {
-    logByDay.set(l.source_id, { id: l.id, workout_date: l.workout_date });
-  }
+  // "Trained" is the shared rule (day-trained.ts, 2026-11-23): a log, in
+  // progress or completed, with at least one saved block. This used to read
+  // completed logs only, so a day that had opened this week for the weekly
+  // job could read as NOT DONE here. An in-progress day is reported as done,
+  // with the blocks that were saved.
+  const logByDay = await loadTrainedDayLogs(supa, userId, days.map((d) => d.id));
   const logIds = [...logByDay.values()].map((l) => l.id);
 
   const [{ data: blocks }, { data: entries }] = logIds.length
