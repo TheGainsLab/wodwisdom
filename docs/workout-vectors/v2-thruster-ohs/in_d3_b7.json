@@ -1,0 +1,205 @@
+{
+ "v3071": {
+  "format": "amrap",
+  "duration_seconds": 600,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Shoulder to Overhead",
+    "reps": 5,
+    "load_lb": 115,
+    "load_x_bodyweight": 0.62
+   },
+   {
+    "order": 2,
+    "movement": "Deadlift",
+    "reps": 10,
+    "load_lb": 115,
+    "load_x_bodyweight": 0.62
+   },
+   {
+    "order": 3,
+    "movement": "Box Jump",
+    "reps": 15
+   }
+  ]
+ },
+ "v3072": {
+  "format": "for_time",
+  "time_cap_seconds": 1440,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps": 18
+   },
+   {
+    "order": 2,
+    "movement": "Snatch",
+    "reps": 18,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 3,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps": 21
+   },
+   {
+    "order": 4,
+    "movement": "Snatch",
+    "reps": 15,
+    "load_lb": 135,
+    "load_x_bodyweight": 0.73
+   },
+   {
+    "order": 5,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps": 24
+   },
+   {
+    "order": 6,
+    "movement": "Snatch",
+    "reps": 12,
+    "load_lb": 185,
+    "load_x_bodyweight": 1.0
+   },
+   {
+    "order": 7,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps": 27
+   },
+   {
+    "order": 8,
+    "movement": "Snatch",
+    "reps": 9,
+    "load_lb": 225,
+    "load_x_bodyweight": 1.21
+   },
+   {
+    "order": 9,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps": 30
+   },
+   {
+    "order": 10,
+    "movement": "Snatch",
+    "reps": 6,
+    "load_lb": 245,
+    "load_x_bodyweight": 1.32
+   },
+   {
+    "order": 11,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps": 33
+   },
+   {
+    "order": 12,
+    "movement": "Snatch",
+    "reps": 3,
+    "load_lb": 265,
+    "load_x_bodyweight": 1.43
+   }
+  ]
+ },
+ "v3073": {
+  "format": "for_time",
+  "time_cap_seconds": 600,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Deadlift",
+    "reps": 100,
+    "load_lb": 225,
+    "load_x_bodyweight": 1.21
+   },
+   {
+    "order": 2,
+    "movement": "Bar-Facing Burpee",
+    "reps": 100
+   }
+  ]
+ },
+ "v3074": {
+  "format": "for_time",
+  "time_cap_seconds": 1200,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Thruster",
+    "reps": 105,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 2,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps": 105
+   }
+  ]
+ },
+ "v3075": {
+  "format": "for_time",
+  "time_cap_seconds": 720,
+  "reps_are": "whole workout",
+  "rest": "180 seconds built in",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Snatch",
+    "reps": 30,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 2,
+    "movement": "Bar-Facing Burpee",
+    "reps": 36,
+    "rest_after_seconds": 180
+   },
+   {
+    "order": 3,
+    "movement": "Bar Muscle-up",
+    "reps": 30
+   },
+   {
+    "order": 4,
+    "movement": "Bar-Facing Burpee",
+    "reps": 36
+   }
+  ]
+ },
+ "v3076": {
+  "format": "amrap",
+  "duration_seconds": 1200,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Row",
+    "distance_m": 300
+   },
+   {
+    "order": 2,
+    "movement": "Deadlift",
+    "reps": 10,
+    "load_lb": 185,
+    "load_x_bodyweight": 1.0
+   },
+   {
+    "order": 3,
+    "movement": "Double-Under",
+    "reps": 50
+   }
+  ]
+ }
+}

@@ -1,0 +1,207 @@
+{
+ "v2031": {
+  "format": "amrap",
+  "duration_seconds": 300,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Clean",
+    "reps": 1,
+    "load_lb": 165,
+    "load_x_bodyweight": 0.89
+   },
+   {
+    "order": 2,
+    "movement": "Jerk",
+    "reps": 1,
+    "load_lb": 165,
+    "load_x_bodyweight": 0.89
+   }
+  ]
+ },
+ "v2032": {
+  "format": "amrap",
+  "duration_seconds": 1200,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Overhead Walking Lunge (barbell)",
+    "distance_ft": 25,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 2,
+    "movement": "Bar-Facing Burpee",
+    "reps": 8
+   },
+   {
+    "order": 3,
+    "movement": "Overhead Walking Lunge (barbell)",
+    "distance_ft": 25,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 4,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps": 8
+   }
+  ]
+ },
+ "v2033": {
+  "format": "amrap",
+  "duration_seconds": 420,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Thruster",
+    "reps_pattern": "ascending each round: 3, 6, 9, 12 and so on, adding 3 every round until time runs out",
+    "load_lb": 100,
+    "load_x_bodyweight": 0.54
+   },
+   {
+    "order": 2,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps_pattern": "ascending each round: 3, 6, 9, 12 and so on, adding 3 every round until time runs out"
+   }
+  ]
+ },
+ "v2034": {
+  "format": "amrap",
+  "duration_seconds": 240,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Thruster",
+    "reps": 15,
+    "load_lb": 100,
+    "load_x_bodyweight": 0.54
+   },
+   {
+    "order": 2,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps": 15
+   }
+  ]
+ },
+ "v2035": {
+  "format": "amrap",
+  "duration_seconds": 420,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Clean and Jerk",
+    "reps_pattern": "ascending each round: 3, 6, 9, 12 and so on, adding 3 every round until time runs out",
+    "load_lb": 135,
+    "load_x_bodyweight": 0.73
+   },
+   {
+    "order": 2,
+    "movement": "Toes-to-Bar",
+    "reps_pattern": "ascending each round: 3, 6, 9, 12 and so on, adding 3 every round until time runs out"
+   }
+  ]
+ },
+ "v2036": {
+  "format": "for_time",
+  "time_cap_seconds": 720,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Wall-Ball Shot",
+    "reps": 20,
+    "load_lb": 20,
+    "load_x_bodyweight": 0.11
+   },
+   {
+    "order": 2,
+    "movement": "Box Jump-Over",
+    "reps": 18
+   },
+   {
+    "order": 3,
+    "movement": "Wall-Ball Shot",
+    "reps": 30,
+    "load_lb": 20,
+    "load_x_bodyweight": 0.11
+   },
+   {
+    "order": 4,
+    "movement": "Box Jump-Over",
+    "reps": 18
+   },
+   {
+    "order": 5,
+    "movement": "Wall-Ball Shot",
+    "reps": 40,
+    "load_lb": 20,
+    "load_x_bodyweight": 0.11
+   },
+   {
+    "order": 6,
+    "movement": "Med Ball Box Step",
+    "reps": 18,
+    "load_lb": 20,
+    "load_x_bodyweight": 0.11
+   },
+   {
+    "order": 7,
+    "movement": "Wall-Ball Shot",
+    "reps": 66,
+    "load_lb": 20,
+    "load_x_bodyweight": 0.11
+   },
+   {
+    "order": 8,
+    "movement": "Med Ball Box Step",
+    "reps": 18,
+    "load_lb": 20,
+    "load_x_bodyweight": 0.11
+   },
+   {
+    "order": 9,
+    "movement": "Wall-Ball Shot",
+    "reps": 40,
+    "load_lb": 20,
+    "load_x_bodyweight": 0.11
+   },
+   {
+    "order": 10,
+    "movement": "Box Jump-Over",
+    "reps": 18
+   },
+   {
+    "order": 11,
+    "movement": "Wall-Ball Shot",
+    "reps": 30,
+    "load_lb": 20,
+    "load_x_bodyweight": 0.11
+   },
+   {
+    "order": 12,
+    "movement": "Box Jump-Over",
+    "reps": 18
+   },
+   {
+    "order": 13,
+    "movement": "Wall-Ball Shot",
+    "reps": 20,
+    "load_lb": 20,
+    "load_x_bodyweight": 0.11
+   }
+  ]
+ }
+}

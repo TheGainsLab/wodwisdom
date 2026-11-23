@@ -1,0 +1,264 @@
+{
+ "v3081": {
+  "format": "for_time",
+  "time_cap_seconds": 540,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Deadlift",
+    "reps": 21,
+    "load_lb": 225,
+    "load_x_bodyweight": 1.21
+   },
+   {
+    "order": 2,
+    "movement": "Handstand Push-up",
+    "reps": 21
+   },
+   {
+    "order": 3,
+    "movement": "Deadlift",
+    "reps": 15,
+    "load_lb": 225,
+    "load_x_bodyweight": 1.21
+   },
+   {
+    "order": 4,
+    "movement": "Handstand Push-up",
+    "reps": 15
+   },
+   {
+    "order": 5,
+    "movement": "Deadlift",
+    "reps": 9,
+    "load_lb": 225,
+    "load_x_bodyweight": 1.21
+   },
+   {
+    "order": 6,
+    "movement": "Handstand Push-up",
+    "reps": 9
+   },
+   {
+    "order": 7,
+    "movement": "Deadlift",
+    "reps": 21,
+    "load_lb": 315,
+    "load_x_bodyweight": 1.7
+   },
+   {
+    "order": 8,
+    "movement": "Handstand Walk",
+    "distance_ft": 50
+   },
+   {
+    "order": 9,
+    "movement": "Deadlift",
+    "reps": 15,
+    "load_lb": 315,
+    "load_x_bodyweight": 1.7
+   },
+   {
+    "order": 10,
+    "movement": "Handstand Walk",
+    "distance_ft": 50
+   },
+   {
+    "order": 11,
+    "movement": "Deadlift",
+    "reps": 9,
+    "load_lb": 315,
+    "load_x_bodyweight": 1.7
+   },
+   {
+    "order": 12,
+    "movement": "Handstand Walk",
+    "distance_ft": 50
+   }
+  ]
+ },
+ "v3082": {
+  "format": "for_time",
+  "time_cap_seconds": 1200,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Box Jump",
+    "reps": 30
+   },
+   {
+    "order": 2,
+    "movement": "Clean and Jerk",
+    "reps": 15,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 3,
+    "movement": "Box Jump",
+    "reps": 30
+   },
+   {
+    "order": 4,
+    "movement": "Clean and Jerk",
+    "reps": 15,
+    "load_lb": 135,
+    "load_x_bodyweight": 0.73
+   },
+   {
+    "order": 5,
+    "movement": "Box Jump",
+    "reps": 30
+   },
+   {
+    "order": 6,
+    "movement": "Clean and Jerk",
+    "reps": 10,
+    "load_lb": 185,
+    "load_x_bodyweight": 1.0
+   },
+   {
+    "order": 7,
+    "movement": "Pistol",
+    "reps": 30
+   },
+   {
+    "order": 8,
+    "movement": "Clean and Jerk",
+    "reps": 10,
+    "load_lb": 225,
+    "load_x_bodyweight": 1.21
+   },
+   {
+    "order": 9,
+    "movement": "Pistol",
+    "reps": 30
+   },
+   {
+    "order": 10,
+    "movement": "Clean and Jerk",
+    "reps": 5,
+    "load_lb": 275,
+    "load_x_bodyweight": 1.48
+   },
+   {
+    "order": 11,
+    "movement": "Pistol",
+    "reps": 30
+   },
+   {
+    "order": 12,
+    "movement": "Clean and Jerk",
+    "reps": 5,
+    "load_lb": 315,
+    "load_x_bodyweight": 1.7
+   }
+  ]
+ },
+ "v3083": {
+  "format": "max_lift",
+  "time_window_seconds": 420,
+  "preceded_by": "starts immediately after a for-time workout of front squats, thrusters, toes-to-bar, chest-to-bar pull-ups and bar muscle-ups with a 15-minute cap",
+  "rest": "self-paced within the window",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Complex: 1 Deadlift + 1 Clean + 1 Hang Clean + 1 Jerk, unbroken",
+    "reps_pattern": "maximum load for one complex; as many attempts as wanted"
+   }
+  ]
+ },
+ "v3084": {
+  "format": "amrap",
+  "duration_seconds": 840,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Row",
+    "calories": 60
+   },
+   {
+    "order": 2,
+    "movement": "Toes-to-Bar",
+    "reps": 50
+   },
+   {
+    "order": 3,
+    "movement": "Wall-Ball Shot",
+    "reps": 40,
+    "load_lb": 20,
+    "load_x_bodyweight": 0.11
+   },
+   {
+    "order": 4,
+    "movement": "Clean",
+    "reps": 30,
+    "load_lb": 135,
+    "load_x_bodyweight": 0.73
+   },
+   {
+    "order": 5,
+    "movement": "Ring Muscle-up",
+    "reps": 20
+   }
+  ]
+ },
+ "v3085": {
+  "format": "amrap",
+  "duration_seconds": 540,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Toes-to-Bar",
+    "reps": 15
+   },
+   {
+    "order": 2,
+    "movement": "Deadlift",
+    "reps": 10,
+    "load_lb": 115,
+    "load_x_bodyweight": 0.62
+   },
+   {
+    "order": 3,
+    "movement": "Snatch",
+    "reps": 5,
+    "load_lb": 115,
+    "load_x_bodyweight": 0.62
+   }
+  ]
+ },
+ "v3086": {
+  "format": "amrap",
+  "duration_seconds": 1080,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Box Jump",
+    "reps": 15
+   },
+   {
+    "order": 2,
+    "movement": "Push Press",
+    "reps": 12,
+    "load_lb": 115,
+    "load_x_bodyweight": 0.62
+   },
+   {
+    "order": 3,
+    "movement": "Toes-to-Bar",
+    "reps": 9
+   }
+  ]
+ }
+}

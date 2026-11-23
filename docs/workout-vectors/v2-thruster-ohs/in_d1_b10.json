@@ -1,0 +1,240 @@
+{
+ "v1101": {
+  "format": "for_time",
+  "time_cap_seconds": 960,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Burpee Over the Bar",
+    "reps": 24
+   },
+   {
+    "order": 2,
+    "movement": "Clean",
+    "reps": 24,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 3,
+    "movement": "Burpee Over the Bar",
+    "reps": 24
+   },
+   {
+    "order": 4,
+    "movement": "Thruster",
+    "reps": 24,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 5,
+    "movement": "Burpee Over the Bar",
+    "reps": 24
+   },
+   {
+    "order": 6,
+    "movement": "Clean",
+    "reps": 24,
+    "load_lb": 115,
+    "load_x_bodyweight": 0.62
+   },
+   {
+    "order": 7,
+    "movement": "Burpee Over the Bar",
+    "reps": 24
+   },
+   {
+    "order": 8,
+    "movement": "Thruster",
+    "reps": 24,
+    "load_lb": 115,
+    "load_x_bodyweight": 0.62
+   },
+   {
+    "order": 9,
+    "movement": "Burpee Over the Bar",
+    "reps": 24
+   },
+   {
+    "order": 10,
+    "movement": "Clean",
+    "reps": 24,
+    "load_lb": 135,
+    "load_x_bodyweight": 0.73
+   },
+   {
+    "order": 11,
+    "movement": "Burpee Over the Bar",
+    "reps": 24
+   },
+   {
+    "order": 12,
+    "movement": "Thruster",
+    "reps": 24,
+    "load_lb": 135,
+    "load_x_bodyweight": 0.73
+   }
+  ]
+ },
+ "v1102": {
+  "format": "amrap",
+  "duration_seconds": 300,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Clean",
+    "reps": 1,
+    "load_lb": 165,
+    "load_x_bodyweight": 0.89
+   },
+   {
+    "order": 2,
+    "movement": "Jerk",
+    "reps": 1,
+    "load_lb": 165,
+    "load_x_bodyweight": 0.89
+   }
+  ]
+ },
+ "v1103": {
+  "format": "amrap",
+  "duration_seconds": 900,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Deadlift",
+    "reps": 9,
+    "load_lb": 155,
+    "load_x_bodyweight": 0.84
+   },
+   {
+    "order": 2,
+    "movement": "Push-up",
+    "reps": 12
+   },
+   {
+    "order": 3,
+    "movement": "Box Jump",
+    "reps": 15
+   }
+  ]
+ },
+ "v1104": {
+  "format": "timed_windows",
+  "structure": "3-minute windows. In each window complete 2 rounds of the two movements; if completed, continue into the next 3-minute window with 2 more reps of each movement per round. Ends at the first window not completed.",
+  "reps_are": "per round",
+  "rest": "whatever remains of each window",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Overhead Squat",
+    "reps_pattern": "10 per round in the first window, then 12, 14, 16 and so on",
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 2,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps_pattern": "10 per round in the first window, then 12, 14, 16 and so on"
+   }
+  ]
+ },
+ "v1105": {
+  "format": "for_time",
+  "time_cap_seconds": 1200,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Wall Walk",
+    "reps": 5
+   },
+   {
+    "order": 2,
+    "movement": "Row",
+    "calories": 50
+   },
+   {
+    "order": 3,
+    "movement": "Wall Walk",
+    "reps": 5
+   },
+   {
+    "order": 4,
+    "movement": "Deadlift",
+    "reps": 25,
+    "load_lb": 225,
+    "load_x_bodyweight": 1.21
+   },
+   {
+    "order": 5,
+    "movement": "Wall Walk",
+    "reps": 5
+   },
+   {
+    "order": 6,
+    "movement": "Clean",
+    "reps": 25,
+    "load_lb": 135,
+    "load_x_bodyweight": 0.73
+   },
+   {
+    "order": 7,
+    "movement": "Wall Walk",
+    "reps": 5
+   },
+   {
+    "order": 8,
+    "movement": "Snatch",
+    "reps": 25,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 9,
+    "movement": "Wall Walk",
+    "reps": 5
+   },
+   {
+    "order": 10,
+    "movement": "Row",
+    "calories": 50
+   }
+  ]
+ },
+ "v1106": {
+  "format": "amrap",
+  "duration_seconds": 600,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Shoulder to Overhead",
+    "reps": 5,
+    "load_lb": 115,
+    "load_x_bodyweight": 0.62
+   },
+   {
+    "order": 2,
+    "movement": "Deadlift",
+    "reps": 10,
+    "load_lb": 115,
+    "load_x_bodyweight": 0.62
+   },
+   {
+    "order": 3,
+    "movement": "Box Jump",
+    "reps": 15
+   }
+  ]
+ }
+}

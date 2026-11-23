@@ -1,0 +1,128 @@
+{
+ "v3031": {
+  "format": "amrap",
+  "duration_seconds": 720,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "DB Front-Rack Walking Lunge (two dumbbells)",
+    "distance_ft": 50,
+    "load_lb": 100,
+    "load_x_bodyweight": 0.54
+   },
+   {
+    "order": 2,
+    "movement": "Toes-to-Bar or Bar Muscle-up",
+    "reps_pattern": "16 toes-to-bar in rounds 1-2, 16 bar muscle-ups in rounds 3-4, alternating every 2 rounds"
+   },
+   {
+    "order": 3,
+    "movement": "DB Power Clean (two dumbbells)",
+    "reps": 8,
+    "load_lb": 100,
+    "load_x_bodyweight": 0.54
+   }
+  ]
+ },
+ "v3032": {
+  "format": "for_time",
+  "time_cap_seconds": 900,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "structure": "10 rounds of 8 and 10",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Ground-to-Overhead (barbell)",
+    "reps": 80,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 2,
+    "movement": "Bar-Facing Burpee",
+    "reps": 100
+   }
+  ]
+ },
+ "v3033": {
+  "format": "for_time",
+  "time_cap_seconds": 2400,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Thruster",
+    "reps": 90,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 2,
+    "movement": "Double-Under",
+    "reps": 350
+   }
+  ]
+ },
+ "v3034": {
+  "format": "timed_windows",
+  "structure": "3-minute windows. In each window complete 2 rounds of the two movements; if completed, continue into the next 3-minute window with 2 more reps of each movement per round. Ends at the first window not completed.",
+  "reps_are": "per round",
+  "rest": "whatever remains of each window",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Overhead Squat",
+    "reps_pattern": "10 per round in the first window, then 12, 14, 16 and so on",
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 2,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps_pattern": "10 per round in the first window, then 12, 14, 16 and so on"
+   }
+  ]
+ },
+ "v3035": {
+  "format": "amrap",
+  "duration_seconds": 1200,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Toes-to-Bar",
+    "reps": 8
+   },
+   {
+    "order": 2,
+    "movement": "DB Clean and Jerk",
+    "reps": 10,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 3,
+    "movement": "Row",
+    "calories": 14
+   }
+  ]
+ },
+ "v3036": {
+  "format": "amrap",
+  "duration_seconds": 420,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Burpee",
+    "reps_pattern": "as many as possible for the whole 7 minutes"
+   }
+  ]
+ }
+}

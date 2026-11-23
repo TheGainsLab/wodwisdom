@@ -1,0 +1,283 @@
+{
+ "v3051": {
+  "format": "amrap",
+  "duration_seconds": 900,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Burpee Pull-up",
+    "reps_pattern": "5 in round 1, then 10, 15, 20, adding 5 every round"
+   },
+   {
+    "order": 2,
+    "movement": "Shuttle Run",
+    "reps": 10,
+    "distance_ft": 500
+   }
+  ]
+ },
+ "v3052": {
+  "format": "for_time",
+  "time_cap_seconds": 720,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "structure": "the clock starts at 6 minutes; finishing the first six items inside 6 minutes adds 3 minutes for the next three, and finishing those inside 9 minutes adds 3 more for the last three",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Wall Walk",
+    "reps": 5
+   },
+   {
+    "order": 2,
+    "movement": "Double-Under",
+    "reps": 50
+   },
+   {
+    "order": 3,
+    "movement": "Snatch",
+    "reps": 15,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 4,
+    "movement": "Wall Walk",
+    "reps": 5
+   },
+   {
+    "order": 5,
+    "movement": "Double-Under",
+    "reps": 50
+   },
+   {
+    "order": 6,
+    "movement": "Snatch",
+    "reps": 12,
+    "load_lb": 135,
+    "load_x_bodyweight": 0.73
+   },
+   {
+    "order": 7,
+    "movement": "Strict Handstand Push-up",
+    "reps": 20
+   },
+   {
+    "order": 8,
+    "movement": "Double-Under",
+    "reps": 50
+   },
+   {
+    "order": 9,
+    "movement": "Snatch",
+    "reps": 9,
+    "load_lb": 185,
+    "load_x_bodyweight": 1.0
+   },
+   {
+    "order": 10,
+    "movement": "Strict Handstand Push-up",
+    "reps": 20
+   },
+   {
+    "order": 11,
+    "movement": "Double-Under",
+    "reps": 50
+   },
+   {
+    "order": 12,
+    "movement": "Snatch",
+    "reps": 6,
+    "load_lb": 225,
+    "load_x_bodyweight": 1.21
+   }
+  ]
+ },
+ "v3053": {
+  "format": "amrap",
+  "duration_seconds": 480,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Deadlift",
+    "reps": 10,
+    "load_lb": 135,
+    "load_x_bodyweight": 0.73
+   },
+   {
+    "order": 2,
+    "movement": "Box Jump",
+    "reps": 15
+   },
+   {
+    "order": 3,
+    "movement": "Deadlift",
+    "reps": 15,
+    "load_lb": 185,
+    "load_x_bodyweight": 1.0
+   },
+   {
+    "order": 4,
+    "movement": "Box Jump",
+    "reps": 15
+   },
+   {
+    "order": 5,
+    "movement": "Deadlift",
+    "reps": 20,
+    "load_lb": 225,
+    "load_x_bodyweight": 1.21
+   },
+   {
+    "order": 6,
+    "movement": "Box Jump",
+    "reps": 15
+   },
+   {
+    "order": 7,
+    "movement": "Deadlift",
+    "reps": 25,
+    "load_lb": 275,
+    "load_x_bodyweight": 1.48
+   },
+   {
+    "order": 8,
+    "movement": "Box Jump",
+    "reps": 15
+   },
+   {
+    "order": 9,
+    "movement": "Deadlift",
+    "reps": 30,
+    "load_lb": 315,
+    "load_x_bodyweight": 1.7
+   },
+   {
+    "order": 10,
+    "movement": "Box Jump",
+    "reps": 15
+   },
+   {
+    "order": 11,
+    "movement": "Deadlift",
+    "reps": 35,
+    "load_lb": 365,
+    "load_x_bodyweight": 1.97
+   },
+   {
+    "order": 12,
+    "movement": "Box Jump",
+    "reps": 15
+   }
+  ]
+ },
+ "v3054": {
+  "format": "for_time",
+  "time_cap_seconds": null,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "structure": "four rounds of 27, 21, 15 and 9 of each movement",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Row",
+    "calories": 72
+   },
+   {
+    "order": 2,
+    "movement": "Thruster",
+    "reps": 72,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   }
+  ]
+ },
+ "v3055": {
+  "format": "for_time",
+  "time_cap_seconds": 1200,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Wall Walk",
+    "reps": 5
+   },
+   {
+    "order": 2,
+    "movement": "Row",
+    "calories": 50
+   },
+   {
+    "order": 3,
+    "movement": "Wall Walk",
+    "reps": 5
+   },
+   {
+    "order": 4,
+    "movement": "Deadlift",
+    "reps": 25,
+    "load_lb": 225,
+    "load_x_bodyweight": 1.21
+   },
+   {
+    "order": 5,
+    "movement": "Wall Walk",
+    "reps": 5
+   },
+   {
+    "order": 6,
+    "movement": "Clean",
+    "reps": 25,
+    "load_lb": 135,
+    "load_x_bodyweight": 0.73
+   },
+   {
+    "order": 7,
+    "movement": "Wall Walk",
+    "reps": 5
+   },
+   {
+    "order": 8,
+    "movement": "Snatch",
+    "reps": 25,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 9,
+    "movement": "Wall Walk",
+    "reps": 5
+   },
+   {
+    "order": 10,
+    "movement": "Row",
+    "calories": 50
+   }
+  ]
+ },
+ "v3056": {
+  "format": "amrap",
+  "duration_seconds": 420,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Clean and Jerk",
+    "reps_pattern": "ascending each round: 3, 6, 9, 12 and so on, adding 3 every round until time runs out",
+    "load_lb": 135,
+    "load_x_bodyweight": 0.73
+   },
+   {
+    "order": 2,
+    "movement": "Toes-to-Bar",
+    "reps_pattern": "ascending each round: 3, 6, 9, 12 and so on, adding 3 every round until time runs out"
+   }
+  ]
+ }
+}

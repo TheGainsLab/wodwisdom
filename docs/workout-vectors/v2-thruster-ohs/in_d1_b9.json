@@ -1,0 +1,284 @@
+{
+ "v1091": {
+  "format": "for_time",
+  "time_cap_seconds": 2400,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Thruster",
+    "reps": 90,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 2,
+    "movement": "Double-Under",
+    "reps": 350
+   }
+  ]
+ },
+ "v1092": {
+  "format": "for_time",
+  "time_cap_seconds": 720,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "structure": "the clock starts at 6 minutes; finishing the first six items inside 6 minutes adds 3 minutes for the next three, and finishing those inside 9 minutes adds 3 more for the last three",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Wall Walk",
+    "reps": 5
+   },
+   {
+    "order": 2,
+    "movement": "Double-Under",
+    "reps": 50
+   },
+   {
+    "order": 3,
+    "movement": "Snatch",
+    "reps": 15,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 4,
+    "movement": "Wall Walk",
+    "reps": 5
+   },
+   {
+    "order": 5,
+    "movement": "Double-Under",
+    "reps": 50
+   },
+   {
+    "order": 6,
+    "movement": "Snatch",
+    "reps": 12,
+    "load_lb": 135,
+    "load_x_bodyweight": 0.73
+   },
+   {
+    "order": 7,
+    "movement": "Strict Handstand Push-up",
+    "reps": 20
+   },
+   {
+    "order": 8,
+    "movement": "Double-Under",
+    "reps": 50
+   },
+   {
+    "order": 9,
+    "movement": "Snatch",
+    "reps": 9,
+    "load_lb": 185,
+    "load_x_bodyweight": 1.0
+   },
+   {
+    "order": 10,
+    "movement": "Strict Handstand Push-up",
+    "reps": 20
+   },
+   {
+    "order": 11,
+    "movement": "Double-Under",
+    "reps": 50
+   },
+   {
+    "order": 12,
+    "movement": "Snatch",
+    "reps": 6,
+    "load_lb": 225,
+    "load_x_bodyweight": 1.21
+   }
+  ]
+ },
+ "v1093": {
+  "format": "max_lift",
+  "time_window_seconds": 420,
+  "preceded_by": "starts immediately after a for-time workout of front squats, thrusters, toes-to-bar, chest-to-bar pull-ups and bar muscle-ups with a 15-minute cap",
+  "rest": "self-paced within the window",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Complex: 1 Deadlift + 1 Clean + 1 Hang Clean + 1 Jerk, unbroken",
+    "reps_pattern": "maximum load for one complex; as many attempts as wanted"
+   }
+  ]
+ },
+ "v1094": {
+  "format": "amrap",
+  "duration_seconds": 1020,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Burpee",
+    "reps": 40
+   },
+   {
+    "order": 2,
+    "movement": "Snatch",
+    "reps": 30,
+    "load_lb": 75,
+    "load_x_bodyweight": 0.4
+   },
+   {
+    "order": 3,
+    "movement": "Burpee",
+    "reps": 30
+   },
+   {
+    "order": 4,
+    "movement": "Snatch",
+    "reps": 30,
+    "load_lb": 135,
+    "load_x_bodyweight": 0.73
+   },
+   {
+    "order": 5,
+    "movement": "Burpee",
+    "reps": 20
+   },
+   {
+    "order": 6,
+    "movement": "Snatch",
+    "reps": 30,
+    "load_lb": 165,
+    "load_x_bodyweight": 0.89
+   },
+   {
+    "order": 7,
+    "movement": "Burpee",
+    "reps": 10
+   },
+   {
+    "order": 8,
+    "movement": "Snatch",
+    "reps_pattern": "as many as possible in the time remaining",
+    "load_lb": 210,
+    "load_x_bodyweight": 1.13
+   }
+  ]
+ },
+ "v1095": {
+  "format": "for_time",
+  "time_cap_seconds": 900,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Dumbbell Snatch",
+    "reps": 21,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 2,
+    "movement": "Lateral Burpee Over Dumbbell",
+    "reps": 21
+   },
+   {
+    "order": 3,
+    "movement": "Dumbbell Snatch",
+    "reps": 21,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 4,
+    "movement": "Lateral Burpee Over Dumbbell",
+    "reps": 21
+   },
+   {
+    "order": 5,
+    "movement": "Dumbbell Snatch",
+    "reps": 15,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 6,
+    "movement": "Lateral Burpee Over Dumbbell",
+    "reps": 15
+   },
+   {
+    "order": 7,
+    "movement": "Dumbbell Snatch",
+    "reps": 15,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 8,
+    "movement": "Lateral Burpee Over Dumbbell",
+    "reps": 15
+   },
+   {
+    "order": 9,
+    "movement": "Dumbbell Snatch",
+    "reps": 9,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 10,
+    "movement": "Lateral Burpee Over Dumbbell",
+    "reps": 9
+   },
+   {
+    "order": 11,
+    "movement": "Dumbbell Snatch",
+    "reps": 9,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 12,
+    "movement": "Lateral Burpee Over Dumbbell",
+    "reps": 9
+   }
+  ]
+ },
+ "v1096": {
+  "format": "amrap",
+  "duration_seconds": 600,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Snatch",
+    "reps": 30,
+    "load_lb": 75,
+    "load_x_bodyweight": 0.4
+   },
+   {
+    "order": 2,
+    "movement": "Snatch",
+    "reps": 30,
+    "load_lb": 135,
+    "load_x_bodyweight": 0.73
+   },
+   {
+    "order": 3,
+    "movement": "Snatch",
+    "reps": 30,
+    "load_lb": 165,
+    "load_x_bodyweight": 0.89
+   },
+   {
+    "order": 4,
+    "movement": "Snatch",
+    "reps_pattern": "as many as possible in the time remaining",
+    "load_lb": 210,
+    "load_x_bodyweight": 1.13
+   }
+  ]
+ }
+}

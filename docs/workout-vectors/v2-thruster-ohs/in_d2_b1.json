@@ -1,0 +1,200 @@
+{
+ "v2011": {
+  "format": "for_time",
+  "time_cap_seconds": 720,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Dumbbell Squat",
+    "reps": 55,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 2,
+    "movement": "Bar-Facing Burpee",
+    "reps": 55
+   }
+  ]
+ },
+ "v2012": {
+  "format": "amrap",
+  "duration_seconds": 540,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Toes-to-Bar",
+    "reps": 15
+   },
+   {
+    "order": 2,
+    "movement": "Deadlift",
+    "reps": 10,
+    "load_lb": 115,
+    "load_x_bodyweight": 0.62
+   },
+   {
+    "order": 3,
+    "movement": "Snatch",
+    "reps": 5,
+    "load_lb": 115,
+    "load_x_bodyweight": 0.62
+   }
+  ]
+ },
+ "v2013": {
+  "format": "amrap",
+  "duration_seconds": 600,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Snatch",
+    "reps": 30,
+    "load_lb": 75,
+    "load_x_bodyweight": 0.4
+   },
+   {
+    "order": 2,
+    "movement": "Snatch",
+    "reps": 30,
+    "load_lb": 135,
+    "load_x_bodyweight": 0.73
+   },
+   {
+    "order": 3,
+    "movement": "Snatch",
+    "reps": 30,
+    "load_lb": 165,
+    "load_x_bodyweight": 0.89
+   },
+   {
+    "order": 4,
+    "movement": "Snatch",
+    "reps_pattern": "as many as possible in the time remaining",
+    "load_lb": 210,
+    "load_x_bodyweight": 1.13
+   }
+  ]
+ },
+ "v2014": {
+  "format": "amrap",
+  "duration_seconds": 900,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Wall-Ball Shot",
+    "reps": 19,
+    "load_lb": 20,
+    "load_x_bodyweight": 0.11
+   },
+   {
+    "order": 2,
+    "movement": "Row",
+    "calories": 19
+   }
+  ]
+ },
+ "v2015": {
+  "format": "for_time",
+  "time_cap_seconds": 720,
+  "reps_are": "whole workout",
+  "rest": "180 seconds built in",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Snatch",
+    "reps": 30,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 2,
+    "movement": "Bar-Facing Burpee",
+    "reps": 36,
+    "rest_after_seconds": 180
+   },
+   {
+    "order": 3,
+    "movement": "Bar Muscle-up",
+    "reps": 30
+   },
+   {
+    "order": 4,
+    "movement": "Bar-Facing Burpee",
+    "reps": 36
+   }
+  ]
+ },
+ "v2016": {
+  "format": "for_time",
+  "time_cap_seconds": 1200,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Wall Walk",
+    "reps": 5
+   },
+   {
+    "order": 2,
+    "movement": "Row",
+    "calories": 50
+   },
+   {
+    "order": 3,
+    "movement": "Wall Walk",
+    "reps": 5
+   },
+   {
+    "order": 4,
+    "movement": "Deadlift",
+    "reps": 25,
+    "load_lb": 225,
+    "load_x_bodyweight": 1.21
+   },
+   {
+    "order": 5,
+    "movement": "Wall Walk",
+    "reps": 5
+   },
+   {
+    "order": 6,
+    "movement": "Clean",
+    "reps": 25,
+    "load_lb": 135,
+    "load_x_bodyweight": 0.73
+   },
+   {
+    "order": 7,
+    "movement": "Wall Walk",
+    "reps": 5
+   },
+   {
+    "order": 8,
+    "movement": "Snatch",
+    "reps": 25,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 9,
+    "movement": "Wall Walk",
+    "reps": 5
+   },
+   {
+    "order": 10,
+    "movement": "Row",
+    "calories": 50
+   }
+  ]
+ }
+}

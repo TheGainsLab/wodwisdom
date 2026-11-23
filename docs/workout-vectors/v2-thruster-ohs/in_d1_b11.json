@@ -1,0 +1,189 @@
+{
+ "v1111": {
+  "format": "amrap",
+  "duration_seconds": 1200,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "DB Thruster",
+    "reps": 4,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 2,
+    "movement": "Toes-to-Bar",
+    "reps": 6
+   },
+   {
+    "order": 3,
+    "movement": "Double-Under",
+    "reps": 24
+   }
+  ]
+ },
+ "v1112": {
+  "format": "amrap",
+  "duration_seconds": 600,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Double-Under",
+    "reps": 30
+   },
+   {
+    "order": 2,
+    "movement": "Snatch",
+    "reps": 15,
+    "load_lb": 75,
+    "load_x_bodyweight": 0.4
+   }
+  ]
+ },
+ "v1113": {
+  "format": "for_time",
+  "time_cap_seconds": 900,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "DB Overhead Walking Lunge (one dumbbell)",
+    "distance_ft": 80,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 2,
+    "movement": "Alternating DB Snatch",
+    "reps": 20,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 3,
+    "movement": "Pull-up",
+    "reps": 20
+   },
+   {
+    "order": 4,
+    "movement": "DB Overhead Walking Lunge (one dumbbell)",
+    "distance_ft": 80,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 5,
+    "movement": "Alternating DB Snatch",
+    "reps": 20,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 6,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps": 20
+   },
+   {
+    "order": 7,
+    "movement": "DB Overhead Walking Lunge (one dumbbell)",
+    "distance_ft": 80,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 8,
+    "movement": "Alternating DB Snatch",
+    "reps": 20,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 9,
+    "movement": "Muscle-up",
+    "reps": 20
+   }
+  ]
+ },
+ "v1114": {
+  "format": "amrap",
+  "duration_seconds": 840,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Row",
+    "calories": 60
+   },
+   {
+    "order": 2,
+    "movement": "Toes-to-Bar",
+    "reps": 50
+   },
+   {
+    "order": 3,
+    "movement": "Wall-Ball Shot",
+    "reps": 40,
+    "load_lb": 20,
+    "load_x_bodyweight": 0.11
+   },
+   {
+    "order": 4,
+    "movement": "Clean",
+    "reps": 30,
+    "load_lb": 135,
+    "load_x_bodyweight": 0.73
+   },
+   {
+    "order": 5,
+    "movement": "Ring Muscle-up",
+    "reps": 20
+   }
+  ]
+ },
+ "v1115": {
+  "format": "amrap",
+  "duration_seconds": 480,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Handstand Push-up",
+    "reps_pattern": "ascending each round: 3, 6, 9, 12 and so on, adding 3 every round until time runs out"
+   },
+   {
+    "order": 2,
+    "movement": "Clean",
+    "reps_pattern": "3 per round for rounds 1 to 3, 6 for rounds 4 to 6, 9 for rounds 7 to 9, adding 3 every third round",
+    "load_lb": 185,
+    "load_x_bodyweight": 1.0
+   }
+  ]
+ },
+ "v1116": {
+  "format": "for_time",
+  "time_cap_seconds": null,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Thruster",
+    "reps": 84,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 2,
+    "movement": "Burpee",
+    "reps": 84
+   }
+  ]
+ }
+}

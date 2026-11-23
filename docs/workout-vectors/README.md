@@ -211,3 +211,32 @@ several axes.
 
 Departure from the plan: 13 vectors were judged after the first year of
 results had been seen (the judges did not see them).
+
+## Refinement process
+
+Agreed 2026-11-23: refinements come from outside data, change the
+definitions (never an individual vector), are proposed from the odd years
+only and tested on the even years, and need a plain coaching reason. The
+women's Open stays untouched as a final check. Baselines for the current
+definitions: odd years -0.34, even years -0.47 (139 pairs: 75 odd, 64 even).
+
+### Tested, not adopted: thrusters and overhead squats as Olympic-lift derivatives (`v2-thruster-ohs/`)
+
+Odd-year evidence: thruster or overhead-squat workouts ranked more like
+snatch, clean and jerk workouts than predicted (+0.06 over 23 pairs, 15 of
+23 leaning that way); wall balls and deadlifts did not.
+
+Change: one sentence added to `olympic_lifting` saying barbell thrusters and
+overhead squats carry part of that axis's share, more as load rises. All 61
+workouts re-judged, three drafts each.
+
+| Definitions | Odd | Even (test) | All |
+|---|---|---|---|
+| Current, three drafts | -0.34 | -0.49 | -0.40 |
+| Version 2, three drafts | -0.38 | -0.48 | -0.42 |
+
+The change did what it said: Olympic lifting rose by about 9 points on the
+14 thruster and overhead-squat workouts and nothing else moved. But it did
+not improve the even years, so it is not adopted. Nine points on one axis
+moves a distance by at most nine, and the pairs that prompted the idea are
+70 or more apart (15.1a and 15.5 went from 78 to 77).

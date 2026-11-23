@@ -1,0 +1,228 @@
+{
+ "v1081": {
+  "format": "for_time",
+  "time_cap_seconds": 900,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Wall Walk",
+    "reps": 55
+   },
+   {
+    "order": 2,
+    "movement": "Double-Under",
+    "reps": 550
+   }
+  ]
+ },
+ "v1082": {
+  "format": "amrap",
+  "duration_seconds": 720,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Wall-Ball Shot",
+    "reps": 150,
+    "load_lb": 20,
+    "load_x_bodyweight": 0.11
+   },
+   {
+    "order": 2,
+    "movement": "Double-Under",
+    "reps": 90
+   },
+   {
+    "order": 3,
+    "movement": "Ring Muscle-up",
+    "reps": 30
+   }
+  ]
+ },
+ "v1083": {
+  "format": "for_time",
+  "time_cap_seconds": 2400,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Thruster",
+    "reps": 90,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 2,
+    "movement": "Double-Under",
+    "reps": 350
+   }
+  ]
+ },
+ "v1084": {
+  "format": "for_time",
+  "time_cap_seconds": 1200,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Thruster",
+    "reps": 105,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 2,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps": 105
+   }
+  ]
+ },
+ "v1085": {
+  "format": "for_time",
+  "time_cap_seconds": 840,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Double-Under",
+    "reps": 200
+   },
+   {
+    "order": 2,
+    "movement": "Overhead Squat",
+    "reps": 40,
+    "load_lb": 115,
+    "load_x_bodyweight": 0.62
+   },
+   {
+    "order": 3,
+    "movement": "Double-Under",
+    "reps": 200
+   },
+   {
+    "order": 4,
+    "movement": "Ring Muscle-up",
+    "reps": 24
+   },
+   {
+    "order": 5,
+    "movement": "Double-Under",
+    "reps": 200
+   },
+   {
+    "order": 6,
+    "movement": "Dumbbell Snatch",
+    "reps": 40,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 7,
+    "movement": "Double-Under",
+    "reps": 200
+   },
+   {
+    "order": 8,
+    "movement": "Bar Muscle-up",
+    "reps": 24
+   }
+  ]
+ },
+ "v1086": {
+  "format": "for_time",
+  "time_cap_seconds": 720,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Wall-Ball Shot",
+    "reps": 20,
+    "load_lb": 20,
+    "load_x_bodyweight": 0.11
+   },
+   {
+    "order": 2,
+    "movement": "Box Jump-Over",
+    "reps": 18
+   },
+   {
+    "order": 3,
+    "movement": "Wall-Ball Shot",
+    "reps": 30,
+    "load_lb": 20,
+    "load_x_bodyweight": 0.11
+   },
+   {
+    "order": 4,
+    "movement": "Box Jump-Over",
+    "reps": 18
+   },
+   {
+    "order": 5,
+    "movement": "Wall-Ball Shot",
+    "reps": 40,
+    "load_lb": 20,
+    "load_x_bodyweight": 0.11
+   },
+   {
+    "order": 6,
+    "movement": "Med Ball Box Step",
+    "reps": 18,
+    "load_lb": 20,
+    "load_x_bodyweight": 0.11
+   },
+   {
+    "order": 7,
+    "movement": "Wall-Ball Shot",
+    "reps": 66,
+    "load_lb": 20,
+    "load_x_bodyweight": 0.11
+   },
+   {
+    "order": 8,
+    "movement": "Med Ball Box Step",
+    "reps": 18,
+    "load_lb": 20,
+    "load_x_bodyweight": 0.11
+   },
+   {
+    "order": 9,
+    "movement": "Wall-Ball Shot",
+    "reps": 40,
+    "load_lb": 20,
+    "load_x_bodyweight": 0.11
+   },
+   {
+    "order": 10,
+    "movement": "Box Jump-Over",
+    "reps": 18
+   },
+   {
+    "order": 11,
+    "movement": "Wall-Ball Shot",
+    "reps": 30,
+    "load_lb": 20,
+    "load_x_bodyweight": 0.11
+   },
+   {
+    "order": 12,
+    "movement": "Box Jump-Over",
+    "reps": 18
+   },
+   {
+    "order": 13,
+    "movement": "Wall-Ball Shot",
+    "reps": 20,
+    "load_lb": 20,
+    "load_x_bodyweight": 0.11
+   }
+  ]
+ }
+}

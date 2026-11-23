@@ -1,0 +1,218 @@
+{
+ "v2111": {
+  "format": "max_lift",
+  "time_window_seconds": null,
+  "structure": "shares one 12-minute clock with the preceding work: the lift window is whatever remains of 12 minutes",
+  "preceded_by": "starts immediately after 1-2-3-4-5-6-7-8-9-10 reps of dumbbell squats (two 50 lb dumbbells) and bar-facing burpees, done for time",
+  "rest": "self-paced within the window",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Clean",
+    "reps_pattern": "one-rep maximum; as many attempts as wanted"
+   }
+  ]
+ },
+ "v2112": {
+  "format": "amrap",
+  "duration_seconds": 300,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Clean",
+    "reps": 1,
+    "load_lb": 165,
+    "load_x_bodyweight": 0.89
+   },
+   {
+    "order": 2,
+    "movement": "Jerk",
+    "reps": 1,
+    "load_lb": 165,
+    "load_x_bodyweight": 0.89
+   }
+  ]
+ },
+ "v2113": {
+  "format": "for_time",
+  "time_cap_seconds": 720,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Pull-up",
+    "reps": 21
+   },
+   {
+    "order": 2,
+    "movement": "Double-Under",
+    "reps": 42
+   },
+   {
+    "order": 3,
+    "movement": "Thruster",
+    "reps": 21,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 4,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps": 18
+   },
+   {
+    "order": 5,
+    "movement": "Double-Under",
+    "reps": 36
+   },
+   {
+    "order": 6,
+    "movement": "Thruster",
+    "reps": 18,
+    "load_lb": 115,
+    "load_x_bodyweight": 0.62
+   },
+   {
+    "order": 7,
+    "movement": "Bar Muscle-up",
+    "reps": 15
+   },
+   {
+    "order": 8,
+    "movement": "Double-Under",
+    "reps": 30
+   },
+   {
+    "order": 9,
+    "movement": "Thruster",
+    "reps": 15,
+    "load_lb": 135,
+    "load_x_bodyweight": 0.73
+   }
+  ]
+ },
+ "v2114": {
+  "format": "for_time",
+  "time_cap_seconds": 2400,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Thruster",
+    "reps": 90,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 2,
+    "movement": "Double-Under",
+    "reps": 350
+   }
+  ]
+ },
+ "v2115": {
+  "format": "for_time",
+  "time_cap_seconds": null,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "structure": "four rounds of 27, 21, 15 and 9 of each movement",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Row",
+    "calories": 72
+   },
+   {
+    "order": 2,
+    "movement": "Thruster",
+    "reps": 72,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   }
+  ]
+ },
+ "v2116": {
+  "format": "for_time",
+  "time_cap_seconds": 900,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Dumbbell Snatch",
+    "reps": 21,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 2,
+    "movement": "Lateral Burpee Over Dumbbell",
+    "reps": 21
+   },
+   {
+    "order": 3,
+    "movement": "Dumbbell Snatch",
+    "reps": 21,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 4,
+    "movement": "Lateral Burpee Over Dumbbell",
+    "reps": 21
+   },
+   {
+    "order": 5,
+    "movement": "Dumbbell Snatch",
+    "reps": 15,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 6,
+    "movement": "Lateral Burpee Over Dumbbell",
+    "reps": 15
+   },
+   {
+    "order": 7,
+    "movement": "Dumbbell Snatch",
+    "reps": 15,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 8,
+    "movement": "Lateral Burpee Over Dumbbell",
+    "reps": 15
+   },
+   {
+    "order": 9,
+    "movement": "Dumbbell Snatch",
+    "reps": 9,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 10,
+    "movement": "Lateral Burpee Over Dumbbell",
+    "reps": 9
+   },
+   {
+    "order": 11,
+    "movement": "Dumbbell Snatch",
+    "reps": 9,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 12,
+    "movement": "Lateral Burpee Over Dumbbell",
+    "reps": 9
+   }
+  ]
+ }
+}
