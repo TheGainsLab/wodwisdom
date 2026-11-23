@@ -80,6 +80,16 @@ Deno.test("every gated route still calls the restriction check", () => {
   }
 });
 
+Deno.test("the fit check runs on the generator and on coach edits, before the restriction check has the last word", () => {
+  const gen = read("generate-program-v3/index.ts");
+  const stage = gen.slice(gen.indexOf("async function stageSafetyReview"), gen.indexOf("async function stageSaving"));
+  const fit = stage.indexOf("runFitGate("); const restr = stage.indexOf("runRestrictionGate(");
+  assert(fit > 0 && restr > fit, "the fit gate must run, and before the restriction gate");
+  const chat = read("chat/index.ts");
+  const cFit = chat.indexOf("fitBlock(input.block"); const cRestr = chat.indexOf("gateBlock(input.block");
+  assert(cFit > 0 && cRestr > cFit && chat.indexOf('.from("ai_edit_log")', cRestr) > cRestr);
+});
+
 Deno.test("the generator has ONE door to saving, and it is the gate", () => {
   const src = read("generate-program-v3/index.ts");
   assertEquals((src.match(/next: "saving"/g) ?? []).length, 1, "a second path to saving would bypass the gate");

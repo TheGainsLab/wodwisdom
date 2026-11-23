@@ -26,6 +26,10 @@ jobs:
         with:
           deno-version: v2.x
       - run: deno test --no-check --no-lock --allow-env --allow-read supabase/functions/
+      # Every edge function must at least LOAD. A stray character in a shared
+      # file nothing in the test suite imports would otherwise pass the tests
+      # and break the function at deploy (caught by hand, 2026-11-23).
+      - run: deno cache --no-lock supabase/functions/*/index.ts
 
   app:
     name: app type-check and tests

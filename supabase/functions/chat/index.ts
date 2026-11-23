@@ -29,7 +29,8 @@ import {
 import { reassembleV3WorkoutText } from "../_shared/v3-workout-prose.ts";
 import { fetchTier4Bundle, type Tier4Bundle } from "../_shared/fetch-tier4-bundle.ts";
 import { gateBlock } from "../_shared/restriction-gate.ts";
-import { loadRestrictions } from "../_shared/restriction-load.ts";
+import { isDeloadWeek, loadFitProfile, loadRestrictions } from "../_shared/restriction-load.ts";
+import { fitBlock } from "../_shared/fit-gate.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -1827,7 +1828,21 @@ Deno.serve(async (req) => {
               let gateNote = "";
               try {
                 const restrictions = await loadRestrictions(supa, userId, { injuryNamesOnly: true });
+                // THE FIT GATE first: loads against their maxes and level, no
+                // number where there is no max, equipment they have unticked,
+                // skills at their level. Not time: one block cannot be judged
+                // against a whole session. It can only lower or swap.
+                const fitProfile = await loadFitProfile(supa, userId, restrictions.doNotProgram, restrictions.vocabulary);
+                const deload = workout_id
+                  ? await supa.from("program_workouts").select("program_id, month_number, week_num").eq("id", workout_id).maybeSingle()
+                    .then(({ data: w }) => w ? isDeloadWeek(supa, w.program_id as string, w.month_number as number | null, w.week_num as number) : false)
+                    .catch(() => false)
+                  : false;
+                const fitted = await fitBlock(input.block, fitProfile, { deloadWeek: deload });
+                const fitActions = fitted.block ? fitted.actions : [];
+                if (fitted.block) input.block = fitted.block;
                 const gated = await gateBlock(input.block, restrictions);
+                gated.actions.unshift(...fitActions);
                 if (gated.block == null) {
                   invalidBounces++;
                   answer(
@@ -1837,9 +1852,9 @@ Deno.serve(async (req) => {
                   );
                   continue;
                 }
+                input.block = gated.block;
                 if (gated.actions.length > 0) {
-                  input.block = gated.block;
-                  gateNote = ` NOTE: the card differs from what you proposed, because part of it went against the athlete's injuries or avoid list: ${gated.actions.join("; ")}. Tell the athlete plainly what was swapped and why; do not describe the movement that was removed as part of the block.`;
+                  gateNote = ` NOTE: the card differs from what you proposed, because part of it did not fit this athlete (their injuries, maxes, equipment or skill level): ${gated.actions.join("; ")}. Tell the athlete plainly what was changed and why; do not describe a removed movement or the old weight as part of the block.`;
                 }
               } catch (e) {
                 console.error("[chat] restriction gate failed for a block proposal:", e instanceof Error ? e.message : String(e));

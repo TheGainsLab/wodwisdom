@@ -56,6 +56,7 @@ import {
 } from "../_shared/audit-runner.ts";
 import { stripInternalMarkers, enforceNoLabelOnCoachedBlocks } from "../_shared/programmatic-fixes.ts";
 import { athleteWordsElsewhere, runRestrictionGate } from "../_shared/restriction-gate.ts";
+import { fitProfileFromPayload, runFitGate } from "../_shared/fit-gate.ts";
 import { saveProgramV3 } from "../_shared/save-program-v3.ts";
 import { type BlockLocation } from "../_shared/compute-block-benchmark.ts";
 // Engine core — the extracted generation pipeline. This function now CONSUMES the
@@ -884,6 +885,29 @@ async function stageSafetyReview(
   const payload = rs.payload!;
   const output = rs.output!;
   const injuries = payload.training_context.injuries_structured;
+
+  // THE FIT GATE first (2026-11-23): loads against the athlete's maxes and
+  // level, no number where there is no max, nothing needing equipment they
+  // have unticked, the session inside their time, skills at their level. It
+  // can only lower, shorten or swap. The restriction gate runs AFTER it and
+  // has the last word, so nothing the fit gate swaps in can go against an
+  // injury. See _shared/fit-gate.ts.
+  const fit = await runFitGate(output, fitProfileFromPayload(payload, rs.skeleton ?? null, injuries?.do_not_program ?? []));
+  if (fit.actions.length > 0) {
+    console.warn(`[generate-program-v3] fit gate made ${fit.actions.length} change(s):`);
+    for (const a of fit.actions) console.warn(`  - ${a}`);
+  }
+  await logGenerationAudit(supa, {
+    user_id: job.user_id,
+    program_id: rs.continuation?.programId ?? null,
+    month_number: rs.continuation?.monthNumber ?? null,
+    stage: "fit_gate",
+    violations: fit.actions,
+    warnings: fit.judgeUnavailable ? ["judge unavailable; arithmetic rules only (equipment, time and skill not enforced this week)"] : [],
+    retried: fit.reviews > 1,
+    meta: { reviews: fit.reviews },
+  }).catch((e) => console.warn("[generate-program-v3] fit_gate log failed (non-fatal):", e));
+
   const gate = await runRestrictionGate(output, {
     injuriesText: payload.training_context.injuries_constraints_text ?? null,
     doNotProgram: injuries?.do_not_program ?? [],
@@ -892,7 +916,7 @@ async function stageSafetyReview(
     vocabulary: payload.vocabulary ?? [],
   });
 
-  if (gate.actions.length > 0) {
+  if (gate.actions.length > 0 || fit.actions.length > 0) {
     // Headers are rendered from the movement rows; re-render so a swapped or
     // removed movement does not linger in a block's header.
     for (const wk of output.weeks ?? []) renderWeekSchemesInPlace(wk);
