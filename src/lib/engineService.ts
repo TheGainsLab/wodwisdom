@@ -6,6 +6,7 @@
 import { supabase } from './supabase';
 import { translateSwitchPosition, type SwitchMappingRow } from '../../supabase/functions/_shared/engine-switch.ts';
 export { isCurrentPassSession } from '../../supabase/functions/_shared/engine-restart.ts';
+import { goalWriteFor } from './engineGoalRules';
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -846,21 +847,31 @@ export async function loadUserProgress(): Promise<EngineUserProgress | null> {
  *  profile row yet still gets one.
  *  BLANK IS A NO-OP (review fix 2026-11-11): the Engine setup and the program
  *  switcher pre-fill this field from the profile; a failed load or an untouched
- *  field must never null a goal the athlete typed elsewhere. Clearing a goal on
- *  purpose is the Athlete page's job. */
-export async function saveEngineGoal(goal: string): Promise<void> {
-  const text = goal.trim();
-  if (!text) return;
+ *  field must never null a goal the athlete typed elsewhere.
+ *  CLEARING ON PURPOSE (2026-11-23): the Engine dashboard tells the member
+ *  "Leave blank any time", but its blank save was skipped too, so the goal
+ *  looked cleared and stayed stored. The dashboard now passes `allowClear`;
+ *  what a clear writes is decided in goalWriteFor (engineGoalRules.ts). */
+export async function saveEngineGoal(
+  goal: string,
+  opts: { allowClear?: boolean; hasProgramming?: boolean } = {},
+): Promise<void> {
+  const write = goalWriteFor(goal, opts);
+  if (!write) return;
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
-  const { error } = await supabase
-    .from('athlete_profiles')
-    .upsert(
-      { user_id: user.id, engine_goal: text, goal: text },
-      { onConflict: 'user_id' }
-    );
+  // A clear only ever touches an existing row; there is nothing to clear
+  // without one, and an upsert would create a profile row to hold nulls.
+  const { error } = write.engine_goal === null
+    ? await supabase.from('athlete_profiles').update(write).eq('user_id', user.id)
+    : await supabase
+      .from('athlete_profiles')
+      .upsert(
+        { user_id: user.id, ...write },
+        { onConflict: 'user_id' }
+      );
 
   if (error) throw error;
 }

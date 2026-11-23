@@ -1,16 +1,25 @@
 /**
  * The chat → profile Apply card. The coach proposed a profile diff
- * (days/week, goal addition, injuries); this renders the exact change with
+ * (days/week, goal addition, injuries, and from 2026-11-23 session length
+ * and equipment); this renders the exact change with
  * Apply / Not now. Nothing changes unless the athlete taps Apply — the tap
  * resolves through the apply-profile-update fn against the logged proposal.
  * Shared by the main AI Coach chat and the day-scoped coach.
  */
+import { equipmentLabel } from '../../supabase/functions/_shared/equipment-labels.ts';
+import { DEFAULT_SESSION_LENGTH_SHOWN, equipmentChangeLines } from '../lib/profileCardLines';
 
 export interface ProfileProposalData {
   proposal_id: string;
   rationale: string;
-  current: { days_per_week: number | null; goal: string | null; injuries_constraints: string | null };
-  proposal: { days_per_week?: number; goal_append?: string; injuries_replace?: string };
+  current: {
+    days_per_week: number | null; goal: string | null; injuries_constraints: string | null;
+    session_length_minutes?: number | null; equipment?: Record<string, unknown> | null;
+  };
+  proposal: {
+    days_per_week?: number; goal_append?: string; injuries_replace?: string;
+    session_length_minutes?: number; equipment_have?: string[]; equipment_dont_have?: string[];
+  };
 }
 
 export type ProfileCardStatus = 'pending' | 'applying' | 'applied' | 'declined' | 'error';
@@ -27,6 +36,7 @@ export default function ProfileUpdateCard({ data, status, effect, onResolve }: {
   const p = data.proposal;
   const c = data.current;
   const done = status === 'applied' || status === 'declined';
+  const equipLines = equipmentChangeLines(c.equipment, p.equipment_have, p.equipment_dont_have);
   return (
     <div style={{
       border: '1px solid var(--accent)', borderRadius: 12, background: 'var(--surface)',
@@ -46,6 +56,24 @@ export default function ProfileUpdateCard({ data, status, effect, onResolve }: {
             <span style={{ fontWeight: 700 }}> → {p.days_per_week}</span>
           </div>
         )}
+        {/* Session length, old → new. With none saved the old value is the
+            60 the program is built to, which is what the profile shows. */}
+        {p.session_length_minutes !== undefined && (
+          <div>
+            <span style={{ color: 'var(--text-muted)' }}>Session length: </span>
+            <span style={{ textDecoration: 'line-through', color: 'var(--text-muted)' }}>{c.session_length_minutes ?? DEFAULT_SESSION_LENGTH_SHOWN} min</span>
+            <span style={{ fontWeight: 700 }}> → {p.session_length_minutes} min</span>
+          </div>
+        )}
+        {/* Equipment: only the named items change, shown as the profile's
+            checklist names them, with what each is marked as now. */}
+        {equipLines.map(line => (
+          <div key={line.key}>
+            <span style={{ color: 'var(--text-muted)' }}>{equipmentLabel(line.key)}: </span>
+            <span style={{ textDecoration: 'line-through', color: 'var(--text-muted)' }}>{line.was}</span>
+            <span style={{ fontWeight: 700 }}> → {line.now}</span>
+          </div>
+        ))}
         {p.goal_append && (
           <div>
             <span style={{ color: 'var(--text-muted)' }}>Adding to your goals:</span>

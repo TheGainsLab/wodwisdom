@@ -4,8 +4,9 @@
  * The coach proposed a profile diff (logged in profile_update_proposals
  * BEFORE the card rendered); the athlete tapped Apply or Not now. This fn
  * resolves that logged row exactly once: on apply it writes the diff to
- * athlete_profiles (append-only goal, replace injuries, set days_per_week)
- * and marks the outcome; on decline it just marks the outcome. Mirrors
+ * athlete_profiles (append-only goal, replace injuries, set days_per_week,
+ * and from 2026-11-23 set session_length_minutes and the named equipment
+ * keys) and marks the outcome; on decline it just marks the outcome. Mirrors
  * apply-block-edit's shape.
  *
  * Auth: the athlete's own token; the proposal must belong to them and be

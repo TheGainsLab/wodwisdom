@@ -14,6 +14,7 @@ import {
   type EngineUserProgress,
   calculateWorkDurationMinutes,
 } from '../lib/engineService';
+import { GOAL_BOX_MAX_CHARS } from '../lib/profileFormRules';
 import { useEntitlements } from '../hooks/useEntitlements';
 import { describeWorkout } from '../lib/engineStructure';
 import { ChevronLeft, ChevronRight, Lock, Check, Play, Settings, BarChart3, Calendar, Trophy, Target } from 'lucide-react';
@@ -405,7 +406,7 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
                     <textarea
                       className="lift-input"
                       rows={2}
-                      maxLength={500}
+                      maxLength={GOAL_BOX_MAX_CHARS}
                       placeholder='e.g. "Row a 10k under 40:00" · "Sub-20 5k" · "Improve my mile"'
                       value={goalDraft}
                       onChange={e => setGoalDraft(e.target.value)}
@@ -422,7 +423,13 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
                         onClick={async () => {
                           setGoalSaving(true);
                           try {
-                            await saveEngineGoal(goalDraft);
+                            // A blank save CLEARS the Engine goal (2026-11-23):
+                            // the line above says "Leave blank any time", and a
+                            // blank save used to be skipped while this screen
+                            // showed the goal gone. For a member with AI
+                            // Programming the profile goal is kept (their
+                            // program needs one) — see goalWriteFor.
+                            await saveEngineGoal(goalDraft, { allowClear: true, hasProgramming: hasFeature('programming') });
                             setProgress(p => (p ? { ...p, engine_goal: goalDraft.trim() || null } : p));
                             setGoalEditing(false);
                           } catch {

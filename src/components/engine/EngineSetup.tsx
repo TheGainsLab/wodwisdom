@@ -8,6 +8,7 @@ import {
   saveProgramVersion,
   type EngineProgram,
 } from '../../lib/engineService';
+import { GOAL_BOX_MAX_CHARS } from '../../lib/profileFormRules';
 
 /**
  * EngineSetup — the first-visit flow for a new Engine subscriber, replacing
@@ -127,7 +128,7 @@ export default function EngineSetup({ onDone }: Props) {
             <textarea
               className="lift-input"
               rows={3}
-              maxLength={500}
+              maxLength={GOAL_BOX_MAX_CHARS}
               placeholder={'e.g. "Gas for MMA rounds. Two strength days, seven hours on the mat."\n"Keep up in class without dying in the metcon."\n"Faster 5k, running three days plus this."'}
               value={goal}
               onChange={(e) => setGoal(e.target.value)}

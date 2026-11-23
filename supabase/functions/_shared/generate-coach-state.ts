@@ -10,12 +10,21 @@
  * consistent with the rest of the architecture (immutable artifacts keyed by
  * deterministic inputs). Cache key:
  *
- *     (athlete_model_version, coach_state_builder_version)
+ *     (athlete_model_version, coach_state_builder_version, inputs_hash)
  *
  * Because generation is non-deterministic (LLM), reuse also makes CoachState
  * IDEMPOTENT per key: the first generation locks in the judgment; every program
  * built against that key uses the exact same CoachState (reproducibility), not a
  * re-roll. `force: true` is the deliberate override (the admin "Re-run" button).
+ *
+ * INPUTS HASH (2026-11-23). The athlete model does not contain the goal, days
+ * per week, session length, injury text or the athlete's notes, so a stored
+ * judgment was reused after any of those changed: the priorities a program
+ * was built from could predate the goal. Each stored state now records a hash
+ * of exactly those five inputs (coach_states.inputs_hash) and is reused only
+ * when the hash also matches. A row with NO hash (every row written before
+ * this) never matches, so each athlete gets one fresh judgment at their next
+ * build and reuse resumes from there.
  */
 
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -188,6 +197,34 @@ async function callCoachStateChecked(payload: WriterPayload, retryViolations = "
   }
 }
 
+/** The five profile inputs a judgment depends on that the athlete model does
+ *  not carry. Read off the payload's training_context. */
+export interface CoachStateInputs {
+  goal_text?: string | null;
+  days_per_week?: number | null;
+  session_length_minutes?: number | null;
+  injuries_constraints_text?: string | null;
+  coach_notes?: string[] | null;
+}
+
+/**
+ * SHA-256 of exactly: goal text, days per week, session length, injury text,
+ * active coach notes. Text is trimmed so whitespace alone is not a change;
+ * notes are sorted so their order is not a change. Nothing else goes in —
+ * adding a field here makes every stored judgment stale once.
+ */
+export async function coachStateInputsHash(inputs: CoachStateInputs): Promise<string> {
+  const canonical = JSON.stringify({
+    goal: (inputs.goal_text ?? "").trim(),
+    days: inputs.days_per_week ?? null,
+    session: inputs.session_length_minutes ?? null,
+    injuries: (inputs.injuries_constraints_text ?? "").trim(),
+    notes: (inputs.coach_notes ?? []).map((n) => n.trim()).filter(Boolean).sort(),
+  });
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonical));
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 export interface GenerateCoachStateResult {
   /** The full persisted/stored snapshot (CoachState ⊃ CoachStateContent). */
   coach_state: CoachState;
@@ -199,13 +236,14 @@ export interface GenerateCoachStateResult {
 interface CachedRow {
   version: number;
   coach_state: CoachState;
+  inputs_hash: string | null;
 }
 
 /**
  * Reuse-if-current, else generate + persist. `force` bypasses the cache (the
  * admin "Re-run" override). The cache key is (athlete_model_version,
- * coach_state_builder_version) — both read off the payload's Athlete Model and
- * the current builder constant.
+ * coach_state_builder_version, inputs_hash) — read off the payload's Athlete
+ * Model, the current builder constant and the payload's training_context.
  */
 export async function generateAndPersistCoachState(
   supa: SupabaseClient,
@@ -214,6 +252,7 @@ export async function generateAndPersistCoachState(
   opts: { force?: boolean } = {},
 ): Promise<GenerateCoachStateResult> {
   const athleteModelVersion = payload.athlete_model.version;
+  const inputsHash = await coachStateInputsHash(payload.training_context);
 
   if (!opts.force) {
     // Programming archive (2026-11-21): a coach state written before the
@@ -223,16 +262,22 @@ export async function generateAndPersistCoachState(
     const archiveCutoff = await loadArchiveCutoff(supa, userId).catch(() => null);
     let cachedQuery = supa
       .from("coach_states")
-      .select("version, coach_state")
+      .select("version, coach_state, inputs_hash")
       .eq("user_id", userId)
       .eq("athlete_model_version", athleteModelVersion)
-      .eq("coach_state_builder_version", COACH_STATE_BUILDER_VERSION);
+      .eq("coach_state_builder_version", COACH_STATE_BUILDER_VERSION)
+      // Same goal, days, session length, injury text and notes as when it was
+      // written. `=` never matches NULL, so rows from before the hash existed
+      // are not reused (2026-11-23).
+      .eq("inputs_hash", inputsHash);
     if (archiveCutoff) cachedQuery = cachedQuery.gt("created_at", archiveCutoff);
     const { data: cached } = await cachedQuery
       .order("version", { ascending: false })
       .limit(1)
       .maybeSingle<CachedRow>();
-    if (cached) {
+    // Belt and braces: the row must carry this exact hash (a missing column or
+    // a client that ignored the filter must not turn into a reuse).
+    if (cached && cached.inputs_hash === inputsHash) {
       console.log(
         `[generate-coach-state] reuse-if-current HIT: coach_state v${cached.version} (AM v${athleteModelVersion}, builder ${COACH_STATE_BUILDER_VERSION})`,
       );
@@ -257,7 +302,7 @@ export async function generateAndPersistCoachState(
       );
     }
   }
-  const persisted = await persistCoachState(supa, userId, content, athleteModelVersion);
+  const persisted = await persistCoachState(supa, userId, content, athleteModelVersion, null, inputsHash);
   console.log(
     `[generate-coach-state] generated coach_state v${persisted.version} (AM v${athleteModelVersion}, builder ${COACH_STATE_BUILDER_VERSION}, force=${!!opts.force})`,
   );

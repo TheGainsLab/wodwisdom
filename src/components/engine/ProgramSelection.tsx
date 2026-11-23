@@ -9,6 +9,8 @@ import {
   restartProgram,
   type EngineProgram,
 } from '../../lib/engineService';
+import { goalToSaveOnProgramPick } from '../../lib/engineGoalRules';
+import { GOAL_BOX_MAX_CHARS } from '../../lib/profileFormRules';
 
 interface Props {
   /** Called after a program is saved. */
@@ -35,6 +37,11 @@ export default function ProgramSelection({ onSelected, currentProgram }: Props) 
   // Optional conditioning goal, saved alongside the program pick. Pre-filled
   // in switcher mode — a program change is the natural goal-review moment.
   const [goal, setGoal] = useState('');
+  // Did the member edit the goal box in THIS screen? (2026-11-23) The box is
+  // pre-filled with the goal as it was when the screen opened; writing that
+  // back on every pick overwrote a goal changed since (profile, dashboard or
+  // the coach's card). Only an edit made here is saved.
+  const [goalEdited, setGoalEdited] = useState(false);
   // Founder rule (2026-11-12): tracks give way to sequencing. With the
   // sequencer ON (the default for every new subscriber) the only choice is
   // days per week — 3, 4 or 5 — and a switch keeps the athlete's month and
@@ -79,7 +86,9 @@ export default function ProgramSelection({ onSelected, currentProgram }: Props) 
         await saveProgramVersion(programId);
       }
       // Best-effort: the goal riding along must never block the program pick.
-      await saveEngineGoal(goal).catch(() => {});
+      // Untouched box = no goal write at all (see goalEdited above).
+      const goalToSave = goalToSaveOnProgramPick(goal, goalEdited);
+      if (goalToSave != null) await saveEngineGoal(goalToSave).catch(() => {});
       onSelected(programId);
     } catch {
       // user can retry
@@ -213,10 +222,10 @@ export default function ProgramSelection({ onSelected, currentProgram }: Props) 
             <textarea
               className="lift-input"
               rows={2}
-              maxLength={500}
+              maxLength={GOAL_BOX_MAX_CHARS}
               placeholder='e.g. "Row a 10k under 40:00" · "Sub-20 5k" · "Improve my mile"'
               value={goal}
-              onChange={(e) => setGoal(e.target.value)}
+              onChange={(e) => { setGoal(e.target.value); setGoalEdited(true); }}
               style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit', textAlign: 'left', fontSize: 14 }}
             />
             <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
