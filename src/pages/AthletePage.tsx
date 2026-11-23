@@ -706,6 +706,24 @@ export default function AthletePage({ session }: { session: Session }) {
   const [units, setUnits] = useState<'lbs' | 'kg'>('lbs');
   const [gender, setGender] = useState<'male' | 'female' | ''>('');
   const [lifts, setLifts] = useState<Record<string, number>>({});
+
+  /** Switching units CONVERTS what is on file (2026-11-23). It used to only
+   *  flip the label, so a 315 lb squat became a 315 kg squat and the next
+   *  week was loaded from it. Lifts and bodyweight convert between lb and kg,
+   *  height between inches and cm; nothing changes when the unit is the same. */
+  const switchUnits = (to: 'lbs' | 'kg') => {
+    if (to === units) return;
+    const toKg = to === 'kg';
+    const weight = (v: number) => (toKg ? Math.round((v * 0.45359237) * 2) / 2 : Math.round(v / 0.45359237));
+    const length = (v: number) => (toKg ? Math.round(v * 2.54) : Math.round((v / 2.54) * 2) / 2);
+    setLifts(prev => Object.fromEntries(
+      Object.entries(prev).map(([k, v]) => [k, typeof v === 'number' && isFinite(v) && v > 0 ? weight(v) : v]),
+    ));
+    setBodyweight(prev => { const n = parseFloat(prev); return isFinite(n) && n > 0 ? String(weight(n)) : prev; });
+    setHeight(prev => { const n = parseFloat(prev); return isFinite(n) && n > 0 ? String(length(n)) : prev; });
+    setUnits(to);
+    markDirty();
+  };
   // When the athlete first saved their Athletic Data (null = never saved).
   // Gates T2 (reviewed semantics, 2026-10-05) and the one-time sparse-save
   // confirm in saveProfile.
@@ -2032,14 +2050,14 @@ export default function AthletePage({ session }: { session: Session }) {
                         <button
                           type="button"
                           className={'skill-level-btn' + (units === 'lbs' ? ' active' : '')}
-                          onClick={() => { setUnits('lbs'); markDirty(); }}
+                          onClick={() => switchUnits('lbs')}
                         >
                           Imperial (lbs / in)
                         </button>
                         <button
                           type="button"
                           className={'skill-level-btn' + (units === 'kg' ? ' active' : '')}
-                          onClick={() => { setUnits('kg'); markDirty(); }}
+                          onClick={() => switchUnits('kg')}
                         >
                           Metric (kg / cm)
                         </button>

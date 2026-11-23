@@ -565,3 +565,27 @@ export async function runRestrictionGate(
   }
   return report;
 }
+
+// ── One block (a change the coach proposes to a single day) ────────────────
+
+/**
+ * Run the gate over ONE block. Returns the block as it may be offered, or
+ * null when nothing of it survives (every movement was ruled out and none
+ * could be replaced) — the caller then asks for a different proposal.
+ * Same guarantee as the full gate; never throws.
+ */
+export async function gateBlock<B extends { movements?: MovementPrescription[] }>(
+  block: B,
+  r: Restrictions,
+  opts: { judge?: Judge; maxReviews?: number } = {},
+): Promise<{ block: B | null; actions: string[]; judgeUnavailable: boolean }> {
+  const copy = JSON.parse(JSON.stringify(block)) as B;
+  // deno-lint-ignore no-explicit-any
+  const wrapped = { weeks: [{ week_num: 1, days: [{ day_num: 1, blocks: [copy] }] }] } as any as WriterOutput;
+  const rep = await runRestrictionGate(wrapped, r, opts);
+  const left = wrapped.weeks?.[0]?.days?.[0]?.blocks ?? [];
+  // Locations mean nothing for a single block: say only what changed.
+  const actions = rep.actions.map((a) => a.replace(/^W1D1 block 0: /, ""));
+  return { block: left.length > 0 ? (left[0] as unknown as B) : null, actions, judgeUnavailable: rep.judgeUnavailable };
+}
+

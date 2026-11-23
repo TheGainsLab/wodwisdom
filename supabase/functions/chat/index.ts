@@ -28,6 +28,8 @@ import {
 } from "../_shared/profile-update.ts";
 import { reassembleV3WorkoutText } from "../_shared/v3-workout-prose.ts";
 import { fetchTier4Bundle, type Tier4Bundle } from "../_shared/fetch-tier4-bundle.ts";
+import { gateBlock } from "../_shared/restriction-gate.ts";
+import { loadRestrictions } from "../_shared/restriction-load.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -1815,6 +1817,35 @@ Deno.serve(async (req) => {
                 answer("That block no longer exists — do not propose against it.", true);
                 continue;
               }
+              // THE RESTRICTION GATE, coach-edit route (2026-11-23). A change
+              // the coach proposes to a day is read against everything the
+              // athlete has said about their body, exactly as a generated
+              // week is, BEFORE the card is drawn — the name check above only
+              // catches exact spellings. Injury-derived names only: on
+              // equipment the coach takes the athlete's word. If the check
+              // itself cannot run, nothing unchecked is offered.
+              let gateNote = "";
+              try {
+                const restrictions = await loadRestrictions(supa, userId, { injuryNamesOnly: true });
+                const gated = await gateBlock(input.block, restrictions);
+                if (gated.block == null) {
+                  invalidBounces++;
+                  answer(
+                    `Proposal rejected: every movement in it goes against this athlete's injuries or avoid list (${gated.actions.join("; ")}). ` +
+                    (invalidBounces > 1 ? "Do NOT propose again this turn — explain to the athlete in text instead." : "Propose a block built from movements they can do, or explain instead."),
+                    true,
+                  );
+                  continue;
+                }
+                if (gated.actions.length > 0) {
+                  input.block = gated.block;
+                  gateNote = ` NOTE: the card differs from what you proposed, because part of it went against the athlete's injuries or avoid list: ${gated.actions.join("; ")}. Tell the athlete plainly what was swapped and why; do not describe the movement that was removed as part of the block.`;
+                }
+              } catch (e) {
+                console.error("[chat] restriction gate failed for a block proposal:", e instanceof Error ? e.message : String(e));
+                answer("The proposal could not be checked against the athlete's injuries just now, so it was not offered. Explain the change in text and suggest they ask again in a moment.", true);
+                continue;
+              }
               const { data: logRow, error: logErr } = await supa
                 .from("ai_edit_log")
                 .insert({
@@ -1844,7 +1875,7 @@ Deno.serve(async (req) => {
                   proposal: input.block,
                 })}\n\n`)
               );
-              answer("The proposal card is now on the athlete's screen with Apply / Keep buttons. Conclude in one or two sentences — do not restate the block's contents.");
+              answer("The proposal card is now on the athlete's screen with Apply / Keep buttons. Conclude in one or two sentences — do not restate the block's contents." + gateNote);
             }
 
             // Continue the turn: assistant leg (text + tool_use) + tool results.

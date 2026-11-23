@@ -94,17 +94,25 @@ export function summarizeEvidence(days: EvidenceDay[], now: Date = new Date()): 
   );
 }
 
-/** The athlete's logs for weeks < `uptoWeek` of a program, as evidence. */
+/**
+ * The athlete's logs for weeks < `uptoWeek` of ONE MONTH of a program, as
+ * evidence. A program holds every month under one id and each month restarts
+ * at week 1, so without the month the lookup also returned earlier months'
+ * weeks, labelled the same: loads were progressed from lifts done a month
+ * before, and old unlogged days read as "not done" (2026-11-23).
+ */
 export async function loadProgramEvidence(
   supa: SupabaseClient,
   userId: string,
   programId: string,
   uptoWeek: number,
+  monthNumber: number,
 ): Promise<EvidenceDay[]> {
   const { data: pw } = await supa
     .from("program_workouts")
     .select("id, week_num, day_num")
     .eq("program_id", programId)
+    .eq("month_number", monthNumber)
     .lt("week_num", uptoWeek);
   const days = (pw ?? []) as Array<{ id: string; week_num: number; day_num: number }>;
   if (days.length === 0) return [];
@@ -189,10 +197,11 @@ export async function buildProgramEvidenceContext(
   userId: string,
   programId: string | null | undefined,
   weekNum: number,
+  monthNumber: number,
 ): Promise<string> {
   if (!programId || weekNum <= 1) return "";
   try {
-    const days = await loadProgramEvidence(supa, userId, programId, weekNum);
+    const days = await loadProgramEvidence(supa, userId, programId, weekNum, monthNumber);
     if (!days.some((d) => d.status === "logged")) return "";
     return summarizeEvidence(days);
   } catch (e) {
