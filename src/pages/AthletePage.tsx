@@ -11,6 +11,10 @@ import Nav from '../components/Nav';
 import { formatMarkdown } from '../lib/formatMarkdown';
 import { ATHLETEDATA_PUBLIC_TIER } from '../lib/featureFlags';
 import { isSinceArchive, sinceArchive } from '../lib/programArchive';
+import {
+  checkDaysPerWeek, draftFieldsToRestore, GOAL_BOX_MAX_CHARS, intakeSaveAction,
+  type DraftFields, type StoredDraft,
+} from '../lib/profileFormRules';
 
 /** The session length the slider shows before the athlete touches it — and what is saved if they never do. */
 const DEFAULT_SESSION_LENGTH_MINUTES = 60;
@@ -79,10 +83,10 @@ const T3_CARD: React.CSSProperties = {
 
 /** Char counter for the Tier 3 text boxes: invisible until the box has focus
  *  or content, so an untouched form shows zero bookkeeping. */
-function t3CounterStyle(len: number, show: boolean): React.CSSProperties {
+function t3CounterStyle(len: number, show: boolean, max = 500): React.CSSProperties {
   return {
     fontSize: 11,
-    color: len >= 480 ? '#e5484d' : 'var(--text-muted)',
+    color: len >= max - 20 ? '#e5484d' : 'var(--text-muted)',
     textAlign: 'right',
     visibility: show ? 'visible' : 'hidden',
     fontVariantNumeric: 'tabular-nums',
@@ -788,6 +792,7 @@ export default function AthletePage({ session }: { session: Session }) {
   const [tdeeOverride, setTdeeOverride] = useState<string>('');
   // Tier 3 — training context
   const [daysPerWeek, setDaysPerWeek] = useState<string>('');
+  const daysCheck = checkDaysPerWeek(daysPerWeek);
   const [sessionLengthMinutes, setSessionLengthMinutes] = useState<string>('');
   const [injuriesConstraints, setInjuriesConstraints] = useState<string>('');
   const [goal, setGoal] = useState<string>('');
@@ -821,6 +826,10 @@ export default function AthletePage({ session }: { session: Session }) {
   // Persisted intake snapshot (JSON) — intake saves via saveIntake, not
   // saveProfile, so the draft logic needs its own clean/dirty reference.
   const loadedIntakeRef = useRef<string>('{}');
+  // The stored profile values the form was loaded from (or last saved as).
+  // Each draft records them, so a later load can tell "the member typed over
+  // this value" from "this value changed underneath an old draft" (2026-11-23).
+  const serverBaseRef = useRef<DraftFields>({ days: '', len: '', goal: '', injuries: '', equipment: {} });
   const [intakeSaving, setIntakeSaving] = useState(false);
   const [intakeError, setIntakeError] = useState('');
 
@@ -1061,39 +1070,49 @@ export default function AthletePage({ session }: { session: Session }) {
           if (raw && typeof raw === 'object') setIntakeAnswers(raw);
           loadedIntakeRef.current = JSON.stringify(raw && typeof raw === 'object' ? raw : {});
         }
+        // The stored values this page load is editing over. Written into
+        // every draft as its `base` (see the draft effect and saveProfile).
+        serverBaseRef.current = {
+          days: d.days_per_week != null ? String(d.days_per_week) : '',
+          len: d.session_length_minutes != null ? String(d.session_length_minutes) : '',
+          goal: d.goal || '',
+          injuries: d.injuries_constraints && d.injuries_constraints !== 'None' ? d.injuries_constraints : '',
+          equipment: (d.equipment as Record<string, boolean> | null) ?? {},
+        };
         // Draft restore: unsaved Step 3 edits survive in-app navigation (the
         // vanished-goal incident, 2026-10-13). Apply only fields that differ
         // from the server copy; marking dirty re-raises the floating pill so
         // the save that clears the draft gets prompted.
+        // True when an unsaved draft was put back into the form. The page must
+        // then STAY marked as changed: this load used to reset the mark a few
+        // lines below, which hid the save prompt and let the draft be deleted
+        // from storage, so the restored edits were lost on the next navigation.
+        let draftRestored = false;
         try {
           const rawDraft = localStorage.getItem(`t3draft:${session.user.id}`);
           if (rawDraft) {
-            const dr = JSON.parse(rawDraft) as Partial<{
-              days: string; len: string; goal: string; injuries: string;
-              intake: Record<string, string>; equipment: Record<string, boolean>;
-            }>;
-            const loadedDays = d.days_per_week != null ? String(d.days_per_week) : '';
-            const loadedLen = d.session_length_minutes != null ? String(d.session_length_minutes) : '';
-            const loadedGoal = d.goal || '';
-            const loadedInj = d.injuries_constraints && d.injuries_constraints !== 'None' ? d.injuries_constraints : '';
+            const dr = JSON.parse(rawDraft) as StoredDraft & { intake?: Record<string, string> };
+            // A stored value that changed after the draft was typed wins
+            // (2026-11-23): a coach card applied in chat was being overwritten
+            // by an older unsaved draft. draftFieldsToRestore drops any draft
+            // field whose stored value is no longer the one it was typed over.
+            const restore = draftFieldsToRestore(dr, serverBaseRef.current);
             let dirtied = false;
-            if (typeof dr.days === 'string' && dr.days !== loadedDays) { setDaysPerWeek(dr.days); dirtied = true; }
-            if (typeof dr.len === 'string' && dr.len !== loadedLen) { setSessionLengthMinutes(dr.len); dirtied = true; }
-            if (typeof dr.goal === 'string' && dr.goal !== loadedGoal) { setGoal(dr.goal); dirtied = true; }
-            if (typeof dr.injuries === 'string' && dr.injuries !== loadedInj) { setInjuriesConstraints(dr.injuries); dirtied = true; }
-            if (dr.equipment && typeof dr.equipment === 'object' && JSON.stringify(dr.equipment) !== JSON.stringify(d.equipment ?? {})) {
-              setEquipment(dr.equipment); dirtied = true;
-            }
+            if (restore.days !== undefined) { setDaysPerWeek(restore.days); dirtied = true; }
+            if (restore.len !== undefined) { setSessionLengthMinutes(restore.len); dirtied = true; }
+            if (restore.goal !== undefined) { setGoal(restore.goal); dirtied = true; }
+            if (restore.injuries !== undefined) { setInjuriesConstraints(restore.injuries); dirtied = true; }
+            if (restore.equipment !== undefined) { setEquipment(restore.equipment); dirtied = true; }
             if (dr.intake && typeof dr.intake === 'object' && JSON.stringify(dr.intake) !== loadedIntakeRef.current) {
               setIntakeAnswers(dr.intake);
             }
-            if (dirtied) markDirty();
+            if (dirtied) { markDirty(); draftRestored = true; }
           }
         } catch { /* storage unavailable or corrupt draft — drafts are best-effort */ }
         setEvalCreditsRemaining(typeof d.eval_credits_remaining === 'number' ? d.eval_credits_remaining : 1);
         setCompetitionAthleteId((d as any).competition_athlete_id ?? null);
         setCompetitionAthleteLabel((d as any).competition_athlete_label ?? null);
-        setIsDirty(false);
+        if (!draftRestored) setIsDirty(false);
       }
       if (evalRes.data) {
         setEvaluations(evalRes.data);
@@ -1165,6 +1184,7 @@ export default function AthletePage({ session }: { session: Session }) {
       localStorage.setItem(key, JSON.stringify({
         days: daysPerWeek, len: sessionLengthMinutes, goal,
         injuries: injuriesConstraints, intake: intakeAnswers, equipment,
+        base: serverBaseRef.current,
       }));
     } catch { /* storage unavailable — drafts are best-effort */ }
   }, [loading, isDirty, daysPerWeek, sessionLengthMinutes, goal, injuriesConstraints, intakeAnswers, equipment, session.user.id]);
@@ -1189,13 +1209,27 @@ export default function AthletePage({ session }: { session: Session }) {
     try {
       const savedOk = await saveProfile();
       if (!savedOk) throw new Error('Failed to save your profile');
-      const hasIntake = Object.values(intakeAnswers).some(v => v && v.trim());
-      if (hasIntake) {
+      // What the stored answers need (2026-11-23): 'extract' rewrites both
+      // stored columns from the non-empty answers; 'clear' is every answer
+      // deleted while something is still stored. Clearing used to do nothing,
+      // so the old answer and the facts extracted from it stayed, reappeared
+      // on reload and kept feeding generation. Both columns are nulled in one
+      // write, so no fact can outlive the words it came from.
+      let storedAnswers: Record<string, unknown> = {};
+      try { storedAnswers = JSON.parse(loadedIntakeRef.current) as Record<string, unknown>; } catch { /* treated as nothing stored */ }
+      const intakeAction = intakeSaveAction(intakeAnswers, storedAnswers);
+      if (intakeAction === 'extract') {
         const { data, error } = await supabase.functions.invoke('process-coaching-intake', {
           body: { answers: intakeAnswers },
         });
         const errMsg = (data as { error?: string } | null)?.error;
         if (error || errMsg) throw new Error(errMsg || error?.message || 'Failed to analyze your answers');
+      } else if (intakeAction === 'clear') {
+        const { error } = await supabase
+          .from('athlete_profiles')
+          .update({ coaching_intake_raw: null, coaching_intake: null, coaching_intake_version: null })
+          .eq('user_id', session.user.id);
+        if (error) throw new Error('Failed to delete your answer');
       }
       loadedIntakeRef.current = JSON.stringify(intakeAnswers);
       // Save collapses the card to its green summary; if the injury parse
@@ -1398,7 +1432,17 @@ export default function AthletePage({ session }: { session: Session }) {
       lifts: cleanLifts,
     });
 
-    const daysPerWeekNum = daysPerWeek === '' ? null : parseInt(daysPerWeek, 10);
+    // Days per week: a whole number 2 to 6, or blank — nothing else is saved
+    // (2026-11-23). The save is refused, not silently changed, so the member
+    // sees the number they typed and why it did not save.
+    const daysChecked = checkDaysPerWeek(daysPerWeek);
+    if (daysChecked.error) {
+      setSaving(false);
+      setError(`Training days per week: ${daysChecked.error} Fix it under Step 3 and save again.`);
+      setSchedExpanded(true);
+      return false;
+    }
+    const daysPerWeekNum = daysChecked.value;
     const sessionLengthNum = sessionLengthMinutes === '' ? null : parseInt(sessionLengthMinutes, 10);
     // Default empty injuries field to "None" so T3 still completes for
     // users who have no constraints and skip the field.
@@ -1444,7 +1488,7 @@ export default function AthletePage({ session }: { session: Session }) {
       height: heightNum && !isNaN(heightNum) ? heightNum : null,
       gender: genderVal,
       tdee_override: tdeeOverrideNum && !isNaN(tdeeOverrideNum) ? tdeeOverrideNum : null,
-      days_per_week: daysPerWeekNum && !isNaN(daysPerWeekNum) ? daysPerWeekNum : null,
+      days_per_week: daysPerWeekNum,
       session_length_minutes: sessionLengthNum && !isNaN(sessionLengthNum) ? sessionLengthNum : DEFAULT_SESSION_LENGTH_MINUTES,
       injuries_constraints: injuriesVal,
       goal: goal.trim() || null,
@@ -1499,6 +1543,14 @@ export default function AthletePage({ session }: { session: Session }) {
     // Step 3 summaries may now show green.
     setSavedSched({ days: daysPerWeek, len: sessionLengthMinutes });
     setSavedGoal(goal);
+    // What is stored now — the base of any draft typed after this save.
+    serverBaseRef.current = {
+      days: payload.days_per_week != null ? String(payload.days_per_week) : '',
+      len: String(payload.session_length_minutes),
+      goal: payload.goal ?? '',
+      injuries: injuriesVal === 'None' ? '' : injuriesVal,
+      equipment: payload.equipment,
+    };
     // Step 2 completes only via a review save — a plain save leaves the
     // stamp (and the tier state) exactly as it was.
     if (reviewedAtIso) setAthleticReviewedAt(reviewedAtIso);
@@ -2417,12 +2469,24 @@ export default function AthletePage({ session }: { session: Session }) {
                         max="6"
                         placeholder="—"
                         aria-label="Days per week"
+                        step="1"
                         value={daysPerWeek}
                         onChange={e => { setDaysPerWeek(e.target.value); markDirty(); }}
-                        style={{ width: 92, textAlign: 'center', fontSize: 18, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}
+                        aria-invalid={daysCheck.error ? true : undefined}
+                        style={{
+                          width: 92, textAlign: 'center', fontSize: 18, fontWeight: 600, fontVariantNumeric: 'tabular-nums',
+                          ...(daysCheck.error ? { borderColor: '#e5484d' } : {}),
+                        }}
                       />
                       <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>2–6 days. Your program is built to fit.</span>
                     </div>
+                    {/* Only a whole number 2 to 6 (or blank) can be saved
+                        (2026-11-23): the min/max attributes never stopped a
+                        typed 1, 7 or 12, which saved as typed while the
+                        program was built for 2 to 6. */}
+                    {daysCheck.error && (
+                      <div role="alert" style={{ fontSize: 12.5, color: '#e5484d', marginTop: 6 }}>{daysCheck.error}</div>
+                    )}
 
                     {/* Session time budget (reinstated 2026-08-31, reversing the
                         Aug duration ruling): optional slider, 30–120 in 15-min
@@ -2593,7 +2657,10 @@ export default function AthletePage({ session }: { session: Session }) {
                       <textarea
                         className="lift-input"
                         rows={3}
-                        maxLength={500}
+                        // Was 500 (2026-11-23): the coach's additions are appended
+                        // with no total cap, and past 500 the box stopped
+                        // accepting typing. Same limit the coach and Engine read to.
+                        maxLength={GOAL_BOX_MAX_CHARS}
                         value={goal}
                         onChange={e => { setGoal(e.target.value); markDirty(); }}
                         onFocus={() => setT3FocusedBox('goal')}
@@ -2609,7 +2676,7 @@ export default function AthletePage({ session }: { session: Session }) {
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#2ec486' }}>
                           {goal.trim() ? <><span style={{ width: 7, height: 7, borderRadius: '50%', background: '#2ec486', flex: 'none' }} />Got it — your program builds around this</> : null}
                         </span>
-                        <span style={t3CounterStyle(goal.length, t3FocusedBox === 'goal' || goal.length > 0)}>{goal.length} / 500</span>
+                        <span style={t3CounterStyle(goal.length, t3FocusedBox === 'goal' || goal.length > 0, GOAL_BOX_MAX_CHARS)}>{goal.length} / {GOAL_BOX_MAX_CHARS}</span>
                       </div>
                     </div>
 
