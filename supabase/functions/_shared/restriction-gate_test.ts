@@ -1,7 +1,7 @@
 // deno test supabase/functions/_shared/restriction-gate_test.ts --no-check --allow-env
 import { assert, assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import {
-  applyFindings, type Finding, hasInjuryText, isRuledOutByName, judgeUserMessage, nameHits, plainName,
+  applyFindings, athleteWordsElsewhere, type Finding, hasInjuryText, isRuledOutByName, judgeUserMessage, nameHits, plainName,
   removeByRule, type Restrictions, restrictionsForPrompt, runRestrictionGate,
 } from "./restriction-gate.ts";
 // deno-lint-ignore no-explicit-any
@@ -180,14 +180,51 @@ Deno.test("GATE — a name the second look spots is handed to the AI, which choo
   assertEquals(o.weeks[0].days[1].blocks[0].movements[0].movement, "Bike"); // swapped, not deleted
 });
 
-Deno.test("GATE — no injury text: no reading; an avoid-list name still comes out", async () => {
+Deno.test("GATE — never skipped: an empty injury box is still read, and an avoid-list name still comes out", async () => {
   const o = week();
   let readings = 0;
   const rep = await runRestrictionGate(o, { injuriesText: "None", doNotProgram: ["Row"], suggestedSubs: [], vocabulary: VOCAB }, { judge: (_o: Any, _r: Any, must?: Any[]) => { if (!must) readings++; return Promise.resolve([]); } });
-  assertEquals(readings, 0);
+  assertEquals(readings, 1);
   assert(rep.actions.length === 1);
   assert(!names(o).flat(2).includes("Row"));
   assert(names(o).flat(2).includes("Run")); // nothing rules running out for this athlete
+});
+
+// The second real case: injury box empty, shoulder pain written under "anything else".
+const BEN_INTAKE = {
+  preferences: { loved: [], disliked: [], skill_goals: [], avoid: ["muscle-ups due to pain in shoulder"] },
+  constraints: { injuries: ["shoulder pain on muscle-ups"], schedule_equipment_notes: null },
+  response: { volume_tolerance: null, recovery_notes: null },
+  freeform_notes: "Athlete wants to come away from muscle-ups due to shoulder pain.",
+};
+
+Deno.test("what the athlete said outside the injury box is collected in their words", () => {
+  const w = athleteWordsElsewhere(BEN_INTAKE, ["more warm-up before strict gymnastics"]);
+  assertEquals(w, [
+    'Injuries or limitations (signup): "shoulder pain on muscle-ups"',
+    'Avoiding (signup): "muscle-ups due to pain in shoulder"',
+    'Anything else (signup): "Athlete wants to come away from muscle-ups due to shoulder pain."',
+    'Note to the coach: "more warm-up before strict gymnastics"',
+  ]);
+  assertEquals(athleteWordsElsewhere(null, null), []);
+});
+
+Deno.test("GATE — Ben's case: injury box says None, the shoulder pain still reaches the writer and the judge", async () => {
+  const words = athleteWordsElsewhere(BEN_INTAKE, []);
+  const forWriter = restrictionsForPrompt("None", ["Ring Muscle Up"], words);
+  assert(forWriter.includes("shoulder pain on muscle-ups") && forWriter.includes("an injury is not always written in the injury box"));
+  assert(restrictionsForPrompt("None", [], words) !== ""); // stated even with no avoid list
+  const o: Any = { weeks: [{ week_num: 1, days: [{ day_num: 1, blocks: [{ block_type: "skills", movements: [{ movement: "Strict HSPU", sets: 5, reps: 3 }] }] }] }] };
+  let told = "";
+  const judge = (out: Any, r: Any) => {
+    told = judgeUserMessage(out, r);
+    return Promise.resolve(out.weeks[0].days[0].blocks[0].movements[0].movement === "Strict HSPU"
+      ? [{ week_num: 1, day_num: 1, block_index: 0, movement_index: 0, movement: "Strict HSPU", reason: "shoulder pain: no strict overhead skill work", replacement: { movement: "Push Up" } }]
+      : []);
+  };
+  await runRestrictionGate(o, { injuriesText: "None", doNotProgram: ["Ring Muscle Up"], otherWords: words, suggestedSubs: [], vocabulary: [...VOCAB, "Strict HSPU"] }, { judge });
+  assert(told.includes("shoulder pain on muscle-ups"));
+  assertEquals(o.weeks[0].days[0].blocks[0].movements[0], { movement: "Push Up", sets: 5, reps: 3 });
 });
 
 Deno.test("GATE — a clean week is left exactly as written, after one reading", async () => {

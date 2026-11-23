@@ -11,8 +11,10 @@
  * one reviewer that reads MEANING (safety-review.ts) could only log.
  *
  * The gate puts those the right way round:
- *   1. JUDGE by meaning — an AI reads the finished output against the
- *      athlete's own injury words and avoid list, every block included, and
+ *   1. JUDGE by meaning — on EVERY week, for EVERY athlete, an AI reads the
+ *      finished output against everything the athlete has said about their
+ *      body (injury box, signup answers, notes to the coach) and their avoid
+ *      list, every block included, and
  *      names each conflict WITH a replacement chosen from the allowed
  *      vocabulary.
  *   2. FIX — code applies the replacements (validated: a real vocabulary
@@ -45,6 +47,11 @@ export interface Restrictions {
   injuriesText: string | null;
   /** The avoid list in force (injury-derived + equipment-derived). */
   doNotProgram: string[];
+  /** Everything ELSE the athlete has said that may bear on their body — the
+   *  signup answers and their notes to the coach. An injury is not always in
+   *  the injury box: one athlete left it empty and wrote "pain in shoulder"
+   *  under "anything else" (2026-11-23). */
+  otherWords?: string[];
   /** Stored substitutes from the injury parse. */
   suggestedSubs: Array<{ instead_of: string; use: string }>;
   /** Every movement name the writer may use. */
@@ -73,7 +80,7 @@ export interface Finding {
 export interface GateReport {
   /** Human-readable lines, one per change made. */
   actions: string[];
-  /** How many times the judge was asked. 0 = no injury text, or unreachable. */
+  /** How many times the judge answered. 0 = unreachable. */
   reviews: number;
   /** True when the judge could not be reached on some round. */
   judgeUnavailable: boolean;
@@ -91,20 +98,56 @@ export function hasInjuryText(text: string | null | undefined): boolean {
  * words. Shared by the writer's rules and the judge so both read the same text.
  * Returns "" when there is nothing to state.
  */
-export function restrictionsForPrompt(injuriesText: string | null | undefined, doNotProgram: string[] | null | undefined): string {
+export function restrictionsForPrompt(
+  injuriesText: string | null | undefined,
+  doNotProgram: string[] | null | undefined,
+  otherWords?: string[] | null,
+): string {
   const list = (doNotProgram ?? []).filter((m) => typeof m === "string" && m.trim() !== "");
   const injured = hasInjuryText(injuriesText);
-  if (!injured && list.length === 0) return "";
+  const other = (otherWords ?? []).map((w) => (w ?? "").trim()).filter(Boolean);
+  if (!injured && list.length === 0 && other.length === 0) return "";
   const lines = ["ABSOLUTE RESTRICTIONS — these outrank every other rule, the skeleton, and any composed metcon:"];
-  if (injured) lines.push(`  The athlete wrote, in their own words: "${(injuriesText ?? "").trim()}"`);
+  if (injured) lines.push(`  Under injuries the athlete wrote, in their own words: "${(injuriesText ?? "").trim()}"`);
+  if (other.length > 0) {
+    lines.push("  Elsewhere the athlete told us (read these for ANY pain, injury or physical limit — an injury is not always written in the injury box):");
+    for (const w of other) lines.push(`    - ${w}`);
+  }
   if (list.length > 0) lines.push(`  Never program: ${list.join(", ")}.`);
   lines.push(
     "  - A banned movement is banned in EVERY form and under EVERY name: any distance, load, tempo or variation of it (\"no running\" bans Run, 400m Run, Shuttle Run, Treadmill Run, a jog in a cool-down).",
     "  - This covers EVERY block: warm-up, mobility, skills, strength, accessory, metcon and cool-down alike.",
     "  - Do NOT scale, shorten or lighten a banned movement — REPLACE it with a different movement that does not load the injured area.",
     "  - If the athlete's words rule out something the list does not name, their words win.",
+    "  - Pain in a body part restricts that body part, not only the movement they named: \"pain in shoulder on muscle-ups\" means go easy on the shoulder — no heavy or high-skill overhead loading (e.g. strict handstand push-ups) while it hurts.",
   );
   return lines.join("\n");
+}
+
+/**
+ * What the athlete said outside the injury box, as labelled lines: the parts
+ * of their signup answers that can carry a physical limit, and their notes to
+ * the coach. Kept in their words; nothing is interpreted here.
+ */
+export function athleteWordsElsewhere(
+  // deno-lint-ignore no-explicit-any
+  intake: any,
+  coachNotes?: string[] | null,
+): string[] {
+  const out: string[] = [];
+  const add = (label: string, v: unknown) => {
+    const items = Array.isArray(v) ? v : [v];
+    for (const it of items) if (typeof it === "string" && it.trim() !== "") out.push(`${label}: "${it.trim()}"`);
+  };
+  if (intake && typeof intake === "object") {
+    add("Injuries or limitations (signup)", intake.constraints?.injuries);
+    add("Avoiding (signup)", intake.preferences?.avoid);
+    add("Recovery (signup)", intake.response?.recovery_notes);
+    add("Schedule or equipment (signup)", intake.constraints?.schedule_equipment_notes);
+    add("Anything else (signup)", intake.freeform_notes);
+  }
+  add("Note to the coach", coachNotes ?? []);
+  return out;
 }
 
 // ── Names ──────────────────────────────────────────────────────────────────
@@ -277,7 +320,9 @@ export function removeByRule(output: WriterOutput, locs: Array<Loc & { movement:
 
 const JUDGE_SYSTEM = `You check AI-written training against ONE athlete's physical restrictions. Nothing else is your job: not variety, not balance, not difficulty.
 
-You receive the athlete's restrictions (their own words, and a list of movements never to program), the list of movements that may be used, and the written training as JSON.
+You receive the athlete's restrictions (what they wrote under injuries, what they said elsewhere — signup answers and notes to their coach — and a list of movements never to program), the list of movements that may be used, and the written training as JSON.
+
+Pain, injury or a physical limit counts wherever the athlete mentioned it, not only under injuries. A statement about one movement tells you about the body part: "pain in shoulder on muscle-ups" means the shoulder is the problem, so heavy or high-skill overhead loading of that shoulder goes against it too. Statements that are only likes, dislikes or goals are NOT restrictions.
 
 Flag a movement when doing it would go against what the athlete said:
   - It is on the never-program list, under any name, distance, load or variation. "No running" rules out Run, 400m Run, Shuttle Run, Treadmill Run and an easy jog alike.
@@ -375,7 +420,7 @@ export function judgeUserMessage(output: WriterOutput, r: Restrictions, mustRepl
   const subs = (r.suggestedSubs ?? []).filter((x) => x?.instead_of && x?.use).map((x) => `${x.instead_of} → ${x.use}`).join("; ");
   const must = (mustReplace ?? []).map((l) => `week ${l.week_num} day ${l.day_num} block_index ${l.block_index} movement_index ${l.movement_index} "${l.movement}"`);
   return [
-    restrictionsForPrompt(r.injuriesText, r.doNotProgram) || "ABSOLUTE RESTRICTIONS: (none stated)",
+    restrictionsForPrompt(r.injuriesText, r.doNotProgram, r.otherWords) || "ABSOLUTE RESTRICTIONS: the athlete has stated no injury, pain or physical limit anywhere, and has no avoid list.",
     "",
     `ALLOWED MOVEMENTS (choose replacements only from these): ${allowed.join(", ")}`,
     ...(subs ? ["", `SUBSTITUTES ALREADY SUGGESTED FOR THIS ATHLETE (guidance, not exact names — pick the allowed movement that best matches): ${subs}`] : []),
@@ -461,7 +506,9 @@ export async function runRestrictionGate(
   let pending: Array<Loc & { movement: string; reason?: string }> = [];
 
   try {
-    if (hasInjuryText(r.injuriesText)) {
+    // EVERY week is read, for EVERY athlete — never skipped (founder,
+    // 2026-11-23). An empty injury box is not evidence of no injury.
+    {
       for (let round = 1; round <= maxReviews; round++) {
         const findings = await judge(output, r);
         if (findings == null) { report.judgeUnavailable = true; break; }
