@@ -1,0 +1,114 @@
+{
+ "x111": {
+  "format": "amrap",
+  "duration_seconds": 420,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Thruster",
+    "reps_pattern": "ascending each round: 3, 6, 9, 12 and so on, adding 3 every round until time runs out",
+    "load_lb": 100,
+    "load_x_bodyweight": 0.54
+   },
+   {
+    "order": 2,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps_pattern": "ascending each round: 3, 6, 9, 12 and so on, adding 3 every round until time runs out"
+   }
+  ]
+ },
+ "x112": {
+  "format": "amrap",
+  "duration_seconds": 480,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Handstand Push-up",
+    "reps_pattern": "ascending each round: 3, 6, 9, 12 and so on, adding 3 every round until time runs out"
+   },
+   {
+    "order": 2,
+    "movement": "Clean",
+    "reps_pattern": "3 per round for rounds 1 to 3, 6 for rounds 4 to 6, 9 for rounds 7 to 9, adding 3 every third round",
+    "load_lb": 185,
+    "load_x_bodyweight": 1.0
+   }
+  ]
+ },
+ "x113": {
+  "format": "max_lift",
+  "time_window_seconds": 360,
+  "preceded_by": "starts immediately after a 9-minute AMRAP of toes-to-bar, deadlifts and snatches",
+  "rest": "self-paced within the window",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Clean and Jerk",
+    "reps_pattern": "one-rep maximum; as many attempts as wanted"
+   }
+  ]
+ },
+ "x114": {
+  "format": "max_lift",
+  "time_window_seconds": 420,
+  "preceded_by": "starts immediately after a for-time workout of front squats, thrusters, toes-to-bar, chest-to-bar pull-ups and bar muscle-ups with a 15-minute cap",
+  "rest": "self-paced within the window",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Complex: 1 Deadlift + 1 Clean + 1 Hang Clean + 1 Jerk, unbroken",
+    "reps_pattern": "maximum load for one complex; as many attempts as wanted"
+   }
+  ]
+ },
+ "x115": {
+  "format": "max_lift",
+  "time_window_seconds": null,
+  "structure": "shares one 12-minute clock with the preceding work: the lift window is whatever remains of 12 minutes",
+  "preceded_by": "starts immediately after 1-2-3-4-5-6-7-8-9-10 reps of dumbbell squats (two 50 lb dumbbells) and bar-facing burpees, done for time",
+  "rest": "self-paced within the window",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Clean",
+    "reps_pattern": "one-rep maximum; as many attempts as wanted"
+   }
+  ]
+ },
+ "x116": {
+  "format": "for_time",
+  "time_cap_seconds": 600,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "DB Overhead Walking Lunge (one dumbbell)",
+    "distance_ft": 200,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 2,
+    "movement": "DB Box Step-up",
+    "reps": 50,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 3,
+    "movement": "Strict Handstand Push-up",
+    "reps": 50
+   },
+   {
+    "order": 4,
+    "movement": "Handstand Walk",
+    "distance_ft": 200
+   }
+  ]
+ }
+}

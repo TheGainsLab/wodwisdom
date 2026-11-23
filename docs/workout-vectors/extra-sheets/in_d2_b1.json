@@ -1,0 +1,133 @@
+{
+ "x211": {
+  "format": "amrap",
+  "duration_seconds": 900,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Deadlift",
+    "reps": 9,
+    "load_lb": 155,
+    "load_x_bodyweight": 0.84
+   },
+   {
+    "order": 2,
+    "movement": "Push-up",
+    "reps": 12
+   },
+   {
+    "order": 3,
+    "movement": "Box Jump",
+    "reps": 15
+   }
+  ]
+ },
+ "x212": {
+  "format": "max_lift",
+  "time_window_seconds": 360,
+  "preceded_by": "starts immediately after a 9-minute AMRAP of toes-to-bar, deadlifts and snatches",
+  "rest": "self-paced within the window",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Clean and Jerk",
+    "reps_pattern": "one-rep maximum; as many attempts as wanted"
+   }
+  ]
+ },
+ "x213": {
+  "format": "for_time",
+  "time_cap_seconds": 900,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "structure": "10 rounds of 8 and 10",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Ground-to-Overhead (barbell)",
+    "reps": 80,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 2,
+    "movement": "Bar-Facing Burpee",
+    "reps": 100
+   }
+  ]
+ },
+ "x214": {
+  "format": "for_time",
+  "time_cap_seconds": 600,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "DB Overhead Walking Lunge (one dumbbell)",
+    "distance_ft": 200,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 2,
+    "movement": "DB Box Step-up",
+    "reps": 50,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 3,
+    "movement": "Strict Handstand Push-up",
+    "reps": 50
+   },
+   {
+    "order": 4,
+    "movement": "Handstand Walk",
+    "distance_ft": 200
+   }
+  ]
+ },
+ "x215": {
+  "format": "amrap",
+  "duration_seconds": 720,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "DB Front-Rack Walking Lunge (two dumbbells)",
+    "distance_ft": 50,
+    "load_lb": 100,
+    "load_x_bodyweight": 0.54
+   },
+   {
+    "order": 2,
+    "movement": "Toes-to-Bar or Bar Muscle-up",
+    "reps_pattern": "16 toes-to-bar in rounds 1-2, 16 bar muscle-ups in rounds 3-4, alternating every 2 rounds"
+   },
+   {
+    "order": 3,
+    "movement": "DB Power Clean (two dumbbells)",
+    "reps": 8,
+    "load_lb": 100,
+    "load_x_bodyweight": 0.54
+   }
+  ]
+ },
+ "x216": {
+  "format": "max_lift",
+  "time_window_seconds": 420,
+  "preceded_by": "starts immediately after a for-time workout of front squats, thrusters, toes-to-bar, chest-to-bar pull-ups and bar muscle-ups with a 15-minute cap",
+  "rest": "self-paced within the window",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Complex: 1 Deadlift + 1 Clean + 1 Hang Clean + 1 Jerk, unbroken",
+    "reps_pattern": "maximum load for one complex; as many attempts as wanted"
+   }
+  ]
+ }
+}

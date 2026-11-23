@@ -161,3 +161,14 @@ Pass mark set beforehand: within 10 of the original vector.
   axis leaning more than 1 point. Judged alone the drafts agree a little
   more closely (spread 5.1 against 7.3), so batching added some noise but
   no bias.
+
+## Second batch of sheets (`extra-sheets/`)
+
+Thirteen more workouts, written from the official prescriptions so that
+every men's Open workout from 2011 to 2026 has a vector: a timed-window
+ladder, four max-lift tests, and eight that the first batch had held back.
+Some use fields the definitions do not describe (`structure`,
+`preceded_by`, `time_window_seconds`, a `format` of `max_lift` or
+`timed_windows`); the judges were told to read them as plain statements of
+fact. Judged the same way as the first batch, after the validation plan was
+written but without the judges seeing any athlete results.
