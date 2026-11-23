@@ -47,7 +47,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { fetchWithTimeout } from "../_shared/fetch-with-timeout.ts";
 import { getTierStatus } from "../_shared/tier-status.ts";
 import { RETURNER_BUILD_WAIT_DAYS, returnerStillHasTheButton } from "../_shared/program-archive.ts";
-import { loadPaidPeriods, mergePeriods } from "../_shared/paid-periods.ts";
+import { entitledProgrammingMonths, loadPaidPeriods, mergePeriods } from "../_shared/paid-periods.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -249,23 +249,19 @@ async function reconcileOne(
   // read so a refunded period is left out and the 15-day window sees the
   // person's periods under other subscriptions.
   const recordRows = await loadPaidPeriods(supa, userId, profile.stripe_customer_id);
-  const paidInvoiceCount: number = mergePeriods(recordRows, (await invResp.json()).data ?? [], sub).subscriptionCounted;
+  const merged = mergePeriods(recordRows, (await invResp.json()).data ?? [], sub);
+  const paidInvoiceCount: number = merged.subscriptionCounted;
   if (paidInvoiceCount === 0) {
     return { user_id: userId, email, reason: "no_paid_invoices" };
   }
 
-  let entitled: number;
-  if (isMonthly) {
-    entitled = paidInvoiceCount;
-  } else {
-    const periodStartSec = sub.current_period_start as number | undefined;
-    if (typeof periodStartSec !== "number") {
-      return { user_id: userId, email, reason: "missing_period_start" };
-    }
-    const daysIntoPeriod = (Date.now() - periodStartSec * 1000) / MS_PER_DAY;
-    const monthsIntoQuarter = Math.min(Math.floor(daysIntoPeriod / 30) + 1, 3);
-    entitled = (paidInvoiceCount - 1) * 3 + monthsIntoQuarter;
-  }
+  // Months owed: each period at its own value, the quarter in progress
+  // released a month at a time (the one rule, shared with the daily drip).
+  // The old (periods − 1) × 3 + drip priced a month paid BEFORE a switch to
+  // quarterly as three, and this sweep then "healed" months not yet due.
+  const ent = entitledProgrammingMonths(merged.periods, sub);
+  if (!ent) return { user_id: userId, email, reason: "missing_period_start" };
+  const entitled: number = ent.entitled;
 
   // --- Delivered truth: latest generated program's cumulative month counter.
   const { data: progs } = await supa
