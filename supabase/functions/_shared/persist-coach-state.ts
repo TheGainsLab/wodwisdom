@@ -56,11 +56,18 @@ export async function persistCoachState(
   content: CoachStateContent,
   athleteModelVersion: number,
   cyclePointer: { month: number } | null = null,
+  /** Hash of the profile inputs the judgment was made from (goal, days,
+   *  session length, injury text, active notes) — see coachStateInputsHash in
+   *  generate-coach-state.ts (2026-11-23). Stored in coach_states.inputs_hash
+   *  so a later build reuses this row only while those inputs are unchanged. */
+  inputsHash: string | null = null,
 ): Promise<PersistCoachStateResult> {
   // Hash the decision content + the input/transform pins, so a model-version
   // change (new facts) or a builder bump also produces a new CoachState version.
+  // The inputs hash is part of it when given: the same words judged from a
+  // changed goal are a new row, so the new inputs have a row to be reused from.
   const contentHash = await sha256Hex(
-    stableStringify({ content, athleteModelVersion, cyclePointer }),
+    stableStringify({ content, athleteModelVersion, cyclePointer, ...(inputsHash ? { inputsHash } : {}) }),
   );
 
   const { data: latest, error: readErr } = await supa
@@ -89,14 +96,26 @@ export async function persistCoachState(
     created_at: new Date().toISOString(),
   };
 
-  const { error: insErr } = await supa.from("coach_states").insert({
+  const row: Record<string, unknown> = {
     user_id: userId,
     version,
     athlete_model_version: athleteModelVersion,
     coach_state_builder_version: content.coach_state_builder_version,
     content_hash: contentHash,
     coach_state,
-  });
+  };
+  let { error: insErr } = await supa.from("coach_states").insert(
+    inputsHash ? { ...row, inputs_hash: inputsHash } : row,
+  );
+  // The inputs_hash column arrives with migration
+  // 20261123200000_coach_state_inputs_hash.sql. If this code runs before that
+  // migration, save the judgment without the hash rather than fail the build:
+  // a row with no hash is never reused, so the only cost is a fresh judgment
+  // next time.
+  if (insErr && inputsHash && /inputs_hash/.test(insErr.message ?? "")) {
+    console.warn(`[persist-coach-state] inputs_hash column missing — saving without it: ${insErr.message}`);
+    ({ error: insErr } = await supa.from("coach_states").insert(row));
+  }
 
   if (insErr) {
     throw new Error(`[persist-coach-state] insert failed for ${userId}: ${insErr.message}`);

@@ -9,6 +9,12 @@
  * MONTH when the next week is written. And for an Engine-only athlete a
  * days-per-week change alters nothing at all, which the card never said.
  *
+ * Session length and equipment (2026-11-23, when the card learned to change
+ * them): session length behaves like days and goal for Programming (the
+ * unwritten weeks are re-planned) and does nothing for the Engine; equipment
+ * is read by every week written from then on, and the Engine does not read
+ * the checklist at all (the machine is picked on each Engine day).
+ *
  * `describeEffect` is pure; `loadEffectFacts` reads what it needs.
  */
 
@@ -29,12 +35,14 @@ export interface AppliedChange {
   days?: boolean;
   goal?: boolean;
   injuries?: boolean;
+  session?: boolean;
+  equipment?: boolean;
 }
 
 /** Sentences for the athlete, in order. Never empty when something changed. */
 export function describeEffect(change: AppliedChange, f: EffectFacts): string[] {
   const out: string[] = [];
-  const planChange = !!(change.days || change.goal);
+  const planChange = !!(change.days || change.goal || change.session);
 
   if (f.hasProgramming) {
     if (planChange) {
@@ -50,6 +58,11 @@ export function describeEffect(change: AppliedChange, f: EffectFacts): string[] 
         ? "Every week written from now on is checked against it. Weeks already written stay as they are; to change one of those days, open it and ask me there."
         : "Your program will be built around it.");
     }
+    if (change.equipment) {
+      out.push(f.program
+        ? "New weeks are written without the equipment you don't have. Weeks already written stay as they are; to change one of those days, open it and ask me there."
+        : "Your program will be built with the equipment you have.");
+    }
   }
 
   if (f.hasEngine) {
@@ -60,6 +73,17 @@ export function describeEffect(change: AppliedChange, f: EffectFacts): string[] 
     }
     if (change.days) {
       out.push("This doesn't change your Engine week: Engine days per week come from your Engine program, which you can change with Switch Program.");
+    }
+  }
+
+  // Engine-only: neither setting is read by the Engine. Say so rather than
+  // leave "Saved to your profile" to imply a change to their training.
+  if (f.hasEngine && !f.hasProgramming) {
+    if (change.session) {
+      out.push("This doesn't change your Engine sessions: session length is an AI Programming setting, and each Engine day has its own length.");
+    }
+    if (change.equipment) {
+      out.push("This doesn't change your Engine days: you pick your machine when you open each Engine day.");
     }
   }
 

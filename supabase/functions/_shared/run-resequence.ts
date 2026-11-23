@@ -26,6 +26,7 @@ import { buildOtherTrainingLoadBlock } from "./athlete-activities.ts";
 import { loadUpcomingProgrammingWeek } from "./programming-week.ts";
 import { buildCoachNotesBlock, markNotesConsumed } from "./coach-notes.ts";
 import { checkEntitlement } from "./entitlements.ts";
+import { goalForPrompt } from "./goal-text.ts";
 import { restartAtFor, sinceRestart } from "./engine-restart.ts";
 import { formatDayTypeCatalogue, loadDayTypeCatalogue } from "./engine-catalogue.ts";
 import { parseProposal, type ProposedDay, validateProposal } from "./engine-sequence.ts";
@@ -174,7 +175,10 @@ export async function runResequence(
   const restartAt = restartAtFor(prof?.engine_restarts, version);
   const athleteAge = typeof prof?.age === "number" && prof.age > 0 ? prof.age : null;
   const athleteGoal = typeof prof?.engine_goal === "string" && prof.engine_goal.trim() !== ""
-    ? prof.engine_goal.trim().slice(0, 500)
+    // The WHOLE goal (2026-11-23): this read the first 500 characters, and the
+    // coach's additions are appended at the end, so the newest text was the
+    // part the sequencer never saw. goalForPrompt keeps the end if it must cut.
+    ? goalForPrompt(prof.engine_goal)
     : null;
   const { data: program } = await supa
     .from("engine_programs").select("days_per_week, name, description").eq("id", version).maybeSingle();
