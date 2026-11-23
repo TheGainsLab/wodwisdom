@@ -55,7 +55,7 @@ import {
   classifyFailuresByKind,
 } from "../_shared/audit-runner.ts";
 import { stripInternalMarkers, enforceNoLabelOnCoachedBlocks } from "../_shared/programmatic-fixes.ts";
-import { reviewSafety } from "../_shared/safety-review.ts";
+import { runRestrictionGate } from "../_shared/restriction-gate.ts";
 import { saveProgramV3 } from "../_shared/save-program-v3.ts";
 import { type BlockLocation } from "../_shared/compute-block-benchmark.ts";
 // Engine core — the extracted generation pipeline. This function now CONSUMES the
@@ -870,33 +870,55 @@ async function stageSurgical(
 }
 
 async function stageSafetyReview(
-  _supa: SupabaseClient,
-  _job: ProgramJobRow,
+  supa: SupabaseClient,
+  job: ProgramJobRow,
   rs: ResumeState,
 ): Promise<StageOutcome> {
-  // ADVISORY ONLY — never regenerates. Runs once, logs any flagged violations,
-  // ships the program unchanged. (Injury-contraindicated movements are already
-  // filtered structurally via injuries_structured.do_not_program.)
+  // THE RESTRICTION GATE (2026-11-23) — no longer advisory. The written output
+  // is read against the athlete's own injury words and avoid list; anything
+  // that goes against them is replaced, and whatever could not be replaced is
+  // taken out by rule. It always returns and the week always goes on to save:
+  // nothing is withheld and nobody is alerted. See _shared/restriction-gate.ts.
   const payload = rs.payload!;
   const output = rs.output!;
-  const safety = await reviewSafety(
-    output,
-    payload.training_context.goal_text,
-    payload.training_context.injuries_constraints_text,
-  );
+  const injuries = payload.training_context.injuries_structured;
+  const gate = await runRestrictionGate(output, {
+    injuriesText: payload.training_context.injuries_constraints_text ?? null,
+    doNotProgram: injuries?.do_not_program ?? [],
+    suggestedSubs: injuries?.suggested_subs ?? [],
+    vocabulary: payload.vocabulary ?? [],
+  });
 
-  if (safety.errored) {
-    console.warn("[generate-program-v3] safety-review errored; proceeding:", safety.reasoning);
-  } else if (!safety.safe && safety.violations.length > 0) {
-    console.warn(
-      `[generate-program-v3] safety review flagged ${safety.violations.length} violation(s) — LOGGED ONLY, no regeneration:`,
-    );
-    for (const v of safety.violations) console.warn(`  - ${v}`);
+  if (gate.actions.length > 0) {
+    // Headers are rendered from the movement rows; re-render so a swapped or
+    // removed movement does not linger in a block's header.
+    for (const wk of output.weeks ?? []) renderWeekSchemesInPlace(wk);
+    console.warn(`[generate-program-v3] restriction gate changed ${gate.actions.length} movement(s):`);
+    for (const a of gate.actions) console.warn(`  - ${a}`);
   }
+  if (gate.judgeUnavailable) console.warn("[generate-program-v3] restriction gate: judge unavailable; rule step applied");
+  await logGenerationAudit(supa, {
+    user_id: job.user_id,
+    program_id: rs.continuation?.programId ?? null,
+    month_number: rs.continuation?.monthNumber ?? null,
+    stage: "restriction_gate",
+    violations: gate.actions,
+    warnings: gate.judgeUnavailable ? ["judge unavailable; rule step only"] : [],
+    retried: gate.reviews > 1,
+    meta: { reviews: gate.reviews },
+  }).catch((e) => console.warn("[generate-program-v3] restriction_gate log failed (non-fatal):", e));
 
   return {
     next: "saving",
-    resumeState: { ...rs, safety: { safe: safety.safe, reasoning: safety.reasoning, errored: !!safety.errored } },
+    resumeState: {
+      ...rs,
+      output,
+      safety: {
+        safe: true,
+        reasoning: gate.actions.length ? `Restriction gate changed ${gate.actions.length} movement(s).` : "Restriction gate: nothing to change.",
+        errored: gate.judgeUnavailable,
+      },
+    },
     displayStage: "saving",
   };
 }

@@ -1,0 +1,492 @@
+/**
+ * restriction-gate.ts — a written week never ships with a movement the
+ * athlete's injuries or avoid list rule out. Fully automatic: no alert, no
+ * human, no withheld week.
+ *
+ * Why (2026-11-23): an athlete wrote "Runners Knee, no lunges or back squats"
+ * and confirmed an avoid list containing "running", "400m run", "mile run".
+ * His program, built three minutes later, held "Run" ten times in cool-down
+ * and mobility blocks. The only enforcing check compared spellings ("run" is
+ * not "running"), a failed repair shipped with the residual logged, and the
+ * one reviewer that reads MEANING (safety-review.ts) could only log.
+ *
+ * The gate puts those the right way round:
+ *   1. JUDGE by meaning — an AI reads the finished output against the
+ *      athlete's own injury words and avoid list, every block included, and
+ *      names each conflict WITH a replacement chosen from the allowed
+ *      vocabulary.
+ *   2. FIX — code applies the replacements (validated: a real vocabulary
+ *      movement, not itself ruled out), then the judge reads the result again.
+ *   3. GUARANTEE — whatever is still flagged after the last round, and any
+ *      avoid-list name (or plain variant of one) still present, is taken out
+ *      by rule: the stored substitute if there is a usable one, else the
+ *      movement is removed. This step uses no AI and cannot fail.
+ * The week then saves as normal.
+ *
+ * If the judge cannot be reached, the rule-based step still runs, so the
+ * protection is never weaker than the name check it replaces.
+ */
+
+import type { MovementPrescription, WriterOutput } from "./v2-output-schema.ts";
+import { MODELS } from "./model-profiles.ts";
+
+const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY_PIPELINE") ?? Deno.env.get("ANTHROPIC_API_KEY");
+const MODEL = MODELS.sonnet;
+
+const NO_INJURY_RE = /^(none|no|nothing|no injuries|n\/a|none\.)$/i;
+
+export interface Restrictions {
+  /** The athlete's own injury / constraint text, as written. */
+  injuriesText: string | null;
+  /** The avoid list in force (injury-derived + equipment-derived). */
+  doNotProgram: string[];
+  /** Stored substitutes from the injury parse. */
+  suggestedSubs: Array<{ instead_of: string; use: string }>;
+  /** Every movement name the writer may use. */
+  vocabulary: string[];
+}
+
+export interface Finding {
+  week_num: number;
+  day_num: number;
+  block_index: number;
+  movement_index: number;
+  movement: string;
+  reason: string;
+  replacement?: {
+    movement?: string;
+    sets?: number;
+    reps?: number;
+    time_seconds?: number;
+    distance?: number;
+    distance_unit?: "ft" | "m";
+    calories?: number;
+    scaling_note?: string;
+  } | null;
+}
+
+export interface GateReport {
+  /** Human-readable lines, one per change made. */
+  actions: string[];
+  /** How many times the judge was asked. 0 = no injury text, or unreachable. */
+  reviews: number;
+  /** True when the judge could not be reached on some round. */
+  judgeUnavailable: boolean;
+}
+
+// ── Reading the athlete's restrictions ─────────────────────────────────────
+
+export function hasInjuryText(text: string | null | undefined): boolean {
+  const t = (text ?? "").trim();
+  return t !== "" && !NO_INJURY_RE.test(t);
+}
+
+/**
+ * The restriction stated for a prompt: first, absolute, in the athlete's own
+ * words. Shared by the writer's rules and the judge so both read the same text.
+ * Returns "" when there is nothing to state.
+ */
+export function restrictionsForPrompt(injuriesText: string | null | undefined, doNotProgram: string[] | null | undefined): string {
+  const list = (doNotProgram ?? []).filter((m) => typeof m === "string" && m.trim() !== "");
+  const injured = hasInjuryText(injuriesText);
+  if (!injured && list.length === 0) return "";
+  const lines = ["ABSOLUTE RESTRICTIONS — these outrank every other rule, the skeleton, and any composed metcon:"];
+  if (injured) lines.push(`  The athlete wrote, in their own words: "${(injuriesText ?? "").trim()}"`);
+  if (list.length > 0) lines.push(`  Never program: ${list.join(", ")}.`);
+  lines.push(
+    "  - A banned movement is banned in EVERY form and under EVERY name: any distance, load, tempo or variation of it (\"no running\" bans Run, 400m Run, Shuttle Run, Treadmill Run, a jog in a cool-down).",
+    "  - This covers EVERY block: warm-up, mobility, skills, strength, accessory, metcon and cool-down alike.",
+    "  - Do NOT scale, shorten or lighten a banned movement — REPLACE it with a different movement that does not load the injured area.",
+    "  - If the athlete's words rule out something the list does not name, their words win.",
+  );
+  return lines.join("\n");
+}
+
+// ── Names ──────────────────────────────────────────────────────────────────
+
+const QUANTITY_TOKEN = /^(\d+(\.\d+)?(m|km|k|mi|ft|yd|cal|cals|s|sec|min)?|mile|miles|meter|meters|metre|metres|km|m)$/;
+
+/** A movement name reduced to its plain form: lower-case, no punctuation, no
+ *  leading/trailing quantity ("400m run" → "run"), "-ing"/plural folded
+ *  ("running" → "run", "box jumps" → "box jump"). Deliberately conservative:
+ *  it never drops a describing word, so "ring row" stays distinct from "row". */
+export function plainName(name: string): string {
+  const tokens = (name ?? "").toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9. ]+/g, " ").split(/\s+/).filter(Boolean);
+  const kept = tokens.filter((t) => !QUANTITY_TOKEN.test(t)).map((t) => {
+    if (t.length > 5 && t.endsWith("ing") && !["swing", "string", "spring", "facing"].includes(t)) {
+      const stem = t.slice(0, -3);
+      const n = stem.length; // running → runn → run; pressing → press (kept)
+      return n > 2 && stem[n - 1] === stem[n - 2] && !"sl".includes(stem[n - 1]) ? stem.slice(0, -1) : stem;
+    }
+    if (t.length > 3 && t.endsWith("s") && !t.endsWith("ss") && !["press", "pass", "abs", "plus", "bus"].includes(t)) return t.slice(0, -1);
+    return t;
+  });
+  return kept.join(" ").trim();
+}
+
+function bannedPlainSet(doNotProgram: string[]): Set<string> {
+  const s = new Set<string>();
+  for (const m of doNotProgram ?? []) {
+    const exact = (m ?? "").trim().toLowerCase();
+    if (exact) s.add(exact);
+    const p = plainName(m ?? "");
+    if (p) s.add(p);
+  }
+  return s;
+}
+
+/** True when the name is on the avoid list, exactly or as a plain variant. */
+export function isRuledOutByName(name: string, doNotProgram: string[]): boolean {
+  const banned = bannedPlainSet(doNotProgram);
+  if (banned.size === 0) return false;
+  return banned.has((name ?? "").trim().toLowerCase()) || banned.has(plainName(name ?? ""));
+}
+
+// ── Walking the output ─────────────────────────────────────────────────────
+
+type Loc = { week_num: number; day_num: number; block_index: number; movement_index: number };
+type AnyBlock = { block_type?: string; movements?: MovementPrescription[]; scheme_format?: { format?: string; minutes?: number; stations?: number[][] } | null };
+
+function blockAt(output: WriterOutput, l: { week_num: number; day_num: number; block_index: number }): AnyBlock | null {
+  const week = (output.weeks ?? []).find((w) => w.week_num === l.week_num);
+  const day = (week?.days ?? []).find((d) => d.day_num === l.day_num);
+  return ((day?.blocks ?? [])[l.block_index] as AnyBlock | undefined) ?? null;
+}
+
+/** Every movement still on the avoid list by name or plain variant. Pure. */
+export function nameHits(output: WriterOutput, doNotProgram: string[]): Array<Loc & { movement: string }> {
+  const hits: Array<Loc & { movement: string }> = [];
+  if ((doNotProgram ?? []).length === 0) return hits;
+  const banned = bannedPlainSet(doNotProgram);
+  for (const week of output.weeks ?? []) {
+    for (const day of week.days ?? []) {
+      (day.blocks ?? []).forEach((b, bi) => {
+        ((b as AnyBlock).movements ?? []).forEach((m, mi) => {
+          const n = (m?.movement ?? "").trim();
+          if (n && (banned.has(n.toLowerCase()) || banned.has(plainName(n)))) {
+            hits.push({ week_num: week.week_num, day_num: day.day_num, block_index: bi, movement_index: mi, movement: n });
+          }
+        });
+      });
+    }
+  }
+  return hits;
+}
+
+const where = (l: Loc) => `W${l.week_num}D${l.day_num} block ${l.block_index}`;
+
+// ── Fixing ─────────────────────────────────────────────────────────────────
+
+function canonical(vocabulary: string[], name: string | null | undefined): string | null {
+  const want = (name ?? "").trim().toLowerCase();
+  if (!want) return null;
+  return vocabulary.find((v) => v.trim().toLowerCase() === want) ?? null;
+}
+
+/** Swap one movement for another, keeping the row's quantity unless the
+ *  replacement brings its own. Load and 1RM anchoring never carry over to a
+ *  different movement. */
+function swap(row: MovementPrescription, to: string, r?: Finding["replacement"]): MovementPrescription {
+  const { weight: _w, weight_women: _ww, weight_unit: _wu, target_pct_1rm: _p, cardio_modality: _c, ...rest } = row;
+  const next: MovementPrescription = { ...rest, movement: to };
+  const brings = r && (r.sets != null || r.reps != null || r.time_seconds != null || r.distance != null || r.calories != null);
+  if (brings) {
+    delete next.sets; delete next.reps; delete next.rep_scheme; delete next.cal_scheme; delete next.distance_scheme;
+    delete next.time_seconds; delete next.distance; delete next.distance_unit; delete next.calories; delete next.max_effort;
+    if (r!.sets != null) next.sets = r!.sets;
+    if (r!.reps != null) { next.reps = r!.reps; next.rep_scheme = [r!.reps]; }
+    if (r!.time_seconds != null) next.time_seconds = r!.time_seconds;
+    if (r!.distance != null) { next.distance = r!.distance; next.distance_unit = r!.distance_unit ?? "m"; }
+    if (r!.calories != null) next.calories = r!.calories;
+  }
+  if (r?.scaling_note) next.scaling_note = r.scaling_note.slice(0, 200);
+  return next;
+}
+
+/** Remove one movement row; keep an EMOM's station map consistent; drop the
+ *  block if it was the block's only movement. */
+function removeMovement(output: WriterOutput, l: Loc): void {
+  const week = (output.weeks ?? []).find((w) => w.week_num === l.week_num);
+  const day = (week?.days ?? []).find((d) => d.day_num === l.day_num);
+  const block = (day?.blocks ?? [])[l.block_index] as AnyBlock | undefined;
+  if (!day || !block?.movements) return;
+  if (block.movements.length <= 1) {
+    day.blocks.splice(l.block_index, 1);
+    return;
+  }
+  block.movements.splice(l.movement_index, 1);
+  const sf = block.scheme_format;
+  if (sf?.stations && Array.isArray(sf.stations)) {
+    sf.stations = sf.stations
+      .map((slot) => slot.filter((i) => i !== l.movement_index).map((i) => (i > l.movement_index ? i - 1 : i)))
+      .filter((slot) => slot.length > 0);
+    if (sf.stations.length === 0) delete sf.stations;
+    else if (typeof sf.minutes === "number" && sf.minutes % sf.stations.length !== 0) {
+      sf.minutes = Math.max(sf.stations.length, Math.floor(sf.minutes / sf.stations.length) * sf.stations.length);
+    }
+  }
+}
+
+/**
+ * Apply the judge's replacements. A replacement is used only when it is a real
+ * vocabulary movement that is not itself ruled out by name; anything else is
+ * returned as `unresolved` for the rule-based step. Pure apart from mutating
+ * `output`. Findings whose location no longer holds that movement are skipped.
+ */
+export function applyFindings(output: WriterOutput, findings: Finding[], r: Restrictions): { applied: string[]; unresolved: Finding[] } {
+  const applied: string[] = [];
+  const unresolved: Finding[] = [];
+  for (const f of findings) {
+    const block = blockAt(output, f);
+    const row = block?.movements?.[f.movement_index];
+    if (!row || (row.movement ?? "").trim().toLowerCase() !== (f.movement ?? "").trim().toLowerCase()) continue;
+    const to = canonical(r.vocabulary, f.replacement?.movement);
+    if (!to || isRuledOutByName(to, r.doNotProgram) || to.toLowerCase() === row.movement.trim().toLowerCase()) {
+      unresolved.push(f);
+      continue;
+    }
+    block!.movements![f.movement_index] = swap(row, to, f.replacement);
+    applied.push(`${where(f)}: "${f.movement}" replaced with "${to}" — ${f.reason}`);
+  }
+  return { applied, unresolved };
+}
+
+/**
+ * The guarantee. For each location: use the stored substitute when it is a
+ * usable vocabulary movement, else remove the movement. No AI; cannot fail.
+ * Locations are handled last-to-first so removals do not shift the others.
+ */
+export function takeOutByRule(output: WriterOutput, locs: Array<Loc & { movement: string; reason?: string }>, r: Restrictions): string[] {
+  const actions: string[] = [];
+  const ordered = [...locs].sort((a, b) =>
+    (b.week_num - a.week_num) || (b.day_num - a.day_num) || (b.block_index - a.block_index) || (b.movement_index - a.movement_index));
+  for (const l of ordered) {
+    const block = blockAt(output, l);
+    const row = block?.movements?.[l.movement_index];
+    if (!row || (row.movement ?? "").trim().toLowerCase() !== l.movement.trim().toLowerCase()) continue;
+    const key = plainName(l.movement);
+    const stored = (r.suggestedSubs ?? []).find((s) => plainName(s.instead_of ?? "") === key || (s.instead_of ?? "").trim().toLowerCase() === l.movement.trim().toLowerCase());
+    const to = canonical(r.vocabulary, stored?.use);
+    if (to && !isRuledOutByName(to, r.doNotProgram)) {
+      block!.movements![l.movement_index] = swap(row, to);
+      actions.push(`${where(l)}: "${l.movement}" replaced with stored substitute "${to}"`);
+    } else {
+      removeMovement(output, l);
+      actions.push(`${where(l)}: "${l.movement}" removed (no usable substitute)${l.reason ? ` — ${l.reason}` : ""}`);
+    }
+  }
+  return actions;
+}
+
+// ── The judge ──────────────────────────────────────────────────────────────
+
+const JUDGE_SYSTEM = `You check AI-written training against ONE athlete's physical restrictions. Nothing else is your job: not variety, not balance, not difficulty.
+
+You receive the athlete's restrictions (their own words, and a list of movements never to program), the list of movements that may be used, and the written training as JSON.
+
+Flag a movement when doing it would go against what the athlete said:
+  - It is on the never-program list, under any name, distance, load or variation. "No running" rules out Run, 400m Run, Shuttle Run, Treadmill Run and an easy jog alike.
+  - The athlete's own words rule it out even though the list does not name it ("runner's knee, no lunges" rules out every lunge and split-squat variation).
+  - It plainly loads an injured area the athlete asked to protect.
+Check EVERY block: warm-up, mobility, skills, strength, accessory, metcon, cool-down. An easy version is still a version: "easy pace" does not make a banned movement acceptable.
+
+Do NOT flag:
+  - Movements that are merely near a restriction but do not load the area the athlete named.
+  - Anything the athlete did not ask to avoid. Their words are the ground truth; do not invent restrictions.
+
+For every flagged movement give a replacement the athlete CAN do, chosen from the allowed list, that keeps the block's purpose (an easy cardio flush stays an easy cardio flush on a different machine; a pulling accessory stays a pull). The replacement must not itself go against the restrictions. Give its quantity when the original quantity would not make sense for it (for example a time in seconds for a machine in place of a distance run).
+
+Report through the report tool. Locations use the JSON's own week_num and day_num, block_index = the block's position in that day's blocks array (first is 0), movement_index = the movement's position in that block's movements array (first is 0), and movement = the name exactly as written.`;
+
+const JUDGE_TOOL = {
+  name: "report_restriction_check",
+  description: "Report every movement that goes against the athlete's restrictions, each with a replacement from the allowed list.",
+  input_schema: {
+    type: "object",
+    properties: {
+      findings: {
+        type: "array",
+        description: "Empty when the training respects every restriction.",
+        items: {
+          type: "object",
+          properties: {
+            week_num: { type: "integer" },
+            day_num: { type: "integer" },
+            block_index: { type: "integer", minimum: 0 },
+            movement_index: { type: "integer", minimum: 0 },
+            movement: { type: "string" },
+            reason: { type: "string", maxLength: 240 },
+            replacement: {
+              type: "object",
+              properties: {
+                movement: { type: "string", description: "A name from the allowed list, exactly as listed." },
+                sets: { type: "integer", minimum: 1 },
+                reps: { type: "integer", minimum: 1 },
+                time_seconds: { type: "integer", minimum: 1 },
+                distance: { type: "number", minimum: 1 },
+                distance_unit: { type: "string", enum: ["ft", "m"] },
+                calories: { type: "integer", minimum: 1 },
+                scaling_note: { type: "string", maxLength: 200 },
+              },
+              required: ["movement"],
+              additionalProperties: false,
+            },
+          },
+          required: ["week_num", "day_num", "block_index", "movement_index", "movement", "reason", "replacement"],
+          additionalProperties: false,
+        },
+      },
+    },
+    required: ["findings"],
+    additionalProperties: false,
+  },
+};
+
+/** The output reduced to what the judge needs: locations and movement lines. */
+export function compactForJudge(output: WriterOutput): unknown {
+  return {
+    weeks: (output.weeks ?? []).map((w) => ({
+      week_num: w.week_num,
+      days: (w.days ?? []).map((d) => ({
+        day_num: d.day_num,
+        blocks: (d.blocks ?? []).map((b, bi) => {
+          const blk = b as AnyBlock & { block_label?: string; block_scheme?: string };
+          return {
+            block_index: bi,
+            block_type: blk.block_type,
+            ...(blk.block_label ? { label: blk.block_label } : {}),
+            ...(blk.block_scheme ? { scheme: blk.block_scheme } : {}),
+            movements: (blk.movements ?? []).map((m, mi) => ({
+              movement_index: mi,
+              movement: m.movement,
+              ...(m.sets != null ? { sets: m.sets } : {}),
+              ...(m.reps != null ? { reps: m.reps } : {}),
+              ...(m.rep_scheme ? { rep_scheme: m.rep_scheme } : {}),
+              ...(m.weight != null ? { weight: m.weight, unit: m.weight_unit } : {}),
+              ...(m.time_seconds != null ? { time_seconds: m.time_seconds } : {}),
+              ...(m.distance != null ? { distance: m.distance, distance_unit: m.distance_unit } : {}),
+              ...(m.calories != null ? { calories: m.calories } : {}),
+              ...(m.scaling_note ? { note: m.scaling_note } : {}),
+            })),
+          };
+        }),
+      })),
+    })),
+  };
+}
+
+export function judgeUserMessage(output: WriterOutput, r: Restrictions): string {
+  const allowed = (r.vocabulary ?? []).filter((v) => !isRuledOutByName(v, r.doNotProgram));
+  return [
+    restrictionsForPrompt(r.injuriesText, r.doNotProgram) || "ABSOLUTE RESTRICTIONS: (none stated)",
+    "",
+    `ALLOWED MOVEMENTS (choose replacements only from these): ${allowed.join(", ")}`,
+    "",
+    "WRITTEN TRAINING (JSON):",
+    JSON.stringify(compactForJudge(output)),
+    "",
+    "Check every movement in every block against the restrictions and report through the tool.",
+  ].join("\n");
+}
+
+type Judge = (output: WriterOutput, r: Restrictions) => Promise<Finding[] | null>;
+
+/** Ask the judge. Returns null when it could not be reached or answered
+ *  unreadably (after one retry) — the caller then relies on the rule step. */
+export const askJudge: Judge = async (output, r) => {
+  if (!ANTHROPIC_API_KEY) return null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const resp = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
+        body: JSON.stringify({
+          model: MODEL,
+          max_tokens: 4096,
+          stream: false,
+          system: JUDGE_SYSTEM,
+          tools: [JUDGE_TOOL],
+          tool_choice: { type: "tool", name: JUDGE_TOOL.name },
+          messages: [{ role: "user", content: judgeUserMessage(output, r) }],
+        }),
+        signal: AbortSignal.timeout(45_000),
+      });
+      if (!resp.ok) {
+        console.error(`[restriction-gate] judge HTTP ${resp.status}: ${(await resp.text().catch(() => "")).slice(0, 300)}`);
+        continue;
+      }
+      const data = await resp.json();
+      const tool = (data.content ?? []).find((b: { type?: string; name?: string }) => b.type === "tool_use" && b.name === JUDGE_TOOL.name);
+      const findings = (tool?.input as { findings?: unknown } | undefined)?.findings;
+      if (!Array.isArray(findings)) {
+        console.error("[restriction-gate] judge answer unreadable:", JSON.stringify(data).slice(0, 300));
+        continue;
+      }
+      return findings.filter((f): f is Finding =>
+        !!f && typeof f === "object" &&
+        Number.isInteger((f as Finding).week_num) && Number.isInteger((f as Finding).day_num) &&
+        Number.isInteger((f as Finding).block_index) && Number.isInteger((f as Finding).movement_index) &&
+        typeof (f as Finding).movement === "string");
+    } catch (e) {
+      console.error("[restriction-gate] judge call failed:", e instanceof Error ? e.message : String(e));
+    }
+  }
+  return null;
+};
+
+// ── The gate ───────────────────────────────────────────────────────────────
+
+/**
+ * Run the gate over a written output, mutating it in place. Always returns;
+ * never throws; after it returns no movement the judge flagged in its final
+ * reading, and no avoid-list name or plain variant, remains in `output`.
+ *
+ * `judge` is injectable for tests. `maxReviews` bounds the AI calls: review,
+ * fix, review again; whatever the last reading flags is taken out by rule.
+ */
+export async function runRestrictionGate(
+  output: WriterOutput,
+  r: Restrictions,
+  opts: { judge?: Judge; maxReviews?: number } = {},
+): Promise<GateReport> {
+  const report: GateReport = { actions: [], reviews: 0, judgeUnavailable: false };
+  const judge = opts.judge ?? askJudge;
+  const maxReviews = Math.max(1, opts.maxReviews ?? 2);
+
+  try {
+    if (hasInjuryText(r.injuriesText)) {
+      for (let round = 1; round <= maxReviews; round++) {
+        const findings = await judge(output, r);
+        if (findings == null) { report.judgeUnavailable = true; break; }
+        report.reviews++;
+        if (findings.length === 0) break;
+        const { applied, unresolved } = applyFindings(output, findings, r);
+        report.actions.push(...applied);
+        const last = round === maxReviews;
+        // Anything the judge flagged without a usable replacement comes out by
+        // rule at once; on the last reading so does everything it flagged.
+        const still = last
+          ? findings.filter((f) => {
+            const row = blockAt(output, f)?.movements?.[f.movement_index];
+            return !!row && row.movement.trim().toLowerCase() === (f.movement ?? "").trim().toLowerCase();
+          })
+          : unresolved;
+        if (still.length > 0) report.actions.push(...takeOutByRule(output, still, r));
+        if (applied.length === 0 && unresolved.length === 0) break; // stale locations only
+      }
+    }
+  } catch (e) {
+    // The judge path must never stop a week from shipping.
+    report.judgeUnavailable = true;
+    console.error("[restriction-gate] judge path failed:", e instanceof Error ? e.message : String(e));
+  }
+
+  // The guarantee, with or without the judge: no avoid-list name survives.
+  try {
+    const hits = nameHits(output, r.doNotProgram);
+    if (hits.length > 0) report.actions.push(...takeOutByRule(output, hits.map((h) => ({ ...h, reason: "on the avoid list" })), r));
+  } catch (e) {
+    console.error("[restriction-gate] rule step failed:", e instanceof Error ? e.message : String(e));
+  }
+  return report;
+}
