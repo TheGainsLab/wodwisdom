@@ -1083,6 +1083,11 @@ export default function AthletePage({ session }: { session: Session }) {
         // vanished-goal incident, 2026-10-13). Apply only fields that differ
         // from the server copy; marking dirty re-raises the floating pill so
         // the save that clears the draft gets prompted.
+        // True when an unsaved draft was put back into the form. The page must
+        // then STAY marked as changed: this load used to reset the mark a few
+        // lines below, which hid the save prompt and let the draft be deleted
+        // from storage, so the restored edits were lost on the next navigation.
+        let draftRestored = false;
         try {
           const rawDraft = localStorage.getItem(`t3draft:${session.user.id}`);
           if (rawDraft) {
@@ -1101,13 +1106,13 @@ export default function AthletePage({ session }: { session: Session }) {
             if (dr.intake && typeof dr.intake === 'object' && JSON.stringify(dr.intake) !== loadedIntakeRef.current) {
               setIntakeAnswers(dr.intake);
             }
-            if (dirtied) markDirty();
+            if (dirtied) { markDirty(); draftRestored = true; }
           }
         } catch { /* storage unavailable or corrupt draft — drafts are best-effort */ }
         setEvalCreditsRemaining(typeof d.eval_credits_remaining === 'number' ? d.eval_credits_remaining : 1);
         setCompetitionAthleteId((d as any).competition_athlete_id ?? null);
         setCompetitionAthleteLabel((d as any).competition_athlete_label ?? null);
-        setIsDirty(false);
+        if (!draftRestored) setIsDirty(false);
       }
       if (evalRes.data) {
         setEvaluations(evalRes.data);
