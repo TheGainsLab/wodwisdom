@@ -2,7 +2,7 @@
 import { assert, assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import {
   applyFindings, type Finding, hasInjuryText, isRuledOutByName, judgeUserMessage, nameHits, plainName,
-  type Restrictions, restrictionsForPrompt, runRestrictionGate, takeOutByRule,
+  removeByRule, type Restrictions, restrictionsForPrompt, runRestrictionGate,
 } from "./restriction-gate.ts";
 // deno-lint-ignore no-explicit-any
 type Any = any;
@@ -13,7 +13,8 @@ const VOCAB = ["Run", "Shuttle Run", "Bike", "Row", "Ring Row", "Walking Lunge",
 const ERIC: Restrictions = {
   injuriesText: "Runners Knee, no lunges or back squats",
   doNotProgram: ["running", "100m run", "400m run", "mile run", "back squat", "lunge", "walking lunge", "box jump"],
-  suggestedSubs: [{ instead_of: "running", use: "Bike" }, { instead_of: "back squat", use: "Glute Bridge" }],
+  // As really stored: phrases, not catalogue names.
+  suggestedSubs: [{ instead_of: "Running", use: "Row (Concept2) or Bike Erg (low resistance, flat foot)" }, { instead_of: "Back Squat", use: "Seated Leg Press (if available) or Sled Push" }],
   vocabulary: VOCAB,
 };
 
@@ -100,21 +101,23 @@ Deno.test("a replacement that is not a real movement, or is itself ruled out, is
   assertEquals(names(o), names(week()));
 });
 
-Deno.test("the rule step: stored substitute when usable, otherwise the movement is removed", () => {
+Deno.test("the last resort removes; a block that was only the banned movement is dropped", () => {
   const o = week();
-  const acts = takeOutByRule(o, nameHits(o, ERIC.doNotProgram), ERIC);
+  const acts = removeByRule(o, nameHits(o, ERIC.doNotProgram));
   assertEquals(acts.length, 2);
-  assertEquals(o.weeks[0].days[0].blocks[3].movements[0].movement, "Bike"); // "running" → Bike
-  assertEquals(o.weeks[0].days[1].blocks[0].movements[0].movement, "Bike");
-  const o2 = week();
-  takeOutByRule(o2, nameHits(o2, ERIC.doNotProgram), { ...ERIC, suggestedSubs: [] });
-  assertEquals(o2.weeks[0].days[0].blocks[3].movements.map((m: Any) => m.movement), ["Hip Flexor Stretch"]); // run removed, stretch kept
-  assertEquals(o2.weeks[0].days[1].blocks.length, 0); // a block that was only the run is dropped
+  assertEquals(o.weeks[0].days[0].blocks[3].movements.map((m: Any) => m.movement), ["Hip Flexor Stretch"]); // run removed, stretch kept
+  assertEquals(o.weeks[0].days[1].blocks.length, 0);
+});
+
+Deno.test("stored substitutes reach the AI as guidance; known conflicts are handed to it by location", () => {
+  const msg = judgeUserMessage(week(), ERIC, [{ week_num: 1, day_num: 2, block_index: 0, movement_index: 0, movement: "Run" }]);
+  assert(msg.includes("Running → Row (Concept2) or Bike Erg (low resistance, flat foot)"));
+  assert(msg.includes('ALREADY KNOWN') && msg.includes('week 1 day 2 block_index 0 movement_index 0 "Run"'));
 });
 
 Deno.test("removing a station from an EMOM keeps its map and minutes consistent", () => {
   const o = week();
-  takeOutByRule(o, [{ week_num: 1, day_num: 1, block_index: 2, movement_index: 1, movement: "Shuttle Run" }], { ...ERIC, suggestedSubs: [] });
+  removeByRule(o, [{ week_num: 1, day_num: 1, block_index: 2, movement_index: 1, movement: "Shuttle Run" }]);
   const b = o.weeks[0].days[0].blocks[2];
   assertEquals(b.movements.map((m: Any) => m.movement), ["Row", "Push Up"]);
   assertEquals(b.scheme_format.stations, [[0], [1]]);
@@ -163,11 +166,26 @@ Deno.test("GATE — a judge that keeps offering bad replacements cannot leave th
   assert(!names(o).flat(2).includes("Shuttle Run"));
 });
 
-Deno.test("GATE — no injury text: no AI call; equipment-only avoid list is still enforced by name", async () => {
+Deno.test("GATE — a name the second look spots is handed to the AI, which chooses the replacement", async () => {
   const o = week();
-  let calls = 0;
-  const rep = await runRestrictionGate(o, { injuriesText: "None", doNotProgram: ["Row"], suggestedSubs: [], vocabulary: VOCAB }, { judge: () => { calls++; return Promise.resolve([]); } });
-  assertEquals(calls, 0); assertEquals(rep.reviews, 0);
+  const seen: Any[] = [];
+  const judge = (_o: Any, _r: Any, must?: Any[]) => {
+    seen.push(must ?? null);
+    if (!must) return Promise.resolve([]); // the reading itself misses the runs
+    return Promise.resolve(must.map((m) => ({ ...m, reason: "no running", replacement: { movement: "Bike", time_seconds: 240 } })));
+  };
+  await runRestrictionGate(o, ERIC, { judge });
+  assertEquals(seen[seen.length - 1].map((m: Any) => m.movement), ["Run", "Run"]);
+  assertEquals(o.weeks[0].days[0].blocks[3].movements[0], { movement: "Bike", time_seconds: 240, scaling_note: "Easy pace" });
+  assertEquals(o.weeks[0].days[1].blocks[0].movements[0].movement, "Bike"); // swapped, not deleted
+});
+
+Deno.test("GATE — no injury text: no reading; an avoid-list name still comes out", async () => {
+  const o = week();
+  let readings = 0;
+  const rep = await runRestrictionGate(o, { injuriesText: "None", doNotProgram: ["Row"], suggestedSubs: [], vocabulary: VOCAB }, { judge: (_o: Any, _r: Any, must?: Any[]) => { if (!must) readings++; return Promise.resolve([]); } });
+  assertEquals(readings, 0);
+  assert(rep.actions.length === 1);
   assert(!names(o).flat(2).includes("Row"));
   assert(names(o).flat(2).includes("Run")); // nothing rules running out for this athlete
 });
