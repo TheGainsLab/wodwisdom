@@ -1,0 +1,226 @@
+{
+ "p121": {
+  "format": "amrap",
+  "scheme_as_written": "AMRAP 20",
+  "duration_seconds": 1200,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Bike",
+    "amount": "not prescribed"
+   },
+   {
+    "order": 2,
+    "movement": "Toes To Bar",
+    "reps": 12
+   },
+   {
+    "order": 3,
+    "movement": "Dumbbell Box Step Up (20 in)",
+    "reps": 12,
+    "load_lb": 35,
+    "load_x_bodyweight": 0.19
+   },
+   {
+    "order": 4,
+    "movement": "Push Up",
+    "reps": 12
+   }
+  ]
+ },
+ "p122": {
+  "format": "intervals",
+  "scheme_as_written": "3 rounds: 5:00 on / 1:00 off",
+  "work_periods": 3,
+  "work_seconds_each": 300,
+  "rest_seconds_between": 60,
+  "reps_are": "per work period",
+  "rest": "60 seconds between work periods",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Row",
+    "distance_m": 350
+   },
+   {
+    "order": 2,
+    "movement": "Air Squat",
+    "reps": 15
+   },
+   {
+    "order": 3,
+    "movement": "Ring Row",
+    "reps": 10
+   },
+   {
+    "order": 4,
+    "movement": "Double Under",
+    "reps": 30
+   }
+  ]
+ },
+ "p123": {
+  "format": "amrap",
+  "scheme_as_written": "AMRAP 20",
+  "duration_seconds": 1200,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Bike",
+    "amount": "not prescribed"
+   },
+   {
+    "order": 2,
+    "movement": "Handstand Push Up",
+    "reps": 12
+   },
+   {
+    "order": 3,
+    "movement": "Walking Lunge",
+    "distance_ft": 50
+   },
+   {
+    "order": 4,
+    "movement": "Toes To Bar",
+    "reps": 8
+   }
+  ]
+ },
+ "p124": {
+  "format": "amrap",
+  "duration_seconds": 480,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Deadlift",
+    "reps": 10,
+    "load_lb": 135,
+    "load_x_bodyweight": 0.73
+   },
+   {
+    "order": 2,
+    "movement": "Box Jump",
+    "reps": 15
+   },
+   {
+    "order": 3,
+    "movement": "Deadlift",
+    "reps": 15,
+    "load_lb": 185,
+    "load_x_bodyweight": 1.0
+   },
+   {
+    "order": 4,
+    "movement": "Box Jump",
+    "reps": 15
+   },
+   {
+    "order": 5,
+    "movement": "Deadlift",
+    "reps": 20,
+    "load_lb": 225,
+    "load_x_bodyweight": 1.21
+   },
+   {
+    "order": 6,
+    "movement": "Box Jump",
+    "reps": 15
+   },
+   {
+    "order": 7,
+    "movement": "Deadlift",
+    "reps": 25,
+    "load_lb": 275,
+    "load_x_bodyweight": 1.48
+   },
+   {
+    "order": 8,
+    "movement": "Box Jump",
+    "reps": 15
+   },
+   {
+    "order": 9,
+    "movement": "Deadlift",
+    "reps": 30,
+    "load_lb": 315,
+    "load_x_bodyweight": 1.7
+   },
+   {
+    "order": 10,
+    "movement": "Box Jump",
+    "reps": 15
+   },
+   {
+    "order": 11,
+    "movement": "Deadlift",
+    "reps": 35,
+    "load_lb": 365,
+    "load_x_bodyweight": 1.97
+   },
+   {
+    "order": 12,
+    "movement": "Box Jump",
+    "reps": 15
+   }
+  ]
+ },
+ "p125": {
+  "format": "intervals",
+  "scheme_as_written": "4 rounds: 4:00 on / 1:00 off",
+  "work_periods": 4,
+  "work_seconds_each": 240,
+  "rest_seconds_between": 60,
+  "reps_are": "per work period",
+  "rest": "60 seconds between work periods",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Row",
+    "distance_m": 400
+   },
+   {
+    "order": 2,
+    "movement": "Burpee",
+    "reps": 10
+   },
+   {
+    "order": 3,
+    "movement": "Air Squat",
+    "reps": 15
+   }
+  ]
+ },
+ "p126": {
+  "format": "for_time",
+  "scheme_as_written": "21-15-9 for time (15-min cap)",
+  "time_cap_seconds": 900,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "structure": "three rounds of 21, 15 and 9 of each movement",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Dumbbell Thruster",
+    "reps": 45,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 2,
+    "movement": "Bar Facing Burpee",
+    "reps": 45
+   },
+   {
+    "order": 3,
+    "movement": "GHD Sit Up",
+    "reps": 45
+   }
+  ]
+ }
+}

@@ -1,0 +1,201 @@
+{
+ "p141": {
+  "format": "amrap",
+  "duration_seconds": 1020,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Burpee",
+    "reps": 40
+   },
+   {
+    "order": 2,
+    "movement": "Snatch",
+    "reps": 30,
+    "load_lb": 75,
+    "load_x_bodyweight": 0.4
+   },
+   {
+    "order": 3,
+    "movement": "Burpee",
+    "reps": 30
+   },
+   {
+    "order": 4,
+    "movement": "Snatch",
+    "reps": 30,
+    "load_lb": 135,
+    "load_x_bodyweight": 0.73
+   },
+   {
+    "order": 5,
+    "movement": "Burpee",
+    "reps": 20
+   },
+   {
+    "order": 6,
+    "movement": "Snatch",
+    "reps": 30,
+    "load_lb": 165,
+    "load_x_bodyweight": 0.89
+   },
+   {
+    "order": 7,
+    "movement": "Burpee",
+    "reps": 10
+   },
+   {
+    "order": 8,
+    "movement": "Snatch",
+    "reps_pattern": "as many as possible in the time remaining",
+    "load_lb": 210,
+    "load_x_bodyweight": 1.13
+   }
+  ]
+ },
+ "p142": {
+  "format": "amrap",
+  "scheme_as_written": "AMRAP 22",
+  "duration_seconds": 1320,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Assault Bike",
+    "amount": "not prescribed"
+   },
+   {
+    "order": 2,
+    "movement": "Dumbbell Hang Clean And Jerk",
+    "reps": 10,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 3,
+    "movement": "Toes To Bar",
+    "reps": 10
+   },
+   {
+    "order": 4,
+    "movement": "Box Jump Over (24 in)",
+    "reps": 10
+   }
+  ]
+ },
+ "p143": {
+  "format": "for_time",
+  "scheme_as_written": "For time (10-min cap)",
+  "time_cap_seconds": 600,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Run",
+    "distance_m": 600
+   },
+   {
+    "order": 2,
+    "movement": "Burpee",
+    "reps": 20
+   },
+   {
+    "order": 3,
+    "movement": "Knee Raise",
+    "reps": 20
+   }
+  ]
+ },
+ "p144": {
+  "format": "amrap",
+  "scheme_as_written": "AMRAP 20",
+  "duration_seconds": 1200,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Wall Ball",
+    "reps": 15,
+    "load_lb": 20,
+    "load_x_bodyweight": 0.11
+   },
+   {
+    "order": 2,
+    "movement": "Row",
+    "distance_m": 250
+   },
+   {
+    "order": 3,
+    "movement": "Box Jump (24 in, step down)",
+    "reps": 10
+   }
+  ]
+ },
+ "p145": {
+  "format": "amrap",
+  "scheme_as_written": "AMRAP 18",
+  "duration_seconds": 1080,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Assault Bike",
+    "amount": "not prescribed"
+   },
+   {
+    "order": 2,
+    "movement": "Wall Walk",
+    "reps": 2
+   },
+   {
+    "order": 3,
+    "movement": "Sit Up",
+    "reps": 12
+   },
+   {
+    "order": 4,
+    "movement": "Lunge",
+    "reps": 16
+   }
+  ]
+ },
+ "p146": {
+  "format": "emom",
+  "scheme_as_written": "EMOM 12 - min 1: Hang Power Clean; min 2: Shuttle Run; min 3: Pull Up; min 4: Assault Bike. Rest remainder of each minute.",
+  "duration_seconds": 720,
+  "reps_are": "per station visit",
+  "rest": "remainder of each minute",
+  "structure": "one station per minute, rotating; 3 visits to each station",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Hang Power Clean",
+    "reps": 5,
+    "load_lb": 100,
+    "load_x_bodyweight": 0.54
+   },
+   {
+    "order": 2,
+    "movement": "Shuttle Run",
+    "reps": 2,
+    "distance_ft": 100
+   },
+   {
+    "order": 3,
+    "movement": "Pull Up",
+    "reps": 8
+   },
+   {
+    "order": 4,
+    "movement": "Assault Bike",
+    "amount": "not prescribed"
+   }
+  ]
+ }
+}

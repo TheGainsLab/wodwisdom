@@ -1,0 +1,197 @@
+{
+ "p111": {
+  "format": "amrap",
+  "duration_seconds": 420,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Snatch",
+    "reps": 10,
+    "load_lb": 75,
+    "load_x_bodyweight": 0.4
+   },
+   {
+    "order": 2,
+    "movement": "Bar Muscle-up",
+    "reps": 3
+   }
+  ]
+ },
+ "p112": {
+  "format": "for_time",
+  "scheme_as_written": "For time (20-min cap)",
+  "time_cap_seconds": 1200,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Bike",
+    "amount": "not prescribed"
+   },
+   {
+    "order": 2,
+    "movement": "Deadlift",
+    "reps": 20,
+    "load_lb": 200,
+    "load_x_bodyweight": 1.08
+   },
+   {
+    "order": 3,
+    "movement": "Toes To Bar",
+    "reps": 20
+   },
+   {
+    "order": 4,
+    "movement": "Front Rack Walking Lunge",
+    "distance_ft": 50,
+    "load_lb": 115,
+    "load_x_bodyweight": 0.62
+   },
+   {
+    "order": 5,
+    "movement": "Double Under",
+    "reps": 100
+   },
+   {
+    "order": 6,
+    "movement": "Row",
+    "distance_m": 750
+   }
+  ]
+ },
+ "p113": {
+  "format": "intervals",
+  "scheme_as_written": "3 rounds: 5:00 on / 1:00 off",
+  "work_periods": 3,
+  "work_seconds_each": 300,
+  "rest_seconds_between": 60,
+  "reps_are": "per work period",
+  "rest": "60 seconds between work periods",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Row",
+    "distance_m": 300
+   },
+   {
+    "order": 2,
+    "movement": "Wall Ball",
+    "reps": 15,
+    "load_lb": 20,
+    "load_x_bodyweight": 0.11
+   },
+   {
+    "order": 3,
+    "movement": "Handstand Walk",
+    "distance_ft": 25
+   },
+   {
+    "order": 4,
+    "movement": "Sit Up",
+    "reps": 15
+   }
+  ]
+ },
+ "p114": {
+  "format": "for_time",
+  "scheme_as_written": "For time (22-min cap)",
+  "time_cap_seconds": 1320,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Run",
+    "distance_m": 800
+   },
+   {
+    "order": 2,
+    "movement": "Kipping Pull Up",
+    "reps": 30
+   },
+   {
+    "order": 3,
+    "movement": "Front Squat",
+    "reps": 20,
+    "load_lb": 155,
+    "load_x_bodyweight": 0.84
+   },
+   {
+    "order": 4,
+    "movement": "Box Jump (24 in, step down)",
+    "reps": 30
+   },
+   {
+    "order": 5,
+    "movement": "GHD Sit Up",
+    "reps": 20
+   },
+   {
+    "order": 6,
+    "movement": "Row",
+    "distance_m": 1000
+   }
+  ]
+ },
+ "p115": {
+  "format": "for_time",
+  "scheme_as_written": "4 rounds for time (18-min cap)",
+  "time_cap_seconds": 1080,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "structure": "4 rounds of 400 m run, 8 snatches, 50 double-unders",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Run",
+    "distance_m": 1600
+   },
+   {
+    "order": 2,
+    "movement": "Power Snatch",
+    "reps": 32,
+    "load_lb": 80,
+    "load_x_bodyweight": 0.43
+   },
+   {
+    "order": 3,
+    "movement": "Double Under",
+    "reps": 200
+   }
+  ]
+ },
+ "p116": {
+  "format": "intervals",
+  "scheme_as_written": "3 rounds: 4:00 on / 1:00 off",
+  "work_periods": 3,
+  "work_seconds_each": 240,
+  "rest_seconds_between": 60,
+  "reps_are": "per work period",
+  "rest": "60 seconds between work periods",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Row",
+    "distance_m": 300
+   },
+   {
+    "order": 2,
+    "movement": "Toes To Bar",
+    "reps": 6
+   },
+   {
+    "order": 3,
+    "movement": "Air Squat",
+    "reps": 12
+   },
+   {
+    "order": 4,
+    "movement": "Sit Up",
+    "reps": 10
+   }
+  ]
+ }
+}

@@ -1,0 +1,171 @@
+{
+ "p241": {
+  "format": "amrap",
+  "scheme_as_written": "AMRAP 20",
+  "duration_seconds": 1200,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Bike",
+    "amount": "not prescribed"
+   },
+   {
+    "order": 2,
+    "movement": "Toes To Bar",
+    "reps": 10
+   },
+   {
+    "order": 3,
+    "movement": "Deadlift",
+    "reps": 8,
+    "load_lb": 200,
+    "load_x_bodyweight": 1.08
+   },
+   {
+    "order": 4,
+    "movement": "Double Under",
+    "reps": 40
+   }
+  ]
+ },
+ "p242": {
+  "format": "for_time",
+  "scheme_as_written": "For time (10-min cap)",
+  "time_cap_seconds": 600,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Run",
+    "distance_m": 600
+   },
+   {
+    "order": 2,
+    "movement": "Burpee",
+    "reps": 20
+   },
+   {
+    "order": 3,
+    "movement": "Knee Raise",
+    "reps": 20
+   }
+  ]
+ },
+ "p243": {
+  "format": "amrap",
+  "scheme_as_written": "AMRAP 20",
+  "duration_seconds": 1200,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Bike",
+    "amount": "not prescribed"
+   },
+   {
+    "order": 2,
+    "movement": "Handstand Push Up",
+    "reps": 12
+   },
+   {
+    "order": 3,
+    "movement": "Walking Lunge",
+    "distance_ft": 50
+   },
+   {
+    "order": 4,
+    "movement": "Toes To Bar",
+    "reps": 8
+   }
+  ]
+ },
+ "p244": {
+  "format": "intervals",
+  "scheme_as_written": "3 rounds: 5:00 on / 1:00 off",
+  "work_periods": 3,
+  "work_seconds_each": 300,
+  "rest_seconds_between": 60,
+  "reps_are": "per work period",
+  "rest": "60 seconds between work periods",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Row",
+    "distance_m": 350
+   },
+   {
+    "order": 2,
+    "movement": "Air Squat",
+    "reps": 15
+   },
+   {
+    "order": 3,
+    "movement": "Ring Row",
+    "reps": 10
+   },
+   {
+    "order": 4,
+    "movement": "Double Under",
+    "reps": 30
+   }
+  ]
+ },
+ "p245": {
+  "format": "for_time",
+  "scheme_as_written": "21-15-9 for time (15-min cap)",
+  "time_cap_seconds": 900,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "structure": "three rounds of 21, 15 and 9 of each movement",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Dumbbell Thruster",
+    "reps": 45,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 2,
+    "movement": "Bar Facing Burpee",
+    "reps": 45
+   },
+   {
+    "order": 3,
+    "movement": "GHD Sit Up",
+    "reps": 45
+   }
+  ]
+ },
+ "p246": {
+  "format": "emom",
+  "scheme_as_written": "EMOM 12 - min 1: Power Clean; min 2: Burpee; min 3: Assault Bike. Rest remainder of each minute.",
+  "duration_seconds": 720,
+  "reps_are": "per station visit",
+  "rest": "remainder of each minute",
+  "structure": "one station per minute, rotating; 4 visits to each station",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Power Clean",
+    "reps": 4,
+    "load_lb": 135,
+    "load_x_bodyweight": 0.73
+   },
+   {
+    "order": 2,
+    "movement": "Burpee",
+    "reps": 8
+   },
+   {
+    "order": 3,
+    "movement": "Assault Bike",
+    "amount": "not prescribed"
+   }
+  ]
+ }
+}
