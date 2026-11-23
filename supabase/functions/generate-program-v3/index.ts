@@ -55,7 +55,7 @@ import {
   classifyFailuresByKind,
 } from "../_shared/audit-runner.ts";
 import { stripInternalMarkers, enforceNoLabelOnCoachedBlocks } from "../_shared/programmatic-fixes.ts";
-import { runRestrictionGate } from "../_shared/restriction-gate.ts";
+import { athleteWordsElsewhere, runRestrictionGate } from "../_shared/restriction-gate.ts";
 import { saveProgramV3 } from "../_shared/save-program-v3.ts";
 import { type BlockLocation } from "../_shared/compute-block-benchmark.ts";
 // Engine core — the extracted generation pipeline. This function now CONSUMES the
@@ -874,8 +874,9 @@ async function stageSafetyReview(
   job: ProgramJobRow,
   rs: ResumeState,
 ): Promise<StageOutcome> {
-  // THE RESTRICTION GATE (2026-11-23) — no longer advisory. The written output
-  // is read against the athlete's own injury words and avoid list; anything
+  // THE RESTRICTION GATE (2026-11-23) — no longer advisory, never skipped. The
+  // written output is read against everything the athlete has said about
+  // their body (injury box, signup answers, notes) and their avoid list; anything
   // that goes against them is replaced, and whatever could not be replaced is
   // taken out by rule. It always returns and the week always goes on to save:
   // nothing is withheld and nobody is alerted. See _shared/restriction-gate.ts.
@@ -885,6 +886,7 @@ async function stageSafetyReview(
   const gate = await runRestrictionGate(output, {
     injuriesText: payload.training_context.injuries_constraints_text ?? null,
     doNotProgram: injuries?.do_not_program ?? [],
+    otherWords: athleteWordsElsewhere(payload.athlete_model?.self_report, payload.training_context.coach_notes),
     suggestedSubs: injuries?.suggested_subs ?? [],
     vocabulary: payload.vocabulary ?? [],
   });

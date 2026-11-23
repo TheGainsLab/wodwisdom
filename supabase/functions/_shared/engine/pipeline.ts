@@ -28,7 +28,7 @@ import type { Gender } from "../compute-benchmarks.ts";
 import type { DomainPack } from "../domain-packs/types.ts";
 import type { ComposedMetcon } from "../metcon-composer.ts";
 import { MODELS } from "../model-profiles.ts";
-import { restrictionsForPrompt } from "../restriction-gate.ts";
+import { athleteWordsElsewhere, restrictionsForPrompt } from "../restriction-gate.ts";
 
 /** Failure list shape from a hard-audit run (type-only; erased at runtime). */
 type AuditFailures = ReturnType<typeof runAudits>["failures"];
@@ -246,15 +246,11 @@ export async function callWeekFill(
     // The athlete's restrictions, in their own words, stated as an absolute
     // (2026-11-23): the old one-line "substitute or scale" let an easy run
     // into the cool-downs of an athlete who wrote "runner's knee".
-    ...(restrictionsForPrompt(
-        payload.training_context.injuries_constraints_text,
-        payload.training_context.injuries_structured?.do_not_program,
-      )
-      ? [restrictionsForPrompt(
-        payload.training_context.injuries_constraints_text,
-        payload.training_context.injuries_structured?.do_not_program,
-      )]
-      : ["- The athlete stated no injuries and has no avoid list."]),
+    restrictionsForPrompt(
+      payload.training_context.injuries_constraints_text,
+      payload.training_context.injuries_structured?.do_not_program,
+      athleteWordsElsewhere(payload.athlete_model?.self_report, payload.training_context.coach_notes),
+    ) || "- The athlete has stated no injury, pain or physical limit, and has no avoid list.",
     // Session-budget phase: honor the skeleton's time allocation when it
     // emitted one. Guidance only — nothing checks or enforces it.
     ...((payload.training_context.session_length_minutes ?? 0) > 0
