@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Workout profile: 12-axis radar</title>
+<style>
+:root{--surface:#fcfcfb;--panel:#ffffff;--text:#0b0b0b;--text2:#52514e;--muted:#a3a29b;--grid:#e4e3de;--s1:#2a78d6;--s2:#eb6834;--line:#d9d8d2}
+@media (prefers-color-scheme:dark){:root{--surface:#1a1a19;--panel:#222221;--text:#f0efec;--text2:#c3c2b7;--muted:#6f6e68;--grid:#383835;--s1:#3987e5;--s2:#d95926;--line:#44443f}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--surface);color:var(--text);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:760px;margin:0 auto;padding:24px 16px 48px}
+h1{font-size:20px;margin:0 0 4px}
+.sub{color:var(--text2);margin:0 0 18px}
+.controls{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px}
+label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--text2);flex:1;min-width:200px}
+select{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--text)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
+.wk{display:flex;gap:10px;align-items:flex-start;margin:0 0 6px}
+.sw{flex:none;width:12px;height:12px;border-radius:3px;margin-top:5px}
+.wk b{display:block}.wk span{color:var(--text2);font-size:13px}
+.summary{margin:8px 0 0;font-size:15px}
+.chart{position:relative;margin-top:6px}
+svg{display:block;width:100%;height:auto;overflow:visible}
+.ring{fill:none;stroke:var(--grid);stroke-width:1}
+.spoke{stroke:var(--grid);stroke-width:1}
+.tick{fill:var(--muted);font-size:10px}
+.ax{font-size:12.5px;fill:var(--text)}
+.ax.dim{fill:var(--muted)}
+.grp{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;fill:var(--text2)}
+.sep{stroke:var(--line);stroke-width:1.5;stroke-dasharray:3 4}
+svg.small .ax{font-size:19px}svg.small .grp{font-size:15px}svg.small .tick{font-size:14px}
+.poly{stroke-width:2;stroke-linejoin:round;fill-opacity:.16}
+.dot{stroke:var(--panel);stroke-width:2}
+.hit{fill:transparent;cursor:default}
+#tip{position:absolute;pointer-events:none;background:var(--text);color:var(--surface);padding:6px 9px;border-radius:7px;font-size:12.5px;white-space:nowrap;transform:translate(-50%,-120%);opacity:0;transition:opacity .08s}
+#tip b{font-weight:600}
+.note{color:var(--text2);font-size:12.5px;margin:10px 0 0}
+details{margin-top:14px}
+summary{cursor:pointer;color:var(--text2);font-size:13px}
+table{border-collapse:collapse;width:100%;margin-top:8px;font-size:13.5px}
+th,td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--grid)}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+tr.dim td{color:var(--muted)}
+</style>
+</head>
+<body>
+<main>
+<h1>Workout profile</h1>
+<p class="sub">Each workout as shares across the 12 axes (they add up to 100). Axes under 5 are greyed out.</p>
+<div class="controls">
+  <label>Workout<select id="a"></select></label>
+  <label>Compare with<select id="b"></select></label>
+</div>
+<div class="card">
+  <div id="heads"></div>
+  <p class="summary" id="summary"></p>
+  <div class="chart"><svg id="svg" viewBox="0 0 640 520" role="img" aria-labelledby="summary"></svg><div id="tip"></div></div>
+  <p class="note" id="scale"></p>
+  <details><summary>Show as a table</summary><div id="tbl"></div></details>
+</div>
+</main>
+<script>
+const DATA=[{"id": "19.5", "name": "Open 19.5", "desc": "33-27-21-15-9 for time: thrusters (95 lb) and chest-to-bar pull-ups", "v": [0.0, 1.8, 0.0, 16.5, 22.0, 0.0, 4.7, 2.5, 19.3, 14.7, 7.7, 10.8]}, {"id": "12.2", "name": "Open 12.2", "desc": "10 minutes: 30 snatches at 75 lb, 30 at 135, 30 at 165, then max at 210", "v": [44.2, 18.0, 8.5, 1.2, 0.0, 0.0, 4.5, 5.0, 2.8, 3.2, 10.3, 2.3]}, {"id": "19.1", "name": "Open 19.1", "desc": "15-minute AMRAP: 19 wall balls, 19-calorie row", "v": [0.0, 0.0, 3.5, 8.7, 0.0, 0.0, 2.5, 0.7, 25.8, 34.8, 7.7, 16.3]}, {"id": "18.4", "name": "Open 18.4", "desc": "For time: 21-15-9 deadlifts (225 lb) and handstand push-ups, then 21-15-9 deadlifts (315 lb) and 50-ft handstand walks", "v": [0.0, 21.7, 24.7, 3.3, 0.0, 17.3, 5.5, 9.0, 0.0, 1.3, 9.3, 7.8]}, {"id": "15.3", "name": "Open 15.3", "desc": "14-minute AMRAP: 7 muscle-ups, 50 wall balls, 100 double-unders", "v": [0.0, 0.0, 0.0, 8.2, 11.0, 7.2, 4.0, 14.7, 19.0, 17.8, 5.3, 12.8]}, {"id": "12.1", "name": "Open 12.1", "desc": "7 minutes of burpees", "v": [0.0, 0.0, 1.3, 9.7, 0.0, 0.0, 5.2, 1.7, 14.2, 26.7, 35.7, 5.7]}, {"id": "14.3", "name": "Open 14.3", "desc": "8 minutes: deadlift and box jump ladder, 135 to 365 lb", "v": [0.0, 23.5, 30.8, 0.0, 0.0, 0.0, 4.0, 0.5, 11.0, 4.0, 15.0, 11.2]}, {"id": "12.5", "name": "Open 12.5", "desc": "7 minutes: thrusters (100 lb) and chest-to-bar pull-ups, 3-6-9-12 and up", "v": [0.0, 3.5, 0.2, 14.7, 20.3, 0.0, 3.7, 2.7, 18.2, 6.2, 17.8, 12.8]}, {"id": "21.1", "name": "Open 21.1", "desc": "For time: wall walks and double-unders, 1-10 up to 21-210", "v": [0.0, 0.0, 0.0, 5.8, 0.0, 25.0, 12.3, 22.7, 1.0, 15.0, 7.8, 10.3]}];
+const AX=[["Olympic lifting","S"],["Powerlifting strength","S"],["Posterior chain","S"],["Upper-body pressing","S"],["Gymnastics pulling","G"],["Gymnastics pressing","G"],["Midline","G"],["Skill and coordination","G"],["Squat cycling","C"],["Aerobic capacity","C"],["Anaerobic capacity","C"],["Mixed-modal conditioning","C"]];
+const GROUPS=[["Strength",0,3],["Gymnastics and skill",4,7],["Conditioning",8,11]];
+const SHORT=["Olympic","Strength","Posterior chain","Pressing","Gym pulling","Gym pressing","Midline","Skill","Squat cycling","Aerobic","Anaerobic","Mixed-modal"];
+const CX=320,CY=262,R=170,DIM=5,NS="http://www.w3.org/2000/svg";let MAX=50;
+const narrow=matchMedia("(max-width:560px)");
+const $=id=>document.getElementById(id);
+const el=(n,a,t)=>{const e=document.createElementNS(NS,n);for(const k in a)e.setAttribute(k,a[k]);if(t!=null)e.textContent=t;return e};
+const ang=i=>(-90+15+i*30)*Math.PI/180;
+const pt=(i,v)=>{const r=R*Math.min(v,MAX)/MAX;return[CX+r*Math.cos(ang(i)),CY+r*Math.sin(ang(i))]};
+const selA=$("a"),selB=$("b");
+DATA.forEach((d,i)=>{selA.add(new Option(d.name+" · "+d.desc,i))});
+selB.add(new Option("Nothing",-1));DATA.forEach((d,i)=>{selB.add(new Option(d.name+" · "+d.desc,i))});
+selA.value=0;selB.value=-1;
+function words(v){const o=v.map((x,i)=>[x,AX[i][0].toLowerCase()]).filter(x=>x[0]>=10).sort((p,q)=>q[0]-p[0]);
+  if(!o.length)return"Spread thinly across many axes.";const a=o.slice(0,2).map(x=>x[1]),b=o.slice(2,4).map(x=>x[1]);
+  return"Mostly "+a.join(" and ")+(b.length?", with "+b.join(" and "):"")+"."}
+function draw(){
+  const A=DATA[+selA.value],B=+selB.value>=0&&+selB.value!==+selA.value?DATA[+selB.value]:null;
+  const series=[[A,"var(--s1)"]];if(B)series.push([B,"var(--s2)"]);
+  $("heads").innerHTML=series.map(([d,c])=>`<p class="wk"><i class="sw" style="background:${c}"></i><span><b style="color:var(--text);font-size:15px">${d.name}</b>${d.desc}</span></p>`).join("");
+  $("summary").textContent=B?"Distance between them: "+Math.round(A.v.reduce((s,x,i)=>s+Math.abs(x-B.v[i]),0)/2)+" out of 100.":words(A.v);
+  const svg=$("svg");svg.replaceChildren();
+  MAX=Math.max(...series.flatMap(([d])=>d.v))>30?50:30;
+  const small=narrow.matches,lab=i=>small?SHORT[i]:AX[i][0];svg.classList.toggle("small",small);
+  $("scale").textContent="Rings mark every 10 points; this chart runs to "+MAX+". Light workouts are drawn to 30 and heavy single-axis ones to 50.";
+  (MAX===50?[10,20,30,40,50]:[10,20,30]).forEach(t=>{svg.append(el("circle",{class:"ring",cx:CX,cy:CY,r:R*t/MAX}));
+    svg.append(el("text",{class:"tick",x:CX+4,y:CY-R*t/MAX-3},t))});
+  const lit=i=>series.some(([d])=>d.v[i]>=DIM);
+  AX.forEach((a,i)=>{const[x,y]=pt(i,MAX);svg.append(el("line",{class:"spoke",x1:CX,y1:CY,x2:x,y2:y}));
+    const lx=CX+(R+14)*Math.cos(ang(i)),ly=CY+(R+14)*Math.sin(ang(i)),c=Math.cos(ang(i));
+    svg.append(el("text",{class:"ax"+(lit(i)?"":" dim"),x:lx,y:ly+4,"text-anchor":c>.2?"start":c<-.2?"end":"middle"},lab(i)))});
+  [0,4,8].forEach(i=>{const a=ang(i)-15*Math.PI/180;svg.append(el("line",{class:"sep",x1:CX,y1:CY,x2:CX+(R+8)*Math.cos(a),y2:CY+(R+8)*Math.sin(a)}))});
+  svg.append(el("text",{class:"grp",x:632,y:20,"text-anchor":"end"},"Strength"));
+  svg.append(el("text",{class:"grp",x:8,y:20,"text-anchor":"start"},"Conditioning"));
+  svg.append(el("text",{class:"grp",x:CX,y:508,"text-anchor":"middle"},"Gymnastics and skill"));
+  series.forEach(([d,c])=>{svg.append(el("polygon",{class:"poly",points:d.v.map((v,i)=>pt(i,v).join(",")).join(" "),fill:c,stroke:c}))});
+  series.forEach(([d,c])=>{d.v.forEach((v,i)=>{if(v<DIM)return;const[x,y]=pt(i,v);svg.append(el("circle",{class:"dot",cx:x,cy:y,r:4.5,fill:c}))})});
+  AX.forEach((a,i)=>{const[x,y]=pt(i,Math.max(...series.map(([d])=>d.v[i]),8));
+    const h=el("circle",{class:"hit",cx:x,cy:y,r:22,tabindex:0});
+    const show=()=>{const t=$("tip"),box=svg.getBoundingClientRect();t.innerHTML="<b>"+a[0]+"</b><br>"+series.map(([d])=>d.name+": "+Math.round(d.v[i])).join("<br>");
+      t.style.left=(x/640*box.width)+"px";t.style.top=(y/520*box.height)+"px";t.style.opacity=1};
+    const hide=()=>{$("tip").style.opacity=0};
+    h.addEventListener("pointerenter",show);h.addEventListener("pointerleave",hide);h.addEventListener("focus",show);h.addEventListener("blur",hide);svg.append(h)});
+  $("tbl").innerHTML="<table><tr><th>Axis</th><th>Group</th>"+series.map(([d])=>`<th class="n">${d.name}</th>`).join("")+"</tr>"+
+    AX.map((a,i)=>`<tr class="${lit(i)?"":"dim"}"><td>${a[0]}</td><td>${GROUPS.find(g=>i>=g[1]&&i<=g[2])[0]}</td>`+series.map(([d])=>`<td class="n">${Math.round(d.v[i])}</td>`).join("")+"</tr>").join("")+"</table>";
+}
+selA.onchange=selB.onchange=draw;narrow.addEventListener("change",draw);draw();
+</script>
+</body>
+</html>

@@ -1,0 +1,171 @@
+{
+ "x321": {
+  "format": "amrap",
+  "duration_seconds": 720,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "DB Front-Rack Walking Lunge (two dumbbells)",
+    "distance_ft": 50,
+    "load_lb": 100,
+    "load_x_bodyweight": 0.54
+   },
+   {
+    "order": 2,
+    "movement": "Toes-to-Bar or Bar Muscle-up",
+    "reps_pattern": "16 toes-to-bar in rounds 1-2, 16 bar muscle-ups in rounds 3-4, alternating every 2 rounds"
+   },
+   {
+    "order": 3,
+    "movement": "DB Power Clean (two dumbbells)",
+    "reps": 8,
+    "load_lb": 100,
+    "load_x_bodyweight": 0.54
+   }
+  ]
+ },
+ "x322": {
+  "format": "max_lift",
+  "time_window_seconds": 420,
+  "preceded_by": "starts immediately after a for-time workout of front squats, thrusters, toes-to-bar, chest-to-bar pull-ups and bar muscle-ups with a 15-minute cap",
+  "rest": "self-paced within the window",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Complex: 1 Deadlift + 1 Clean + 1 Hang Clean + 1 Jerk, unbroken",
+    "reps_pattern": "maximum load for one complex; as many attempts as wanted"
+   }
+  ]
+ },
+ "x323": {
+  "format": "amrap",
+  "duration_seconds": 840,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Ring Muscle-up",
+    "reps": 7
+   },
+   {
+    "order": 2,
+    "movement": "Wall-Ball Shot",
+    "reps": 50,
+    "load_lb": 20,
+    "load_x_bodyweight": 0.11
+   },
+   {
+    "order": 3,
+    "movement": "Double-Under",
+    "reps": 100
+   }
+  ]
+ },
+ "x324": {
+  "format": "amrap",
+  "duration_seconds": 420,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Thruster",
+    "reps_pattern": "ascending each round: 3, 6, 9, 12 and so on, adding 3 every round until time runs out",
+    "load_lb": 100,
+    "load_x_bodyweight": 0.54
+   },
+   {
+    "order": 2,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps_pattern": "ascending each round: 3, 6, 9, 12 and so on, adding 3 every round until time runs out"
+   }
+  ]
+ },
+ "x325": {
+  "format": "for_time",
+  "time_cap_seconds": 900,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "DB Overhead Walking Lunge (one dumbbell)",
+    "distance_ft": 80,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 2,
+    "movement": "Alternating DB Snatch",
+    "reps": 20,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 3,
+    "movement": "Pull-up",
+    "reps": 20
+   },
+   {
+    "order": 4,
+    "movement": "DB Overhead Walking Lunge (one dumbbell)",
+    "distance_ft": 80,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 5,
+    "movement": "Alternating DB Snatch",
+    "reps": 20,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 6,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps": 20
+   },
+   {
+    "order": 7,
+    "movement": "DB Overhead Walking Lunge (one dumbbell)",
+    "distance_ft": 80,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 8,
+    "movement": "Alternating DB Snatch",
+    "reps": 20,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 9,
+    "movement": "Muscle-up",
+    "reps": 20
+   }
+  ]
+ },
+ "x326": {
+  "format": "amrap",
+  "duration_seconds": 900,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Burpee Pull-up",
+    "reps_pattern": "5 in round 1, then 10, 15, 20, adding 5 every round"
+   },
+   {
+    "order": 2,
+    "movement": "Shuttle Run",
+    "reps": 10,
+    "distance_ft": 500
+   }
+  ]
+ }
+}

@@ -1,0 +1,142 @@
+{
+ "r151": {
+  "format": "amrap",
+  "duration_seconds": 1080,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Box Jump",
+    "reps": 15
+   },
+   {
+    "order": 2,
+    "movement": "Push Press",
+    "reps": 12,
+    "load_lb": 115,
+    "load_x_bodyweight": 0.62
+   },
+   {
+    "order": 3,
+    "movement": "Toes-to-Bar",
+    "reps": 9
+   }
+  ]
+ },
+ "r152": {
+  "format": "for_time",
+  "time_cap_seconds": 1200,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Thruster",
+    "reps": 105,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 2,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps": 105
+   }
+  ]
+ },
+ "r153": {
+  "format": "amrap",
+  "duration_seconds": 600,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Bar-Facing Burpee",
+    "reps": 60
+   },
+   {
+    "order": 2,
+    "movement": "Overhead Squat",
+    "reps": 30,
+    "load_lb": 120,
+    "load_x_bodyweight": 0.65
+   },
+   {
+    "order": 3,
+    "movement": "Ring Muscle-up",
+    "reps": 10
+   }
+  ]
+ },
+ "r154": {
+  "format": "for_time",
+  "time_cap_seconds": 600,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Deadlift",
+    "reps": 100,
+    "load_lb": 225,
+    "load_x_bodyweight": 1.21
+   },
+   {
+    "order": 2,
+    "movement": "Bar-Facing Burpee",
+    "reps": 100
+   }
+  ]
+ },
+ "r155": {
+  "format": "amrap",
+  "duration_seconds": 900,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Push-up",
+    "reps": 12
+   },
+   {
+    "order": 2,
+    "movement": "Box Jump",
+    "reps": 15
+   },
+   {
+    "order": 3,
+    "movement": "Deadlift",
+    "reps": 9,
+    "load_lb": 155,
+    "load_x_bodyweight": 0.84
+   }
+  ]
+ },
+ "r156": {
+  "format": "amrap",
+  "duration_seconds": 1200,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Row",
+    "distance_m": 300
+   },
+   {
+    "order": 2,
+    "movement": "Deadlift",
+    "reps": 10,
+    "load_lb": 185,
+    "load_x_bodyweight": 1.0
+   },
+   {
+    "order": 3,
+    "movement": "Double-Under",
+    "reps": 50
+   }
+  ]
+ }
+}

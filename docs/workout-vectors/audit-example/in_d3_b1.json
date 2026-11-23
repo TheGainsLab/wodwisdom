@@ -1,0 +1,211 @@
+{
+ "p311": {
+  "format": "amrap",
+  "scheme_as_written": "AMRAP 20",
+  "duration_seconds": 1200,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Bike",
+    "amount": "not prescribed"
+   },
+   {
+    "order": 2,
+    "movement": "Toes To Bar",
+    "reps": 12
+   },
+   {
+    "order": 3,
+    "movement": "Dumbbell Box Step Up (20 in)",
+    "reps": 12,
+    "load_lb": 35,
+    "load_x_bodyweight": 0.19
+   },
+   {
+    "order": 4,
+    "movement": "Push Up",
+    "reps": 12
+   }
+  ]
+ },
+ "p312": {
+  "format": "amrap",
+  "scheme_as_written": "AMRAP 20",
+  "duration_seconds": 1200,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Wall Ball",
+    "reps": 15,
+    "load_lb": 20,
+    "load_x_bodyweight": 0.11
+   },
+   {
+    "order": 2,
+    "movement": "Row",
+    "distance_m": 250
+   },
+   {
+    "order": 3,
+    "movement": "Box Jump (24 in, step down)",
+    "reps": 10
+   }
+  ]
+ },
+ "p313": {
+  "format": "amrap",
+  "duration_seconds": 1020,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Burpee",
+    "reps": 40
+   },
+   {
+    "order": 2,
+    "movement": "Snatch",
+    "reps": 30,
+    "load_lb": 75,
+    "load_x_bodyweight": 0.4
+   },
+   {
+    "order": 3,
+    "movement": "Burpee",
+    "reps": 30
+   },
+   {
+    "order": 4,
+    "movement": "Snatch",
+    "reps": 30,
+    "load_lb": 135,
+    "load_x_bodyweight": 0.73
+   },
+   {
+    "order": 5,
+    "movement": "Burpee",
+    "reps": 20
+   },
+   {
+    "order": 6,
+    "movement": "Snatch",
+    "reps": 30,
+    "load_lb": 165,
+    "load_x_bodyweight": 0.89
+   },
+   {
+    "order": 7,
+    "movement": "Burpee",
+    "reps": 10
+   },
+   {
+    "order": 8,
+    "movement": "Snatch",
+    "reps_pattern": "as many as possible in the time remaining",
+    "load_lb": 210,
+    "load_x_bodyweight": 1.13
+   }
+  ]
+ },
+ "p314": {
+  "format": "for_time",
+  "scheme_as_written": "For time (22-min cap)",
+  "time_cap_seconds": 1320,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Run",
+    "distance_m": 800
+   },
+   {
+    "order": 2,
+    "movement": "Kipping Pull Up",
+    "reps": 30
+   },
+   {
+    "order": 3,
+    "movement": "Front Squat",
+    "reps": 20,
+    "load_lb": 155,
+    "load_x_bodyweight": 0.84
+   },
+   {
+    "order": 4,
+    "movement": "Box Jump (24 in, step down)",
+    "reps": 30
+   },
+   {
+    "order": 5,
+    "movement": "GHD Sit Up",
+    "reps": 20
+   },
+   {
+    "order": 6,
+    "movement": "Row",
+    "distance_m": 1000
+   }
+  ]
+ },
+ "p315": {
+  "format": "intervals",
+  "scheme_as_written": "4 rounds: 4:00 on / 1:00 off",
+  "work_periods": 4,
+  "work_seconds_each": 240,
+  "rest_seconds_between": 60,
+  "reps_are": "per work period",
+  "rest": "60 seconds between work periods",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Row",
+    "distance_m": 400
+   },
+   {
+    "order": 2,
+    "movement": "Burpee",
+    "reps": 10
+   },
+   {
+    "order": 3,
+    "movement": "Air Squat",
+    "reps": 15
+   }
+  ]
+ },
+ "p316": {
+  "format": "amrap",
+  "scheme_as_written": "AMRAP 15",
+  "duration_seconds": 900,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Assault Bike",
+    "amount": "not prescribed"
+   },
+   {
+    "order": 2,
+    "movement": "Walking Lunge",
+    "distance_ft": 40
+   },
+   {
+    "order": 3,
+    "movement": "Sit Up",
+    "reps": 12
+   },
+   {
+    "order": 4,
+    "movement": "Single Under",
+    "reps": 40
+   }
+  ]
+ }
+}

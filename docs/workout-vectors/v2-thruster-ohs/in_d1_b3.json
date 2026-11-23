@@ -1,0 +1,140 @@
+{
+ "v1031": {
+  "format": "for_time",
+  "time_cap_seconds": null,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "structure": "four rounds of 27, 21, 15 and 9 of each movement",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Row",
+    "calories": 72
+   },
+   {
+    "order": 2,
+    "movement": "Thruster",
+    "reps": 72,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   }
+  ]
+ },
+ "v1032": {
+  "format": "amrap",
+  "duration_seconds": 840,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Ring Muscle-up",
+    "reps": 7
+   },
+   {
+    "order": 2,
+    "movement": "Wall-Ball Shot",
+    "reps": 50,
+    "load_lb": 20,
+    "load_x_bodyweight": 0.11
+   },
+   {
+    "order": 3,
+    "movement": "Double-Under",
+    "reps": 100
+   }
+  ]
+ },
+ "v1033": {
+  "format": "amrap",
+  "duration_seconds": 420,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Snatch",
+    "reps": 10,
+    "load_lb": 75,
+    "load_x_bodyweight": 0.4
+   },
+   {
+    "order": 2,
+    "movement": "Bar Muscle-up",
+    "reps": 3
+   }
+  ]
+ },
+ "v1034": {
+  "format": "amrap",
+  "duration_seconds": 420,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Thruster",
+    "reps_pattern": "ascending each round: 3, 6, 9, 12 and so on, adding 3 every round until time runs out",
+    "load_lb": 100,
+    "load_x_bodyweight": 0.54
+   },
+   {
+    "order": 2,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps_pattern": "ascending each round: 3, 6, 9, 12 and so on, adding 3 every round until time runs out"
+   }
+  ]
+ },
+ "v1035": {
+  "format": "for_time",
+  "time_cap_seconds": 1200,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Ring Muscle-up",
+    "reps": 40
+   },
+   {
+    "order": 2,
+    "movement": "Row",
+    "calories": 80
+   },
+   {
+    "order": 3,
+    "movement": "Wall-Ball Shot",
+    "reps": 120,
+    "load_lb": 20,
+    "load_x_bodyweight": 0.11
+   }
+  ]
+ },
+ "v1036": {
+  "format": "amrap",
+  "duration_seconds": 540,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Toes-to-Bar",
+    "reps": 15
+   },
+   {
+    "order": 2,
+    "movement": "Deadlift",
+    "reps": 10,
+    "load_lb": 115,
+    "load_x_bodyweight": 0.62
+   },
+   {
+    "order": 3,
+    "movement": "Snatch",
+    "reps": 5,
+    "load_lb": 115,
+    "load_x_bodyweight": 0.62
+   }
+  ]
+ }
+}

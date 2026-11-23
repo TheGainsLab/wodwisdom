@@ -34,6 +34,7 @@ import type { Gender } from "./compute-benchmarks.ts";
 import type { BlockPrescription, MovementPrescription } from "./v2-output-schema.ts";
 import { canonicalScheme, hashWorkoutText } from "./signature-hash.ts";
 import {
+  buildDraftContext,
   claimEvidence,
   DEFAULT_PROVENANCE,
   draftSignature,
@@ -44,6 +45,7 @@ import {
   type SignatureDraft,
   type SignatureExemplar,
   type SupaLike,
+  withDraftContext,
 } from "./signature-draft-core.ts";
 
 /** Jobs per worker invocation: each can cost a parse + a draft (+ repair)
@@ -363,31 +365,49 @@ async function durationLibrary(
 }
 
 /** Nearest ratified signatures by format + time domain — the consistency
- *  anchors that keep unreviewed drafts in line with reviewed ones. */
+ *  anchors that keep unreviewed drafts in line with reviewed ones. Returns
+ *  the exemplars exactly as the judge is shown them (no ids — the prompt
+ *  text must not change) and, separately, their ids for the draft context. */
+const EXEMPLAR_COLUMNS = "id, name, archetype, time_domain, format, demand, discrimination, stimulus, gates";
+
+function splitExemplarRows(
+  // deno-lint-ignore no-explicit-any
+  rows: any[] | null | undefined,
+): { exemplars: SignatureExemplar[]; ids: string[] } {
+  const exemplars: SignatureExemplar[] = [];
+  const ids: string[] = [];
+  for (const row of rows ?? []) {
+    const { id, ...shown } = row as { id?: unknown } & SignatureExemplar;
+    if (typeof id === "string") ids.push(id);
+    exemplars.push(shown as SignatureExemplar);
+  }
+  return { exemplars, ids };
+}
+
 async function fetchExemplars(
   supa: SupaLike,
   workout: BlockPrescription,
   timeDomain: string | null,
-): Promise<SignatureExemplar[]> {
+): Promise<{ exemplars: SignatureExemplar[]; ids: string[] }> {
   const format = canonicalScheme(workout.block_scheme) || null;
   let q = supa.from("workout_signatures")
-    .select("name, archetype, time_domain, format, demand, discrimination, stimulus, gates")
+    .select(EXEMPLAR_COLUMNS)
     .eq("status", "approved")
     .order("approved_at", { ascending: false })
     .limit(3);
   if (format) q = q.eq("format", format);
   if (timeDomain) q = q.eq("time_domain", timeDomain);
   const { data } = await q;
-  if (data && data.length > 0) return data as SignatureExemplar[];
-  if (!timeDomain) return [];
+  if (data && data.length > 0) return splitExemplarRows(data);
+  if (!timeDomain) return { exemplars: [], ids: [] };
   // Relax the format filter before giving up.
   const { data: wide } = await supa.from("workout_signatures")
-    .select("name, archetype, time_domain, format, demand, discrimination, stimulus, gates")
+    .select(EXEMPLAR_COLUMNS)
     .eq("status", "approved")
     .eq("time_domain", timeDomain)
     .order("approved_at", { ascending: false })
     .limit(3);
-  return (wide ?? []) as SignatureExemplar[];
+  return splitExemplarRows(wide);
 }
 
 /** A short human name for the review dashboard; uniqueness rides the hash
@@ -469,11 +489,14 @@ async function draftOneJob(
   // 5. Context: duration-class spread + ratified precedents. Best-effort.
   let library: MeasuredLibrary | null = null;
   let exemplars: SignatureExemplar[] = [];
+  let precedentIds: string[] = [];
   try {
     library = await durationLibrary(supa, clean, measured?.median_seconds ?? null);
   } catch (_) { /* judgment proceeds without spread context */ }
   try {
-    exemplars = await fetchExemplars(supa, clean, measured?.time_domain ?? null);
+    const found = await fetchExemplars(supa, clean, measured?.time_domain ?? null);
+    exemplars = found.exemplars;
+    precedentIds = found.ids;
   } catch (_) { /* judgment proceeds without precedents */ }
 
   // 6. The judgment seat.
@@ -500,7 +523,10 @@ async function draftOneJob(
       : null,
     drafted_model: "sonnet",
     status: "draft",
-    provenance: DEFAULT_PROVENANCE,
+    provenance: withDraftContext(
+      DEFAULT_PROVENANCE,
+      await buildDraftContext("queue", precedentIds),
+    ),
   };
   const { data, error } = await supa
     .from("workout_signatures")

@@ -1,0 +1,133 @@
+{
+ "x311": {
+  "format": "amrap",
+  "duration_seconds": 1200,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Overhead Walking Lunge (barbell)",
+    "distance_ft": 25,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 2,
+    "movement": "Bar-Facing Burpee",
+    "reps": 8
+   },
+   {
+    "order": 3,
+    "movement": "Overhead Walking Lunge (barbell)",
+    "distance_ft": 25,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 4,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps": 8
+   }
+  ]
+ },
+ "x312": {
+  "format": "timed_windows",
+  "structure": "3-minute windows. In each window complete 2 rounds of the two movements; if completed, continue into the next 3-minute window with 2 more reps of each movement per round. Ends at the first window not completed.",
+  "reps_are": "per round",
+  "rest": "whatever remains of each window",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Overhead Squat",
+    "reps_pattern": "10 per round in the first window, then 12, 14, 16 and so on",
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 2,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps_pattern": "10 per round in the first window, then 12, 14, 16 and so on"
+   }
+  ]
+ },
+ "x313": {
+  "format": "max_lift",
+  "time_window_seconds": null,
+  "structure": "shares one 12-minute clock with the preceding work: the lift window is whatever remains of 12 minutes",
+  "preceded_by": "starts immediately after 1-2-3-4-5-6-7-8-9-10 reps of dumbbell squats (two 50 lb dumbbells) and bar-facing burpees, done for time",
+  "rest": "self-paced within the window",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Clean",
+    "reps_pattern": "one-rep maximum; as many attempts as wanted"
+   }
+  ]
+ },
+ "x314": {
+  "format": "max_lift",
+  "time_window_seconds": 360,
+  "preceded_by": "starts immediately after a 9-minute AMRAP of toes-to-bar, deadlifts and snatches",
+  "rest": "self-paced within the window",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Clean and Jerk",
+    "reps_pattern": "one-rep maximum; as many attempts as wanted"
+   }
+  ]
+ },
+ "x315": {
+  "format": "for_time",
+  "time_cap_seconds": 600,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "DB Overhead Walking Lunge (one dumbbell)",
+    "distance_ft": 200,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 2,
+    "movement": "DB Box Step-up",
+    "reps": 50,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 3,
+    "movement": "Strict Handstand Push-up",
+    "reps": 50
+   },
+   {
+    "order": 4,
+    "movement": "Handstand Walk",
+    "distance_ft": 200
+   }
+  ]
+ },
+ "x316": {
+  "format": "amrap",
+  "duration_seconds": 480,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Handstand Push-up",
+    "reps_pattern": "ascending each round: 3, 6, 9, 12 and so on, adding 3 every round until time runs out"
+   },
+   {
+    "order": 2,
+    "movement": "Clean",
+    "reps_pattern": "3 per round for rounds 1 to 3, 6 for rounds 4 to 6, 9 for rounds 7 to 9, adding 3 every third round",
+    "load_lb": 185,
+    "load_x_bodyweight": 1.0
+   }
+  ]
+ }
+}

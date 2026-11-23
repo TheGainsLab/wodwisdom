@@ -14,6 +14,7 @@
 
 import { callClaude } from "./call-claude.ts";
 import { FOCUS_AREAS } from "./coach-state.ts";
+import { resolveModelProfile } from "./model-profiles.ts";
 import type { ExpectedBenchmark } from "./compute-block-benchmark.ts";
 import type { BlockPrescription } from "./v2-output-schema.ts";
 import { hashWorkoutStructure, hashWorkoutText } from "./signature-hash.ts";
@@ -218,15 +219,19 @@ export interface SignatureExemplar {
   gates: unknown;
 }
 
-/** One drafting call with one validation-driven repair attempt. */
-export async function draftSignature(
+/** The model the judgment seat runs on — the default profile's primary
+ *  (what callClaude used implicitly; now passed explicitly so the id
+ *  recorded in the draft context is the id that was called). */
+export const DRAFT_MODEL = resolveModelProfile("default").primary;
+
+/** The user message for one draft. Pure — and the single place the framing
+ *  text lives, so draftPromptHash() sees any change to it. */
+export function buildDraftAsk(
   workout: BlockPrescription,
   library: MeasuredLibrary | null,
   measured: ExpectedBenchmark | null,
-  apiKey: string,
   exemplars?: SignatureExemplar[],
-): Promise<SignatureDraft> {
-  if (!apiKey) throw new Error("ANTHROPIC_API_KEY not configured");
+): string {
   const workoutJson = JSON.stringify(workout, null, 2);
   // MEASURED CONTEXT rides EVERY draft that has it, library workout or not —
   // the judge confirms duration/pacing against computation instead of
@@ -252,13 +257,26 @@ export async function draftSignature(
       JSON.stringify(exemplars)
     }`
     : "";
-  const ask = `Tag this workout:\n\n${workoutJson}${measuredBlock}${exemplarBlock}`;
+  return `Tag this workout:\n\n${workoutJson}${measuredBlock}${exemplarBlock}`;
+}
+
+/** One drafting call with one validation-driven repair attempt. */
+export async function draftSignature(
+  workout: BlockPrescription,
+  library: MeasuredLibrary | null,
+  measured: ExpectedBenchmark | null,
+  apiKey: string,
+  exemplars?: SignatureExemplar[],
+): Promise<SignatureDraft> {
+  if (!apiKey) throw new Error("ANTHROPIC_API_KEY not configured");
+  const ask = buildDraftAsk(workout, library, measured, exemplars);
 
   let raw = await callClaude({
     apiKey,
     system: DRAFT_SYSTEM,
     userContent: ask,
     maxTokens: 2000,
+    model: DRAFT_MODEL,
     fallbackToHaiku: false, // judgment seat — a degraded draft is worse than none
   });
   let sig = extractJson(raw) as SignatureDraft;
@@ -273,6 +291,7 @@ export async function draftSignature(
           errors.join("\n- ")
         }\n\nEmit corrected strict JSON.`,
       maxTokens: 2000,
+      model: DRAFT_MODEL,
       fallbackToHaiku: false,
     });
     sig = extractJson(raw) as SignatureDraft;
@@ -322,6 +341,104 @@ export const DEFAULT_PROVENANCE = {
   discrimination: { kind: "derived_from_demand" },
   stimulus: { kind: "editorial" },
 };
+
+// ============================================================
+// Draft context — what the judge was shown when it drafted this row
+// ============================================================
+//
+// Two signatures can only be compared safely when they were drafted under
+// the same conditions (variation review 2026-11-21: one workout signed in
+// two sessions read 20–30 apart; within one session, 5–15). The context
+// rides provenance.draft so a drift between sessions is visible per row:
+//   prompt_hash    changes whenever the system prompt or the framing of the
+//                  user message changes — computed, never hand-bumped
+//   model          the exact model id called (an alias like "sonnet" pins
+//                  nothing)
+//   path           'queue' drafts see ratified precedents; 'admin' drafts
+//                  see none
+//   precedent_ids  which ratified signatures the judge was shown
+
+export interface DraftContext {
+  prompt_hash: string;
+  model: string;
+  path: "admin" | "queue";
+  precedent_ids: string[];
+  drafted_at: string;
+}
+
+let promptHashMemo: Promise<string> | null = null;
+
+/** Hash of everything fixed in a draft request: the system prompt plus the
+ *  user-message framing rendered around placeholder inputs. */
+export function draftPromptHash(): Promise<string> {
+  promptHashMemo ??= (async () => {
+    const probe = buildDraftAsk(
+      { block_type: "metcon", movements: [] } as unknown as BlockPrescription,
+      { expected_rel_iqr: 0 },
+      {
+        median_score: "0",
+        median_seconds: 1,
+        time_domain: "short",
+        median_watts: 0,
+      } as unknown as ExpectedBenchmark,
+      [{ demand: {}, discrimination: null, stimulus: null, gates: [] }],
+    );
+    const digest = await crypto.subtle.digest(
+      "SHA-256",
+      new TextEncoder().encode(`${DRAFT_SYSTEM}\u0000${probe}`),
+    );
+    return Array.from(new Uint8Array(digest))
+      .map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 16);
+  })();
+  return promptHashMemo;
+}
+
+export async function buildDraftContext(
+  path: DraftContext["path"],
+  precedentIds: string[],
+): Promise<DraftContext> {
+  return {
+    prompt_hash: await draftPromptHash(),
+    model: DRAFT_MODEL,
+    path,
+    precedent_ids: precedentIds,
+    drafted_at: new Date().toISOString(),
+  };
+}
+
+/** Shape-check a context that travelled through a client (the admin tool
+ *  drafts and saves in separate requests, so the context is echoed back).
+ *  Null = nothing usable; the row then simply carries no draft context. */
+export function parseDraftContext(v: unknown): DraftContext | null {
+  if (typeof v !== "object" || v === null || Array.isArray(v)) return null;
+  const o = v as Record<string, unknown>;
+  if (typeof o.prompt_hash !== "string" || !/^[0-9a-f]{16}$/.test(o.prompt_hash)) return null;
+  if (typeof o.model !== "string" || !o.model || o.model.length > 100) return null;
+  if (o.path !== "admin" && o.path !== "queue") return null;
+  if (
+    !Array.isArray(o.precedent_ids) || o.precedent_ids.length > 10 ||
+    !o.precedent_ids.every((x) => typeof x === "string" && x.length <= 64)
+  ) return null;
+  if (typeof o.drafted_at !== "string" || Number.isNaN(Date.parse(o.drafted_at))) return null;
+  return {
+    prompt_hash: o.prompt_hash,
+    model: o.model,
+    path: o.path,
+    precedent_ids: o.precedent_ids as string[],
+    drafted_at: new Date(o.drafted_at).toISOString(),
+  };
+}
+
+/** Attach (or replace) the draft context on a provenance object. */
+export function withDraftContext(
+  provenance: unknown,
+  ctx: DraftContext | null,
+): Record<string, unknown> {
+  const base = (typeof provenance === "object" && provenance !== null)
+    ? provenance as Record<string, unknown>
+    : DEFAULT_PROVENANCE;
+  return ctx ? { ...base, draft: ctx } : { ...base };
+}
 
 export function canonicalJson(v: unknown): string {
   if (Array.isArray(v)) return "[" + v.map(canonicalJson).join(",") + "]";

@@ -1,0 +1,109 @@
+{
+ "x221": {
+  "format": "max_lift",
+  "time_window_seconds": 300,
+  "preceded_by": "starts immediately after a 15-minute AMRAP of burpee pull-ups and shuttle runs",
+  "rest": "self-paced within the window",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Thruster (taken from the floor)",
+    "reps_pattern": "one-rep maximum; as many attempts as wanted"
+   }
+  ]
+ },
+ "x222": {
+  "format": "amrap",
+  "duration_seconds": 420,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Thruster",
+    "reps_pattern": "ascending each round: 3, 6, 9, 12 and so on, adding 3 every round until time runs out",
+    "load_lb": 100,
+    "load_x_bodyweight": 0.54
+   },
+   {
+    "order": 2,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps_pattern": "ascending each round: 3, 6, 9, 12 and so on, adding 3 every round until time runs out"
+   }
+  ]
+ },
+ "x223": {
+  "format": "for_time",
+  "time_cap_seconds": null,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "structure": "four rounds of 27, 21, 15 and 9 of each movement",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Row",
+    "calories": 72
+   },
+   {
+    "order": 2,
+    "movement": "Thruster",
+    "reps": 72,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   }
+  ]
+ },
+ "x224": {
+  "format": "max_lift",
+  "time_window_seconds": null,
+  "structure": "shares one 12-minute clock with the preceding work: the lift window is whatever remains of 12 minutes",
+  "preceded_by": "starts immediately after 1-2-3-4-5-6-7-8-9-10 reps of dumbbell squats (two 50 lb dumbbells) and bar-facing burpees, done for time",
+  "rest": "self-paced within the window",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Clean",
+    "reps_pattern": "one-rep maximum; as many attempts as wanted"
+   }
+  ]
+ },
+ "x225": {
+  "format": "amrap",
+  "duration_seconds": 900,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Burpee Pull-up",
+    "reps_pattern": "5 in round 1, then 10, 15, 20, adding 5 every round"
+   },
+   {
+    "order": 2,
+    "movement": "Shuttle Run",
+    "reps": 10,
+    "distance_ft": 500
+   }
+  ]
+ },
+ "x226": {
+  "format": "amrap",
+  "duration_seconds": 480,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Handstand Push-up",
+    "reps_pattern": "ascending each round: 3, 6, 9, 12 and so on, adding 3 every round until time runs out"
+   },
+   {
+    "order": 2,
+    "movement": "Clean",
+    "reps_pattern": "3 per round for rounds 1 to 3, 6 for rounds 4 to 6, 9 for rounds 7 to 9, adding 3 every third round",
+    "load_lb": 185,
+    "load_x_bodyweight": 1.0
+   }
+  ]
+ }
+}

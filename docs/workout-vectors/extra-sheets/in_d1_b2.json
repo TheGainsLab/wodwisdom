@@ -1,0 +1,169 @@
+{
+ "x121": {
+  "format": "amrap",
+  "duration_seconds": 900,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Burpee Pull-up",
+    "reps_pattern": "5 in round 1, then 10, 15, 20, adding 5 every round"
+   },
+   {
+    "order": 2,
+    "movement": "Shuttle Run",
+    "reps": 10,
+    "distance_ft": 500
+   }
+  ]
+ },
+ "x122": {
+  "format": "max_lift",
+  "time_window_seconds": 300,
+  "preceded_by": "starts immediately after a 15-minute AMRAP of burpee pull-ups and shuttle runs",
+  "rest": "self-paced within the window",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Thruster (taken from the floor)",
+    "reps_pattern": "one-rep maximum; as many attempts as wanted"
+   }
+  ]
+ },
+ "x123": {
+  "format": "for_time",
+  "time_cap_seconds": 900,
+  "reps_are": "whole workout",
+  "rest": "120 seconds built in",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Front Squat",
+    "reps": 15,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 2,
+    "movement": "Toes-to-Bar",
+    "reps": 30
+   },
+   {
+    "order": 3,
+    "movement": "Thruster",
+    "reps": 15,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51,
+    "rest_after_seconds": 60
+   },
+   {
+    "order": 4,
+    "movement": "Front Squat",
+    "reps": 15,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 5,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps": 30
+   },
+   {
+    "order": 6,
+    "movement": "Thruster",
+    "reps": 15,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51,
+    "rest_after_seconds": 60
+   },
+   {
+    "order": 7,
+    "movement": "Front Squat",
+    "reps": 15,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 8,
+    "movement": "Bar Muscle-up",
+    "reps": 30
+   },
+   {
+    "order": 9,
+    "movement": "Thruster",
+    "reps": 15,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   }
+  ]
+ },
+ "x124": {
+  "format": "timed_windows",
+  "structure": "3-minute windows. In each window complete 2 rounds of the two movements; if completed, continue into the next 3-minute window with 2 more reps of each movement per round. Ends at the first window not completed.",
+  "reps_are": "per round",
+  "rest": "whatever remains of each window",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Overhead Squat",
+    "reps_pattern": "10 per round in the first window, then 12, 14, 16 and so on",
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 2,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps_pattern": "10 per round in the first window, then 12, 14, 16 and so on"
+   }
+  ]
+ },
+ "x125": {
+  "format": "for_time",
+  "time_cap_seconds": 900,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "structure": "10 rounds of 8 and 10",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Ground-to-Overhead (barbell)",
+    "reps": 80,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 2,
+    "movement": "Bar-Facing Burpee",
+    "reps": 100
+   }
+  ]
+ },
+ "x126": {
+  "format": "amrap",
+  "duration_seconds": 720,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "DB Front-Rack Walking Lunge (two dumbbells)",
+    "distance_ft": 50,
+    "load_lb": 100,
+    "load_x_bodyweight": 0.54
+   },
+   {
+    "order": 2,
+    "movement": "Toes-to-Bar or Bar Muscle-up",
+    "reps_pattern": "16 toes-to-bar in rounds 1-2, 16 bar muscle-ups in rounds 3-4, alternating every 2 rounds"
+   },
+   {
+    "order": 3,
+    "movement": "DB Power Clean (two dumbbells)",
+    "reps": 8,
+    "load_lb": 100,
+    "load_x_bodyweight": 0.54
+   }
+  ]
+ }
+}

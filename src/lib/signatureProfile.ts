@@ -91,11 +91,15 @@ export type DepthBand = 'zero' | 'shallow' | 'mid' | 'deep';
 // Labels and probes are display vocabulary; definitions mirror
 // signature_axes (the DB stays the source of truth where available —
 // callers may override via the axisMeta argument).
+// Movement placements follow the drafting glossary (AXES_GLOSSARY in
+// supabase/functions/_shared/signature-draft-core.ts) — the only copy the
+// signature judge reads. Written as "home axis; also loaded by", never as
+// a fixed primary/secondary split: shares are set per workout.
 
 export const AXIS_META: Record<string, { label: string; definition: string; probe: string }> = {
   olympic_lifting: {
     label: 'Olympic lifting',
-    definition: 'Snatch and clean & jerk — speed-strength, receiving positions, barbell cycling',
+    definition: 'Snatch and clean & jerk — speed-strength, receiving positions, barbell cycling; home of every barbell snatch and clean variant',
     probe: 'a heavy snatch or clean & jerk day',
   },
   powerlifting_strength: {
@@ -105,7 +109,7 @@ export const AXIS_META: Record<string, { label: string; definition: string; prob
   },
   posterior_chain: {
     label: 'Posterior chain',
-    definition: 'Hinge capacity under volume — deadlifts, swings, pulls off the floor',
+    definition: 'Hinge capacity under volume — deadlifts, swings, hip extension; also loaded by dumbbell and kettlebell snatches and cleans',
     probe: 'a high-rep deadlift or swing piece',
   },
   upper_body_pressing: {
@@ -115,12 +119,12 @@ export const AXIS_META: Record<string, { label: string; definition: string; prob
   },
   gymnastics_pulling: {
     label: 'Gymnastics pulling',
-    definition: 'Bodyweight pulling — pull-ups, chest-to-bar, toes-to-bar, muscle-ups',
+    definition: 'Bodyweight pulling — pull-ups, chest-to-bar, toes-to-bar, rope climbs, muscle-ups',
     probe: 'a max set of chest-to-bar or a muscle-up piece',
   },
   gymnastics_pressing: {
     label: 'Inverted pressing',
-    definition: 'Inverted gymnastics — HSPU, handstand walks, wall walks',
+    definition: 'Inverted gymnastics — HSPU, wall walks, handstand holds, dips; also loaded by the dip of ring muscle-ups',
     probe: 'a handstand push-up or wall-walk test',
   },
   midline: {
@@ -130,12 +134,12 @@ export const AXIS_META: Record<string, { label: string; definition: string; prob
   },
   skill_coordination: {
     label: 'Skill & coordination',
-    definition: 'Rhythm skills — double-unders, pistols, rope climbs',
+    definition: 'Rhythm and balance skills — double-unders, handstand walks; also loaded by the muscle-up transition',
     probe: 'a max unbroken double-under set',
   },
   squat_cycling: {
     label: 'Squat cycling',
-    definition: 'High-rep leg endurance — wall balls, light thrusters, lunge volume',
+    definition: 'High-rep leg endurance — wall balls, light thrusters, lunge and pistol volume',
     probe: 'a big wall-ball or thruster set',
   },
   aerobic_capacity: {

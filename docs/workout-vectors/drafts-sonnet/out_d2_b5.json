@@ -1,0 +1,8 @@
+{
+"s251": {"olympic_lifting":14,"powerlifting_strength":5,"posterior_chain":14,"upper_body_pressing":6,"gymnastics_pulling":0,"gymnastics_pressing":14,"midline":6,"skill_coordination":3,"squat_cycling":4,"aerobic_capacity":14,"anaerobic_capacity":4,"mixed_modal_conditioning":16},
+"s252": {"olympic_lifting":14,"powerlifting_strength":2,"posterior_chain":5,"upper_body_pressing":6,"gymnastics_pulling":6,"gymnastics_pressing":0,"midline":12,"skill_coordination":4,"squat_cycling":15,"aerobic_capacity":15,"anaerobic_capacity":6,"mixed_modal_conditioning":15},
+"s253": {"olympic_lifting":0,"powerlifting_strength":0,"posterior_chain":3,"upper_body_pressing":10,"gymnastics_pulling":7,"gymnastics_pressing":0,"midline":12,"skill_coordination":17,"squat_cycling":10,"aerobic_capacity":17,"anaerobic_capacity":6,"mixed_modal_conditioning":18},
+"s254": {"olympic_lifting":0,"powerlifting_strength":0,"posterior_chain":3,"upper_body_pressing":16,"gymnastics_pulling":22,"gymnastics_pressing":0,"midline":5,"skill_coordination":3,"squat_cycling":16,"aerobic_capacity":14,"anaerobic_capacity":5,"mixed_modal_conditioning":16},
+"s255": {"olympic_lifting":30,"powerlifting_strength":12,"posterior_chain":8,"upper_body_pressing":5,"gymnastics_pulling":0,"gymnastics_pressing":3,"midline":4,"skill_coordination":3,"squat_cycling":0,"aerobic_capacity":8,"anaerobic_capacity":10,"mixed_modal_conditioning":17},
+"s256": {"olympic_lifting":0,"powerlifting_strength":0,"posterior_chain":0,"upper_body_pressing":8,"gymnastics_pulling":0,"gymnastics_pressing":25,"midline":8,"skill_coordination":22,"squat_cycling":0,"aerobic_capacity":15,"anaerobic_capacity":6,"mixed_modal_conditioning":16}
+}

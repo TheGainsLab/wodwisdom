@@ -1,0 +1,369 @@
+{
+ "14.2": {
+  "format": "timed_windows",
+  "structure": "3-minute windows. In each window complete 2 rounds of the two movements; if completed, continue into the next 3-minute window with 2 more reps of each movement per round. Ends at the first window not completed.",
+  "reps_are": "per round",
+  "rest": "whatever remains of each window",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Overhead Squat",
+    "reps_pattern": "10 per round in the first window, then 12, 14, 16 and so on",
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 2,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps_pattern": "10 per round in the first window, then 12, 14, 16 and so on"
+   }
+  ]
+ },
+ "15.1a": {
+  "format": "max_lift",
+  "time_window_seconds": 360,
+  "preceded_by": "starts immediately after a 9-minute AMRAP of toes-to-bar, deadlifts and snatches",
+  "rest": "self-paced within the window",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Clean and Jerk",
+    "reps_pattern": "one-rep maximum; as many attempts as wanted"
+   }
+  ]
+ },
+ "15.5": {
+  "format": "for_time",
+  "time_cap_seconds": null,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "structure": "four rounds of 27, 21, 15 and 9 of each movement",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Row",
+    "calories": 72
+   },
+   {
+    "order": 2,
+    "movement": "Thruster",
+    "reps": 72,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   }
+  ]
+ },
+ "16.1": {
+  "format": "amrap",
+  "duration_seconds": 1200,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Overhead Walking Lunge (barbell)",
+    "distance_ft": 25,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 2,
+    "movement": "Bar-Facing Burpee",
+    "reps": 8
+   },
+   {
+    "order": 3,
+    "movement": "Overhead Walking Lunge (barbell)",
+    "distance_ft": 25,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 4,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps": 8
+   }
+  ]
+ },
+ "17.2": {
+  "format": "amrap",
+  "duration_seconds": 720,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "DB Front-Rack Walking Lunge (two dumbbells)",
+    "distance_ft": 50,
+    "load_lb": 100,
+    "load_x_bodyweight": 0.54
+   },
+   {
+    "order": 2,
+    "movement": "Toes-to-Bar or Bar Muscle-up",
+    "reps_pattern": "16 toes-to-bar in rounds 1-2, 16 bar muscle-ups in rounds 3-4, alternating every 2 rounds"
+   },
+   {
+    "order": 3,
+    "movement": "DB Power Clean (two dumbbells)",
+    "reps": 8,
+    "load_lb": 100,
+    "load_x_bodyweight": 0.54
+   }
+  ]
+ },
+ "18.2a": {
+  "format": "max_lift",
+  "time_window_seconds": null,
+  "structure": "shares one 12-minute clock with the preceding work: the lift window is whatever remains of 12 minutes",
+  "preceded_by": "starts immediately after 1-2-3-4-5-6-7-8-9-10 reps of dumbbell squats (two 50 lb dumbbells) and bar-facing burpees, done for time",
+  "rest": "self-paced within the window",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Clean",
+    "reps_pattern": "one-rep maximum; as many attempts as wanted"
+   }
+  ]
+ },
+ "19.3": {
+  "format": "for_time",
+  "time_cap_seconds": 600,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "DB Overhead Walking Lunge (one dumbbell)",
+    "distance_ft": 200,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 2,
+    "movement": "DB Box Step-up",
+    "reps": 50,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 3,
+    "movement": "Strict Handstand Push-up",
+    "reps": 50
+   },
+   {
+    "order": 4,
+    "movement": "Handstand Walk",
+    "distance_ft": 200
+   }
+  ]
+ },
+ "20.1": {
+  "format": "for_time",
+  "time_cap_seconds": 900,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "structure": "10 rounds of 8 and 10",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Ground-to-Overhead (barbell)",
+    "reps": 80,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 2,
+    "movement": "Bar-Facing Burpee",
+    "reps": 100
+   }
+  ]
+ },
+ "21.4": {
+  "format": "max_lift",
+  "time_window_seconds": 420,
+  "preceded_by": "starts immediately after a for-time workout of front squats, thrusters, toes-to-bar, chest-to-bar pull-ups and bar muscle-ups with a 15-minute cap",
+  "rest": "self-paced within the window",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Complex: 1 Deadlift + 1 Clean + 1 Hang Clean + 1 Jerk, unbroken",
+    "reps_pattern": "maximum load for one complex; as many attempts as wanted"
+   }
+  ]
+ },
+ "23.2A": {
+  "format": "amrap",
+  "duration_seconds": 900,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Burpee Pull-up",
+    "reps_pattern": "5 in round 1, then 10, 15, 20, adding 5 every round"
+   },
+   {
+    "order": 2,
+    "movement": "Shuttle Run",
+    "reps": 10,
+    "distance_ft": 500
+   }
+  ]
+ },
+ "23.2B": {
+  "format": "max_lift",
+  "time_window_seconds": 300,
+  "preceded_by": "starts immediately after a 15-minute AMRAP of burpee pull-ups and shuttle runs",
+  "rest": "self-paced within the window",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Thruster (taken from the floor)",
+    "reps_pattern": "one-rep maximum; as many attempts as wanted"
+   }
+  ]
+ },
+ "23.3": {
+  "format": "for_time",
+  "time_cap_seconds": 720,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "structure": "the clock starts at 6 minutes; finishing the first six items inside 6 minutes adds 3 minutes for the next three, and finishing those inside 9 minutes adds 3 more for the last three",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Wall Walk",
+    "reps": 5
+   },
+   {
+    "order": 2,
+    "movement": "Double-Under",
+    "reps": 50
+   },
+   {
+    "order": 3,
+    "movement": "Snatch",
+    "reps": 15,
+    "load_lb": 95,
+    "load_x_bodyweight": 0.51
+   },
+   {
+    "order": 4,
+    "movement": "Wall Walk",
+    "reps": 5
+   },
+   {
+    "order": 5,
+    "movement": "Double-Under",
+    "reps": 50
+   },
+   {
+    "order": 6,
+    "movement": "Snatch",
+    "reps": 12,
+    "load_lb": 135,
+    "load_x_bodyweight": 0.73
+   },
+   {
+    "order": 7,
+    "movement": "Strict Handstand Push-up",
+    "reps": 20
+   },
+   {
+    "order": 8,
+    "movement": "Double-Under",
+    "reps": 50
+   },
+   {
+    "order": 9,
+    "movement": "Snatch",
+    "reps": 9,
+    "load_lb": 185,
+    "load_x_bodyweight": 1.0
+   },
+   {
+    "order": 10,
+    "movement": "Strict Handstand Push-up",
+    "reps": 20
+   },
+   {
+    "order": 11,
+    "movement": "Double-Under",
+    "reps": 50
+   },
+   {
+    "order": 12,
+    "movement": "Snatch",
+    "reps": 6,
+    "load_lb": 225,
+    "load_x_bodyweight": 1.21
+   }
+  ]
+ },
+ "26.2": {
+  "format": "for_time",
+  "time_cap_seconds": 900,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "DB Overhead Walking Lunge (one dumbbell)",
+    "distance_ft": 80,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 2,
+    "movement": "Alternating DB Snatch",
+    "reps": 20,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 3,
+    "movement": "Pull-up",
+    "reps": 20
+   },
+   {
+    "order": 4,
+    "movement": "DB Overhead Walking Lunge (one dumbbell)",
+    "distance_ft": 80,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 5,
+    "movement": "Alternating DB Snatch",
+    "reps": 20,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 6,
+    "movement": "Chest-to-Bar Pull-up",
+    "reps": 20
+   },
+   {
+    "order": 7,
+    "movement": "DB Overhead Walking Lunge (one dumbbell)",
+    "distance_ft": 80,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 8,
+    "movement": "Alternating DB Snatch",
+    "reps": 20,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 9,
+    "movement": "Muscle-up",
+    "reps": 20
+   }
+  ]
+ }
+}

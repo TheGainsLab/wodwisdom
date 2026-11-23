@@ -1,0 +1,32 @@
+{
+ "format": "amrap",
+ "duration_seconds": 780,
+ "reps_are": "per round",
+ "rest": "none",
+ "movements": [
+  {
+   "order": 1,
+   "movement": "Deadlift",
+   "reps": 55,
+   "load_lb": 225,
+   "load_x_bodyweight": 1.21
+  },
+  {
+   "order": 2,
+   "movement": "Wall-Ball Shot",
+   "reps": 55,
+   "load_lb": 20,
+   "load_x_bodyweight": 0.11
+  },
+  {
+   "order": 3,
+   "movement": "Row",
+   "calories": 55
+  },
+  {
+   "order": 4,
+   "movement": "Handstand Push-up",
+   "reps": 55
+  }
+ ]
+}

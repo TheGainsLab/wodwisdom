@@ -1,0 +1,188 @@
+{
+ "p321": {
+  "format": "amrap",
+  "scheme_as_written": "AMRAP 18",
+  "duration_seconds": 1080,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Assault Bike",
+    "amount": "not prescribed"
+   },
+   {
+    "order": 2,
+    "movement": "Wall Walk",
+    "reps": 2
+   },
+   {
+    "order": 3,
+    "movement": "Sit Up",
+    "reps": 12
+   },
+   {
+    "order": 4,
+    "movement": "Lunge",
+    "reps": 16
+   }
+  ]
+ },
+ "p322": {
+  "format": "amrap",
+  "scheme_as_written": "AMRAP 20",
+  "duration_seconds": 1200,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Bike",
+    "amount": "not prescribed"
+   },
+   {
+    "order": 2,
+    "movement": "Handstand Push Up",
+    "reps": 12
+   },
+   {
+    "order": 3,
+    "movement": "Walking Lunge",
+    "distance_ft": 50
+   },
+   {
+    "order": 4,
+    "movement": "Toes To Bar",
+    "reps": 8
+   }
+  ]
+ },
+ "p323": {
+  "format": "amrap",
+  "scheme_as_written": "AMRAP 22",
+  "duration_seconds": 1320,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Assault Bike",
+    "amount": "not prescribed"
+   },
+   {
+    "order": 2,
+    "movement": "Dumbbell Hang Clean And Jerk",
+    "reps": 10,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 3,
+    "movement": "Toes To Bar",
+    "reps": 10
+   },
+   {
+    "order": 4,
+    "movement": "Box Jump Over (24 in)",
+    "reps": 10
+   }
+  ]
+ },
+ "p324": {
+  "format": "for_time",
+  "scheme_as_written": "For time (20-min cap)",
+  "time_cap_seconds": 1200,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Bike",
+    "amount": "not prescribed"
+   },
+   {
+    "order": 2,
+    "movement": "Deadlift",
+    "reps": 20,
+    "load_lb": 200,
+    "load_x_bodyweight": 1.08
+   },
+   {
+    "order": 3,
+    "movement": "Toes To Bar",
+    "reps": 20
+   },
+   {
+    "order": 4,
+    "movement": "Front Rack Walking Lunge",
+    "distance_ft": 50,
+    "load_lb": 115,
+    "load_x_bodyweight": 0.62
+   },
+   {
+    "order": 5,
+    "movement": "Double Under",
+    "reps": 100
+   },
+   {
+    "order": 6,
+    "movement": "Row",
+    "distance_m": 750
+   }
+  ]
+ },
+ "p325": {
+  "format": "for_time",
+  "scheme_as_written": "4 rounds for time (18-min cap)",
+  "time_cap_seconds": 1080,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "structure": "4 rounds of 400 m run, 8 snatches, 50 double-unders",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Run",
+    "distance_m": 1600
+   },
+   {
+    "order": 2,
+    "movement": "Power Snatch",
+    "reps": 32,
+    "load_lb": 80,
+    "load_x_bodyweight": 0.43
+   },
+   {
+    "order": 3,
+    "movement": "Double Under",
+    "reps": 200
+   }
+  ]
+ },
+ "p326": {
+  "format": "for_time",
+  "scheme_as_written": "21-15-9 for time (15-min cap)",
+  "time_cap_seconds": 900,
+  "reps_are": "whole workout",
+  "rest": "none",
+  "structure": "three rounds of 21, 15 and 9 of each movement",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Dumbbell Thruster",
+    "reps": 45,
+    "load_lb": 50,
+    "load_x_bodyweight": 0.27
+   },
+   {
+    "order": 2,
+    "movement": "Bar Facing Burpee",
+    "reps": 45
+   },
+   {
+    "order": 3,
+    "movement": "GHD Sit Up",
+    "reps": 45
+   }
+  ]
+ }
+}

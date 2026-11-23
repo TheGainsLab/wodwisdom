@@ -1,0 +1,20 @@
+{
+ "format": "amrap",
+ "duration_seconds": 420,
+ "reps_are": "per round",
+ "rest": "none",
+ "movements": [
+  {
+   "order": 1,
+   "movement": "Snatch",
+   "reps": 10,
+   "load_lb": 75,
+   "load_x_bodyweight": 0.4
+  },
+  {
+   "order": 2,
+   "movement": "Bar Muscle-up",
+   "reps": 3
+  }
+ ]
+}

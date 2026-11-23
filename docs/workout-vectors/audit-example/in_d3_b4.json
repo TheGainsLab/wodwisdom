@@ -1,0 +1,175 @@
+{
+ "p341": {
+  "format": "emom",
+  "scheme_as_written": "EMOM 12 - min 1: Hang Power Clean; min 2: Shuttle Run; min 3: Pull Up; min 4: Assault Bike. Rest remainder of each minute.",
+  "duration_seconds": 720,
+  "reps_are": "per station visit",
+  "rest": "remainder of each minute",
+  "structure": "one station per minute, rotating; 3 visits to each station",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Hang Power Clean",
+    "reps": 5,
+    "load_lb": 100,
+    "load_x_bodyweight": 0.54
+   },
+   {
+    "order": 2,
+    "movement": "Shuttle Run",
+    "reps": 2,
+    "distance_ft": 100
+   },
+   {
+    "order": 3,
+    "movement": "Pull Up",
+    "reps": 8
+   },
+   {
+    "order": 4,
+    "movement": "Assault Bike",
+    "amount": "not prescribed"
+   }
+  ]
+ },
+ "p342": {
+  "format": "intervals",
+  "scheme_as_written": "3 rounds: 5:00 on / 1:00 off",
+  "work_periods": 3,
+  "work_seconds_each": 300,
+  "rest_seconds_between": 60,
+  "reps_are": "per work period",
+  "rest": "60 seconds between work periods",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Row",
+    "distance_m": 350
+   },
+   {
+    "order": 2,
+    "movement": "Air Squat",
+    "reps": 15
+   },
+   {
+    "order": 3,
+    "movement": "Ring Row",
+    "reps": 10
+   },
+   {
+    "order": 4,
+    "movement": "Double Under",
+    "reps": 30
+   }
+  ]
+ },
+ "p343": {
+  "format": "amrap",
+  "scheme_as_written": "AMRAP 20",
+  "duration_seconds": 1200,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Bike",
+    "amount": "not prescribed"
+   },
+   {
+    "order": 2,
+    "movement": "Toes To Bar",
+    "reps": 10
+   },
+   {
+    "order": 3,
+    "movement": "Deadlift",
+    "reps": 8,
+    "load_lb": 200,
+    "load_x_bodyweight": 1.08
+   },
+   {
+    "order": 4,
+    "movement": "Double Under",
+    "reps": 40
+   }
+  ]
+ },
+ "p344": {
+  "format": "intervals",
+  "scheme_as_written": "3 rounds: 6:00 on / 1:30 off",
+  "work_periods": 3,
+  "work_seconds_each": 360,
+  "rest_seconds_between": 90,
+  "reps_are": "per work period",
+  "rest": "90 seconds between work periods",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Run",
+    "distance_m": 600
+   },
+   {
+    "order": 2,
+    "movement": "Handstand Push Up",
+    "reps": 10
+   },
+   {
+    "order": 3,
+    "movement": "Box Jump (24 in, step down)",
+    "reps": 12
+   },
+   {
+    "order": 4,
+    "movement": "V Up",
+    "reps": 12
+   }
+  ]
+ },
+ "p345": {
+  "format": "emom",
+  "scheme_as_written": "EMOM 12 - min 1: Power Clean; min 2: Burpee; min 3: Assault Bike. Rest remainder of each minute.",
+  "duration_seconds": 720,
+  "reps_are": "per station visit",
+  "rest": "remainder of each minute",
+  "structure": "one station per minute, rotating; 4 visits to each station",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Power Clean",
+    "reps": 4,
+    "load_lb": 135,
+    "load_x_bodyweight": 0.73
+   },
+   {
+    "order": 2,
+    "movement": "Burpee",
+    "reps": 8
+   },
+   {
+    "order": 3,
+    "movement": "Assault Bike",
+    "amount": "not prescribed"
+   }
+  ]
+ },
+ "p346": {
+  "format": "amrap",
+  "duration_seconds": 420,
+  "reps_are": "per round",
+  "rest": "none",
+  "movements": [
+   {
+    "order": 1,
+    "movement": "Snatch",
+    "reps": 10,
+    "load_lb": 75,
+    "load_x_bodyweight": 0.4
+   },
+   {
+    "order": 2,
+    "movement": "Bar Muscle-up",
+    "reps": 3
+   }
+  ]
+ }
+}
