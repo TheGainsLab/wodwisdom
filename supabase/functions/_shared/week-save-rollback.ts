@@ -14,6 +14,16 @@
  * visible and the cron's next tick retries the week. Earlier weeks are never
  * touched. Every step is best-effort and never throws: the caller re-throws
  * the original error.
+ *
+ * (2026-11-23) A week save now also removes any rows the week ALREADY had,
+ * written ones included, before it inserts — so a re-run of the saving stage
+ * replaces the week instead of duplicating it. Step 2 covers that case with
+ * no change: once this save's own rows are removed, a week from
+ * `clearedOutlineFromWeek` on that has no rows at all is rebuilt as an
+ * outline, whatever its rows were before. So a failed re-run leaves the week
+ * as an outline (the weekly job writes it again) and never as a duplicate or
+ * a hole. Weeks before `clearedOutlineFromWeek` are not read, not removed and
+ * not rebuilt.
  */
 
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -27,7 +37,8 @@ export interface FailedWeekSave {
   monthNumber: number;
   /** ids of the program_workouts rows THIS save inserted (empty if the insert never succeeded). */
   insertedWorkoutIds: string[];
-  /** The first week whose outline rows this save deleted; null if that delete never ran. */
+  /** The first week this save deleted rows from (its own week's rows of any
+   *  status, and the outline rows of that week and later); null if no delete ran. */
   clearedOutlineFromWeek: number | null;
   /** Used to rebuild outline rows when the month has no stored skeleton. */
   fallbackSkeleton?: OutlineSkeleton | null;

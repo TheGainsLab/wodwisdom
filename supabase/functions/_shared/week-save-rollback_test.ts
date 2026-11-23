@@ -128,3 +128,18 @@ Deno.test("when the cleanup itself fails it never throws and never deletes more;
   assertEquals(rep.problems.length, 1);
   assertEquals(String(db.store.last_fill_error).includes("rollback: remove inserted rows: delete refused"), true);
 });
+
+// (2026-11-23) A week save now removes the week's existing rows — written
+// ones too — before inserting, so a re-run replaces instead of duplicating.
+Deno.test("a failed re-run that had removed the week's written rows leaves that week as an outline, and earlier weeks untouched", async () => {
+  // Week 2 was written once; the re-run removed those rows, inserted n1-n3 (and the later outline), then failed.
+  const { db, supa } = fakeDb(midSaveOfWeek2(), { skeleton: SKELETON, last_fill_error: null });
+  const rep = await rollBackFailedWeekSave(supa, {
+    programId: P, monthNumber: 1, insertedWorkoutIds: NEW_IDS, clearedOutlineFromWeek: 2, error: new Error("re-run failed"),
+  });
+  assertEquals(rep.problems, []);
+  assertEquals(db.rows.filter((r) => r.id.startsWith("w1")).map((r) => r.id), ["w1d1", "w1d2", "w1d3"]);
+  assertEquals(weeksWith(db.rows, "written"), [1]);
+  assertEquals(weeksWith(db.rows, "outline"), [2, 3, 4]);
+  assertEquals(db.rows.filter((r) => r.month_number === 1 && r.week_num === 2).length, 3); // once, not twice
+});

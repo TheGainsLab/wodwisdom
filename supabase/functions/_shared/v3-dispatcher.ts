@@ -145,8 +145,10 @@ export interface ResumeState {
    *  replaces this week's outline rows. rs.weeks holds ONLY this week so the
    *  audits and the save touch nothing already written. */
   weeklyFill?: { weekNum: number };
-  /** The month's weeks already written (from program_month_skeletons), for a
-   *  week job's fill to progress from. Never audited or saved again. */
+  /** The month's weeks already written, for a week job's fill to progress
+   *  from: read from the program's CURRENT rows, edits included (2026-11-23,
+   *  written-weeks.ts); the copy in program_month_skeletons is the fallback.
+   *  Never audited or saved again. */
   priorWrittenWeeks?: WeekPrescription[];
   /** Built once in payload_building — rebuilding re-fires parse-injuries +
    *  re-hits the DB and can drift. */
@@ -175,10 +177,19 @@ export interface ResumeState {
   /** Safety review result (advisory, log-only). */
   safety?: { safe: boolean; reasoning: string; errored: boolean };
   /** FIRST-CYCLE job-level dedup: the programs row id, persisted the instant
-   *  saveProgramV3 creates it, so a saving re-entry reuses it instead of
-   *  creating a second program. (Append mode dedups via the program_months
-   *  marker instead.) */
+   *  the saving stage creates it (persistCreatedProgramId, below), so a
+   *  saving re-entry reuses it instead of creating a second program. (Append
+   *  mode dedups via the program_months marker instead.) */
   programId?: string;
+  /** The ids of the "tell your coach" notes whose text is in `payload`
+   *  (2026-11-23). Only these are marked as used after the save: a note
+   *  written after the payload was built has not been read by this job. */
+  coachNoteIds?: string[];
+  /** WEEK JOB (2026-11-23): the skeleton re-plan this job needed FAILED and
+   *  the week was filled from the stored skeleton. The save then leaves the
+   *  stored built_from alone (so the next week job tries the re-plan again)
+   *  and, when the notes were what asked for the re-plan, leaves them unused. */
+  replan?: { failed: boolean; notesNeededIt: boolean };
   /** Wall-clock start, for elapsed_ms in result_json. */
   startedAtMs?: number;
 }
@@ -318,6 +329,55 @@ export async function advanceStage(
     locked_at: null,
     claim_token: null,
   });
+}
+
+/**
+ * Persist the id of a program the saving stage has JUST created, before the
+ * rest of the save (2026-11-23). ResumeState.programId was documented as
+ * "persisted the instant" the row exists, but it was only written when the
+ * saving stage committed: a worker lost between the insert and that commit
+ * left no trace, and the re-run created a second program.
+ *
+ * Token-gated like every other job write, and it touches nothing but
+ * resume_state: the stage stays claimed and keeps running. Returns false when
+ * this worker no longer owns the job (the caller must undo its insert and
+ * stop — the new owner will do the save).
+ */
+export async function persistCreatedProgramId(
+  supa: SupabaseClient,
+  jobId: string,
+  claimToken: string,
+  resumeState: ResumeState,
+  programId: string,
+): Promise<boolean> {
+  return await commitGated(supa, jobId, claimToken, { resume_state: { ...resumeState, programId } });
+}
+
+export type FirstBuildSavePlan = "save" | "skip" | "redo";
+
+/**
+ * Pure: what the saving stage does with a month, given what it finds.
+ *
+ *  - save: nothing saved yet for this (program, month).
+ *  - skip: the month marker already exists on a program this job did not
+ *    create (a continuation: another attempt or worker saved the month).
+ *  - redo: the marker already exists on the program THIS job created on an
+ *    earlier, lost attempt of the saving stage. That attempt may have died
+ *    half way through its inserts, so its rows are cleared and the month is
+ *    saved again — one program, saved once, complete. (Before the id was
+ *    persisted early this case could not arise: the re-run made a second
+ *    program instead.)
+ */
+export function firstBuildSavePlan(s: {
+  /** The month marker insert hit the unique constraint. */
+  markerExists: boolean;
+  /** rs.continuation.programId — set for a continuation or a week job. */
+  continuationProgramId: string | null | undefined;
+  /** rs.programId as loaded at the start of this saving attempt. */
+  resumedProgramId: string | null | undefined;
+}): FirstBuildSavePlan {
+  if (!s.markerExists) return "save";
+  return !s.continuationProgramId && !!s.resumedProgramId ? "redo" : "skip";
 }
 
 /** Terminal success. Token-gated. */

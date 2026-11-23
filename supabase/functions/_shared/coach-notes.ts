@@ -115,8 +115,22 @@ export async function markNotesConsumed(supa: SupabaseClient, ids: string[], pro
     .then(() => {}, (e: unknown) => console.warn("[coach-notes] mark consumed failed:", e));
 }
 
-/** Spend every unspent 'next_week' note for a product (Programming saves a
- *  whole generation at once and holds texts, not ids). */
+/**
+ * Pure: the ids of the active Programming notes whose text a payload carried.
+ * The payload holds the note TEXTS (they go into prompts); the job state
+ * keeps these ids next to it so that, after the save, only the notes this
+ * job actually read are marked as used (2026-11-23).
+ */
+export function noteIdsForTexts(notes: CoachNote[], payloadTexts: string[] | null | undefined, now: Date = new Date()): string[] {
+  const read = new Set(payloadTexts ?? []);
+  if (read.size === 0) return [];
+  return activeNotes(notes, "programming", now).filter((n) => read.has(n.text)).map((n) => n.id);
+}
+
+/** Spend every unspent 'next_week' note for a product.
+ *  NOT used by Programming any more (2026-11-23): it also spent notes written
+ *  after the payload was built, which nobody had read. Programming marks the
+ *  ids it read with markNotesConsumed. */
 export async function markUserNotesConsumed(supa: SupabaseClient, userId: string, product: NoteProduct): Promise<void> {
   const col = product === "engine" ? "consumed_engine_at" : "consumed_programming_at";
   await supa.from("coach_notes").update({ [col]: new Date().toISOString() })
@@ -158,7 +172,9 @@ export const COACH_NOTE_PROMPT =
   "ALWAYS call the tool — never write 'save that note' or 'I'll note that' in text: the athlete can only save a " +
   "note you have drafted as a card, and a sentence about saving with no card is a broken promise. " +
   "Horizon is next_week unless they say it is ongoing. Durable facts (injuries, days per week, a goal shift) " +
-  "are propose_profile_update instead. One card per message. After they save: say it will be read at the " +
+  "are propose_profile_update instead. A change to HOW MANY DAYS A WEEK they train — fewer or more, even for a " +
+  "short while — is ALWAYS a profile update (propose_profile_update days_per_week), NEVER a note: a note cannot " +
+  "change the day count, and one that asks for it changes nothing. One card per message. After they save: say it will be read at the " +
   "next generation — the Engine's next block within days (only when AI Sequencing is on); AI Programming's NEXT WEEK, written once every day of the current week has something logged or on its weekly date, whichever comes first. " +
   "If a RECURRING NOTE line is present below, offer once, in one sentence, to make it part of their goal " +
   "(propose_profile_update goal_append) — only if they agree.";

@@ -33,14 +33,25 @@ import { isBarbellMetconMovement } from "../_shared/metcon-variety-audits.ts";
 import { trimWriterMovementAnnotations } from "../_shared/movement-name-repair.ts";
 import { buildStratifiedMetconExamples } from "../_shared/metcon-examples.ts";
 import { composeMetconsForSlots } from "../_shared/compose-metcons.ts";
-import { builtFromOf, classifyNotesForReplan, loadMonthStore, profileDrift, weeksToCarryForward, type MonthStore } from "../_shared/weekly-fill.ts";
+import {
+  builtFromForWeekSave,
+  builtFromOf,
+  classifyNotesForReplan,
+  loadMonthStore,
+  noteIdsToConsume,
+  profileDrift,
+  weeksToCarryForward,
+  type MonthStore,
+} from "../_shared/weekly-fill.ts";
+import { priorWeeksForWeekJob } from "../_shared/written-weeks.ts";
+import { withPlanChecks } from "../_shared/plan-fidelity.ts";
 import { formatAuditFailuresForLog, logGenerationAudit } from "../_shared/generation-audit-log.ts";
 import {
   enqueueSignatureDraftsForWeeks,
   formatEnqueueStats,
   triggerDraftWorker,
 } from "../_shared/signature-draft-queue.ts";
-import { markUserNotesConsumed } from "../_shared/coach-notes.ts";
+import { loadCoachNotes, markNotesConsumed, noteIdsForTexts } from "../_shared/coach-notes.ts";
 import { isArchived, isProgramArchived, loadArchiveCutoff } from "../_shared/program-archive.ts";
 import { buildProgramEvidenceContext } from "../_shared/program-evidence.ts";
 import { buildTrainingDesignInput } from "../_shared/training-design-input.ts";
@@ -73,7 +84,7 @@ import {
   callSkeletonWriter,
   callWeekFill,
   resolveGender,
-  auditOutput,
+  auditOutput as auditOutputHard,
   applyProgrammaticFixes,
   applySurgicalFixes,
   recomputeBenchmarks,
@@ -82,6 +93,8 @@ import {
 import { renderWeekSchemesInPlace } from "../_shared/compose-block-scheme.ts";
 import { getDomainPack } from "../_shared/domain-packs/registry.ts";
 import {
+  firstBuildSavePlan,
+  persistCreatedProgramId,
   runStageWithLease,
   type ProgramJobRow,
   type ResumeState,
@@ -166,6 +179,28 @@ async function enforceInjuryConfirmationGuard(
 // core is sport-agnostic — the pack supplies all sport-coupled content.
 const PACK = getDomainPack("crossfit@3");
 
+/**
+ * The hard audits PLUS the check of each written day against its skeleton day
+ * (2026-11-23, _shared/plan-fidelity.ts): the planned block types are there,
+ * and the strength block's main lift is the planned primary_lift. A wrong
+ * lift is block-local, so the surgical stage repairs it; a missing block type
+ * is logged as a residual.
+ *
+ * This is called ONLY from the benchmark_audit and surgical stages, which run
+ * BEFORE safety_review. The fit gate and the restriction gate there remove on
+ * purpose (an accessory block for a session under 45 minutes, a movement
+ * dropped or swapped); nothing audits their output, so this check cannot flag
+ * or undo what they did. Keep it that way: never call this after the gates.
+ */
+function auditOutput(
+  output: WriterOutput,
+  payload: WriterPayload,
+  skeleton: SkeletonOutput,
+  pack: typeof PACK,
+) {
+  return withPlanChecks(auditOutputHard(output, payload, skeleton, pack), output, skeleton);
+}
+
 /** Transition from surgical (or benchmark_audit) into safety_review: drop the
  *  surgical cursor, persist the final output + residual failures. */
 function toSafety(rs: ResumeState, output: WriterOutput, residualFailures: unknown[]): ResumeState {
@@ -242,9 +277,19 @@ async function stagePayloadBuilding(
   const weekly = rs.weeklyFill != null || weeklyRow?.programming_weekly === true;
   if (weekly) console.log(`[generate-program-v3] weekly mode for ${userId}`);
 
+  // The ids of the notes this payload carries (2026-11-23). After the save
+  // only THESE are marked as used: marking every active note also spent notes
+  // written while the job was running, which nothing had read. Best-effort:
+  // on a read failure nothing is marked and the notes are read again.
+  const coachNoteIds = (payload.training_context.coach_notes ?? []).length > 0
+    ? await loadCoachNotes(supa, userId)
+      .then((ns) => noteIdsForTexts(ns, payload.training_context.coach_notes))
+      .catch(() => [] as string[])
+    : [];
+
   return {
     next: "coach_state",
-    resumeState: { ...rs, payload, weekly, startedAtMs: rs.startedAtMs ?? Date.now() },
+    resumeState: { ...rs, payload, weekly, coachNoteIds, startedAtMs: rs.startedAtMs ?? Date.now() },
     displayStage: "payload_built",
   };
 }
@@ -289,8 +334,13 @@ async function stageCoachState(
   // month's evaluations. Delete-then-insert keeps retries idempotent. Best-effort:
   // a failed insert must never fail generation.
   const monthNumber = rs.continuation.monthNumber;
+  // A WEEK JOB leaves the month's evaluation alone (2026-11-23). It used to
+  // delete it and re-insert it hidden here, to be revealed only by a
+  // successful save: a week job that failed in between left the athlete
+  // without their evaluation until a later week succeeded. Only a month build
+  // writes (and, in saving, reveals) evaluations.
   const review = typeof coachState.month_in_review === "string" ? coachState.month_in_review.trim() : "";
-  if (review) {
+  if (review && !rs.weeklyFill) {
     try {
       // Keyed by user + month NUMBER: a returner's new Month 1 must not wipe
       // the review their archived program's Month 1 left behind. Only rows
@@ -390,6 +440,10 @@ async function stageSkeleton(
     const verdict = drift.length ? "replan" : notes.length ? await classifyNotesForReplan(notes) : "fill";
     let skeleton = store.skeleton;
     let replanned = false;
+    // What the save needs to know when the re-plan fails (2026-11-23): it
+    // must not record the new built_from, and must not spend notes that asked
+    // for the re-plan — see builtFromForWeekSave / noteIdsToConsume.
+    let replan: { failed: boolean; notesNeededIt: boolean } = { failed: false, notesNeededIt: false };
     if (verdict === "replan") {
       const reasons = [
         ...(drift.length ? [`The athlete's PROFILE CHANGED since this skeleton was built: ${drift.join("; ")}. The remaining weeks must match the CURRENT profile (days per week above all).`] : []),
@@ -422,11 +476,23 @@ async function stageSkeleton(
         // the cron tries again next tick.
         if (daysChanged) throw new Error(`[generate-program-v3] week ${weekNum}: re-plan on a days-per-week change failed: ${e instanceof Error ? e.message : String(e)}`);
         console.warn(`[generate-program-v3] week ${weekNum}: re-plan failed, filling from the stored skeleton:`, e instanceof Error ? e.message : String(e));
+        // Did the NOTES ask for this re-plan? With no drift they were the
+        // only trigger. With drift the classifier was never asked, so ask it
+        // now (failure path only; an error answers "fill").
+        const notesNeededIt = notes.length > 0 &&
+          (drift.length === 0 || (await classifyNotesForReplan(notes)) === "replan");
+        replan = { failed: true, notesNeededIt };
       }
     }
+    // The prior weeks the fill progresses from are the program AS IT STANDS
+    // NOW — the current rows, edits by the athlete or the coach included —
+    // not the copy stored when each week was first written (2026-11-23). The
+    // stored copy is the fallback when the rows cannot be read.
+    const prior = await priorWeeksForWeekJob(supa, rs.continuation.programId!, rs.continuation.monthNumber, weekNum, store.written_weeks);
+    console.log(`[generate-program-v3] week ${weekNum}: ${prior.weeks.length} prior week(s) from ${prior.source === "rows" ? "the current program rows" : "the stored copy (rows unreadable)"}`);
     return {
       next: "metcons",
-      resumeState: { ...rs, skeleton, weeks: [], priorWrittenWeeks: store.written_weeks, composedMetcons: store.composed_metcons ?? [] },
+      resumeState: { ...rs, skeleton, weeks: [], priorWrittenWeeks: prior.weeks, replan, composedMetcons: store.composed_metcons ?? [] },
       displayStage: "skeleton_done",
       extraPatch: { skeleton_json: skeleton, ...(replanned ? { replanned: true } : {}) },
     };
@@ -987,6 +1053,9 @@ async function stageSaving(
   if (rs.continuation.programId && await isProgramArchived(supa, rs.continuation.programId)) {
     throw new Error("[generate-program-v3] program was archived during generation; nothing saved");
   }
+  // A first build whose program THIS job created on an earlier attempt of
+  // this stage (the id was persisted the moment the row existed — below).
+  const resumedOwnShell = !rs.continuation.programId && !!rs.programId;
   let createdShell = false;
   if (!programId) {
     const { data: shell, error: shellErr } = await supa
@@ -1005,7 +1074,23 @@ async function stageSaving(
     }
     programId = shell.id as string;
     createdShell = true;
+    // A FIRST BUILD CANNOT BE SAVED AS TWO PROGRAMS (2026-11-23): write the
+    // new program's id onto the job NOW, before the rest of the save. It used
+    // to be written only when this stage committed, so a worker lost in
+    // between left no trace of the program and the re-run created a second
+    // one. If the write does not land, this worker no longer owns the job:
+    // take the row back out and stop — the new owner does the save.
+    const kept = job.claim_token
+      ? await persistCreatedProgramId(supa, job.id, job.claim_token, rs, programId)
+      : false;
+    if (!kept) {
+      await supa.from("programs").delete().eq("id", programId).then(() => {}, () => {});
+      throw new Error("[generate-program-v3] could not record the new program on the job (job no longer owned); nothing saved");
+    }
   }
+  // The program is this job's own creation, now or on an earlier attempt: a
+  // failed save must not leave it behind empty.
+  const ownShell = createdShell || resumedOwnShell;
 
   // Idempotency gate: claim this (program, month). A unique-violation means a
   // prior attempt (or a concurrent worker) already saved this month — treat as
@@ -1014,16 +1099,32 @@ async function stageSaving(
   const { error: markerErr } = rs.weeklyFill
     ? { error: null }
     : await supa.from("program_months").insert({ program_id: programId, month_number: monthNumber });
-  const alreadySaved = !rs.weeklyFill && markerErr != null &&
+  const markerExists = !rs.weeklyFill && markerErr != null &&
     (markerErr.code === "23505" || /duplicate key|already exists/i.test(markerErr.message ?? ""));
-  if (markerErr && !alreadySaved) {
+  if (markerErr && !markerExists) {
     // Don't orphan a just-created shell behind this throw — without the delete
     // the user is left with an empty "program with no workouts" row.
-    if (createdShell) {
+    if (ownShell) {
       await supa.from("programs").delete().eq("id", programId).then(() => {}, () => {});
     }
     throw new Error(`[generate-program-v3] program_months marker insert failed: ${markerErr.message}`);
   }
+  // The marker on a program this job created itself comes from an earlier,
+  // lost attempt of this stage, which may have died half way through its
+  // inserts: clear whatever it wrote and save the month again (2026-11-23).
+  // On anyone else's program the marker means the month is saved: skip.
+  const savePlan = firstBuildSavePlan({
+    markerExists,
+    continuationProgramId: rs.continuation.programId,
+    resumedProgramId: rs.programId,
+  });
+  if (savePlan === "redo") {
+    console.warn(`[generate-program-v3] month ${monthNumber} of ${programId}: an earlier attempt of this job began the save; clearing its rows and saving again`);
+    const { error: clearErr } = await supa.from("program_workouts").delete()
+      .eq("program_id", programId).eq("month_number", monthNumber);
+    if (clearErr) throw new Error(`[generate-program-v3] could not clear the earlier attempt's rows: ${clearErr.message}`);
+  }
+  const alreadySaved = savePlan === "skip";
 
   if (!alreadySaved) {
     try {
@@ -1033,13 +1134,30 @@ async function stageSaving(
         programId, // always append mode in the dispatcher (shell pre-created for first-cycle)
         monthNumber,
         ...(rs.weekly
-          ? { weekly: { composedMetcons: rs.composedMetcons ?? null, builtFrom: builtFromOf(rs.payload!.training_context), ...(rs.weeklyFill ? { weekAppend: true, skeletonToStore: skeleton } : {}) } }
+          ? {
+            weekly: {
+              composedMetcons: rs.composedMetcons ?? null,
+              // A week job whose re-plan FAILED filled from the old skeleton:
+              // the stored built_from stays as it is, so the next week job
+              // sees the same drift and tries the re-plan again (2026-11-23).
+              builtFrom: rs.weeklyFill
+                ? builtFromForWeekSave(rs.replan?.failed === true, builtFromOf(rs.payload!.training_context))
+                : builtFromOf(rs.payload!.training_context),
+              ...(rs.weeklyFill ? { weekAppend: true, skeletonToStore: skeleton } : {}),
+            },
+          }
           : {}),
       });
       console.log(`[generate-program-v3] saved program ${programId} (month ${monthNumber})`);
       // The month was written with the athlete's "tell your coach" notes in
       // view: spend the one-week ones for Programming (standing notes stay).
-      await markUserNotesConsumed(supa, userId, "programming");
+      // Only the notes THIS job read (their ids were kept with the payload),
+      // and not the ones that asked for a re-plan that failed (2026-11-23).
+      await markNotesConsumed(
+        supa,
+        noteIdsToConsume(rs.coachNoteIds, rs.replan ?? { failed: false, notesNeededIt: false }),
+        "programming",
+      );
 
       // Per-generation avoidance record (handoff 1.5 / T6): persist the effective
       // avoidance list that gated THIS cycle, WITH T5 provenance tags — the
@@ -1068,7 +1186,7 @@ async function stageSaving(
       await supa.from("program_months").delete()
         .eq("program_id", programId).eq("month_number", monthNumber)
         .then(() => {}, () => {});
-      if (createdShell) {
+      if (ownShell) {
         await supa.from("programs").delete().eq("id", programId).then(() => {}, () => {});
       }
       throw saveErr;
@@ -1091,14 +1209,17 @@ async function stageSaving(
   }
 
   // Reveal this month's coaching evaluations (non-fatal, scoped to user+month).
-  try {
-    await Promise.allSettled([
-      supa.from("profile_evaluations").update({ visible: true }).eq("user_id", userId).eq("month_number", monthNumber),
-      supa.from("training_evaluations").update({ visible: true }).eq("user_id", userId).eq("month_number", monthNumber),
-      supa.from("nutrition_evaluations").update({ visible: true }).eq("user_id", userId).eq("month_number", monthNumber),
-    ]);
-  } catch (visErr) {
-    console.warn("[generate-program-v3] eval visibility flip failed (non-fatal):", visErr);
+  // A MONTH BUILD only: a week job neither hides nor reveals them (2026-11-23).
+  if (!rs.weeklyFill) {
+    try {
+      await Promise.allSettled([
+        supa.from("profile_evaluations").update({ visible: true }).eq("user_id", userId).eq("month_number", monthNumber),
+        supa.from("training_evaluations").update({ visible: true }).eq("user_id", userId).eq("month_number", monthNumber),
+        supa.from("nutrition_evaluations").update({ visible: true }).eq("user_id", userId).eq("month_number", monthNumber),
+      ]);
+    } catch (visErr) {
+      console.warn("[generate-program-v3] eval visibility flip failed (non-fatal):", visErr);
+    }
   }
 
   // Soft audits — log-only safety net.

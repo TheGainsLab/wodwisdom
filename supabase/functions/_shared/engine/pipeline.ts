@@ -192,12 +192,93 @@ function repairSkeletonEmission(skeleton: SkeletonOutput): SkeletonOutput {
   return s as SkeletonOutput;
 }
 
-// EVAL STOPGAP: a verbose week fill can need >150s of Sonnet output; no fixed
-// total-duration timeout that ALSO leaves room for a retry fits under the ~400s
-// edge wall-clock. ONE attempt with a generous budget; a transient blip fails the
-// run and it's re-kicked.
-const MAX_WEEK_FILL_ATTEMPTS = 1;
+// A verbose week fill can need >150s of Sonnet output, so ONE attempt gets a
+// generous budget. (2026-11-23) A PASSING error no longer fails the build: a
+// transient failure — HTTP 429/500/502/503/504/529, a network error, or a
+// timeout — is retried ONCE after a short pause, and only when enough of the
+// stage's budget is left for a second attempt to have a real chance. Those
+// errors usually come back within seconds, so there normally is; a timeout
+// that used up the whole first window is not retried (no room under the ~400s
+// edge wall-clock). Anything else (400/401/403/404, a malformed reply) throws
+// at once, as before. This retry lives in callWeekFill only; the dispatcher's
+// "a writer stage that throws fails the job" rule is unchanged.
+const MAX_WEEK_FILL_ATTEMPTS = 2;
 const WEEK_FILL_TIMEOUT_MS = 330_000;
+/** All attempts, the pause included, finish inside this. */
+export const WEEK_FILL_BUDGET_MS = 360_000;
+export const WEEK_FILL_RETRY_PAUSE_MS = 5_000;
+/** Below this a second attempt could not finish a week: do not start one. */
+export const WEEK_FILL_MIN_RETRY_WINDOW_MS = 120_000;
+
+export const TRANSIENT_HTTP_STATUSES = [429, 500, 502, 503, 504, 529];
+
+/** A non-2xx reply from the model API, with its status kept for the retry decision. */
+export class ClaudeHttpError extends Error {
+  constructor(public readonly status: number, body: string) {
+    super(`Claude HTTP ${status}: ${body.slice(0, 500)}`);
+    this.name = "ClaudeHttpError";
+  }
+}
+
+/** Pure: is this failure one that passes by itself? */
+export function isTransientFillError(err: unknown): boolean {
+  if (err instanceof ClaudeHttpError) return TRANSIENT_HTTP_STATUSES.includes(err.status);
+  if (!(err instanceof Error)) return false;
+  // A timeout (AbortSignal.timeout) or an aborted request. Decided by the
+  // error's NAME, never by words in its message: our own "malformed reply"
+  // errors quote the model's text, which can say anything.
+  if (err.name === "TimeoutError" || err.name === "AbortError") return true;
+  // A network failure: fetch rejects with a TypeError (connection refused or
+  // reset, DNS, TLS, a body cut off mid-read). Other TypeErrors are bugs.
+  return err.name === "TypeError" &&
+    /fetch|request|network|connect|dns|tls|socket|body|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN/i.test(err.message);
+}
+
+/**
+ * Run `attempt` and, when it fails with a transient error, run it once more
+ * after a pause — if the budget still has room. `attempt` is told the time by
+ * which it must be done. Exported for the test; callWeekFill is the only user.
+ */
+export async function withOneTransientRetry<T>(
+  attempt: (deadlineMs: number, attemptNo: number) => Promise<T>,
+  opts: {
+    budgetMs: number;
+    attemptTimeoutMs: number;
+    pauseMs: number;
+    minRetryWindowMs: number;
+    maxAttempts?: number;
+    isTransient?: (err: unknown) => boolean;
+    now?: () => number;
+    sleep?: (ms: number) => Promise<void>;
+    onRetry?: (err: unknown, attemptNo: number, elapsedMs: number) => void;
+    onGiveUp?: (err: unknown, attemptNo: number, elapsedMs: number, why: string) => void;
+  },
+): Promise<T> {
+  const now = opts.now ?? Date.now;
+  const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  const isTransient = opts.isTransient ?? isTransientFillError;
+  const maxAttempts = opts.maxAttempts ?? 2;
+  const start = now();
+  const hardStop = start + opts.budgetMs;
+  for (let n = 1; ; n++) {
+    const deadline = Math.min(now() + opts.attemptTimeoutMs, hardStop);
+    try {
+      return await attempt(deadline, n);
+    } catch (err) {
+      const elapsed = now() - start;
+      const why = !isTransient(err)
+        ? "not a transient error"
+        : n >= maxAttempts
+        ? "already retried"
+        : hardStop - (now() + opts.pauseMs) < opts.minRetryWindowMs
+        ? "no time left in the stage's budget"
+        : "";
+      if (why) { opts.onGiveUp?.(err, n, elapsed, why); throw err; }
+      opts.onRetry?.(err, n, elapsed);
+      await sleep(opts.pauseMs);
+    }
+  }
+}
 
 /** Fill ONE week of the program. Reuses the pack's week-fill prompt + emit_week
  *  tool, with the full skeleton as context, the specific week to fill, and the
@@ -307,12 +388,13 @@ export async function callWeekFill(
   // 5-day week is ~10-12K tokens of JSON on its own.
   const maxTokens = WEEK_FILL_FORCED_TOOL_OK ? 16000 : 32000;
 
-  let lastErr: unknown = null;
-  // One nudge when a non-forced reply carries no tool call (text instead).
-  let nudge = "";
-  for (let attempt = 1; attempt <= MAX_WEEK_FILL_ATTEMPTS; attempt++) {
-    const t0 = Date.now();
-    try {
+  const describe = (err: unknown) => (err instanceof Error ? `${err.name}: ${err.message}` : String(err));
+  return await withOneTransientRetry(async (deadlineMs) => {
+    // One nudge when a non-forced reply carries no tool call (text instead).
+    // The nudge is not a retry: it shares this attempt's deadline.
+    let nudge = "";
+    for (;;) {
+      const t0 = Date.now();
       const resp = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
@@ -329,17 +411,12 @@ export async function callWeekFill(
           tool_choice: WEEK_FILL_FORCED_TOOL_OK ? { type: "tool", name: "emit_week" } : { type: "auto" },
           messages: [{ role: "user", content: nudge ? `${nudge}\n\n---\n\n${userMessage}` : userMessage }],
         }),
-        signal: AbortSignal.timeout(WEEK_FILL_TIMEOUT_MS),
+        signal: AbortSignal.timeout(Math.max(1_000, deadlineMs - Date.now())),
       });
 
       if (!resp.ok) {
         const body = await resp.text().catch(() => "");
-        if ((resp.status >= 500 || resp.status === 429) && attempt < MAX_WEEK_FILL_ATTEMPTS) {
-          lastErr = new Error(`Claude HTTP ${resp.status}`);
-          console.warn(`[engine fill week ${weekNum}] HTTP ${resp.status}; retry ${attempt}/${MAX_WEEK_FILL_ATTEMPTS}`);
-          continue;
-        }
-        throw new Error(`Claude HTTP ${resp.status}: ${body.slice(0, 500)}`);
+        throw new ClaudeHttpError(resp.status, body);
       }
 
       const data = (await resp.json()) as ClaudeResponse;
@@ -354,7 +431,6 @@ export async function callWeekFill(
         if (!WEEK_FILL_FORCED_TOOL_OK && !nudge && data.stop_reason !== "max_tokens") {
           nudge = "YOUR PREVIOUS REPLY DID NOT CALL emit_week. Reply ONLY with one emit_week tool call carrying the complete week.";
           console.warn(`[engine fill week ${weekNum}] no tool call in reply (stop_reason=${data.stop_reason}); nudging once`);
-          attempt--; // the nudge does not spend an attempt
           continue;
         }
         throw new Error(
@@ -368,21 +444,18 @@ export async function callWeekFill(
       }
       week.week_num = weekNum; // enforce regardless of what the model emitted
       return week;
-    } catch (err) {
-      lastErr = err;
-      const elapsed = Date.now() - t0;
-      const msg = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
-      const isTransient = err instanceof Error &&
-        (err.name === "TimeoutError" || /timed out|timeout|aborted/i.test(err.message));
-      if (isTransient && attempt < MAX_WEEK_FILL_ATTEMPTS) {
-        console.warn(`[engine fill week ${weekNum}] transient after ${elapsed}ms (${msg}); retry ${attempt}/${MAX_WEEK_FILL_ATTEMPTS}`);
-        continue;
-      }
-      console.warn(`[engine fill week ${weekNum}] giving up after ${elapsed}ms (${msg})`);
-      throw err;
     }
-  }
-  throw lastErr ?? new Error(`week ${weekNum} fill failed`);
+  }, {
+    budgetMs: WEEK_FILL_BUDGET_MS,
+    attemptTimeoutMs: WEEK_FILL_TIMEOUT_MS,
+    pauseMs: WEEK_FILL_RETRY_PAUSE_MS,
+    minRetryWindowMs: WEEK_FILL_MIN_RETRY_WINDOW_MS,
+    maxAttempts: MAX_WEEK_FILL_ATTEMPTS,
+    onRetry: (err, n, elapsed) =>
+      console.warn(`[engine fill week ${weekNum}] transient after ${elapsed}ms (${describe(err)}); retrying once (attempt ${n + 1}/${MAX_WEEK_FILL_ATTEMPTS})`),
+    onGiveUp: (err, _n, elapsed, why) =>
+      console.warn(`[engine fill week ${weekNum}] giving up after ${elapsed}ms (${describe(err)}) — ${why}`),
+  });
 }
 
 // ============================================================
