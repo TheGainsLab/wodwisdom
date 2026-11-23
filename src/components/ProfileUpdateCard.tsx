@@ -15,9 +15,13 @@ export interface ProfileProposalData {
 
 export type ProfileCardStatus = 'pending' | 'applying' | 'applied' | 'declined' | 'error';
 
-export default function ProfileUpdateCard({ data, status, onResolve }: {
+export default function ProfileUpdateCard({ data, status, effect, onResolve }: {
   data: ProfileProposalData;
   status: ProfileCardStatus;
+  /** What the applied change does and when — computed by the server from the
+   *  athlete's real state. The card never guesses ("next month" was wrong for
+   *  weekly programs and for the Engine). */
+  effect?: string;
   onResolve: (action: 'apply' | 'decline') => void;
 }) {
   const p = data.proposal;
@@ -62,7 +66,7 @@ export default function ProfileUpdateCard({ data, status, onResolve }: {
       <div style={{ display: 'flex', gap: 8, marginTop: 12, alignItems: 'center' }}>
         {done ? (
           <span style={{ fontSize: 13, fontWeight: 600, color: status === 'applied' ? '#2ec486' : 'var(--text-muted)' }}>
-            {status === 'applied' ? '✓ Applied — your next month builds from this' : 'Kept as-is'}
+            {status === 'applied' ? `✓ Applied${effect ? `. ${effect}` : ''}` : 'Kept as-is'}
           </span>
         ) : (
           <>

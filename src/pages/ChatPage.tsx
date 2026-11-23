@@ -22,6 +22,7 @@ interface Message {
   /** When set, this message renders as a profile-update card, not a bubble. */
   profileProposal?: ProfileProposalData;
   proposalStatus?: ProfileCardStatus;
+  proposalEffect?: string;
   /** When set, this message renders as a "note for your coach" card. */
   noteProposal?: NoteProposalData;
   noteStatus?: NoteCardStatus;
@@ -460,6 +461,7 @@ export default function ChatPage({ session }: { session: Session }) {
                 key={i}
                 data={m.profileProposal}
                 status={m.proposalStatus ?? 'pending'}
+                effect={m.proposalEffect}
                 onResolve={async (action) => {
                   const pid = m.profileProposal!.proposal_id;
                   setMessages(prev => prev.map(msg =>
@@ -477,7 +479,7 @@ export default function ChatPage({ session }: { session: Session }) {
                     if (!resp.ok) throw new Error(data?.error || 'failed');
                     setMessages(prev => prev.map(msg =>
                       msg.profileProposal?.proposal_id === pid
-                        ? { ...msg, proposalStatus: action === 'apply' ? 'applied' : 'declined' }
+                        ? { ...msg, proposalStatus: action === 'apply' ? 'applied' : 'declined', proposalEffect: typeof data?.effect === 'string' ? data.effect : undefined }
                         : msg
                     ));
                   } catch {

@@ -180,7 +180,8 @@ const COACH_SPINE =
   "- Garbled or ambiguous input: when a detail your answer depends on is garbled or unclear, ask a one-line clarifying question instead of guessing. Restate small numbers you rely on (rest lengths, round counts) from the session context — don't approximate them from memory.\n\n" +
   "PROGRAM REGENERATION (rebuilds go through the human coach):\n" +
   "- Day-to-day adjustments are YOURS to coach right here: scaling, movement substitutions, pacing, rearranging a week around travel or soreness. Never route those to the human coach.\n" +
-  "- A REBUILD is different: regenerating, replacing, or starting a program over (goals changed, equipment changed, the program no longer fits). Rebuilds require the coach's sign-off — there is no self-serve regenerate, and you cannot trigger one.\n" +
+  "- A change of goal, days per week or equipment does NOT need a rebuild and does NOT need a human: AI Programming re-plans the weeks of the month that are not written yet when the next week is written (days and goal via propose_profile_update; equipment via the profile's equipment checklist). A REBUILD means throwing the program away and starting over; there is no self-serve regenerate and you cannot trigger one, so only for that send them to the Message a human coach button.\n" +
+  "- YOU ARE THE COACH. Never tell the athlete to 'flag', 'tell', 'mention' or 'send' something to 'your coach' or 'the coach' — there is no one else in this conversation. When something should carry into future weeks, offer the note card or the profile card yourself and say plainly what it will do. The only other person is the HUMAN coach, reached with the Message a human coach button, and only for what you truly cannot do.\n" +
   "- When an athlete asks for a rebuild: first coach what's adjustable right now, then tell them a rebuild is set up with their human coach — tap the 'Message a human coach' button here in the chat, say what changed and what they want different, and the coach takes it from there (replies by email, usually within 24 hours).\n" +
   "- Frame it as service, not a wall: a rebuild is deliberate, done with them, built from their updated profile and goals. Never promise the rebuild will happen or when, never suggest workarounds, and never imply they did something wrong by asking.\n\n" +
   "PRODUCT CATALOG (for your awareness — use per the rules below):\n" +
@@ -1185,7 +1186,7 @@ Deno.serve(async (req) => {
               parts.push(`Current: Week ${currentWorkout.week_num}, Day ${currentWorkout.day_num}`);
             }
             if (outlineWeeks.length) {
-              parts.push(`Not yet written (weekly Programming — each week is written after the previous week's last day is logged): week${outlineWeeks.length === 1 ? "" : "s"} ${outlineWeeks.join(", ")}`);
+              parts.push(`Not yet written (weekly Programming — each week is written once every day of the week before has something logged, or on its weekly date from when the month was built, whichever comes first): week${outlineWeeks.length === 1 ? "" : "s"} ${outlineWeeks.join(", ")}`);
             }
             aiProgramContext = "\n\nAI PROGRAM:\n" + parts.join("\n");
           }
@@ -1425,7 +1426,7 @@ Deno.serve(async (req) => {
         "- Preserve the day's purpose: keep the block's intent, time domain, and stimulus unless the athlete explicitly asks to change them. Honor the coaching plan — shrink primary work rather than delete it, and say why in the rationale.\n" +
         "- The do_not_program list is ABSOLUTE: never propose a movement on it even when asked by name. Explain, offer the closest safe alternative, and note they can update their profile if the constraint no longer applies.\n" +
         "- equipment_not_available comes from the profile's checklist and can be out of date. If the athlete says they HAVE something on it (or chooses to do a movement, e.g. to go for a run), take their word and propose the edit. If they say they DON'T have something today's block uses, make the swap for today AND tell them their profile's equipment checklist still lists it, so later days will use it too until they untick it.\n" +
-        "- Cycle-level requests (\"more squatting this cycle\", \"add a training day\") are conversation, not edits — explain that consistent logging shapes the next cycle's evaluation.\n" +
+        "- Requests about the weeks ahead (\"more squatting\", \"add a training day\", \"shorter sessions\") are not edits to today, but they ARE something you act on: a lasting change to days per week or goal is a propose_profile_update, and a wish for the coming weeks is a propose_coach_note. Either one re-plans the weeks of this month that are not written yet. Never tell them it must wait for the next cycle.\n" +
         "- If the athlete keeps reversing recent changes, pause and help them decide what they actually want instead of proposing again.\n" +
         "- After a card is shown, conclude in one or two sentences; never restate the block's contents in text."
       : "";
@@ -1771,8 +1772,9 @@ Deno.serve(async (req) => {
                 );
                 answer(
                   "The profile-update card is on the athlete's screen with Apply / Not now. Conclude in one or two " +
-                  "sentences: if they apply, their NEXT generated month is built from the updated profile; a rebuild " +
-                  "of the CURRENT month goes through a human (Message a human coach / coach@thegainslab.com).",
+                  "sentences. Do NOT say 'next month' and do NOT mention a human or a rebuild: once applied, the card " +
+                  "itself states exactly what changes and when (for AI Programming, unwritten weeks of this month are " +
+                  "re-planned when the next week is written). Say only that it takes effect once they tap Apply.",
                 );
                 continue;
               }

@@ -73,6 +73,9 @@ import {
 import { checkEntitlement } from "./entitlements.ts";
 import { loadArchiveCutoff } from "./program-archive.ts";
 
+/** Minutes per session when the athlete has never set one. Matches the profile page. */
+export const DEFAULT_SESSION_LENGTH_MINUTES = 60;
+
 // ============================================================
 // Payload types
 // ============================================================
@@ -1028,7 +1031,11 @@ export async function buildWriterPayload(
     equipment,
     training_context: {
       days_per_week: clampDaysPerWeek(profile.days_per_week),
-      session_length_minutes: asNumber(profile.session_length_minutes),
+      // An empty session length is 60 minutes — what the profile screen has
+      // always shown for an untouched slider. Passing null through meant NO
+      // time budget at all (2026-11-23: an 80-minute first session for an
+      // athlete who believed he had chosen 60).
+      session_length_minutes: asNumber(profile.session_length_minutes) ?? DEFAULT_SESSION_LENGTH_MINUTES,
       goal_text: asString(profile.goal),
       coach_notes: coachNoteTexts,
       injuries_constraints_text: asString(profile.injuries_constraints),
