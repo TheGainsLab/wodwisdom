@@ -123,8 +123,10 @@ function familiesOf(name: string): Set<string> {
 export function isPlannedLift(primaryLift: string, movement: string): boolean {
   const a = norm(primaryLift); const b = norm(movement);
   if (!a || !b) return true; // nothing to compare
-  if (a === b || a.includes(b) || b.includes(a)) return true;
+  if (a === b) return true;
   const fa = familiesOf(primaryLift); const fb = familiesOf(movement);
+  // Two known lifts are compared by family, never by one name sitting inside
+  // the other: "Press" is inside "Push Press" and they are different lifts.
   if (fa.size > 0 && fb.size > 0) {
     for (const f of fb) {
       if (fa.has(f)) return true;
@@ -133,6 +135,7 @@ export function isPlannedLift(primaryLift: string, movement: string): boolean {
     }
     return false;
   }
+  if (a.includes(b) || b.includes(a)) return true;
   const ta = new Set(tokens(primaryLift));
   return tokens(movement).some((t) => ta.has(t));
 }
