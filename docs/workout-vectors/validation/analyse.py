@@ -67,3 +67,18 @@ if __name__=='__main__':
     for i,lab in enumerate(('closest quarter','2nd','3rd','farthest quarter')):
         seg=srt[i*q:(i+1)*q] if i<3 else srt[3*q:]
         print('  %-16s dist %2.0f-%2.0f  mean resid_corr %+.3f'%(lab,seg[0]['l1'],seg[-1]['l1'],st.mean(r['res0'] for r in seg)))
+    import random
+    rng=random.Random(1); obs=spear(g('l1'),g('res')); N=5000; cnt=0
+    for _ in range(N):
+        xs=[];ys=[]
+        for y,(n,d) in R.items():
+            k=max(max(p) for p in d); o=list(range(1,k+1)); rng.shuffle(o); mr=st.mean(v[1] for v in d.values())
+            for (a,b),(raw,res) in d.items():
+                xs.append(l1(vec(name(y,o[a-1])),vec(name(y,o[b-1])))); ys.append(res-mr)
+        cnt+= spear(xs,ys)<=obs
+    print(' shuffle test: %d of %d shuffles as negative as observed'%(cnt,N))
+    big=[r for r in rows if len(R[r['y']][1])>=6]
+    print(' years with 4+ workouts only n=%d: L1 %.3f'%(len(big),spear(g('l1',big),g('res',big))))
+    print(' uncentred resid, same years: %.3f'%spear(g('l1',big),g('res0',big)))
+    print(' mismatches (far but similar):',[(r['a'],r['b'],round(r['l1']),round(r['res0'],2)) for r in sorted(rows,key=lambda r:-r['res']) if r['l1']>55][:5])
+    print(' mismatches (close but dissimilar):',[(r['a'],r['b'],round(r['l1']),round(r['res0'],2)) for r in sorted(rows,key=lambda r:r['res']) if r['l1']<40][:5])

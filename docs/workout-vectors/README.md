@@ -172,3 +172,42 @@ Some use fields the definitions do not describe (`structure`,
 `timed_windows`); the judges were told to read them as plain statements of
 fact. Judged the same way as the first batch, after the validation plan was
 written but without the judges seeing any athlete results.
+
+## External validation: Open rankings (`validation/`)
+
+Plan in `validation/plan.md`, written before any athlete results were seen.
+Results pasted from the competition service are in `validation/results.py`;
+`python3 analyse.py` (run inside `validation/`) reproduces every figure.
+
+Data: men's RX, 2011 to 2026, athletes with a valid result on every workout
+of their year (8,600 to 107,000 per year). 139 same-year pairs of workouts.
+
+| Measure | Correlation with ranking similarity |
+|---|---|
+| Vector distance (primary) | -0.39 |
+| Movement overlap (baseline) | +0.09 |
+| Euclidean / cosine / Jensen-Shannon | -0.41 / -0.37 / -0.40 |
+| Second (cheaper) judge, 91 pairs | -0.35 (first judge on the same pairs: -0.33) |
+
+- Shuffling vectors among workouts within each year never matched the
+  observed figure in 5,000 tries.
+- Mean ranking similarity by distance quarter: -0.20, -0.24, -0.26, -0.32
+  (closest to farthest).
+- Same-year Open workouts almost never share a movement, so movement overlap
+  cannot tell pairs apart.
+- Varies by year: about -0.7 to -0.9 in 2013, 2014, 2016, 2021 and 2023;
+  nothing in 2011 and 2017.
+- Without the four max-lift tests: -0.35. With first-batch vectors only: -0.33.
+
+Reading: the vectors carry real information about which workouts suit the
+same athletes, and far more than movement overlap, but the relationship is
+moderate. Distance explains roughly 15% of the variation in ranking
+similarity.
+
+Largest misses: a max clean and jerk against row-and-thrusters (15.1a and
+15.5, distance 78, among the most similar rankings) and 11.3 against 11.4.
+Both suggest a size-and-strength factor that the 12 axes split across
+several axes.
+
+Departure from the plan: 13 vectors were judged after the first year of
+results had been seen (the judges did not see them).
