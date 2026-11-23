@@ -260,6 +260,37 @@ export async function saveProgramV3(
     const outlineSkeleton = opts.weekly?.weekAppend ? (opts.weekly.skeletonToStore ?? opts.skeleton) : opts.skeleton;
     if (opts.weekly?.weekAppend) {
       const minWeek = Math.min(...output.weeks.map((w) => w.week_num));
+      // A WEEK WITH A LOGGED SESSION IS NEVER REPLACED (2026-11-23). The
+      // replace below deletes the week's written rows; a workout log points
+      // at those rows by id (no foreign key), so replacing a week the athlete
+      // has opened would cut their log loose from its day. If any day of this
+      // week has a log of any status, the week is already saved and in use:
+      // keep it exactly as it is and change nothing. Checked before any
+      // delete, so nothing needs rolling back.
+      const { data: weekRows, error: weekRowsErr } = await supa
+        .from("program_workouts")
+        .select("id")
+        .eq("program_id", programId)
+        .eq("month_number", monthNumber)
+        .eq("status", "written")
+        .in("week_num", [...writtenWeeks]);
+      if (weekRowsErr) throw new Error(`[save-v3] week rows read failed: ${weekRowsErr.message}`);
+      const weekRowIds = (weekRows ?? []).map((r) => r.id as string);
+      if (weekRowIds.length > 0) {
+        const { data: weekLogs, error: weekLogsErr } = await supa
+          .from("workout_logs")
+          .select("id")
+          .in("source_id", weekRowIds)
+          .limit(1);
+        if (weekLogsErr) throw new Error(`[save-v3] week logs read failed: ${weekLogsErr.message}`);
+        if ((weekLogs ?? []).length > 0) {
+          console.warn(`[save-v3] week ${[...writtenWeeks].join(",")} of month ${monthNumber} already has a logged session; kept as saved`);
+          return programId;
+        }
+      }
+      // Set BEFORE the deletes: if one of them fails part-way, the rollback
+      // still rebuilds the outline of any week left with no rows.
+      clearedOutlineFromWeek = minWeek;
       const { error: delErr } = await supa
         .from("program_workouts")
         .delete()
@@ -268,7 +299,21 @@ export async function saveProgramV3(
         .eq("status", "outline")
         .gte("week_num", minWeek);
       if (delErr) throw new Error(`[save-v3] outline rows delete failed: ${delErr.message}`);
-      clearedOutlineFromWeek = minWeek;
+      // A WEEK CAN ONLY BE SAVED ONCE (2026-11-23). Week saves have no month
+      // marker and the table has no unique key on program/month/week/day, so
+      // a re-run of the saving stage (worker lost after the rows were written,
+      // before the job committed) inserted the week's days a second time.
+      // Any row this week already has — written, not only outline — is
+      // removed here, in the same save, so a re-run REPLACES. Earlier weeks
+      // are never touched. If the save then fails, week-save-rollback puts
+      // the week back as an outline for the next tick.
+      const { error: priorErr } = await supa
+        .from("program_workouts")
+        .delete()
+        .eq("program_id", programId)
+        .eq("month_number", monthNumber)
+        .in("week_num", [...writtenWeeks]);
+      if (priorErr) throw new Error(`[save-v3] this week's existing rows delete failed: ${priorErr.message}`);
     }
     if (opts.weekly && outlineSkeleton) {
       const { data: existingRows } = opts.weekly.weekAppend

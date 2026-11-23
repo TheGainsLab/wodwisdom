@@ -8,7 +8,7 @@ const built = "2026-11-14T12:00:00Z";
 const daysLater = (d: number) => new Date(Date.parse(built) + d * 24 * 60 * 60 * 1000);
 const w1 = (...days: number[]) => days.map((day) => ({ week: 1, day }));
 
-Deno.test("week 2 fills once every day of week 1 has a log (any status)", () => {
+Deno.test("week 2 fills once every day of week 1 was trained", () => {
   assertEquals(nextWeekToFill([2, 3, 4], w1(1, 2, 3, 4, 5), five, built, daysLater(3)), { week: 2, reason: "trained" });
   assertEquals(nextWeekToFill([2, 3, 4], w1(1, 2, 3), three, built, daysLater(2)), { week: 2, reason: "trained" });
 });

@@ -1184,12 +1184,19 @@ export const AUDIT_KIND: Record<string, AuditKind> = {
   scheme_format_valid: "block-local",
   workup_top_set: "block-local",
   do_not_program: "block-local",
+  // The written week against its plan (2026-11-23, plan-fidelity.ts; run by
+  // generate-program-v3 with the hard audits, before the fit and restriction
+  // gates): a wrong main lift is one block to rewrite.
+  plan_primary_lift: "block-local",
   // Structural — whole-program issues; only writer-retry can fix
   // (metcon_presence: a MISSING block has nothing for a surgical
   // block-local call to rewrite).
   block_type_enum: "structural-writer",
   day_count: "structural-writer",
   metcon_presence: "structural-writer",
+  // A planned block type missing from a day (plan-fidelity.ts): like
+  // metcon_presence, nothing for a block rewrite to work on — logged.
+  plan_block_types: "structural-writer",
   structural_integrity: "structural-writer",
 };
 

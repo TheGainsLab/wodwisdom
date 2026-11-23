@@ -3,11 +3,15 @@
  * previous week is consumed (weekly Programming PR 4, founder decisions
  * 2026-11-12/13).
  *
- * Each tick: for every program in weekly mode with an outline week, find the
- * lowest outline week W. It is due (founder decisions 2026-11-15) when EITHER
- *  - every day of week W-1 has a workout log, in progress or completed —
- *    saving one block is interacting with the day, and an interaction is a
- *    completion as far as the generator is concerned; or
+ * Each tick: for every program in weekly mode, look at EVERY month that still
+ * has an outline week, oldest month first (2026-11-23: only the newest month
+ * used to be looked at, so outline weeks left behind in an older month were
+ * never written), and in that month find the lowest outline week W. It is due
+ * (founder decisions 2026-11-15) when EITHER
+ *  - every day of week W-1 was trained: it has a workout log, in progress or
+ *    completed, with at least one saved block (the shared rule in
+ *    _shared/day-trained.ts) — saving one block is interacting with the day,
+ *    and an interaction is a completion as far as the generator is concerned; or
  *  - 7 × (W-1) days have passed since the month was built (week 2 at day 7,
  *    week 3 at day 14, week 4 at day 21) — the whole month is delivered
  *    inside the payment window whatever the athlete does.
@@ -18,8 +22,13 @@
  * composes the week's metcons against the month so far, fills the week from
  * the logs and the notes, audits it, and replaces the outline rows.
  *
- * A failed job leaves the outline; the next tick tries again. Capped per tick
- * so a backlog drains over a few ticks rather than one long one.
+ * A failed job leaves the outline. Capped per tick so a backlog drains over a
+ * few ticks rather than one long one. Programs are taken in turn (2026-11-23):
+ * never attempted first, then the one attempted longest ago; and a month whose
+ * week jobs keep failing backs off — 1h, 2h, 4h, 8h, then 24h between
+ * attempts — so it cannot take a slot every hour. One week job per program
+ * per tick. The picking is pure and tested: see pickMonthToFill, fillRetryAt
+ * and orderForKicks in _shared/weekly-fill.ts.
  *
  * AUTH: verify_jwt=false; X-Cron-Key = LIFECYCLE_CRON_KEY (shared gate).
  * Ack-then-work like engine-resequence-cron (pg_net's ~5s timeout).
@@ -29,13 +38,22 @@
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireCronKey } from "../_shared/cron-auth.ts";
 import { fetchWithTimeout } from "../_shared/fetch-with-timeout.ts";
-import { nextWeekToFill } from "../_shared/weekly-fill.ts";
+import { loadMonthFillStates, orderForKicks, pickMonthToFill } from "../_shared/weekly-fill.ts";
 import { checkEntitlement } from "../_shared/entitlements.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const CRON_KEY = Deno.env.get("LIFECYCLE_CRON_KEY");
 const MAX_KICKS_PER_TICK = 5;
+
+interface Candidate {
+  program: string;
+  userId: string;
+  month: number;
+  week: number;
+  gate: string;
+  lastFillAttemptAt: string | null;
+}
 
 async function runTick(supa: SupabaseClient): Promise<void> {
   const t0 = Date.now();
@@ -44,12 +62,15 @@ async function runTick(supa: SupabaseClient): Promise<void> {
   try {
     const { data: programs } = await supa
       .from("programs")
-      .select("id, user_id, generated_months")
+      .select("id, user_id")
       .eq("weekly_mode", true)
       .eq("committed", true)
       .is("archived_at", null); // an archived program gets no new weeks (2026-11-21)
 
-    for (const prog of (programs ?? []) as Array<{ id: string; user_id: string; generated_months: number | null }>) {
+    // PASS 1 — what is due. One week per program: the earliest due outline
+    // week of the earliest month that has one.
+    const candidates: Candidate[] = [];
+    for (const prog of (programs ?? []) as Array<{ id: string; user_id: string }>) {
       const pid = prog.id as string;
       try {
         // ACCESS: a week is only written for someone who can still use it.
@@ -59,38 +80,25 @@ async function runTick(supa: SupabaseClient): Promise<void> {
           results.push({ program: pid, action: "skip", reason: "no programming access" });
           continue;
         }
-        const month = prog.generated_months || 1;
-        const { data: days } = await supa
-          .from("program_workouts")
-          .select("id, week_num, day_num, status")
-          .eq("program_id", pid)
-          .eq("month_number", month);
-        const rows = (days ?? []) as Array<{ id: string; week_num: number; day_num: number; status: string | null }>;
-        const outlineWeeks = [...new Set(rows.filter((r) => r.status === "outline").map((r) => r.week_num))];
-        if (outlineWeeks.length === 0) { results.push({ program: pid, action: "skip", reason: "no outline weeks" }); continue; }
+        const pick = pickMonthToFill(await loadMonthFillStates(supa, pid, prog.user_id));
+        if (pick.action === "skip") { results.push({ program: pid, action: "skip", reason: pick.reason, ...pick.detail }); continue; }
+        candidates.push({ program: pid, userId: prog.user_id, month: pick.month, week: pick.week, gate: pick.reason, lastFillAttemptAt: pick.lastFillAttemptAt });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error(`[weekly-programming-cron] program=${pid} ERROR: ${msg}`);
+        results.push({ program: pid, action: "error", error: msg });
+      }
+    }
 
-        const writtenIds = rows.filter((r) => r.status !== "outline").map((r) => r.id);
-        // Any log counts (no status filter): an in-progress day with one saved
-        // block is an interaction, and an interaction is a completion here.
-        const { data: logs } = writtenIds.length
-          ? await supa.from("workout_logs").select("source_id")
-            .eq("user_id", prog.user_id).eq("source_type", "program").in("source_id", writtenIds)
-          : { data: [] };
-        const loggedIds = new Set((logs ?? []).map((l) => l.source_id as string));
-        const loggedDays = rows.filter((r) => loggedIds.has(r.id)).map((r) => ({ week: r.week_num, day: r.day_num }));
-        const daysInWeek = (w: number) => Math.max(0, ...rows.filter((r) => r.week_num === w).map((r) => r.day_num));
-        // The month's clock starts when the month was built (save-v3 stamps
-        // created_at on a fresh build, so an admin rebuild restarts it).
-        const { data: store } = await supa
-          .from("program_month_skeletons").select("created_at")
-          .eq("program_id", pid).eq("month_number", month).maybeSingle();
-        const gate = nextWeekToFill(outlineWeeks, loggedDays, daysInWeek, store?.created_at ?? null);
-        if (gate == null) { results.push({ program: pid, action: "skip", reason: "previous week not trained and clock not run", next_outline: Math.min(...outlineWeeks), month_started_at: store?.created_at ?? null }); continue; }
-        const due = gate.week;
-
-        if (kicks >= MAX_KICKS_PER_TICK) { results.push({ program: pid, action: "deferred", week: due, gate: gate.reason }); continue; }
+    // PASS 2 — kick, in turn: never attempted first, then longest ago.
+    for (const c of orderForKicks(candidates)) {
+      const pid = c.program;
+      const month = c.month;
+      const due = c.week;
+      try {
+        if (kicks >= MAX_KICKS_PER_TICK) { results.push({ program: pid, action: "deferred", month, week: due, gate: c.gate }); continue; }
         const { data: active } = await supa
-          .from("program_jobs").select("id").eq("user_id", prog.user_id).eq("status", "processing")
+          .from("program_jobs").select("id").eq("user_id", c.userId).eq("status", "processing")
           .gte("updated_at", new Date(Date.now() - 30 * 60 * 1000).toISOString()).limit(1).maybeSingle();
         if (active) { results.push({ program: pid, action: "skip", reason: "generation already running", job: active.id }); continue; }
 
@@ -102,7 +110,7 @@ async function runTick(supa: SupabaseClient): Promise<void> {
           headers: {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${SUPABASE_SERVICE_KEY}`,
-            "x-webhook-user-id": prog.user_id,
+            "x-webhook-user-id": c.userId,
           },
           body: JSON.stringify({ program_id: pid, month_number: month, fill_week: due }),
         }, 15_000);
@@ -111,11 +119,11 @@ async function runTick(supa: SupabaseClient): Promise<void> {
           await supa.from("program_month_skeletons")
             .update({ last_fill_error: `kick ${resp.status}: ${JSON.stringify(body).slice(0, 200)}` })
             .eq("program_id", pid).eq("month_number", month);
-          results.push({ program: pid, action: "error", week: due, status: resp.status, body });
+          results.push({ program: pid, action: "error", month, week: due, status: resp.status, body });
           continue;
         }
         kicks += 1;
-        results.push({ program: pid, action: "kicked", week: due, gate: gate.reason, job: body.job_id });
+        results.push({ program: pid, action: "kicked", month, week: due, gate: c.gate, job: body.job_id });
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         console.error(`[weekly-programming-cron] program=${pid} ERROR: ${msg}`);

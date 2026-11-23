@@ -78,3 +78,38 @@ Deno.test("non-writer stages are not reaper-retried on throw", () => {
     assertEquals(isWriterStage(s), false, `${s} should NOT be a writer stage`);
   }
 });
+
+// ── A first build cannot be saved as two programs (2026-11-23) ─────────────
+import { firstBuildSavePlan, persistCreatedProgramId, type ResumeState } from "./v3-dispatcher.ts";
+import { memorySupa } from "./fixtures/memory-supa.ts";
+
+const RS: ResumeState = { continuation: { programId: null, monthNumber: 1 } };
+
+Deno.test("the new program's id is written onto the job as soon as the program exists, without ending the stage", async () => {
+  const db = memorySupa({ program_jobs: [{ id: "job", claim_token: "tok", status: "processing", next_stage: "saving", resume_state: RS }] });
+  assertEquals(await persistCreatedProgramId(db.supa, "job", "tok", RS, "prog-new"), true);
+  const job = db.tables.program_jobs[0];
+  assertEquals(job.resume_state.programId, "prog-new");
+  assertEquals(job.resume_state.continuation, RS.continuation); // the rest of the state is kept
+  assertEquals([job.status, job.next_stage, job.claim_token], ["processing", "saving", "tok"]); // still claimed, still saving
+});
+
+Deno.test("a worker that no longer owns the job cannot record a program on it", async () => {
+  const db = memorySupa({ program_jobs: [{ id: "job", claim_token: "someone-else", resume_state: RS }] });
+  assertEquals(await persistCreatedProgramId(db.supa, "job", "tok", RS, "prog-new"), false);
+  assertEquals(db.tables.program_jobs[0].resume_state.programId, undefined);
+});
+
+Deno.test("a re-entered saving stage of a first build saves again into the SAME program instead of skipping or making a second one", () => {
+  // The earlier attempt created the program, claimed the month, and was lost mid-save.
+  assertEquals(firstBuildSavePlan({ markerExists: true, continuationProgramId: null, resumedProgramId: "prog-new" }), "redo");
+  // Lost before it claimed the month: an ordinary save into the same program.
+  assertEquals(firstBuildSavePlan({ markerExists: false, continuationProgramId: null, resumedProgramId: "prog-new" }), "save");
+});
+
+Deno.test("a month already saved on an existing program is still skipped, never cleared", () => {
+  assertEquals(firstBuildSavePlan({ markerExists: true, continuationProgramId: "prog-old", resumedProgramId: null }), "skip");
+  assertEquals(firstBuildSavePlan({ markerExists: true, continuationProgramId: "prog-old", resumedProgramId: "prog-old" }), "skip");
+  assertEquals(firstBuildSavePlan({ markerExists: false, continuationProgramId: "prog-old", resumedProgramId: null }), "save");
+  assertEquals(firstBuildSavePlan({ markerExists: false, continuationProgramId: null, resumedProgramId: null }), "save");
+});
