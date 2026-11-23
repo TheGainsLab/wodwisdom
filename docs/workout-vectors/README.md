@@ -240,3 +240,25 @@ The change did what it said: Olympic lifting rose by about 9 points on the
 not improve the even years, so it is not adopted. Nine points on one axis
 moves a distance by at most nine, and the pairs that prompted the idea are
 70 or more apart (15.1a and 15.5 went from 78 to 77).
+
+## Position reached (2026-11-23)
+
+- The model measures how workouts differ in stimulus. That is its purpose:
+  constant variation exists to vary the stimulus.
+- The same athletes scoring well on two different workouts is evidence of
+  athlete capability, not evidence that the workouts lack variation. So Open
+  rankings are a sanity check the model passed, not a target to tune toward.
+  The -0.39 figure is not a score to improve.
+- A refinement is legitimate when the model has misdescribed the workout
+  itself (for example, a thruster being derived from the Olympic lifts), not
+  when its only support is that the same athletes do well on both.
+- The model stays as built: the 12 axes, the current definitions, the
+  current distance. Axis merges suggested by rankings (such as gymnastics
+  pulling with pressing) are not adopted.
+
+Same-couplet check (thrusters and chest-to-bar pull-ups): 12.5 to 13.5 is 7
+apart and 12.5 to 19.5 is 14 apart. The movement axes hold steady and only
+the energy-system axes move, in the direction the durations imply.
+
+Known gaps in the sheets: 13.5 omits its time-extension rule, 20.5 omits
+"partition any way", and for-time sheets give the cap, not a typical time.
