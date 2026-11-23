@@ -97,3 +97,15 @@ Deno.test("a month build still saves its weeks without removing anything first",
   assertEquals(db.tables.program_workouts.some((r: Any) => r.id === "old"), true);
   assertEquals(shape({ tables: { program_workouts: db.tables.program_workouts.filter((r: Any) => r.month_number === 2).map((r: Any) => ({ ...r, month_number: 1 })) } }), "3w/0o 0w/3o 0w/3o 0w/3o");
 });
+
+Deno.test("a week the athlete has opened is never replaced: the rows, blocks and the log's link all stay", async () => {
+  const db = start();
+  await saveWeek(db.supa, week(2));
+  const ids = rowsOf(db, 2).map((r: Any) => r.id);
+  const blocksBefore = db.tables.program_blocks_v2.length;
+  db.tables.workout_logs = [{ id: "log-1", user_id: "U", source_type: "program", source_id: ids[0], status: "in_progress" }];
+  await saveWeek(db.supa, week(2, "Front Squat")); // the saving stage re-entered after the athlete started
+  assertEquals(rowsOf(db, 2).map((r: Any) => r.id), ids); // the same rows the log points at
+  assertEquals(db.tables.program_blocks_v2.length, blocksBefore);
+  assertEquals(shape(db), "3w/0o 3w/0o 0w/3o 0w/3o"); // later weeks' outline untouched too
+});
