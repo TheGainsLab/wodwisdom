@@ -12,6 +12,9 @@ import { formatMarkdown } from '../lib/formatMarkdown';
 import { ATHLETEDATA_PUBLIC_TIER } from '../lib/featureFlags';
 import { isSinceArchive, sinceArchive } from '../lib/programArchive';
 
+/** The session length the slider shows before the athlete touches it — and what is saved if they never do. */
+const DEFAULT_SESSION_LENGTH_MINUTES = 60;
+
 // ============================================================
 // Defensive shape normalizers for LLM-emitted v2 output.
 //
@@ -1424,7 +1427,7 @@ export default function AthletePage({ session }: { session: Session }) {
       gender: genderVal,
       tdee_override: tdeeOverrideNum && !isNaN(tdeeOverrideNum) ? tdeeOverrideNum : null,
       days_per_week: daysPerWeekNum && !isNaN(daysPerWeekNum) ? daysPerWeekNum : null,
-      session_length_minutes: sessionLengthNum && !isNaN(sessionLengthNum) ? sessionLengthNum : null,
+      session_length_minutes: sessionLengthNum && !isNaN(sessionLengthNum) ? sessionLengthNum : DEFAULT_SESSION_LENGTH_MINUTES,
       injuries_constraints: injuriesVal,
       goal: goal.trim() || null,
       // ONE GOAL (2026-11-10): the Engine sequencer reads engine_goal; keep it
@@ -1607,7 +1610,7 @@ export default function AthletePage({ session }: { session: Session }) {
     equipment,
     athletic_reviewed_at: athleticReviewedAt,
     days_per_week: daysPerWeek ? parseInt(daysPerWeek, 10) : null,
-    session_length_minutes: sessionLengthMinutes ? parseInt(sessionLengthMinutes, 10) : null,
+    session_length_minutes: sessionLengthMinutes ? parseInt(sessionLengthMinutes, 10) : DEFAULT_SESSION_LENGTH_MINUTES,
     injuries_constraints: injuriesConstraints.trim() || 'None',
     goal: goal.trim() || null,
   };
@@ -2405,9 +2408,9 @@ export default function AthletePage({ session }: { session: Session }) {
 
                     {/* Session time budget (reinstated 2026-08-31, reversing the
                         Aug duration ruling): optional slider, 30–120 in 15-min
-                        steps. Only persists once the athlete moves it — an
-                        untouched slider stays null, keeping "chose 60" distinct
-                        from "never said". Applies from the next generated month. */}
+                        steps. An untouched slider SAVES the 60 it shows (founder,
+                        2026-11-23): what the screen says is what is stored.
+                        Applies from the next written week. */}
                     <div style={{ fontSize: 14, fontWeight: 700, margin: '18px 0 10px' }}>About how long can you train per session?</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                       <input
@@ -2416,12 +2419,12 @@ export default function AthletePage({ session }: { session: Session }) {
                         max={120}
                         step={15}
                         aria-label="Session length in minutes"
-                        value={sessionLengthMinutes ? parseInt(sessionLengthMinutes, 10) : 60}
+                        value={sessionLengthMinutes ? parseInt(sessionLengthMinutes, 10) : DEFAULT_SESSION_LENGTH_MINUTES}
                         onChange={e => { setSessionLengthMinutes(e.target.value); markDirty(); }}
                         style={{ flex: 1, maxWidth: 260, accentColor: 'var(--accent)' }}
                       />
                       <span style={{ fontSize: 15, fontWeight: 600, fontVariantNumeric: 'tabular-nums', minWidth: 110 }}>
-                        {sessionLengthMinutes ? `${sessionLengthMinutes} min` : '60 min — default'}
+                        {`${sessionLengthMinutes || DEFAULT_SESSION_LENGTH_MINUTES} min`}
                       </span>
                     </div>
                     <button
