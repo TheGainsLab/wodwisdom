@@ -82,9 +82,8 @@
   },
   "competition": null,
   "expected_model": {
-    "thresholds_version": "v1",
-    "model_builder_version": "v1.4",
-    "inference_version": null,
+    "thresholds_version": "v2",
+    "model_builder_version": "v1.8",
     "capabilities": {
       "back_squat": {
         "value": 215,
@@ -171,7 +170,7 @@
         "as_of": null
       }
     },
-    "capability_revisions": [],
+    "training_fingerprint": null,
     "recovery_class": "open",
     "strength_ratios": {
       "snatch_to_back_squat": 0.605,
@@ -183,72 +182,141 @@
       "deadlift_to_bodyweight": 1.897,
       "press_to_bodyweight": 0.655,
       "bench_to_bodyweight": 1,
-      "deadlift_to_back_squat": 1.279
+      "deadlift_to_back_squat": 1.279,
+      "jerk_to_clean": 1.061,
+      "snatch_to_power_snatch": 1.13,
+      "clean_to_power_clean": 1.138,
+      "push_press_to_press": 1.316,
+      "jerk_to_push_press": 1.4
     },
-    "derived_metrics": {},
+    "derived_metrics": {
+      "row_2k_to_5k_retention": 0.945,
+      "run_mile_to_5k_retention": 0.946,
+      "strict_pulling_ahead_of_dynamic": false,
+      "dynamic_pulling_ahead_of_strict": false,
+      "pressing_strength_ahead_of_inverted_skill": true
+    },
     "competition_movements": {},
     "logged_competition_results": [],
     "self_report": null,
+    "outside_training": null,
     "normative": {
       "snatch_to_back_squat": {
         "value": 0.605,
         "threshold": 0.6,
         "gap": 0.005,
-        "position": "at_or_near"
+        "position": "at_or_near",
+        "target_estimate": 130
       },
       "clean_jerk_to_back_squat": {
         "value": 0.814,
         "threshold": 0.8,
         "gap": 0.014,
-        "position": "at_or_near"
+        "position": "at_or_near",
+        "target_estimate": 170
       },
       "snatch_to_clean_jerk": {
         "value": 0.743,
         "threshold": 0.76,
         "gap": -0.017,
-        "position": "at_or_near"
+        "position": "at_or_near",
+        "target_estimate": 135
       },
       "front_squat_to_back_squat": {
         "value": 0.86,
         "threshold": 0.85,
         "gap": 0.01,
-        "position": "at_or_near"
+        "position": "at_or_near",
+        "target_estimate": 185
       },
       "overhead_squat_to_snatch": {
         "value": 1.115,
         "threshold": 0.95,
         "gap": 0.165,
-        "position": "well_above"
+        "position": "well_above",
+        "target_estimate": 125
       },
       "deadlift_to_back_squat": {
         "value": 1.279,
         "threshold": 1.3,
         "gap": -0.021,
+        "position": "at_or_near",
+        "target_estimate": 280
+      },
+      "jerk_to_clean": {
+        "value": 1.061,
+        "threshold": 1.02,
+        "gap": 0.041,
+        "position": "at_or_near",
+        "target_estimate": 170
+      },
+      "snatch_to_power_snatch": {
+        "value": 1.13,
+        "threshold": 1.05,
+        "gap": 0.08,
+        "position": "above",
+        "target_estimate": 120
+      },
+      "clean_to_power_clean": {
+        "value": 1.138,
+        "threshold": 1.1,
+        "gap": 0.038,
+        "position": "at_or_near",
+        "target_estimate": 160
+      },
+      "push_press_to_press": {
+        "value": 1.316,
+        "threshold": 1.3,
+        "gap": 0.016,
+        "position": "at_or_near",
+        "target_estimate": 125
+      },
+      "jerk_to_push_press": {
+        "value": 1.4,
+        "threshold": 1.15,
+        "gap": 0.25,
+        "position": "well_above",
+        "target_estimate": 145
+      },
+      "row_2k_to_5k_retention": {
+        "value": 0.945,
+        "threshold": 0.95,
+        "gap": -0.005,
         "position": "at_or_near"
+      },
+      "run_mile_to_5k_retention": {
+        "value": 0.946,
+        "threshold": 0.9,
+        "gap": 0.046,
+        "position": "above"
       },
       "back_squat_to_bodyweight": {
         "value": 1.483,
         "threshold": 1.5,
         "gap": -0.017,
-        "position": "at_or_near"
+        "position": "at_or_near",
+        "target_estimate": 220
       },
       "deadlift_to_bodyweight": {
         "value": 1.897,
         "threshold": 2,
         "gap": -0.103,
-        "position": "below"
+        "position": "below",
+        "target_estimate": 290
       },
       "press_to_bodyweight": {
         "value": 0.655,
         "threshold": 0.6,
         "gap": 0.055,
-        "position": "above"
+        "position": "above",
+        "target_estimate": 85
       },
       "bench_to_bodyweight": {
         "value": 1,
         "threshold": 1,
         "gap": 0,
-        "position": "at_or_near"
+        "position": "at_or_near",
+        "target_estimate": 145
       }
     },
     "ranked_by_position": [
@@ -256,12 +324,19 @@
       "snatch_to_clean_jerk",
       "deadlift_to_back_squat",
       "back_squat_to_bodyweight",
+      "row_2k_to_5k_retention",
       "bench_to_bodyweight",
       "snatch_to_back_squat",
       "front_squat_to_back_squat",
+      "push_press_to_press",
       "clean_jerk_to_back_squat",
+      "clean_to_power_clean",
+      "jerk_to_clean",
+      "run_mile_to_5k_retention",
+      "snatch_to_power_snatch",
       "press_to_bodyweight",
-      "overhead_squat_to_snatch"
+      "overhead_squat_to_snatch",
+      "jerk_to_push_press"
     ]
   }
 }

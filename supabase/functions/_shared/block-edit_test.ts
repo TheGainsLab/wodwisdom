@@ -13,7 +13,8 @@ import {
 } from "./block-edit.ts";
 
 function proposal(movements: BlockPrescription["movements"]): BlockPrescription {
-  return { block_type: "strength", block_scheme: "4x5", movements };
+  // Every prescription block declares its typed format (the checker requires it).
+  return { block_type: "strength", block_scheme: "4x5", scheme_format: { format: "straight_sets", rest_seconds: 90 }, movements };
 }
 
 Deno.test("a legal proposal passes", () => {

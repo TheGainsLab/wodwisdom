@@ -1,0 +1,43 @@
+# The full test suite and the real app type-check, on every pull request.
+#
+# Why (2026-11-23): 18 tests had been failing on main, some for months, and
+# nothing noticed — the only automatic check ran a hand-picked handful of
+# files, and its type-check pointed at a config that checks no source files.
+# Code merged and deployed with the suite red. The tests exist to catch a
+# rewrite silently dropping a safeguard (the 60-minute session default was
+# lost exactly that way); they only do that if a failure stops the merge.
+#
+# The whole suite is hermetic: it runs with env and file-read access only.
+
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  functions:
+    name: edge function tests (all)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: deno test --no-check --no-lock --allow-env --allow-read supabase/functions/
+
+  app:
+    name: app type-check and tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # tsconfig.json only references other configs and checks nothing by
+      # itself; tsconfig.app.json is the one that covers src/.
+      - run: npx tsc --noEmit -p tsconfig.app.json
+      - run: npm run test:calculators
