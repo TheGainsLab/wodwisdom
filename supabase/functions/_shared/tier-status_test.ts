@@ -17,7 +17,7 @@ import {
 } from "./tier-status.ts";
 
 /** T1 basics + required lifts + all skills rated — everything but conditioning. */
-function baseProfile(conditioning: AthleteProfileInput["conditioning"]): AthleteProfileInput {
+function baseProfile(conditioning: AthleteProfileInput["conditioning"], reviewed = true): AthleteProfileInput {
   const skills: Record<string, string> = {};
   for (const k of [
     "muscle_ups", "bar_muscle_ups", "strict_ring_muscle_ups", "toes_to_bar",
@@ -34,45 +34,55 @@ function baseProfile(conditioning: AthleteProfileInput["conditioning"]): Athlete
     units: "lbs",
     lifts: { back_squat: 315, deadlift: 405, bench_press: 225, snatch: 155, clean_and_jerk: 205 },
     skills,
+    // Tier 2 is complete once the athlete has REVIEWED the section
+    // (2026-10-05); the data-shape gaps are informational (`missing`).
+    athletic_reviewed_at: reviewed ? "2026-10-05T00:00:00.000Z" : null,
     conditioning,
   };
 }
 
-Deno.test("2k row + mile satisfies the conditioning gate (other benchmarks blank)", () => {
+Deno.test("2k row + mile: nothing missing, and a reviewed profile can run the evaluation", () => {
   const status = getTierStatus(baseProfile({ "2k_row": "7:30", "1_mile_run": "6:45" }));
+  assertEquals(status.tier2.missing, []);
   assert(status.tier2.complete);
   assert(status.canRunEval);
 });
 
-Deno.test("2k row + 5k run also satisfies the gate (either run counts)", () => {
+Deno.test("2k row + 5k run: either run counts", () => {
   const status = getTierStatus(baseProfile({ "2k_row": "7:30", "5k_run": "22:30" }));
+  assertEquals(status.tier2.missing, []);
   assert(status.tier2.complete);
+});
+
+Deno.test("2k row alone: conditioning is listed as missing, but a reviewed profile is not blocked", () => {
+  const status = getTierStatus(baseProfile({ "2k_row": "7:30" }));
+  assertEquals(status.tier2.missing, ["conditioning"]);
+  assert(status.tier2.complete); // gaps are informational since 2026-10-05
   assert(status.canRunEval);
 });
 
-Deno.test("2k row alone is not enough — a run time is required", () => {
-  const status = getTierStatus(baseProfile({ "2k_row": "7:30" }));
-  assert(!status.tier2.complete);
-  assertEquals(status.tier2.missing, ["conditioning"]);
-  assert(!status.canRunEval);
-});
-
-Deno.test("runs alone are not enough — the 2k row is required", () => {
+Deno.test("runs alone: the 2k row is listed as missing", () => {
   const status = getTierStatus(baseProfile({ "1_mile_run": "6:45", "5k_run": "22:30" }));
-  assert(!status.tier2.complete);
   assertEquals(status.tier2.missing, ["conditioning"]);
 });
 
-Deno.test("optional benchmarks alone don't satisfy the gate", () => {
+Deno.test("optional benchmarks alone leave conditioning listed as missing", () => {
   const status = getTierStatus(baseProfile({
     "1k_row": "3:45", "5k_row": "20:00", "1min_bike_cals": 25, "10min_bike_cals": 180,
   }));
-  assert(!status.tier2.complete);
+  assertEquals(status.tier2.missing, ["conditioning"]);
 });
 
 Deno.test("blank-string and zero values don't count as filled", () => {
   const status = getTierStatus(baseProfile({ "2k_row": "  ", "1_mile_run": 0 }));
+  assertEquals(status.tier2.missing, ["conditioning"]);
+});
+
+Deno.test("a profile that was never reviewed is not complete, however full its data", () => {
+  const status = getTierStatus(baseProfile({ "2k_row": "7:30", "1_mile_run": "6:45" }, false));
+  assertEquals(status.tier2.missing, []);
   assert(!status.tier2.complete);
+  assert(!status.canRunEval);
 });
 
 Deno.test("conditioningStatus names the required gaps legibly", () => {

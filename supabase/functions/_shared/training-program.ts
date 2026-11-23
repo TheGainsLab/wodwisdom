@@ -108,7 +108,7 @@ export async function fetchAndFormatProgramContext(
   const workouts = (allRows ?? []).filter((w) => (w as { status?: string | null }).status !== "outline");
   const outlineWeeks = [...new Set((allRows ?? []).filter((w) => (w as { status?: string | null }).status === "outline").map((w) => w.week_num as number))].sort((a, b) => a - b);
   const outlineNote = outlineWeeks.length
-    ? `\nWeek${outlineWeeks.length === 1 ? "" : "s"} ${outlineWeeks.join(", ")}: not yet written — each week is written after the previous week's last day is logged.`
+    ? `\nWeek${outlineWeeks.length === 1 ? "" : "s"} ${outlineWeeks.join(", ")}: not yet written — each week is written once every day of the week before has something logged, or on its weekly date from when the month was built, whichever comes first.`
     : "";
 
   if (!workouts || workouts.length === 0) return "";

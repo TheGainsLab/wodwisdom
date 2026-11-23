@@ -217,6 +217,7 @@ for (const fixture of ALL_FIXTURES) {
           "previous_cycle",
           "profile_evaluation",
           "rag",
+          "signature_profile",
           "skills",
           "training_context",
           "training_evaluation",
@@ -476,14 +477,14 @@ Deno.test("buildWriterPayload(games_linked): all_results[].result with null work
 // training_context: clamping + free-text passthrough
 // ============================================================
 
-Deno.test("buildWriterPayload: days_per_week clamped low (2 → 3)", async () => {
+Deno.test("buildWriterPayload: 2 days a week is honoured, not rounded up (floor 2 since 2026-10-05)", async () => {
   installFetchStub(null);
   try {
     const supa = makeStubSupa({
       profileRow: { ...FIXTURE_BEGINNER_FITNESS.profileRow, days_per_week: 2 },
     });
     const payload = await buildWriterPayload(supa, "u");
-    assertEquals(payload.training_context.days_per_week, 3);
+    assertEquals(payload.training_context.days_per_week, 2);
   } finally {
     restoreFetch();
   }

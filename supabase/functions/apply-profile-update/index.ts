@@ -18,6 +18,33 @@ import {
   type ProfileCurrent,
   type ProfileProposal,
 } from "../_shared/profile-update.ts";
+import { describeEffect, loadEffectFacts } from "../_shared/profile-effect.ts";
+
+/**
+ * An injury note changed by the card must refresh the avoid list, exactly as
+ * a save on the profile page does. It did not (2026-11-23): two athletes'
+ * lists stayed on an older note after the coach rewrote it. Bounded retry;
+ * a build also refreshes it, and every written week is read against the
+ * athlete's current words regardless, so a failure here is not fatal.
+ */
+async function refreshAvoidList(userId: string): Promise<boolean> {
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const resp = await fetch(`${SUPABASE_URL}/functions/v1/parse-injuries-constraints`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${SERVICE_KEY}`, "x-webhook-user-id": userId },
+        body: "{}",
+        signal: AbortSignal.timeout(45_000),
+      });
+      if (resp.ok) return true;
+      console.error(JSON.stringify({ tag: "injury_parse_failed", at: "apply-profile-update", user_id: userId, http_status: resp.status, attempt }));
+    } catch (e) {
+      console.error(JSON.stringify({ tag: "injury_parse_failed", at: "apply-profile-update", user_id: userId, error: e instanceof Error ? e.message : String(e), attempt }));
+    }
+    if (attempt < 3) await new Promise((r) => setTimeout(r, attempt * 800));
+  }
+  return false;
+}
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -50,11 +77,20 @@ Deno.serve(async (req) => {
     if (row.user_id !== user.id) return json({ error: "Not your proposal" }, 403);
     if (row.outcome) return json({ error: `Already ${row.outcome}`, outcome: row.outcome }, 409);
 
+    let effect: string[] = [];
+    let avoidListRefreshed: boolean | null = null;
     if (action === "apply") {
-      const applyErr = await applyProposalToProfile(
+      const applied = await applyProposalToProfile(
         supa, user.id, row.current as ProfileCurrent, row.proposal as ProfileProposal,
       );
-      if (applyErr) return json({ error: `Apply failed: ${applyErr}` }, 500);
+      if (applied.error) return json({ error: `Apply failed: ${applied.error}` }, 500);
+      if (applied.changed.injuries) avoidListRefreshed = await refreshAvoidList(user.id);
+      try {
+        effect = describeEffect(applied.changed, await loadEffectFacts(supa, user.id));
+      } catch (e) {
+        console.error("[apply-profile-update] effect lookup failed:", e);
+        effect = ["Saved to your profile."];
+      }
     }
 
     await supa
@@ -62,7 +98,13 @@ Deno.serve(async (req) => {
       .update({ outcome: action === "apply" ? "applied" : "declined", resolved_at: new Date().toISOString() })
       .eq("id", proposalId);
 
-    return json({ ok: true, outcome: action === "apply" ? "applied" : "declined" });
+    return json({
+      ok: true,
+      outcome: action === "apply" ? "applied" : "declined",
+      // What this change does and when, stated from the athlete's real state.
+      effect: effect.join(" "),
+      ...(avoidListRefreshed != null ? { avoid_list_refreshed: avoidListRefreshed } : {}),
+    });
   } catch (e) {
     console.error("[apply-profile-update] error:", e);
     return json({ error: e instanceof Error ? e.message : "Internal error" }, 500);

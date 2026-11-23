@@ -16,7 +16,7 @@ interface ProposalData {
 type CoachMessage =
   | { kind: 'text'; role: 'user' | 'assistant'; content: string; streaming?: boolean }
   | { kind: 'proposal'; data: ProposalData; status: 'pending' | 'applying' | 'applied' | 'kept' | 'error' }
-  | { kind: 'profile_proposal'; data: ProfileProposalData; status: ProfileCardStatus };
+  | { kind: 'profile_proposal'; data: ProfileProposalData; status: ProfileCardStatus; effect?: string };
 
 function formatMarkdown(text: string): string {
   return text
@@ -143,7 +143,7 @@ export default function CoachChat({ session, workoutId, onDayChanged }: {
       if (!resp.ok) throw new Error(data?.error || `Failed (${resp.status})`);
       setMessages(prev => prev.map(m =>
         m.kind === 'profile_proposal' && m.data.proposal_id === proposalId
-          ? { ...m, status: action === 'apply' ? 'applied' as const : 'declined' as const }
+          ? { ...m, status: action === 'apply' ? 'applied' as const : 'declined' as const, effect: typeof data?.effect === 'string' ? data.effect : undefined }
           : m
       ));
     } catch {
@@ -323,6 +323,7 @@ export default function CoachChat({ session, workoutId, onDayChanged }: {
               key={i}
               data={m.data}
               status={m.status}
+              effect={m.effect}
               onResolve={(action) => resolveProfileProposal(m.data.proposal_id, action)}
             />
           ) : m.kind === 'text' ? (
