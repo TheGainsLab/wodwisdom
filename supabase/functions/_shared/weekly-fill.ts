@@ -131,10 +131,11 @@ export type WeekGateReason = "trained" | "clock";
 
 /** Pure: which week a weekly program should fill next, and why it is due.
  *  `outlineWeeks` are the weeks still outline; `loggedDays` the (week, day)
- *  pairs with ANY workout log (in progress counts — saving one block is
- *  interacting with the day, and for the generator an interaction is a
- *  completion); `daysInWeek` the day count per week; `monthStartedAt` when
- *  the month was built.
+ *  pairs that were TRAINED — the shared rule in day-trained.ts: a workout
+ *  log, in progress or completed, with at least one saved block (saving one
+ *  block is interacting with the day, and for the generator an interaction
+ *  is a completion); `daysInWeek` the day count per week; `monthStartedAt`
+ *  when the month was built.
  *
  *  Founder decisions 2026-11-15 — two gates, either opens the week:
  *   - trained: every day of the week before has a log. The athlete did

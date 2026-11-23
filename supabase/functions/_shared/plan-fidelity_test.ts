@@ -89,7 +89,7 @@ Deno.test("the wrong lift goes to the block rewrite; a missing block is logged â
 });
 
 Deno.test("the plan checks are folded into an audit run without disturbing its other results", () => {
-  const clean = { passed: true, failures: [], all: [{ rule: "x", passed: true, violations: [] }] };
+  const clean: ReturnType<typeof runAudits> = { passed: true, failures: [], all: [{ rule: "x", passed: true, violations: [] }] };
   const good = withPlanChecks(clean, written(DAY1()), PLAN);
   assertEquals([good.passed, good.failures.length, good.all.map((r) => r.rule)], [true, 0, ["x", "plan_block_types", "plan_primary_lift"]]);
   const day1 = DAY1(); day1[1] = block("strength", "Deadlift");
