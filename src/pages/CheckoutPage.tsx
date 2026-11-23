@@ -189,7 +189,19 @@ export default function CheckoutPage({ session }: CheckoutPageProps) {
       return;
     }
 
-    // Existing subscriber: fetch proration preview
+    // Existing subscriber. A subscription holds ONE plan, so picking a plan
+    // that lacks something they have would REPLACE it, not add to it. Any
+    // route in (a link, a locked tile) is turned into the plan that keeps
+    // everything: All Access. The server refuses the swap as well.
+    const wouldLose = userFeatures.some(f => !PLAN_FEATURES[p].includes(f));
+    if (wouldLose) {
+      if (p !== 'all_access' && isUpgrade('all_access')) { await selectPlan('all_access'); return; }
+      setError(`${PLAN_NAMES[p]} would replace your current plan and remove part of what you have. All Access keeps everything.`);
+      setStage('browse');
+      return;
+    }
+
+    // Fetch proration preview
     setSelectedPlan(p);
     setPreviewLoading(true);
     setPreview(null);

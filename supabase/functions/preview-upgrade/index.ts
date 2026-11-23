@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { fetchWithTimeout } from "../_shared/fetch-with-timeout.ts";
+import { assertKeepsEverything } from "../_shared/plan-change-guard.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -77,6 +78,10 @@ serve(async (req) => {
     if (currentPriceId && currentPriceId === newPriceId) {
       throw new Error("You're already on this plan and billing interval.");
     }
+
+    // Never preview a change that removes something the member has: the
+    // confirm screen must not appear for it (see plan-change-guard.ts).
+    assertKeepsEverything(PRICES, subscription.items?.data?.[0]?.price, plan);
     let currentPlanName = "Current Plan";
     if (currentPriceId) {
       // Try to match the price ID to a known plan
