@@ -459,6 +459,61 @@ export function entitledEngineMonthsFromPeriods(
 }
 
 /**
+ * PROGRAMMING months owed on the current subscription: every counted,
+ * unrefunded period of THIS subscription at its own value — a monthly period
+ * is one month, a quarterly period three — with the quarter in progress
+ * released one month at a time (30-day steps from current_period_start).
+ *
+ * Why (2026-11-23): both Programming jobs still used the old formula,
+ * (periods − 1) × 3 + drip, which prices EVERY earlier period as a quarter.
+ * A member who paid one MONTH and then switched to quarterly was worked out
+ * as owed 4 months, not 2, and was built months 3 and 4 on the two days after
+ * the switch — two months early, with his real month then left unwritten.
+ * The Engine's count was corrected for the same fault the day before.
+ *
+ * Per subscription, as the Programming drip has always been (a returner's new
+ * subscription starts a new program). A period whose length is not monthly or
+ * quarterly is valued as the current subscription's cadence, which is what
+ * the old formula did with it.
+ *
+ * Returns null when it cannot be computed (a quarter in progress with no
+ * period start) — callers must then build nothing.
+ */
+export function entitledProgrammingMonths(
+  periods: CountedPeriod[],
+  current: (SubscriptionLike & { id?: string | null }) | null,
+  nowMs: number = Date.now(),
+): PeriodEntitlement | null {
+  if (!current?.id) return { entitled: 0, monthsIntoCurrentQuarter: 1, periods: 0 };
+  const mine = periods.filter((p) => p.counts && p.subscription_id === current.id);
+  const currentCadence = subscriptionCadence(current);
+
+  // The quarter in progress: this subscription's latest counted period, when
+  // the subscription is quarterly now. Picked BEFORE refunds are dropped.
+  let inProgress: CountedPeriod | null = null;
+  if (currentCadence === "quarterly") {
+    for (const p of mine) if (inProgress == null || p.started > inProgress.started) inProgress = p;
+  }
+  let monthsIntoCurrentQuarter = 1;
+  if (inProgress) {
+    const startSec = current.current_period_start;
+    if (typeof startSec !== "number" || !Number.isFinite(startSec)) return null;
+    const daysIntoPeriod = Math.max(0, (nowMs - startSec * 1000) / MS_PER_DAY);
+    monthsIntoCurrentQuarter = Math.min(Math.floor(daysIntoPeriod / 30) + 1, 3);
+  }
+
+  let total = 0;
+  let counted = 0;
+  for (const p of mine) {
+    if (p.refunded) continue;
+    counted += 1;
+    if (p === inProgress) { total += monthsIntoCurrentQuarter; continue; }
+    total += p.months > 0 ? p.months : monthsFor(currentCadence);
+  }
+  return { entitled: total, monthsIntoCurrentQuarter, periods: counted };
+}
+
+/**
  * How many of a period's months have been RELEASED by `nowMs` — what a full
  * refund of it takes back. Monthly: its 1. Quarterly: 1, 2 or 3 by 30-day
  * steps since it began, so refunding a quarter in its first month takes back

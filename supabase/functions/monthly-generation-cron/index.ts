@@ -12,8 +12,8 @@
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { fetchWithTimeout } from "../_shared/fetch-with-timeout.ts";
-import { ENGINE_MONTHS_CAP, entitledEngineMonths, lastUnlockIso, subscriptionCadence } from "../_shared/engine-entitlement.ts";
-import { entitledEngineMonthsFromPeriods, loadPaidPeriods, mergePeriods, type MergedPeriods } from "../_shared/paid-periods.ts";
+import { ENGINE_MONTHS_CAP, lastUnlockIso, subscriptionCadence } from "../_shared/engine-entitlement.ts";
+import { entitledEngineMonthsFromPeriods, entitledProgrammingMonths, loadPaidPeriods, mergePeriods, type MergedPeriods } from "../_shared/paid-periods.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -121,7 +121,9 @@ Deno.serve(async (_req) => {
       }
       if (paidInvoiceCount === 0) continue;
 
-      const ent = entitledEngineMonths("quarterly", paidInvoiceCount, periodStartSec);
+      // Each period at its own value (a month paid before a switch to
+      // quarterly is ONE month, not three) — see entitledProgrammingMonths.
+      const ent = merged ? entitledProgrammingMonths(merged.periods, sub) : null;
       if (!ent) continue;
       const { entitled: entitledMonths, monthsIntoCurrentQuarter } = ent;
 
