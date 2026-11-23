@@ -14,6 +14,7 @@ import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import type { WriterOutput } from "./v2-output-schema.ts";
 import { composeBlockScheme } from "./compose-block-scheme.ts";
 import type { SkeletonOutput } from "./v3-output-schema.ts";
+import { rollBackFailedWeekSave } from "./week-save-rollback.ts";
 
 interface InsertedWorkout {
   id: string;
@@ -222,6 +223,11 @@ export async function saveProgramV3(
     programId = program.id as string;
   }
 
+  // What a week job has done so far, so a failure can undo exactly that and
+  // nothing else (see week-save-rollback.ts).
+  let insertedWorkoutIds: string[] = [];
+  let clearedOutlineFromWeek: number | null = null;
+
   try {
     // 2. program_workouts — one row per day.
     const workoutInserts: Array<Record<string, unknown>> = [];
@@ -262,6 +268,7 @@ export async function saveProgramV3(
         .eq("status", "outline")
         .gte("week_num", minWeek);
       if (delErr) throw new Error(`[save-v3] outline rows delete failed: ${delErr.message}`);
+      clearedOutlineFromWeek = minWeek;
     }
     if (opts.weekly && outlineSkeleton) {
       const { data: existingRows } = opts.weekly.weekAppend
@@ -290,6 +297,7 @@ export async function saveProgramV3(
     if (wkErr || !workouts) {
       throw new Error(`[save-v3] program_workouts insert failed: ${wkErr?.message ?? "unknown"}`);
     }
+    insertedWorkoutIds = (workouts as InsertedWorkout[]).map((w) => w.id);
     const workoutByDay = new Map<string, InsertedWorkout>();
     for (const w of workouts as InsertedWorkout[]) {
       workoutByDay.set(`${w.week_num}-${w.day_num}`, w);
@@ -454,9 +462,21 @@ export async function saveProgramV3(
 
     return programId;
   } catch (err) {
-    if (appendMode) {
-      // Append failure: remove ONLY this cycle's partial rows (cascades to its
-      // blocks/movements). NEVER delete the program — prior months must survive.
+    if (opts.weekly?.weekAppend) {
+      // A WEEK job failed: the month already holds weeks the athlete has
+      // trained. Undo only what this save did; never the month.
+      await rollBackFailedWeekSave(supa, {
+        programId,
+        monthNumber,
+        insertedWorkoutIds,
+        clearedOutlineFromWeek,
+        fallbackSkeleton: opts.weekly.skeletonToStore ?? opts.skeleton ?? null,
+        error: err,
+      });
+    } else if (appendMode) {
+      // A new MONTH on an existing program failed: remove ONLY this cycle's
+      // partial rows (cascades to its blocks/movements). NEVER delete the
+      // program — prior months must survive.
       await supa
         .from("program_workouts")
         .delete()

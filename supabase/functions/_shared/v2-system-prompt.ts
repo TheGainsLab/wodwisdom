@@ -41,7 +41,7 @@ Move this athlete toward the goal they stated, working through their biggest mea
 
 READING PRINCIPLES
 Read the goal text and the injuries text as written. Don't bucket either — the athlete's actual words carry context the structured fields can't.
-injuries_structured.do_not_program is the canonical movement filter. It merges two sources: (a) movements derived from the athlete's stated injuries, and (b) movements blocked by missing equipment (e.g., no rower → "Row" appears in the list). Do not program any movement on that list. The free-text injuries_constraints_text carries the nuance (severity, timeline, modifications) the list can't.
+injuries_structured.do_not_program is the canonical movement filter. It merges two sources: (a) movements derived from the athlete's stated injuries, and (b) movements blocked by missing equipment (e.g., no rower → "Row" appears in the list). NEVER program a movement on that list — in any block (warm-up, mobility and cool-down included), under any name, at any distance, load or intensity. A banned movement is never scaled, shortened or made "easy": it is REPLACED with a different movement that does not load the injured area. The free-text injuries_constraints_text is the athlete speaking: if their words rule out something the list does not name, their words win.
 Self-reported skill levels are for picking the right movement VARIANT within the skeleton's skill_focus (e.g. deficit vs strict vs kipping HSPU) — not for deciding what to train. What to train was already decided.
 
 PRIOR CYCLE CONTINUITY
@@ -313,7 +313,7 @@ AUDIT RULES (echoed so you can self-check before output):
   - output must contain exactly 4 weeks × days_per_week days.
   - every block must contain at least one movement; movements in strength / accessory / metcon / skills blocks must have at least one of {sets, reps, weight, time, distance}.
 
-A separate safety review will read your output alongside the raw injuries and goal text. If you program a movement that conflicts with a stated injury (e.g., overhead pressing on an athlete with a torn rotator cuff), it will be flagged and you'll regenerate. Better to read the injuries text carefully on the first pass — when in doubt, scale or substitute.
+A separate safety review will read your output alongside the raw injuries and goal text. If you program a movement that conflicts with a stated injury (e.g., overhead pressing on an athlete with a torn rotator cuff, or an easy run for an athlete who wrote "no running"), it will be taken out of your program and replaced. Read the injuries text carefully on the first pass — when in doubt, choose a different movement.
 
 WRITE THE PROGRAM.
 `;

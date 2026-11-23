@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { fetchWithTimeout } from "../_shared/fetch-with-timeout.ts";
+import { assertKeepsEverything } from "../_shared/plan-change-guard.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -62,6 +63,11 @@ serve(async (req) => {
     if (subscription.items?.data?.[0]?.price?.id === newPriceId) {
       throw new Error("You're already on this plan and billing interval.");
     }
+
+    // A self-serve change may never take away something the member has (a
+    // subscription holds one price, so "switching" to a single product from
+    // another REPLACES it). Refused here whatever screen sent the request.
+    assertKeepsEverything(PRICES, subscription.items?.data?.[0]?.price, plan);
 
     // Update the subscription: swap price, prorate, reset billing cycle
     const updateParams = new URLSearchParams({

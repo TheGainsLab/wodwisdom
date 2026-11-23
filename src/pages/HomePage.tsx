@@ -128,8 +128,8 @@ export default function HomePage({ session }: { session: Session }) {
   // (2026-10-08 onboarding pass: hand-holding at the resting-copy level).
   const tiles: Array<{ key: string; label: string; sub: string; to: string; icon: React.ReactNode; locked: boolean; plan: string; badge?: boolean; lockLabel?: string; lockTo?: string }> = [
     { key: 'coach', label: 'AI Coach', sub: 'Training, nutrition, recovery. Available anytime.', to: '/chat', icon: <MessageSquare size={20} />, locked: false, plan: '' },
-    { key: 'training', label: 'AI Programming', sub: 'Personalized programming, built around you.', to: '/programs', icon: <Dumbbell size={20} />, locked: !hasProgramming, plan: 'programming' },
-    { key: 'engine', label: 'Year of the Engine', sub: 'Exceptional conditioning.', to: '/engine', icon: <Flame size={20} />, locked: !hasEngine, plan: 'engine' },
+    { key: 'training', label: 'AI Programming', sub: 'Personalized programming, built around you.', to: '/programs', icon: <Dumbbell size={20} />, locked: !hasProgramming, plan: hasEngine ? 'all_access' : 'programming' },
+    { key: 'engine', label: 'Year of the Engine', sub: 'Exceptional conditioning.', to: '/engine', icon: <Flame size={20} />, locked: !hasEngine, plan: hasProgramming ? 'all_access' : 'engine' },
     // Nutrition is NOT sold standalone — it rides along with Engine or AI
     // Programming (founder, 2026-10-08). Locked state says so and sends the
     // user to the plans page instead of a nutrition checkout.
