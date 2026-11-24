@@ -920,7 +920,11 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                     </div>
                   </div>
                 )}
-                {program?.weekly_mode && !archived && (
+                {/* A first-program note: shown only while the FIRST month still has
+                    an unwritten week (2026-11-24). It used to stay for the
+                    program's whole life, still saying "Week 1 is written" in
+                    month 3 with every week written. */}
+                {program?.weekly_mode && !archived && allWorkouts.some((w) => (w.month_number ?? 1) === 1 && w.status === 'outline') && (
                   <div style={{ margin: '10px 0 2px', padding: '10px 14px', border: '1px dashed var(--border)', borderRadius: 10, fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.5 }}>
                     <strong style={{ color: 'var(--text)' }}>This is a starting point.</strong> Week 1 is written; the weeks after it are written one at a time from how you train and what you tell your coach. {nextArrival ? <>Your next week: {nextArrival.charAt(0).toLowerCase() + nextArrival.slice(1)} </> : null}Tell your coach what you&rsquo;d change and next week is written from it.
                   </div>
