@@ -11,6 +11,7 @@ import { getCorsHeaders } from "../_shared/cors.ts";
 import { ARCHIVED_PROGRAM_ERROR, isLogOfArchivedProgram, isProgramDayArchived } from "../_shared/program-archive.ts";
 import { computeMetconPower, type MetconBlockInput } from "../_shared/metcon-workcalc.ts";
 import { computeCardioPower } from "../_shared/cardio-power.ts";
+import { UNCOUNTED_BLOCK_TYPES_FILTER } from "../_shared/day-block-count.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -441,12 +442,12 @@ Deno.serve(async (req) => {
     let autoCompleted = false;
     const sourceId = body.source_id ?? null;
     if (sourceId && preExistingStatus !== "completed") {
-      // Count saved blocks for this log (exclude warm-up/mobility/cool-down)
+      // Count saved blocks for this log (only the types that count: day-block-count.ts)
       const { count: savedCount } = await supa
         .from("workout_log_blocks")
         .select("id", { count: "exact", head: true })
         .eq("log_id", logId)
-        .not("block_type", "in", '("warm-up","mobility","cool-down")');
+        .not("block_type", "in", UNCOUNTED_BLOCK_TYPES_FILTER);
 
       // Resolve program version so we count totals from the right table.
       // v3 programs store blocks in program_blocks_v2; v1 in program_workout_blocks.
@@ -461,12 +462,12 @@ Deno.serve(async (req) => {
       const totalsTable =
         programVersion === "v3" ? "program_blocks_v2" : "program_workout_blocks";
 
-      // Count total program blocks for this workout (exclude warm-up/mobility/cool-down)
+      // Count total program blocks for this workout (same list)
       const { count: totalCount } = await supa
         .from(totalsTable)
         .select("id", { count: "exact", head: true })
         .eq("program_workout_id", sourceId)
-        .not("block_type", "in", '("warm-up","mobility","cool-down")');
+        .not("block_type", "in", UNCOUNTED_BLOCK_TYPES_FILTER);
 
       if (
         savedCount != null &&

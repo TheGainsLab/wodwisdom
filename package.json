@@ -9,7 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "seed:movements": "tsx scripts/seed-movements.ts",
-    "test:calculators": "tsx --test tests/calculators.test.ts tests/visitorSource.test.ts tests/profileFormRules.test.ts tests/engineGoalRules.test.ts tests/weekSchedule.test.ts tests/profileSaveEffect.test.ts"
+    "test:calculators": "tsx --test tests/calculators.test.ts tests/visitorSource.test.ts tests/profileFormRules.test.ts tests/engineGoalRules.test.ts tests/weekSchedule.test.ts tests/profileSaveEffect.test.ts tests/metconLogKind.test.ts tests/dayBlockCount.test.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.95.3",

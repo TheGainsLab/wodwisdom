@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { weekArrivalText, weekWrittenBy } from '../src/lib/weekSchedule';
+import { weekArrivalText, weekWrittenBy, WEEK_BEING_WRITTEN } from '../src/lib/weekSchedule';
 
 const BUILT = '2026-11-16T10:00:00.000Z';
 const day = (n: number) => new Date(Date.parse(BUILT) + n * 86400000);
@@ -47,4 +47,9 @@ test('with no build time the sentence still says how the week arrives, with no d
 test('the month-2 label is the number the page shows', () => {
   const t = weekArrivalText({ monthStartedAt: BUILT, weekInMonth: 2, previousWeekLabel: 5, isNext: true, now: day(1) });
   assert.match(t, /every day of week 5/);
+});
+
+test('a week whose write is running says so, whatever its date', () => {
+  assert.equal(weekArrivalText({ monthStartedAt: BUILT, weekInMonth: 2, previousWeekLabel: 1, isNext: true, beingWritten: true, now: day(2) }), WEEK_BEING_WRITTEN);
+  assert.equal(weekArrivalText({ monthStartedAt: null, weekInMonth: 3, previousWeekLabel: 2, isNext: false, beingWritten: true }), WEEK_BEING_WRITTEN);
 });

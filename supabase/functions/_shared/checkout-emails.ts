@@ -319,10 +319,15 @@ export function buildGoodbyeEmail(args: {
   const link = `${planLink(args.plan)}?utm_source=gainslab_email&utm_medium=email&utm_campaign=${args.involuntary ? "card_failed_comeback" : "goodbye_comeback"}`;
   const button = `<p><a href="${link}" style="display:inline-block;background:#0074d4;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600">${args.involuntary ? "Resubscribe" : "Come back anytime"}</a></p>`;
   if (args.involuntary) {
-    const subject = "Your card declined — your progress is safe";
+    // (2026-11-24) Was "your progress is safe" / "your access paused today.
+    // That's the only thing that happened; nothing was lost." — sent only
+    // after the retries are exhausted and the subscription has ENDED, and
+    // followed by a paragraph saying they start a new program. History and
+    // PRs are kept (said below); the access is not paused, it has ended.
+    const subject = "Your card declined — your access has ended";
     const html = emailWrap(
       greeting(args.fullName) +
-      `<p>Your renewal didn't go through — the card on file was declined and the automatic retries couldn't recover it, so your access paused today. That's the only thing that happened; nothing was lost.</p>` +
+      `<p>Your renewal didn't go through — the card on file was declined and the automatic retries couldn't recover it, so your access ended today.</p>` +
       (kind === "programming"
         ? `<p>${PROGRAMMING_RETURN} Resubscribe with a working card and you can run that evaluation and build it the same day:</p>`
         : kind === "both"

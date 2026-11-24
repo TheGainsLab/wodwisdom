@@ -1736,9 +1736,14 @@ export default function TrainingLogPage({ session }: { session: Session }) {
             ) : view !== 'calendar' && logs.length === 0 && scheduled.length === 0 && engineSessions.length === 0 ? (
               <div className="workout-review-section" style={{ textAlign: 'center', padding: 40 }}>
                 <p style={{ color: 'var(--text-dim)', marginBottom: 20 }}>No workouts logged yet.</p>
-                <button className="auth-btn" onClick={() => navigate('/workout/start')} style={{ maxWidth: 200 }}>
-                  Log your first workout
-                </button>
+                {/* (2026-11-24) This used to open the logger with no workout
+                    chosen, which only shows "No workout selected". Sessions
+                    are logged from the program's own days. */}
+                {hasProgramming && (
+                  <button className="auth-btn" onClick={() => navigate('/programs')} style={{ maxWidth: 200 }}>
+                    Open my program
+                  </button>
+                )}
               </div>
             ) : view === 'calendar' ? (
               /* ── Calendar section ── */
@@ -1776,14 +1781,21 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                     so they're not staring at a blank grid. */}
                 {logs.length === 0 && scheduled.length === 0 && engineSessions.length === 0 && (
                   <p style={{ textAlign: 'center', color: 'var(--text-dim)', fontSize: 13, marginTop: 16 }}>
-                    Tap any date from today onward to schedule a session — or{' '}
-                    <button
-                      type="button"
-                      onClick={() => navigate('/workout/start')}
-                      style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', font: 'inherit', padding: 0, textDecoration: 'underline' }}
-                    >
-                      log a workout
-                    </button>.
+                    Tap any date from today onward to schedule a session
+                    {/* (2026-11-24) "log a workout" opened the logger with no
+                        workout chosen ("No workout selected"). */}
+                    {hasProgramming ? (
+                      <>
+                        {' '}— or{' '}
+                        <button
+                          type="button"
+                          onClick={() => navigate('/programs')}
+                          style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', font: 'inherit', padding: 0, textDecoration: 'underline' }}
+                        >
+                          open your program
+                        </button>{' '}to log one.
+                      </>
+                    ) : '.'}
                   </p>
                 )}
 

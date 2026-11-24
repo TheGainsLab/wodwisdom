@@ -12,6 +12,7 @@ import WorkoutBlocksDisplay, { BlockContent } from '../components/WorkoutBlocksD
 import { BlockCoachingBody, coachingForBlockType, formatReviewMarkdown, CHEVRON_DOWN, type ReviewBlock } from '../components/reviewCoaching';
 import { useWorkoutReview } from '../lib/useWorkoutReview';
 import { weekArrivalText } from '../lib/weekSchedule';
+import { UNCOUNTED_BLOCK_TYPES_FILTER } from '../../supabase/functions/_shared/day-block-count.ts';
 import BlockLog, { type DayLogController, type SavedBlockSnapshot, loggedMovementNames, blockFullyLogged, isLoggableBlock, isRowLoggerBlock } from '../components/blockLog';
 import { formatArchiveDate } from '../lib/programArchive';
 import { formatMovementName } from '../lib/movementName';
@@ -267,6 +268,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
       weekInMonth,
       previousWeekLabel: (month - 1) * 4 + weekInMonth - 1,
       isNext: weekInMonth === lowestOutline,
+      beingWritten: writingWeek?.month === month && writingWeek.week === weekInMonth,
     });
   };
   // The next week to be written: the lowest unwritten week of the earliest month that has one.
@@ -305,6 +307,9 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
   // Generation poll handle — one poller at a time, cleared on unmount.
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [generatingNextMonth, setGeneratingNextMonth] = useState(false);
+  // The week a running week job is writing, so its row can say "Being
+  // written now" instead of looking like it is still waiting (2026-11-24).
+  const [writingWeek, setWritingWeek] = useState<{ month: number; week: number } | null>(null);
   // Coach's notes (founder, 2026-10-09): the delivered program opens with the
   // same ranked priorities the generator was handed, so deliberate emphases —
   // and by implication what's parked this cycle — land as a decision explained
@@ -589,7 +594,8 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
 
     const isV3 = prog.program_version === 'v3';
     const workoutIds = wk.map((w) => w.id);
-    const SKIP_BLOCK_TYPES = '("warm-up","mobility","cool-down")';
+    // The one list of block types that do not count toward a day being done.
+    const SKIP_BLOCK_TYPES = UNCOUNTED_BLOCK_TYPES_FILTER;
 
     // ── Wave A: everything keyed only by workout id. ───────────────────
     // These three have no dependency on one another and were previously
@@ -752,12 +758,19 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
       if (jobData?.status === 'complete') {
         if (pollRef.current) clearInterval(pollRef.current);
         setGeneratingNextMonth(false);
+        setWritingWeek(null);
         // Reload program to show new workouts
         loadProgram();
       } else if (jobData?.status === 'failed') {
         if (pollRef.current) clearInterval(pollRef.current);
         setGeneratingNextMonth(false);
-        alert('Failed to generate next month: ' + (jobData?.error || 'Unknown error'));
+        setWritingWeek(null);
+        // A member did not start this build (weeks and months are written by
+        // the system, which retries on its own), so a pop-up with the raw
+        // server error told them nothing they could act on (2026-11-24).
+        // Admins, who press the Generate Month button, still see it.
+        console.error('[ProgramDetailPage] build failed:', jobData?.error);
+        if (isAdmin) alert('Failed to generate next month: ' + (jobData?.error || 'Unknown error'));
       }
     }, 5000);
   };
@@ -768,13 +781,19 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
   const findInFlightJob = async (): Promise<string | null> => {
     const { data } = await supabase
       .from('program_jobs')
-      .select('id')
+      .select('id, fill:resume_state->weeklyFill, month:resume_state->continuation->monthNumber')
       .eq('user_id', session.user.id)
       .in('status', ['pending', 'processing'])
       .gte('updated_at', new Date(Date.now() - 30 * 60 * 1000).toISOString())
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
+    // A week job names the week it is writing: mark that row "Being written now".
+    const weekNum = Number((data?.fill as { weekNum?: unknown } | null)?.weekNum);
+    const monthNum = Number(data?.month);
+    setWritingWeek(data?.id && Number.isInteger(weekNum) && weekNum > 0
+      ? { month: Number.isInteger(monthNum) && monthNum > 0 ? monthNum : 1, week: weekNum }
+      : null);
     return data?.id ?? null;
   };
 

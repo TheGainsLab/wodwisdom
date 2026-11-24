@@ -36,6 +36,7 @@ import type { ReviewBlock } from '../components/reviewCoaching';
 import { scoreMetcon, deriveTimeDomain, type BenchmarkResult } from '../lib/metconScoring';
 import { formatMovementName } from '../lib/movementName';
 import { prescriptionText } from '../lib/formatMovement';
+import { metconLogKind, METCON_LOG_FIELDS } from '../lib/metconLogKind';
 
 // ── Save payload (the `block` body of save-workout-block) ──
 export interface LogEntry {
@@ -222,13 +223,6 @@ function reshapeBenchmark(eb: unknown): BenchmarkResult | null {
   if (!b || !b.median_score) return null;
   return { medianScore: b.median_score, excellentScore: b.excellent_score ?? '--', cohortAnchors: b.cohort_anchors ?? [] };
 }
-function inferMetconType(block: ProgramBlockV2): string {
-  const combined = [block.block_scheme, block.block_label].filter(Boolean).join('\n').toUpperCase();
-  if (/AMRAP|AS MANY ROUNDS/.test(combined)) return 'amrap';
-  if (/EMOM|E\d+MOM/.test(combined)) return 'emom';
-  return 'for_time';
-}
-
 /**
  * Reps in one round of this metcon, when the shape supports rounds (every
  * movement carries a uniform rep_scheme). Used to convert a capped athlete's
@@ -649,7 +643,9 @@ function MetconLog({ block, controller, coaching, onSaved }: {
   const [saveFailed, setSaveFailed] = useState(false);
   const snap = controller.savedSnapshot?.(block.sort_order) ?? null;
   const [score, setScore] = useState(snap?.score ?? '');
-  const [capped, setCapped] = useState(snap?.capped ?? false);
+  // "Hit the cap" exists only for a race against the clock: an older log of
+  // an interval piece saved as capped must not reopen with its result hidden.
+  const [capped, setCapped] = useState((snap?.capped ?? false) && METCON_LOG_FIELDS[metconLogKind(block.scheme_format?.format)].cap);
   const [cappedReps, setCappedReps] = useState('');
   const [notes, setNotes] = useState(snap?.notes ?? '');
   const [rpe, setRpe] = useState<number | null>(snap?.rpe ?? null);
@@ -685,7 +681,10 @@ function MetconLog({ block, controller, coaching, onSaved }: {
     return a;
   }, [block, snap]);
   const [actuals, setActuals] = useState(initialActuals);
-  const isForTime = inferMetconType(block) === 'for_time';
+  // The fields come from the block's STORED format, never from its title
+  // (src/lib/metconLogKind.ts).
+  const logFields = METCON_LOG_FIELDS[metconLogKind(block.scheme_format?.format)];
+  const isForTime = logFields.cap;
   const roundSize = metconRoundSize(block);
   const capTotal = capped ? parseCapProgress(cappedReps, roundSize) : null;
   const anythingAsserted = claim != null || score.trim() !== '' || capped || rpe != null ||
@@ -709,9 +708,11 @@ function MetconLog({ block, controller, coaching, onSaved }: {
       });
     });
     const benchmark = reshapeBenchmark(block.expected_benchmark);
-    const wType = inferMetconType(block);
+    // Scored against the benchmark only when the format has a comparable
+    // result (a time or rounds + reps); otherwise the result is kept as written.
+    const wType = logFields.scoreType;
     const text = [block.block_scheme, block.block_label].filter(Boolean).join('\n');
-    const scoring = !capped && score.trim() && benchmark ? scoreMetcon(score.trim(), wType, benchmark) : null;
+    const scoring = !capped && score.trim() && benchmark && wType ? scoreMetcon(score.trim(), wType, benchmark) : null;
     const cappedScore = block.time_cap_seconds != null ? formatClock(block.time_cap_seconds) : null;
     setSaveFailed(false);
     controller.saveBlock({
@@ -723,14 +724,14 @@ function MetconLog({ block, controller, coaching, onSaved }: {
       percentile: scoring?.percentile ?? null, performance_tier: scoring?.performanceTier ?? null,
       median_benchmark: benchmark && benchmark.medianScore !== '--' ? benchmark.medianScore : null,
       excellent_benchmark: benchmark && benchmark.excellentScore !== '--' ? benchmark.excellentScore : null,
-      time_domain: deriveTimeDomain(wType, text, benchmark?.medianScore ?? null),
+      time_domain: deriveTimeDomain(wType ?? block.scheme_format?.format ?? '', text, benchmark?.medianScore ?? null),
     }).then((res) => { if (res) onSaved(); else setSaveFailed(true); }, () => setSaveFailed(true));
   };
   return (
     <div className="block-log">
       <div style={{ margin: '10px 0 8px' }}>
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>{isForTime ? 'Result (time)' : 'Result (rounds + reps)'}</div>
-        {!capped && <input style={{ ...inputStyle, textAlign: 'left' }} placeholder={isForTime ? 'e.g. 12:34' : 'e.g. 5+18'} value={score} onChange={e => setScore(e.target.value)} />}
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>{logFields.label}</div>
+        {!capped && <input style={{ ...inputStyle, textAlign: 'left' }} placeholder={logFields.placeholder} value={score} onChange={e => setScore(e.target.value)} />}
       </div>
       {isForTime && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'center', marginBottom: 8 }}>
