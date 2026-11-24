@@ -94,7 +94,7 @@ export default function ProgramsFeaturePage({ signedIn = false }: { signedIn?: b
           Then AI Coach stays with you. Need to change a workout? Ask. Need cues, pacing, strategy, or training advice? Ask. It knows your program, your history, and your numbers, so the guidance is specific to you.
         </p>
         <p className="feature-hero-body">
-          And when the month ends, the next one is built from what you actually did.
+          And each new month is built from what you actually did.
         </p>
       </section>
 
@@ -175,7 +175,7 @@ export default function ProgramsFeaturePage({ signedIn = false }: { signedIn?: b
         <div className="feature-container">
           <div className="lp-kicker">Personalization · Level 3</div>
           <h2 className="lp-h2">It never stops adapting.</h2>
-          <p style={bodyP}>When you complete a month, the next one generates automatically from what you log — scores, feedback, RPEs, and any outside training. Weaknesses you've improved rotate out of focus; the next priority rotates in.</p>
+          <p style={bodyP}>Each new month generates automatically from what you log — scores, feedback, RPEs, and any outside training. Weaknesses you've improved rotate out of focus; the next priority rotates in.</p>
           <p style={{ ...bodyP, ...bold }}>Month one is built from your evaluation. Every month after is built from evidence.</p>
           <Link className="lp-link" to="/examples?tab=programming">See real programs and evaluations &rarr;</Link>
         </div>
