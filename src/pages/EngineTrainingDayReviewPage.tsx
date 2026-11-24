@@ -15,11 +15,19 @@ import {
 import { buildEngineShareCardData } from '../lib/shareCard';
 import ShareCardModal from '../components/competitionHistory/ShareCardModal';
 import { ChevronLeft, Share2 } from 'lucide-react';
+import type { ProfileProposalData } from '../components/ProfileUpdateCard';
+import type { NoteProposalData } from '../components/CoachNoteCard';
+import { NoteCardHost, ProfileCardHost } from '../components/CoachCards';
+import { noteProposalFromEvent, profileProposalFromEvent } from '../lib/coachCards';
 
 interface CoachMessage {
   role: 'user' | 'assistant';
   content: string;
   streaming?: boolean;
+  /** A coach card in place of text (2026-11-24): this chat used to show
+   *  neither, so a profile change or note the coach offered could not be
+   *  saved from here. See lib/coachCards.ts. */
+  card?: { kind: 'profile'; data: ProfileProposalData } | { kind: 'note'; data: NoteProposalData };
 }
 
 function CoachChat({ engineProgramDay, autoQuestion, modality, units, targetPace }: { engineProgramDay: number; autoQuestion?: string; modality?: string; units?: string; targetPace?: number | null }) {
@@ -48,7 +56,7 @@ function CoachChat({ engineProgramDay, autoQuestion, modality, units, targetPace
         headers: await getAuthHeaders(),
         body: JSON.stringify({
           question,
-          history: [...messages, userMsg].slice(-10),
+          history: [...messages, userMsg].filter((m) => !m.card).map(({ role, content }) => ({ role, content })).slice(-10),
           // Sequence identity: the scoped position. (engine_program_day is
           // the legacy field name pre-refactor bundles used for catalog days;
           // this bundle sends only the sequence.)
@@ -94,10 +102,34 @@ function CoachChat({ engineProgramDay, autoQuestion, modality, units, targetPace
                 return updated;
               });
             }
+            {
+              // 'profile_proposal' / 'note_proposal' → a card after the current
+              // text; the coach's wrap-up streams into a new bubble under it.
+              const profile = profileProposalFromEvent(event);
+              const note = noteProposalFromEvent(event);
+              const card: CoachMessage['card'] = profile ? { kind: 'profile', data: profile } : note ? { kind: 'note', data: note } : undefined;
+              if (card) {
+                const closed = fullText;
+                fullText = '';
+                setMessages((prev) => {
+                  const updated = [...prev];
+                  const last = updated[updated.length - 1];
+                  if (last && last.role === 'assistant' && last.streaming) {
+                    if (closed.trim()) updated[updated.length - 1] = { role: 'assistant', content: closed };
+                    else updated.pop();
+                  }
+                  updated.push({ role: 'assistant', content: '', card });
+                  updated.push({ role: 'assistant', content: '', streaming: true });
+                  return updated;
+                });
+              }
+            }
             if (event.type === 'done') {
               setMessages((prev) => {
                 const updated = [...prev];
-                updated[updated.length - 1] = { role: 'assistant', content: fullText };
+                // An empty trailing bubble (nothing said after a card) is removed.
+                if (fullText.trim()) updated[updated.length - 1] = { role: 'assistant', content: fullText };
+                else if (updated[updated.length - 1]?.streaming) updated.pop();
                 return updated;
               });
             }
@@ -128,7 +160,11 @@ function CoachChat({ engineProgramDay, autoQuestion, modality, units, targetPace
 
       {messages.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16, maxHeight: 480, overflowY: 'auto' }}>
-          {messages.map((m, i) => (
+          {messages.map((m, i) => m.card ? (
+            m.card.kind === 'profile'
+              ? <ProfileCardHost key={m.card.data.proposal_id} data={m.card.data} />
+              : <NoteCardHost key={m.card.data.proposal_id} data={m.card.data} />
+          ) : (
             <div
               key={i}
               style={{
