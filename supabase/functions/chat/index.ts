@@ -1,6 +1,7 @@
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { MODELS } from "../_shared/model-profiles.ts";
 import { buildCoachNotesBlock, buildProposeCoachNoteTool, COACH_NOTE_PROMPT, loadCoachNotes, recurringNotes } from "../_shared/coach-notes.ts";
+import { noteReadBy } from "../_shared/note-readers.ts";
 import { renderCoachStateForChat, type CoachState } from "../_shared/coach-state.ts";
 import {
   type BlockEditContext,
@@ -1734,6 +1735,14 @@ Deno.serve(async (req) => {
                 if (!text) { answer("The note needs text.", true); continue; }
                 const horizon = nIn.horizon === "until_removed" ? "until_removed" : "next_week";
                 proposalsEmitted++;
+                // Who reads it, for THIS athlete (note-readers.ts): the Engine
+                // reads notes only with AI Sequencing on. Sent on the card too,
+                // so the "Saved" line says the same thing the coach does.
+                const readBy = noteReadBy({
+                  hasProgramming: features.has("programming"),
+                  hasEngine: hasEngineTier,
+                  aiSequencing: athleteProfile?.engine_ai_sequencing === true,
+                });
                 controller.enqueue(
                   encoder.encode(`data: ${JSON.stringify({
                     type: "note_proposal",
@@ -1741,11 +1750,12 @@ Deno.serve(async (req) => {
                     text,
                     horizon,
                     rationale: (nIn.rationale ?? "").slice(0, 200),
+                    read_by: readBy,
                   })}\n\n`)
                 );
                 answer(
-                  "The note card is on the athlete's screen with Save / Not now. Conclude in one or two sentences: " +
-                  "if they save it, it is read before the Engine's next block (within days) and AI Programming's next generation.",
+                  "The note card is on the athlete's screen with Save / Not now. Conclude in one or two sentences. " +
+                  `If they save it, this is exactly who reads it and when — say this and promise nothing more: ${readBy}`,
                 );
                 continue;
               }

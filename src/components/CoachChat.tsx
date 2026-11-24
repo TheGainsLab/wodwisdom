@@ -3,6 +3,9 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase, CHAT_ENDPOINT, APPLY_BLOCK_EDIT_ENDPOINT, APPLY_PROFILE_UPDATE_ENDPOINT, getAuthHeaders } from '../lib/supabase';
 import { movementToLine, type BlockProposal } from '../pages/ProgramDetailPage';
 import ProfileUpdateCard, { type ProfileProposalData, type ProfileCardStatus } from './ProfileUpdateCard';
+import type { NoteProposalData } from './CoachNoteCard';
+import { NoteCardHost } from './CoachCards';
+import { noteProposalFromEvent } from '../lib/coachCards';
 
 interface ProposalData {
   ai_edit_log_id: string;
@@ -16,7 +19,10 @@ interface ProposalData {
 type CoachMessage =
   | { kind: 'text'; role: 'user' | 'assistant'; content: string; streaming?: boolean }
   | { kind: 'proposal'; data: ProposalData; status: 'pending' | 'applying' | 'applied' | 'kept' | 'error' }
-  | { kind: 'profile_proposal'; data: ProfileProposalData; status: ProfileCardStatus; effect?: string };
+  | { kind: 'profile_proposal'; data: ProfileProposalData; status: ProfileCardStatus; effect?: string }
+  // The note card (2026-11-24): this chat used to drop it, so the coach asked
+  // the member to tap Save on a card that was not there. See lib/coachCards.ts.
+  | { kind: 'note_proposal'; data: NoteProposalData };
 
 function formatMarkdown(text: string): string {
   return text
@@ -254,6 +260,28 @@ export default function CoachChat({ session, workoutId, onDayChanged }: {
                 return updated;
               });
             }
+            {
+              // 'note_proposal' → the note card, placed like the other cards:
+              // after the current text, with the coach's wrap-up beneath it.
+              const note = noteProposalFromEvent(event);
+              if (note) {
+                fullText = '';
+                setMessages(prev => {
+                  const updated = [...prev];
+                  for (let i = updated.length - 1; i >= 0; i--) {
+                    const m = updated[i];
+                    if (m.kind === 'text' && m.role === 'assistant' && m.streaming) {
+                      if (m.content.trim()) updated[i] = { ...m, streaming: false };
+                      else updated.splice(i, 1);
+                      break;
+                    }
+                  }
+                  updated.push({ kind: 'note_proposal', data: note });
+                  updated.push({ kind: 'text', role: 'assistant', content: '', streaming: true });
+                  return updated;
+                });
+              }
+            }
             if (event.type === 'proposal' && event.ai_edit_log_id) {
               // Card lands after the current text; the coach's wrap-up keeps
               // streaming into a fresh bubble beneath it.
@@ -326,6 +354,8 @@ export default function CoachChat({ session, workoutId, onDayChanged }: {
               effect={m.effect}
               onResolve={(action) => resolveProfileProposal(m.data.proposal_id, action)}
             />
+          ) : m.kind === 'note_proposal' ? (
+            <NoteCardHost key={m.data.proposal_id} data={m.data} />
           ) : m.kind === 'text' ? (
             <div key={i} style={{
               alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',

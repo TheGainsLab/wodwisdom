@@ -5,13 +5,13 @@ import { addCoachNote, deleteCoachNote, describeNote, setCoachNoteHorizon, type 
  * "Tell your coach" — the box under a week's days on the program page
  * (founder, 2026-11-12). One field, Save, the saved notes under it with their
  * horizon and a delete. Default horizon: next week. Written weeks are done:
- * a note shapes what gets written next (the Engine's next block within days;
- * AI Programming's next generation). The Engine dashboard has no box to
+ * a note shapes what gets written next. WHO reads it depends on the member
+ * (the Engine only with AI Sequencing on): pass `readBy` from note-readers.ts. The Engine dashboard has no box to
  * type in (the goal line there is its box), but it does show the list, in
  * `compact` form, so an Engine-only member can see and remove a note the
  * coach saved in chat (2026-11-24).
  */
-export default function CoachNotesBox({ notes, programId, weekNum, onChange, compact = false, readOnly = false }: {
+export default function CoachNotesBox({ notes, programId, weekNum, onChange, compact = false, readOnly = false, readBy }: {
   notes: CoachNote[];
   programId: string | null;
   weekNum: number | null;
@@ -21,6 +21,8 @@ export default function CoachNotesBox({ notes, programId, weekNum, onChange, com
   /** A finished week: what was said, with when it was read. No field, no
    *  edits. Renders nothing when there were no notes. */
   readOnly?: boolean;
+  /** Who reads a note and when, for THIS member (note-readers.ts). */
+  readBy?: string;
 }) {
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
@@ -90,8 +92,9 @@ export default function CoachNotesBox({ notes, programId, weekNum, onChange, com
     <div style={{ padding: '12px 14px', borderTop: '1px dashed var(--border)' }}>
       <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>Tell your coach</div>
       <div style={{ fontSize: 12, color: 'var(--text-muted)', margin: '2px 0 8px', lineHeight: 1.5 }}>
-        Anything: how this week went, what you want next week, a thought about a later week. Read when your next
-        week is written, and by the Engine for its next block. Written days don&rsquo;t change; to adjust one now, open it and ask the coach.
+        Anything: how this week went, what you want next week, a thought about a later week.{' '}
+        {readBy || 'AI Programming reads it the next time it writes a week for you.'}{' '}
+        Written days don&rsquo;t change; to adjust one now, open it and ask the coach.
       </div>
       <div style={{ display: 'flex', gap: 8 }}>
         <input

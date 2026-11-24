@@ -13,6 +13,7 @@ import { BlockCoachingBody, coachingForBlockType, formatReviewMarkdown, CHEVRON_
 import { useWorkoutReview } from '../lib/useWorkoutReview';
 import { coachNotesWeeks, weekArrivalText } from '../lib/weekSchedule';
 import { loadStimulusNotes } from '../lib/stimulusNotes';
+import { noteReadBy } from '../../supabase/functions/_shared/note-readers.ts';
 import { UNCOUNTED_BLOCK_TYPES_FILTER } from '../../supabase/functions/_shared/day-block-count.ts';
 import BlockLog, { type DayLogController, type SavedBlockSnapshot, loggedMovementNames, blockFullyLogged, isLoggableBlock, isRowLoggerBlock } from '../components/blockLog';
 import { formatArchiveDate } from '../lib/programArchive';
@@ -229,7 +230,15 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const monthFilter = searchParams.get('month') ? parseInt(searchParams.get('month')!, 10) : null;
-  const { isAdmin } = useEntitlements(session.user.id);
+  const { isAdmin, hasFeature, hasEngineAccess } = useEntitlements(session.user.id);
+  // Who reads a "tell your coach" note, for THIS member (note-readers.ts):
+  // the Engine reads notes only with AI Sequencing on.
+  const [aiSequencing, setAiSequencing] = useState(false);
+  useEffect(() => {
+    supabase.from('athlete_profiles').select('engine_ai_sequencing').eq('user_id', session.user.id).maybeSingle()
+      .then(({ data }) => setAiSequencing(data?.engine_ai_sequencing === true), () => {});
+  }, [session.user.id]);
+  const notesReadBy = noteReadBy({ hasProgramming: true, hasEngine: hasEngineAccess || hasFeature('engine'), aiSequencing });
   // "Tell your coach" notes (founder, 2026-11-12): written under a week's
   // days, surfaced in the collapsed row and a one-line summary up top.
   const [coachNotes, setCoachNotes] = useState<CoachNote[]>([]);
@@ -1364,6 +1373,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                               notes={weekNotes}
                               programId={id ?? null}
                               weekNum={week.weekNum}
+                              readBy={notesReadBy}
                               onChange={(next) => setCoachNotes((prev) => [
                                 ...next,
                                 ...prev.filter((n) => !(n.week_num === week.weekNum && (n.program_id == null || n.program_id === id))),
