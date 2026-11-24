@@ -61,3 +61,11 @@ test('no screen still promises every member that the Engine reads their note', (
     assert.doesNotMatch(src, /by the Engine for its next block|The Engine reads these when|read before your next week is written/, f.slice(SRC.length));
   }
 });
+
+test('every screen that talks to the coach has the "Message a human coach" button the coach points to', () => {
+  const screens = filesUnder(SRC).filter((f) => /fetch\(CHAT_ENDPOINT/.test(readFileSync(f, 'utf8')));
+  for (const f of screens) {
+    const src = readFileSync(f, 'utf8');
+    assert.match(src, /<HumanCoachButton \/>|<CoachContactModal/, `${f.slice(SRC.length)} has no human-coach button`);
+  }
+});

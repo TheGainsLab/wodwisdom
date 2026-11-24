@@ -5,6 +5,7 @@ import { movementToLine, type BlockProposal } from '../pages/ProgramDetailPage';
 import ProfileUpdateCard, { type ProfileProposalData, type ProfileCardStatus } from './ProfileUpdateCard';
 import type { NoteProposalData } from './CoachNoteCard';
 import { NoteCardHost } from './CoachCards';
+import HumanCoachButton from './HumanCoachButton';
 import { noteProposalFromEvent } from '../lib/coachCards';
 
 interface ProposalData {
@@ -466,6 +467,8 @@ export default function CoachChat({ session, workoutId, onDayChanged }: {
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
         </button>
       </div>
+      {/* The coach points members to this button "here in the chat". */}
+      <HumanCoachButton />
     </div>
   );
 }
