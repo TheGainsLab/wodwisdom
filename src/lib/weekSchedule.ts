@@ -27,6 +27,10 @@ export function weekWrittenBy(monthStartedAt: string | null | undefined, weekInM
   return new Date(start + 7 * (weekInMonth - 1) * DAY_MS + HOUR_MS);
 }
 
+/** Shown on a week while its write is running (2026-11-24: a write in flight
+ *  used to look exactly like waiting). */
+export const WEEK_BEING_WRITTEN = 'Being written now. It will be here in a few minutes.';
+
 const fmt = (d: Date) => d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
 export interface WeekArrivalFacts {
@@ -38,11 +42,14 @@ export interface WeekArrivalFacts {
   previousWeekLabel: number;
   /** True for the next week to be written (the lowest unwritten week of its month). */
   isNext: boolean;
+  /** A write for this week is running right now (a week job is in flight). */
+  beingWritten?: boolean;
   now?: Date;
 }
 
 /** The sentence for one unwritten week. */
 export function weekArrivalText(f: WeekArrivalFacts): string {
+  if (f.beingWritten) return WEEK_BEING_WRITTEN;
   const by = weekWrittenBy(f.monthStartedAt, f.weekInMonth);
   const now = f.now ?? new Date();
   if (by && by.getTime() <= now.getTime()) return 'Due now. It is being written and will be here within the hour.';
