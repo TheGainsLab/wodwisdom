@@ -795,6 +795,10 @@ async function stageFillWeek(
     const metconBlock = day?.blocks?.find((b) => b.block_type === "metcon");
     if (metconBlock && m.stimulus_note?.trim()) {
       metconBlock.block_notes = m.stimulus_note.trim().slice(0, 500);
+      // Its OWN field too (2026-11-24): block_notes is never shown to the
+      // athlete (it also holds internal working), so the purpose never
+      // reached their screen. stimulus_note is what the app displays.
+      (metconBlock as { stimulus_note?: string }).stimulus_note = m.stimulus_note.trim().slice(0, 500);
     }
   }
   // A week job carries forward ONLY the week it wrote: the earlier weeks are

@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { weekArrivalText, weekWrittenBy, WEEK_BEING_WRITTEN } from '../src/lib/weekSchedule';
+import { coachNotesWeeks, weekArrivalText, weekWrittenBy, WEEK_BEING_WRITTEN } from '../src/lib/weekSchedule';
 
 const BUILT = '2026-11-16T10:00:00.000Z';
 const day = (n: number) => new Date(Date.parse(BUILT) + n * 86400000);
@@ -52,4 +52,27 @@ test('the month-2 label is the number the page shows', () => {
 test('a week whose write is running says so, whatever its date', () => {
   assert.equal(weekArrivalText({ monthStartedAt: BUILT, weekInMonth: 2, previousWeekLabel: 1, isNext: true, beingWritten: true, now: day(2) }), WEEK_BEING_WRITTEN);
   assert.equal(weekArrivalText({ monthStartedAt: null, weekInMonth: 3, previousWeekLabel: 2, isNext: false, beingWritten: true }), WEEK_BEING_WRITTEN);
+});
+
+// ── Where the "Tell your coach" box sits ────────────────────────────────────
+const wk = (week_num: number, done: boolean[], status = 'written', month_number = 1) =>
+  done.map((d) => ({ month_number, week_num, status, done: d }));
+
+test('the notes box sits on the latest written week', () => {
+  assert.deepEqual([...coachNotesWeeks([...wk(1, [true, true]), ...wk(2, [false, false]), ...wk(3, [false], 'outline')])], [2]);
+});
+
+test('…and also on the week still being trained when a later week has been written', () => {
+  // Week 2 has a day left; the clock has already written week 3.
+  const days = [...wk(1, [true, true]), ...wk(2, [true, false]), ...wk(3, [false, false]), ...wk(4, [false], 'outline')];
+  assert.deepEqual([...coachNotesWeeks(days)].sort(), [2, 3]);
+});
+
+test('an unwritten week never carries the box, and month 2 uses the numbers the page shows', () => {
+  assert.equal(coachNotesWeeks(wk(1, [false], 'outline')).size, 0);
+  assert.deepEqual([...coachNotesWeeks([...wk(4, [true]), ...wk(1, [false], 'written', 2)])], [5]);
+});
+
+test('everything done: only the latest written week has it', () => {
+  assert.deepEqual([...coachNotesWeeks([...wk(1, [true]), ...wk(2, [true])])], [2]);
 });

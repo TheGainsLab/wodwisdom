@@ -6,8 +6,10 @@ import { addCoachNote, deleteCoachNote, describeNote, setCoachNoteHorizon, type 
  * (founder, 2026-11-12). One field, Save, the saved notes under it with their
  * horizon and a delete. Default horizon: next week. Written weeks are done:
  * a note shapes what gets written next (the Engine's next block within days;
- * AI Programming's next generation). Not on the Engine dashboard — the goal
- * line there is its box.
+ * AI Programming's next generation). The Engine dashboard has no box to
+ * type in (the goal line there is its box), but it does show the list, in
+ * `compact` form, so an Engine-only member can see and remove a note the
+ * coach saved in chat (2026-11-24).
  */
 export default function CoachNotesBox({ notes, programId, weekNum, onChange, compact = false, readOnly = false }: {
   notes: CoachNote[];

@@ -109,3 +109,36 @@ Deno.test("a week the athlete has opened is never replaced: the rows, blocks and
   assertEquals(db.tables.program_blocks_v2.length, blocksBefore);
   assertEquals(shape(db), "3w/0o 3w/0o 0w/3o 0w/3o"); // later weeks' outline untouched too
 });
+
+// ── The conditioning piece's purpose note (2026-11-24) ──────────────────────
+const weekWithMetcon = (n: number): Any => ({
+  week_num: n,
+  days: DAYS.map((d) => ({ day_num: d, blocks: [
+    { block_type: "strength", scheme_format: { format: "work_sets" }, movements: [{ movement: "Back Squat", sets: 5, reps: 5, weight: 100, weight_unit: "kg" }] },
+    { block_type: "metcon", scheme_format: { format: "amrap", minutes: 12 }, block_notes: "Even pace.", stimulus_note: "Even pace.", movements: [{ movement: "Row", calories: 15 }] },
+  ] })),
+});
+
+Deno.test("a metcon's purpose note is saved in its own field; other blocks carry none", async () => {
+  const db = start();
+  await saveWeek(db.supa, weekWithMetcon(2));
+  const ids = new Set(rowsOf(db, 2).map((r: Any) => r.id));
+  const blocks = db.tables.program_blocks_v2.filter((b: Any) => ids.has(b.program_workout_id));
+  assertEquals(blocks.filter((b: Any) => b.block_type === "metcon").map((b: Any) => b.stimulus_note), ["Even pace.", "Even pace.", "Even pace."]);
+  assertEquals(blocks.filter((b: Any) => b.block_type === "strength").every((b: Any) => !b.stimulus_note), true);
+});
+
+Deno.test("if the purpose-note column is not there yet, the week still saves, without it", async () => {
+  const db = start();
+  let first = true;
+  const failing = memorySupa(db.tables, { fail: (t, op) => {
+    if (t === "program_blocks_v2" && op === "insert" && first) { first = false; return 'column "stimulus_note" of relation "program_blocks_v2" does not exist'; }
+    return null;
+  } });
+  await saveWeek(failing.supa, weekWithMetcon(2));
+  assertEquals(shape(failing), "3w/0o 3w/0o 0w/3o 0w/3o"); // the week is saved
+  const ids = new Set(rowsOf(failing, 2).map((r: Any) => r.id));
+  const blocks = failing.tables.program_blocks_v2.filter((b: Any) => ids.has(b.program_workout_id));
+  assertEquals(blocks.length, 6);
+  assertEquals(blocks.some((b: Any) => "stimulus_note" in b), false);
+});

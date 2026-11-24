@@ -391,6 +391,8 @@ export async function saveProgramV3(
             scheme_format: b.scheme_format ?? null,
             time_cap_seconds: b.time_cap_seconds ?? null,
             block_notes: b.block_notes ?? null,
+            // The piece's purpose, shown to the athlete (composed metcons only).
+            ...((b as { stimulus_note?: string }).stimulus_note ? { stimulus_note: (b as { stimulus_note?: string }).stimulus_note } : {}),
             cardio_modality: b.cardio_modality ?? null,
             sort_order: bIdx,
             block_intent: buildBlockIntent(skDay, b.block_type),
@@ -400,10 +402,18 @@ export async function saveProgramV3(
         }
       }
     }
-    const { data: blocks, error: blErr } = await supa
+    let { data: blocks, error: blErr } = await supa
       .from("program_blocks_v2")
       .insert(blockInserts)
       .select("id");
+    // Deploy-order safety: if this code runs before the stimulus_note column
+    // exists, save without it rather than fail the build. PostgREST sends
+    // every row with the same keys, so the key is dropped from all of them.
+    if (blErr && /stimulus_note/.test(blErr.message ?? "")) {
+      console.warn("[save-v3] stimulus_note column missing; saving blocks without it");
+      const without = blockInserts.map(({ stimulus_note: _drop, ...rest }) => rest);
+      ({ data: blocks, error: blErr } = await supa.from("program_blocks_v2").insert(without).select("id"));
+    }
     if (blErr || !blocks) {
       throw new Error(`[save-v3] program_blocks_v2 insert failed: ${blErr?.message ?? "unknown"}`);
     }

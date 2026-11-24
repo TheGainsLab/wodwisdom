@@ -45,7 +45,8 @@ const landingFor = (plan: string | null | undefined) => (plan && PLAN_LANDING[pl
 
 /** First-stop line per landing, for the screens that name it. */
 const FIRST_STOP: Record<string, string> = {
-  '/profile': 'your profile and free evaluation — your program is built from it',
+  // Not "free evaluation": this line is read by someone who has just paid.
+  '/profile': 'your profile and evaluation — your program is built from it',
   '/engine': 'Engine setup — pick your days, set a goal, start with a time trial',
   '/knowledge': 'the research library — ask it anything',
   '/chat': 'your AI Coach — ask your first question',

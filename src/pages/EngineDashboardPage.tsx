@@ -16,6 +16,8 @@ import {
 } from '../lib/engineService';
 import { GOAL_BOX_MAX_CHARS } from '../lib/profileFormRules';
 import { useEntitlements } from '../hooks/useEntitlements';
+import CoachNotesBox from '../components/CoachNotesBox';
+import { loadCoachNotes, type CoachNote } from '../lib/coachNotes';
 import { describeWorkout } from '../lib/engineStructure';
 import { ChevronLeft, ChevronRight, Lock, Check, Play, Settings, BarChart3, Calendar, Trophy, Target } from 'lucide-react';
 
@@ -90,6 +92,14 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
   const [goalEditing, setGoalEditing] = useState(false);
   const [goalDraft, setGoalDraft] = useState('');
   const [goalSaving, setGoalSaving] = useState(false);
+  // Notes saved for the coach (2026-11-24). The coach can save one in any
+  // chat and the Engine reads them when it picks sessions, but the only
+  // screen that listed them was the AI Programming page: an Engine-only
+  // member could never see or remove one. Listed here, with delete; shown
+  // only when there are any.
+  const [coachNotes, setCoachNotes] = useState<CoachNote[]>([]);
+  const [notesOpen, setNotesOpen] = useState(false);
+  useEffect(() => { loadCoachNotes().then(setCoachNotes).catch(() => {}); }, []);
   const { hasFeature, hasEngineAccess, isAdmin, loading: entLoading } = useEntitlements(session.user.id);
 
   const load = async () => {
@@ -447,6 +457,23 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
                   </div>
                 )}
               </div>
+
+              {coachNotes.length > 0 && (
+                <div style={{ padding: '0 4px' }}>
+                  <button type="button" onClick={() => setNotesOpen((o) => !o)} aria-expanded={notesOpen}
+                    style={{ background: 'none', border: 'none', padding: 0, fontFamily: 'inherit', fontSize: 13, color: 'var(--text-dim)', cursor: 'pointer' }}>
+                    {coachNotes.length} note{coachNotes.length === 1 ? '' : 's'} for your coach {notesOpen ? '▴' : '›'}
+                  </button>
+                  {notesOpen && (
+                    <>
+                      <CoachNotesBox compact notes={coachNotes} programId={null} weekNum={null} onChange={setCoachNotes} />
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.5 }}>
+                        The Engine reads these when it chooses your sessions. Remove one with ✕ when it no longer applies.
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
 
               {/* Start button — locked when the pointer sits in a month beyond entitlement */}
               {currentDayLocked ? (

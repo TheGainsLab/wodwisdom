@@ -11,7 +11,8 @@ import { loadCoachNotes, type CoachNote } from '../lib/coachNotes';
 import WorkoutBlocksDisplay, { BlockContent } from '../components/WorkoutBlocksDisplay';
 import { BlockCoachingBody, coachingForBlockType, formatReviewMarkdown, CHEVRON_DOWN, type ReviewBlock } from '../components/reviewCoaching';
 import { useWorkoutReview } from '../lib/useWorkoutReview';
-import { weekArrivalText } from '../lib/weekSchedule';
+import { coachNotesWeeks, weekArrivalText } from '../lib/weekSchedule';
+import { loadStimulusNotes } from '../lib/stimulusNotes';
 import { UNCOUNTED_BLOCK_TYPES_FILTER } from '../../supabase/functions/_shared/day-block-count.ts';
 import BlockLog, { type DayLogController, type SavedBlockSnapshot, loggedMovementNames, blockFullyLogged, isLoggableBlock, isRowLoggerBlock } from '../components/blockLog';
 import { formatArchiveDate } from '../lib/programArchive';
@@ -96,6 +97,8 @@ export interface ProgramBlockV2 {
   scheme_format?: SchemeFormatV2 | null;
   time_cap_seconds: number | null;
   block_notes: string | null;
+  /** A composed metcon's purpose and pacing, written for the athlete. */
+  stimulus_note?: string | null;
   sort_order: number;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   expected_benchmark: any | null;
@@ -279,16 +282,18 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
     const week = Math.min(...outline.filter((w) => (w.month_number ?? 1) === month).map((w) => w.week_num));
     return arrivalFor(month, week);
   })();
-  // The week in progress = the latest WRITTEN week of the program (outline
-  // weeks don't count). Only this week carries the "tell your coach" box;
-  // it stays here through the hour between the last log and the next fill.
-  const currentNotesWeek = allWorkouts.reduce((best, w) => {
-    if (w.status === 'outline') return best;
-    const n = ((w.month_number ?? 1) - 1) * 4 + (w.week_num || 1);
-    return n > best ? n : best;
-  }, 0);
   const [completedWorkoutIds, setCompletedWorkoutIds] = useState<Set<string>>(new Set());
   const [inProgressWorkouts, setInProgressWorkouts] = useState<Map<string, { logId: string; savedCount: number; totalBlocks: number }>>(new Map());
+  // The weeks that carry an open "tell your coach" box: the latest written
+  // week, and the earliest written week that still has a day not done (see
+  // coachNotesWeeks). "Done" is the page's own rule for a finished day.
+  const notesWeeks = coachNotesWeeks(allWorkouts.map((w) => {
+    const ip = inProgressWorkouts.get(w.id);
+    return {
+      month_number: w.month_number, week_num: w.week_num, status: w.status,
+      done: completedWorkoutIds.has(w.id) || (!!ip && ip.totalBlocks > 0 && ip.savedCount >= ip.totalBlocks),
+    };
+  }));
   const [workoutBlocks, setWorkoutBlocks] = useState<Map<string, ProgramBlock[]>>(new Map());
   // v3-only: structured blocks + movements per program_workout_id.
   const [v3BlocksByWorkout, setV3BlocksByWorkout] = useState<Map<string, ProgramBlockV2[]>>(new Map());
@@ -653,6 +658,10 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
 
     const allBlocks = v3Blocks.map((b) => ({ ...b, movements: [] as ProgramMovementV2[] }));
     const blockIds = allBlocks.map((b) => b.id);
+    // The purpose note of each conditioning piece, read on its own (see
+    // stimulusNotes.ts): metcon blocks only, and never blocks the page.
+    const stimulusNotes = await loadStimulusNotes(allBlocks.filter((b) => b.block_type === 'metcon').map((b) => b.id));
+    for (const b of allBlocks) (b as { stimulus_note?: string | null }).stimulus_note = stimulusNotes.get(b.id) ?? null;
     // Only in-progress logs need block tallies; completed ones just need the id.
     const inProgress = logs.filter((l) => l.status === 'in_progress' && l.source_id);
 
@@ -918,7 +927,11 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                     </div>
                   </div>
                 )}
-                {program?.weekly_mode && !archived && (
+                {/* A first-program note: shown only while the FIRST month still has
+                    an unwritten week (2026-11-24). It used to stay for the
+                    program's whole life, still saying "Week 1 is written" in
+                    month 3 with every week written. */}
+                {program?.weekly_mode && !archived && allWorkouts.some((w) => (w.month_number ?? 1) === 1 && w.status === 'outline') && (
                   <div style={{ margin: '10px 0 2px', padding: '10px 14px', border: '1px dashed var(--border)', borderRadius: 10, fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.5 }}>
                     <strong style={{ color: 'var(--text)' }}>This is a starting point.</strong> Week 1 is written; the weeks after it are written one at a time from how you train and what you tell your coach. {nextArrival ? <>Your next week: {nextArrival.charAt(0).toLowerCase() + nextArrival.slice(1)} </> : null}Tell your coach what you&rsquo;d change and next week is written from it.
                   </div>
@@ -987,7 +1000,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                     <p style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)', margin: '0 0 16px' }}>
                       <strong style={{ color: 'var(--text)' }}>Built for you. Not by yourself.</strong>{' '}
                       Prefer a human? Tap <strong style={{ color: 'var(--text)' }}>Message a human coach</strong>{' '}
-                      in the chat — a real coach replies by email within a day.
+                      in the chat — a real coach replies by email, usually within a day.
                     </p>
                     <button
                       type="button"
@@ -1343,7 +1356,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                           if (isOutlineWeek) return null;
                           const weekNotes = coachNotes.filter((n) => n.week_num === week.weekNum && (n.program_id == null || n.program_id === id));
                           if (archived && weekNotes.length === 0) return null;
-                          if (archived || week.weekNum !== currentNotesWeek) {
+                          if (archived || !notesWeeks.has(week.weekNum)) {
                             return <CoachNotesBox readOnly notes={weekNotes} programId={id ?? null} weekNum={week.weekNum} onChange={() => {}} />;
                           }
                           return (
@@ -1959,6 +1972,13 @@ function V3BlockCard({ block, onUpdateMovement, onUpdateBlock, onAddMovement, on
         />
       ) : (
         block.block_scheme && <div style={schemeStyle}>{block.block_scheme}</div>
+      )}
+      {/* The piece's purpose and pacing, written for the athlete (2026-11-24).
+          It used to be saved only in block_notes, which is never shown. */}
+      {block.block_type === 'metcon' && block.stimulus_note && !editing && (
+        <div style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.5, margin: '4px 0 8px' }}>
+          <span style={{ fontWeight: 700, color: 'var(--text)' }}>Purpose: </span>{block.stimulus_note}
+        </div>
       )}
       {/* block_notes is the writer's internal reasoning (load math, percentile/
           ratio justification) — kept in the DB for admin/eval, not shown to the
