@@ -17,6 +17,7 @@ import {
   afterLostContact, STATUS_CHECK_FAILURES_BEFORE_LOOKUP,
   type DraftFields, type StoredDraft,
 } from '../lib/profileFormRules';
+import { changedBySave, saveEffectNotes, NO_SAVE_EFFECT, type SaveEffectNotes } from '../lib/profileSaveEffect';
 
 /** The session length the slider shows before the athlete touches it — and what is saved if they never do. */
 const DEFAULT_SESSION_LENGTH_MINUTES = 60;
@@ -835,6 +836,9 @@ export default function AthletePage({ session }: { session: Session }) {
   // Each draft records them, so a later load can tell "the member typed over
   // this value" from "this value changed underneath an old draft" (2026-11-23).
   const serverBaseRef = useRef<DraftFields>({ days: '', len: '', goal: '', injuries: '', equipment: {} });
+  // After a save by a member whose program is running: what the save changes
+  // and when, shown under the card it belongs to (src/lib/profileSaveEffect).
+  const [saveEffect, setSaveEffect] = useState<SaveEffectNotes>(NO_SAVE_EFFECT);
   const [intakeSaving, setIntakeSaving] = useState(false);
   const [intakeError, setIntakeError] = useState('');
 
@@ -1479,6 +1483,7 @@ export default function AthletePage({ session }: { session: Session }) {
   const saveProfile = async (overrides?: { equipment?: Record<string, boolean>; review?: boolean }): Promise<boolean> => {
     setSaving(true);
     setError('');
+    setSaveEffect(NO_SAVE_EFFECT);
 
     // Only store non-zero lifts
     const cleanLifts: Record<string, number> = {};
@@ -1626,6 +1631,7 @@ export default function AthletePage({ session }: { session: Session }) {
     // Step 3 summaries may now show green.
     setSavedSched({ days: daysPerWeek, len: sessionLengthMinutes });
     setSavedGoal(goal);
+    const storedBefore = serverBaseRef.current;
     // What is stored now — the base of any draft typed after this save.
     serverBaseRef.current = {
       days: payload.days_per_week != null ? String(payload.days_per_week) : '',
@@ -1634,6 +1640,28 @@ export default function AthletePage({ session }: { session: Session }) {
       injuries: injuriesVal === 'None' ? '' : injuriesVal,
       equipment: payload.equipment,
     };
+    // A member whose program is running is told what this save changes and
+    // when (2026-11-24). Best-effort: the save has already succeeded, so a
+    // failed lookup shows nothing rather than an error.
+    if (hasGeneratedProgram) {
+      const change = changedBySave(storedBefore, serverBaseRef.current);
+      if (Object.values(change).some(Boolean)) {
+        void (async () => {
+          try {
+            const { data: prog } = await supabase.from('programs').select('id, weekly_mode')
+              .eq('user_id', session.user.id).eq('source', 'generated').is('archived_at', null)
+              .order('created_at', { ascending: false }).limit(1).maybeSingle();
+            if (!prog?.id) return;
+            const { data: outline } = await supabase.from('program_workouts')
+              .select('week_num, month_number').eq('program_id', prog.id).eq('status', 'outline');
+            const weeks = new Set((outline ?? []).map((r) => `${r.month_number}-${r.week_num}`));
+            setSaveEffect(saveEffectNotes(change, { weekly: prog.weekly_mode === true, outlineWeeksLeft: weeks.size }));
+          } catch (err) {
+            console.error('[AthletePage] save-effect lookup failed:', err);
+          }
+        })();
+      }
+    }
     // Step 2 completes only via a review save — a plain save leaves the
     // stamp (and the tier state) exactly as it was.
     if (reviewedAtIso) setAthleticReviewedAt(reviewedAtIso);
@@ -2626,6 +2654,12 @@ export default function AthletePage({ session }: { session: Session }) {
                       amber demand went 2026-10-12 — required-ness is already
                       enforced by the step badge and the Generate gate, and
                       three matching rows read as the checklist they are). */}
+                  {saveEffect.schedule.length > 0 && (
+                    <div role="status" style={{ margin: '8px 2px 0', padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 10, fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.5 }}>
+                      <strong style={{ color: 'var(--text)' }}>Saved.</strong>{' '}
+                      {saveEffect.schedule.join(' ')}
+                    </div>
+                  )}
                   <div className="settings-card" style={{ ...T3_CARD, marginTop: 16 }}>
                     <button
                       type="button"
@@ -2696,6 +2730,12 @@ export default function AthletePage({ session }: { session: Session }) {
                   {/* Card 3 — YOUR COACH: ALL the free-text / voice. One
                       "Save & analyze" persists goals/injuries (via the full
                       profile save) AND runs the intake extraction. */}
+                  {saveEffect.equipment.length > 0 && (
+                    <div role="status" style={{ margin: '8px 2px 0', padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 10, fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.5 }}>
+                      <strong style={{ color: 'var(--text)' }}>Saved.</strong>{' '}
+                      {saveEffect.equipment.join(' ')}
+                    </div>
+                  )}
                   <div className="settings-card" style={{ ...T3_CARD, marginTop: 16 }}>
                     <button
                       type="button"
@@ -2904,6 +2944,12 @@ export default function AthletePage({ session }: { session: Session }) {
                     {intakeError && <div className="auth-error" style={{ display: 'block', marginTop: 12 }}>{intakeError}</div>}
                     </div>)}
                   </div>
+                  {saveEffect.coach.length > 0 && (
+                    <div role="status" style={{ margin: '8px 2px 0', padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 10, fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.5 }}>
+                      <strong style={{ color: 'var(--text)' }}>Saved.</strong>{' '}
+                      {saveEffect.coach.join(' ')}
+                    </div>
+                  )}
                   </>
                   )}
                 </TierCard>
