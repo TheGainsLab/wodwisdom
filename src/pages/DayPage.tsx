@@ -167,6 +167,10 @@ export default function DayPage(_props: { session: Session }) {
         },
       }));
       return { auto_completed: data?.auto_completed };
+    } catch {
+      // A thrown request (no connection at all) is a failed save like any
+      // other: the panel shows "Couldn't save" and keeps what was typed.
+      return null;
     } finally {
       setSavingSort(null);
     }
