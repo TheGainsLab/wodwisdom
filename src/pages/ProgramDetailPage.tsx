@@ -987,7 +987,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                     <p style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)', margin: '0 0 16px' }}>
                       <strong style={{ color: 'var(--text)' }}>Built for you. Not by yourself.</strong>{' '}
                       Prefer a human? Tap <strong style={{ color: 'var(--text)' }}>Message a human coach</strong>{' '}
-                      in the chat — a real coach replies by email within a day.
+                      in the chat — a real coach replies by email, usually within a day.
                     </p>
                     <button
                       type="button"
