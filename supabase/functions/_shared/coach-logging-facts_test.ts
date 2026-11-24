@@ -67,3 +67,33 @@ Deno.test("the human-coach message limit the coach states is the server's", asyn
   assertMatch(chat, /TWO such messages per 24 hours/);
   assertMatch(await read("../contact-coach/index.ts"), /2 DELIVERED sends per rolling 24h/);
 });
+
+// ── The plan rule and the coach's identity (founder, 2026-11-24) ────────────
+
+Deno.test("one rule about the plan: the three conflicting instructions are gone", async () => {
+  const chat = await read("../chat/index.ts");
+  assertNotMatch(chat, /Hold your position: never reverse a recommendation/);
+  assertNotMatch(chat, /Do not defend the plan against the athlete/);
+  assertMatch(chat, /THE PROGRAM STANDS UNLESS THE ATHLETE CHANGES IT/);
+  assertMatch(chat, /A QUESTION IS NOT A REQUEST/);
+  assertMatch(chat, /IF THEY SAY THEY WANT THE CHANGE, MAKE IT/);
+  assertMatch(chat, /NO NEGOTIATION/);
+  assertMatch(chat, /A NUMBER ONCE QUOTED STAYS/);
+});
+
+Deno.test("the coach is not told to give its opinion of an alternative", async () => {
+  const chat = await read("../chat/index.ts");
+  assertMatch(chat, /Do not offer your opinion of an alternative/);
+});
+
+Deno.test("the plan block still says to explain the plan, which the rule relies on", async () => {
+  const state = await read("./coach-state.ts");
+  assertMatch(state, /never re-litigate the coach's priorities or deprioritizations — explain them instead/);
+});
+
+Deno.test("asked sincerely, the coach says it is the AI Coach", async () => {
+  const chat = await read("../chat/index.ts");
+  assertNotMatch(chat, /Never describe yourself as an AI\./);
+  assertMatch(chat, /you are the AI Coach, and a human coach is available through the Message a human coach button/);
+  assertMatch(chat, /Never deny being an AI, never dodge the question, never imply you are a person/);
+});
