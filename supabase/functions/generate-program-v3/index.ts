@@ -69,6 +69,7 @@ import { stripInternalMarkers, enforceNoLabelOnCoachedBlocks } from "../_shared/
 import { athleteWordsElsewhere, runRestrictionGate } from "../_shared/restriction-gate.ts";
 import { fitProfileFromPayload, runFitGate } from "../_shared/fit-gate.ts";
 import { saveProgramV3 } from "../_shared/save-program-v3.ts";
+import { refreshAvoidListForBuild } from "../_shared/injury-refresh.ts";
 import { type BlockLocation } from "../_shared/compute-block-benchmark.ts";
 // Engine core — the extracted generation pipeline. This function now CONSUMES the
 // Engine (payload -> skeleton -> audits -> fill -> audit suite -> recovery)
@@ -225,32 +226,10 @@ async function stagePayloadBuilding(
   // check the response so a parse HTTP failure is visible rather than silently
   // proceeding on a stale/null list. The parse refresh itself stays non-fatal — the
   // confirmation guard below is the actual gate.
-  try {
-    const resp = await fetch(`${SUPABASE_URL}/functions/v1/parse-injuries-constraints`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${SUPABASE_SERVICE_KEY}`,
-        "x-webhook-user-id": userId,
-      },
-      body: "{}",
-      signal: AbortSignal.timeout(30_000),
-    });
-    if (!resp.ok) {
-      // Structured tag for log-based monitoring (no dedicated alert channel — a
-      // persistent parse failure is almost always a global Claude/model issue that
-      // also fails generation itself). Queryable in fn Logs by tag.
-      console.error(JSON.stringify({
-        tag: "injury_parse_failed", at: "generate-program-v3.refresh",
-        user_id: userId, http_status: resp.status,
-      }));
-    }
-  } catch (e) {
-    console.error(JSON.stringify({
-      tag: "injury_parse_failed", at: "generate-program-v3.refresh",
-      user_id: userId, error: e instanceof Error ? e.message : String(e),
-    }));
-  }
+  // Three tries (2026-11-24: it was one, and a single failed call left the
+  // build on the old list). Still non-fatal: after three failures the old
+  // list is kept and the weekly restriction check reads the note itself.
+  await refreshAvoidListForBuild(userId, "generate-program-v3.refresh", { url: SUPABASE_URL, serviceKey: SUPABASE_SERVICE_KEY });
 
   // Guard (handoff 1.3): block generation past a non-empty-but-unconfirmed injury
   // note. Flag-gated — observability-only until 1.1/T6 ship (see the helper).
