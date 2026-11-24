@@ -268,7 +268,7 @@ export default function ChatPage({ session }: { session: Session }) {
                 const card: Message = {
                   role: 'assistant',
                   content: '',
-                  noteProposal: { proposal_id: event.proposal_id, text: event.text || '', horizon: event.horizon === 'until_removed' ? 'until_removed' : 'next_week', rationale: event.rationale || '' },
+                  noteProposal: { proposal_id: event.proposal_id, text: event.text || '', horizon: event.horizon === 'until_removed' ? 'until_removed' : 'next_week', rationale: event.rationale || '', ...(typeof event.read_by === 'string' && event.read_by ? { readBy: event.read_by } : {}) },
                   noteStatus: 'pending',
                 };
                 const closedContent = accumulatedContent;

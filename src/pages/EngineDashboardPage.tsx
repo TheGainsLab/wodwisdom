@@ -18,6 +18,7 @@ import { GOAL_BOX_MAX_CHARS } from '../lib/profileFormRules';
 import { useEntitlements } from '../hooks/useEntitlements';
 import CoachNotesBox from '../components/CoachNotesBox';
 import { loadCoachNotes, type CoachNote } from '../lib/coachNotes';
+import { noteReadBy } from '../../supabase/functions/_shared/note-readers.ts';
 import { describeWorkout } from '../lib/engineStructure';
 import { ChevronLeft, ChevronRight, Lock, Check, Play, Settings, BarChart3, Calendar, Trophy, Target } from 'lucide-react';
 
@@ -468,7 +469,11 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
                     <>
                       <CoachNotesBox compact notes={coachNotes} programId={null} weekNum={null} onChange={setCoachNotes} />
                       <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.5 }}>
-                        The Engine reads these when it chooses your sessions. Remove one with ✕ when it no longer applies.
+                        {/* True for THIS member (note-readers.ts): the Engine reads
+                            notes only with AI Sequencing on. The line here used to
+                            say "The Engine reads these" to everyone. */}
+                        {noteReadBy({ hasProgramming: hasFeature('programming'), hasEngine: true, aiSequencing: progress?.engine_ai_sequencing === true })}{' '}
+                        Remove one with ✕ when it no longer applies.
                       </div>
                     </>
                   )}

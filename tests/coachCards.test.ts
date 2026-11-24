@@ -48,3 +48,16 @@ test('other events, and events with no id, are not cards', () => {
     assert.equal(profileProposalFromEvent(e as never), null);
   }
 });
+
+test('the note card carries who reads the note, as the server worked it out for this member', () => {
+  const card = noteProposalFromEvent({ type: 'note_proposal', proposal_id: 'p9', text: 'Go easier', horizon: 'next_week', read_by: 'Your Engine sessions follow a fixed order, so a note doesn\'t change them.' });
+  assert.match(card!.readBy!, /fixed order/);
+  assert.equal(noteProposalFromEvent({ type: 'note_proposal', proposal_id: 'p10', text: 'x' })!.readBy, undefined);
+});
+
+test('no screen still promises every member that the Engine reads their note', () => {
+  for (const f of filesUnder(SRC)) {
+    const src = readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, ''); // comments may quote the old wording
+    assert.doesNotMatch(src, /by the Engine for its next block|The Engine reads these when|read before your next week is written/, f.slice(SRC.length));
+  }
+});

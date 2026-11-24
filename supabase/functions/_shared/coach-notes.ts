@@ -54,7 +54,11 @@ export function formatCoachNotes(notes: CoachNote[], audience: NoteAudience): st
     return `  - "${n.text.replace(/\s+/g, " ").trim()}" (${when}, written ${date})`;
   });
   const rule = audience === "coach"
-    ? `These are read before every Engine block and every AI-Programming generation. Answer questions about them ` +
+    // Who reads them depends on the athlete (2026-11-24, see note-readers.ts):
+    // the Engine reads notes only through AI Sequencing.
+    ? `AI Programming reads these the next time it writes a week. The Engine reads them ONLY when this athlete's ` +
+      `AI SEQUENCING is ON (see that line), when it picks their next block, from their second Engine month; with it ` +
+      `OFF the Engine's sessions follow a fixed order and it does not read them. Answer questions about them ` +
       `from this list; never claim one was applied before the next generation.`
     : `Honour each within this program's structure: shape intensity, emphasis and ${audience === "engine" ? "day-type" : "movement"} ` +
       `choice toward it. A note never changes the day count, never overrides an injury or constraint, and never ` +
@@ -167,14 +171,18 @@ export const COACH_NOTE_PROMPT =
   "\n\nNOTES FOR THE COACH (propose_coach_note): When the athlete asks for a WEEK-SCALE change to their training " +
   "— more or less of a movement or kind of work, go easier or harder next week, a travel or hotel-gym week, " +
   "equipment for a while — draft a note with propose_coach_note. The athlete sees a card with the note and " +
-  "Save / Not now; NOTHING is saved unless they tap Save. A saved note is read before every Engine block and " +
-  "every AI-Programming generation; it shapes emphasis, dose and movement choice, never the day count. " +
+  "Save / Not now; NOTHING is saved unless they tap Save. WHO READS A SAVED NOTE DEPENDS ON THE ATHLETE: AI Programming " +
+  "reads it the next time it writes a week; the Engine reads it ONLY when the athlete's AI SEQUENCING is ON, when it picks " +
+  "their next block, and only from their second Engine month (month one is a fixed assessment). For an Engine athlete with " +
+  "AI SEQUENCING OFF the sessions follow a fixed order and a note changes NOTHING in the Engine — never tell them the Engine " +
+  "will act on it; say so plainly and that AI Sequencing can be switched on in Settings. Where it is read, a note shapes " +
+  "emphasis, dose and movement choice, never the day count. " +
   "ALWAYS call the tool — never write 'save that note' or 'I'll note that' in text: the athlete can only save a " +
   "note you have drafted as a card, and a sentence about saving with no card is a broken promise. " +
   "Horizon is next_week unless they say it is ongoing. Durable facts (injuries, days per week, a goal shift) " +
   "are propose_profile_update instead. A change to HOW MANY DAYS A WEEK they train — fewer or more, even for a " +
   "short while — is ALWAYS a profile update (propose_profile_update days_per_week), NEVER a note: a note cannot " +
-  "change the day count, and one that asks for it changes nothing. One card per message. After they save: say it will be read at the " +
-  "next generation — the Engine's next block within days (only when AI Sequencing is on); AI Programming's NEXT WEEK, written once every day of the current week has something logged or on its weekly date, whichever comes first. " +
+  "change the day count, and one that asks for it changes nothing. One card per message. After they save: say when it is read using the " +
+  "tool result's own wording for THIS athlete (it is computed from what they hold) — never a general promise. For AI Programming that is the NEXT WEEK, written once every day of the current week has something logged or on its weekly date, whichever comes first. " +
   "If a RECURRING NOTE line is present below, offer once, in one sentence, to make it part of their goal " +
   "(propose_profile_update goal_append) — only if they agree.";

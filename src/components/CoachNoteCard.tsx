@@ -8,6 +8,8 @@ export interface NoteProposalData {
   text: string;
   horizon: 'next_week' | 'until_removed';
   rationale: string;
+  /** Who reads the note and when, for THIS member (from the server). */
+  readBy?: string;
 }
 export type NoteCardStatus = 'pending' | 'saving' | 'saved' | 'declined' | 'error';
 
@@ -30,7 +32,7 @@ export default function CoachNoteCard({ data, status, onResolve }: {
       </div>
       {done ? (
         <div style={{ fontSize: 12.5, color: status === 'saved' ? '#2ec486' : 'var(--text-muted)' }}>
-          {status === 'saved' ? 'Saved — read before your next week is written.' : 'Not saved.'}
+          {status === 'saved' ? `Saved. ${data.readBy || 'AI Programming reads it the next time it writes a week for you.'}` : 'Not saved.'}
         </div>
       ) : (
         <div style={{ display: 'flex', gap: 8 }}>

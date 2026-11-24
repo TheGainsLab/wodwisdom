@@ -35,5 +35,6 @@ export function noteProposalFromEvent(event: ChatEvent): NoteProposalData | null
     text: typeof event.text === 'string' ? event.text : '',
     horizon: event.horizon === 'until_removed' ? 'until_removed' : 'next_week',
     rationale: typeof event.rationale === 'string' ? event.rationale : '',
+    ...(typeof event.read_by === 'string' && event.read_by ? { readBy: event.read_by } : {}),
   };
 }
