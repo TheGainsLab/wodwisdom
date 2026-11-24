@@ -110,6 +110,10 @@ export interface MovementPrescription {
    */
   max_effort?: boolean;
   weight?: number;
+  /** True when `weight` is loaded on a barbell (rounded to plates at save);
+   *  false for a fixed implement or machine, whose weight is kept exactly.
+   *  Decided by the writer. Absent on blocks written before 2026-11-24. */
+  on_barbell?: boolean;
   /** Women's RX load when it differs (library/Open prescriptions carry
    *  the men's load in `weight`; the engine's gender slots split here —
    *  merged from workout_signatures.loads_women at measure time, or set
@@ -304,6 +308,13 @@ function buildMovementSchema(units: "lbs" | "kg") {
       max_effort: { type: "boolean", description: "TRUE only for 'as many reps/cals as possible in the remaining window' (a finisher inside a bounded clock). Set NO volume fields with it — never invent a number. Metcon blocks only, LAST movement only, at most one per block, never in AMRAPs (AMRAP movements have fixed per-round reps via rep_scheme)." },
       weight: { type: "number", minimum: 0 },
       weight_unit: { type: "string", enum: [units] },
+      on_barbell: {
+        type: "boolean",
+        description:
+          "SET THIS WITH EVERY weight. TRUE when the weight is loaded on a BARBELL (it is then rounded to loadable plates after you). " +
+          "FALSE when it is a fixed implement or a machine — dumbbell, kettlebell, wall ball / medicine ball, sandbag, weight vest, sled, machine stack, carry handles: " +
+          "its weight is kept EXACTLY as you write it, so write a size that exists (a 24 kg kettlebell, a 9 kg wall ball, a 22.5 kg dumbbell).",
+      },
       rpe: { type: "integer", minimum: 1, maximum: 10 },
       time_seconds: { type: "integer", minimum: 1, maximum: 7200 },
       distance: { type: "number", minimum: 0, description: "PER-ROUND distance for distance-counted movements ('3 RFT: Row 250m' → 250, with sets: 3). Single-pass → the full distance, sets omitted." },

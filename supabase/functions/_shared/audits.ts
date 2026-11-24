@@ -428,6 +428,9 @@ export function auditPlateMath(output: WriterOutput): AuditResult {
         for (let mi = 0; mi < safeMovements(b).length; mi++) {
           const m = safeMovements(b)[mi];
           if (m.weight == null || m.weight <= 0) continue;
+          // A fixed implement (kettlebell, dumbbell, wall ball, machine) is not
+          // loaded with plates: its weight is whatever size exists (2026-11-24).
+          if ((m as { on_barbell?: boolean }).on_barbell === false) continue;
           if (isNonPlateMathWeightMovement(m.movement)) continue;
           if (!isPlateMathSafe(m.weight, m.weight_unit ?? null)) {
             const step = m.weight_unit === "kg" ? "2.5kg" : "5lb";
@@ -854,12 +857,16 @@ export function auditMetconDuration(
 export function auditDayCount(
   output: WriterOutput,
   daysPerWeek: number,
+  /** How many weeks this output should hold: 4 for a whole month, 1 for a
+   *  weekly job (2026-11-24: every weekly job logged a false "Output has 1
+   *  weeks; expected exactly 4", which buried real findings). */
+  expectedWeeks = 4,
 ): AuditResult {
   const violations: string[] = [];
   const weeks = safeWeeks(output);
 
-  if (weeks.length !== 4) {
-    violations.push(`Output has ${weeks.length} weeks; expected exactly 4.`);
+  if (weeks.length !== expectedWeeks) {
+    violations.push(`Output has ${weeks.length} weeks; expected exactly ${expectedWeeks}.`);
   }
 
   const seenWeekNums = new Set<number>();
@@ -1133,6 +1140,8 @@ export interface AuditContext {
    *  must never be programmed (parsed from free-text injuries). Empty/omitted
    *  when no injury constraints. */
   doNotProgram?: string[];
+  /** Weeks the output should hold (default 4; 1 for a weekly job). */
+  expectedWeeks?: number;
 }
 
 export const ALL_AUDITS = [
@@ -1151,7 +1160,7 @@ export const ALL_AUDITS = [
   (ctx: AuditContext): AuditResult => auditSchemeFormat(ctx.output),
   (ctx: AuditContext): AuditResult => auditWorkupTopSet(ctx.output),
   (ctx: AuditContext): AuditResult => auditMetconDuration(ctx.output, ctx.skeleton),
-  (ctx: AuditContext): AuditResult => auditDayCount(ctx.output, ctx.daysPerWeek),
+  (ctx: AuditContext): AuditResult => auditDayCount(ctx.output, ctx.daysPerWeek, ctx.expectedWeeks ?? 4),
   (ctx: AuditContext): AuditResult => auditLoadSanity(ctx.output, ctx.lifts),
   // vocabulary_compliance dropped 2026-05-14 — see chat log. v1 had no
   // vocabulary enforcement; v2 reverted to free movement naming with
