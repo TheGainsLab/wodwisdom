@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import {
   checkDaysPerWeek, DAYS_PER_WEEK_MESSAGE, draftFieldsToRestore, GOAL_BOX_MAX_CHARS,
   intakeSaveAction, sameEquipment, type DraftFields,
+  freshEvaluationNote, generateReminder, FRESH_EVALUATION_NOTE, GENERATE_REMINDER, GENERATE_REMINDER_WITH_FRESH_EVALUATION,
 } from '../src/lib/profileFormRules';
 
 // ── Days per week ──────────────────────────────────────────────────────────
@@ -89,4 +90,26 @@ test('draft: equipment is compared by its ticks, not by the order the keys come 
 
 test('draft: one written before the base was recorded restores as it always did', () => {
   assert.deepEqual(draftFieldsToRestore({ goal: 'typed', days: '4' }, STORED), { goal: 'typed' });
+});
+
+// ── Before the first build ─────────────────────────────────────────────────
+const newMember = { hasProgramming: true, hasProgram: false, hasEvaluation: true, evalCredits: 1 };
+
+test('a new Programming member with an old evaluation is told a fresh one is available', () => {
+  assert.equal(freshEvaluationNote(newMember), FRESH_EVALUATION_NOTE);
+  assert.equal(generateReminder(newMember), GENERATE_REMINDER_WITH_FRESH_EVALUATION);
+});
+
+test('the fresh-evaluation note is not shown to a free member, a member with a program, or one with no credit', () => {
+  assert.equal(freshEvaluationNote({ ...newMember, hasProgramming: false }), null);
+  assert.equal(freshEvaluationNote({ ...newMember, hasProgram: true }), null);
+  assert.equal(freshEvaluationNote({ ...newMember, evalCredits: 0 }), null);
+  // Never ran one: the ordinary run card already asks them to; no "fresh" wording.
+  assert.equal(freshEvaluationNote({ ...newMember, hasEvaluation: false }), null);
+});
+
+test('every member about to build their first program is reminded to review their profile', () => {
+  assert.equal(generateReminder({ ...newMember, evalCredits: 0 }), GENERATE_REMINDER);
+  assert.equal(generateReminder({ ...newMember, hasProgram: true }), null);
+  assert.equal(generateReminder({ ...newMember, hasProgramming: false }), null);
 });

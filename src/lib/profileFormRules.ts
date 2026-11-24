@@ -105,3 +105,41 @@ export function draftFieldsToRestore(draft: StoredDraft, server: DraftFields): P
   }
   return out;
 }
+
+// ── Before the first build ─────────────────────────────────────────────────
+// (2026-11-24) When Programming access is granted to someone with no program
+// yet, the server sets their evaluation count to one (migration
+// 20261124000000). They have to be TOLD: a member who rushed the free
+// evaluation months ago would otherwise build their first program from it.
+
+export const FRESH_EVALUATION_NOTE =
+  'Your Programming plan includes one fresh evaluation. Review and update your profile first, then tap Run New. Your program is built from it.';
+export const GENERATE_REMINDER_WITH_FRESH_EVALUATION =
+  'Before you generate: review and update your profile, then run your fresh evaluation above. Your program is built from it.';
+export const GENERATE_REMINDER =
+  'Before you generate: review your profile and update anything that has changed. Your program is built from it.';
+
+export interface FirstBuildFacts {
+  /** Holds Programming access (not counting admin override). */
+  hasProgramming: boolean;
+  /** A live generated program exists. */
+  hasProgram: boolean;
+  /** At least one evaluation is on file. */
+  hasEvaluation: boolean;
+  /** Evaluation credits left (the real count, not the admin bypass). */
+  evalCredits: number;
+}
+
+/** The note on the evaluation card: only for a Programming member with no
+ *  program yet who already has an evaluation AND a credit to run a new one. */
+export function freshEvaluationNote(f: FirstBuildFacts): string | null {
+  return f.hasProgramming && !f.hasProgram && f.hasEvaluation && f.evalCredits > 0 ? FRESH_EVALUATION_NOTE : null;
+}
+
+/** The reminder beside Generate: every member about to build their first
+ *  program is reminded to review their profile; one with a fresh evaluation
+ *  waiting is pointed at it. Null once a program exists. */
+export function generateReminder(f: FirstBuildFacts): string | null {
+  if (!f.hasProgramming || f.hasProgram) return null;
+  return freshEvaluationNote(f) ? GENERATE_REMINDER_WITH_FRESH_EVALUATION : GENERATE_REMINDER;
+}

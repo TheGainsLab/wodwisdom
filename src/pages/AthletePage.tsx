@@ -13,6 +13,7 @@ import { ATHLETEDATA_PUBLIC_TIER } from '../lib/featureFlags';
 import { isSinceArchive, sinceArchive } from '../lib/programArchive';
 import {
   checkDaysPerWeek, draftFieldsToRestore, GOAL_BOX_MAX_CHARS, intakeSaveAction,
+  freshEvaluationNote, generateReminder,
   type DraftFields, type StoredDraft,
 } from '../lib/profileFormRules';
 
@@ -1914,6 +1915,21 @@ export default function AthletePage({ session }: { session: Session }) {
                             </div>
                             <div style={{ fontSize: 15, fontWeight: 600 }}>Your evaluation is ready</div>
                             {when && <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>Last run: {when}</div>}
+                            {(() => {
+                              // A fresh evaluation came with their Programming plan: say so,
+                              // and ask for a profile review first (2026-11-24).
+                              const note = freshEvaluationNote({
+                                hasProgramming: hasFeature('programming'),
+                                hasProgram: hasGeneratedProgram,
+                                hasEvaluation: true,
+                                evalCredits: evalCreditsRemaining,
+                              });
+                              return note ? (
+                                <div style={{ fontSize: 13, color: 'var(--accent)', marginTop: 6, lineHeight: 1.5, maxWidth: 460 }}>
+                                  {note}
+                                </div>
+                              ) : null;
+                            })()}
                             {!hasEvalCredit && (
                               <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 4 }}>
                                 Subscribers receive ongoing monthly analysis automatically.
@@ -2950,6 +2966,20 @@ export default function AthletePage({ session }: { session: Session }) {
                           Generation takes a few minutes — your full month, warm-ups to cool-downs.
                         </span>
                       )}
+                      {(() => {
+                        // Review the profile before the first build (2026-11-24).
+                        const reminder = ready ? generateReminder({
+                          hasProgramming: hasFeature('programming'),
+                          hasProgram: hasGeneratedProgram,
+                          hasEvaluation: currentEvaluations.length > 0,
+                          evalCredits: evalCreditsRemaining,
+                        }) : null;
+                        return reminder ? (
+                          <span style={{ fontSize: 12, color: 'var(--text)', marginTop: -2, lineHeight: 1.5 }}>
+                            {reminder}
+                          </span>
+                        ) : null;
+                      })()}
                       {ready && !goal.trim() && (
                         <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -6 }}>
                           No goal set — add one in Make it Personal above and the program builds toward it.
