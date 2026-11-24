@@ -18,6 +18,7 @@ import { ChevronLeft, Share2 } from 'lucide-react';
 import type { ProfileProposalData } from '../components/ProfileUpdateCard';
 import type { NoteProposalData } from '../components/CoachNoteCard';
 import { NoteCardHost, ProfileCardHost } from '../components/CoachCards';
+import HumanCoachButton from '../components/HumanCoachButton';
 import { noteProposalFromEvent, profileProposalFromEvent } from '../lib/coachCards';
 
 interface CoachMessage {
@@ -232,6 +233,8 @@ function CoachChat({ engineProgramDay, autoQuestion, modality, units, targetPace
           </svg>
         </button>
       </div>
+      {/* The coach points members to this button "here in the chat". */}
+      <HumanCoachButton />
     </div>
   );
 }
