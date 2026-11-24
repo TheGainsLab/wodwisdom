@@ -11,7 +11,7 @@ import { loadCoachNotes, type CoachNote } from '../lib/coachNotes';
 import WorkoutBlocksDisplay, { BlockContent } from '../components/WorkoutBlocksDisplay';
 import { BlockCoachingBody, coachingForBlockType, formatReviewMarkdown, CHEVRON_DOWN, type ReviewBlock } from '../components/reviewCoaching';
 import { useWorkoutReview } from '../lib/useWorkoutReview';
-import { weekArrivalText } from '../lib/weekSchedule';
+import { coachNotesWeeks, weekArrivalText } from '../lib/weekSchedule';
 import { UNCOUNTED_BLOCK_TYPES_FILTER } from '../../supabase/functions/_shared/day-block-count.ts';
 import BlockLog, { type DayLogController, type SavedBlockSnapshot, loggedMovementNames, blockFullyLogged, isLoggableBlock, isRowLoggerBlock } from '../components/blockLog';
 import { formatArchiveDate } from '../lib/programArchive';
@@ -279,16 +279,18 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
     const week = Math.min(...outline.filter((w) => (w.month_number ?? 1) === month).map((w) => w.week_num));
     return arrivalFor(month, week);
   })();
-  // The week in progress = the latest WRITTEN week of the program (outline
-  // weeks don't count). Only this week carries the "tell your coach" box;
-  // it stays here through the hour between the last log and the next fill.
-  const currentNotesWeek = allWorkouts.reduce((best, w) => {
-    if (w.status === 'outline') return best;
-    const n = ((w.month_number ?? 1) - 1) * 4 + (w.week_num || 1);
-    return n > best ? n : best;
-  }, 0);
   const [completedWorkoutIds, setCompletedWorkoutIds] = useState<Set<string>>(new Set());
   const [inProgressWorkouts, setInProgressWorkouts] = useState<Map<string, { logId: string; savedCount: number; totalBlocks: number }>>(new Map());
+  // The weeks that carry an open "tell your coach" box: the latest written
+  // week, and the earliest written week that still has a day not done (see
+  // coachNotesWeeks). "Done" is the page's own rule for a finished day.
+  const notesWeeks = coachNotesWeeks(allWorkouts.map((w) => {
+    const ip = inProgressWorkouts.get(w.id);
+    return {
+      month_number: w.month_number, week_num: w.week_num, status: w.status,
+      done: completedWorkoutIds.has(w.id) || (!!ip && ip.totalBlocks > 0 && ip.savedCount >= ip.totalBlocks),
+    };
+  }));
   const [workoutBlocks, setWorkoutBlocks] = useState<Map<string, ProgramBlock[]>>(new Map());
   // v3-only: structured blocks + movements per program_workout_id.
   const [v3BlocksByWorkout, setV3BlocksByWorkout] = useState<Map<string, ProgramBlockV2[]>>(new Map());
@@ -1343,7 +1345,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                           if (isOutlineWeek) return null;
                           const weekNotes = coachNotes.filter((n) => n.week_num === week.weekNum && (n.program_id == null || n.program_id === id));
                           if (archived && weekNotes.length === 0) return null;
-                          if (archived || week.weekNum !== currentNotesWeek) {
+                          if (archived || !notesWeeks.has(week.weekNum)) {
                             return <CoachNotesBox readOnly notes={weekNotes} programId={id ?? null} weekNum={week.weekNum} onChange={() => {}} />;
                           }
                           return (

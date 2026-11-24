@@ -62,3 +62,29 @@ export function weekArrivalText(f: WeekArrivalFacts): string {
     ? `Written after week ${f.previousWeekLabel}, on ${fmt(by)} at the latest.`
     : `Written after week ${f.previousWeekLabel}.`;
 }
+
+// ── Where the "Tell your coach" box sits ────────────────────────────────────
+/**
+ * The weeks that carry an open "Tell your coach" box (2026-11-24).
+ *
+ * It used to sit on the latest WRITTEN week only. When the clock wrote week 3
+ * while a member was still working through week 2, the box moved to week 3
+ * and the week they were actually training had none. It now sits on both:
+ *  - the latest written week, and
+ *  - the earliest written week that still has a day not done.
+ * A note is read at the next write whichever week it is typed under.
+ *
+ * Week numbers are the ones the page shows ((month − 1) × 4 + week).
+ */
+export function coachNotesWeeks(
+  days: Array<{ month_number?: number | null; week_num: number; status?: string | null; done: boolean }>,
+): Set<number> {
+  const written = days.filter((d) => d.status !== 'outline');
+  const label = (d: { month_number?: number | null; week_num: number }) => ((d.month_number ?? 1) - 1) * 4 + (d.week_num || 1);
+  const out = new Set<number>();
+  if (written.length === 0) return out;
+  out.add(Math.max(...written.map(label)));
+  const open = written.filter((d) => !d.done).map(label);
+  if (open.length > 0) out.add(Math.min(...open));
+  return out;
+}
