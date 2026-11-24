@@ -10,6 +10,7 @@ import {
   type ProgramBlockV2, type ProgramMovementV2,
 } from './ProgramDetailPage';
 import type { DayLogController, SaveBlockPayload, SavedBlockSnapshot, SavedEntrySnapshot } from '../components/blockLog';
+import { loadStimulusNotes } from '../lib/stimulusNotes';
 
 // DayPage — the single surface for an AI-programming training day. Renders the
 // real V3DayView (colored cards + per-block Edit / Coach ▾ + Session
@@ -63,6 +64,9 @@ export default function DayPage(_props: { session: Session }) {
       const blks = ((blockRows as (ProgramBlockV2 & { program_workout_id: string })[] | null) ?? []).map(b => ({ ...b, movements: [] as ProgramMovementV2[] }));
       if (blks.length) {
         const blockIds = blks.map(b => b.id);
+        // Each conditioning piece's purpose note, read on its own (stimulusNotes.ts).
+        const stimulusNotes = await loadStimulusNotes(blks.filter(b => b.block_type === 'metcon').map(b => b.id));
+        for (const b of blks) b.stimulus_note = stimulusNotes.get(b.id) ?? null;
         const { data: movRows } = await supabase
           .from('program_movements_v2').select(MOVEMENT_SELECT).in('block_id', blockIds).order('sort_order');
         const byBlock = new Map<string, ProgramMovementV2[]>();

@@ -12,6 +12,7 @@ import WorkoutBlocksDisplay, { BlockContent } from '../components/WorkoutBlocksD
 import { BlockCoachingBody, coachingForBlockType, formatReviewMarkdown, CHEVRON_DOWN, type ReviewBlock } from '../components/reviewCoaching';
 import { useWorkoutReview } from '../lib/useWorkoutReview';
 import { coachNotesWeeks, weekArrivalText } from '../lib/weekSchedule';
+import { loadStimulusNotes } from '../lib/stimulusNotes';
 import { UNCOUNTED_BLOCK_TYPES_FILTER } from '../../supabase/functions/_shared/day-block-count.ts';
 import BlockLog, { type DayLogController, type SavedBlockSnapshot, loggedMovementNames, blockFullyLogged, isLoggableBlock, isRowLoggerBlock } from '../components/blockLog';
 import { formatArchiveDate } from '../lib/programArchive';
@@ -96,6 +97,8 @@ export interface ProgramBlockV2 {
   scheme_format?: SchemeFormatV2 | null;
   time_cap_seconds: number | null;
   block_notes: string | null;
+  /** A composed metcon's purpose and pacing, written for the athlete. */
+  stimulus_note?: string | null;
   sort_order: number;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   expected_benchmark: any | null;
@@ -655,6 +658,10 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
 
     const allBlocks = v3Blocks.map((b) => ({ ...b, movements: [] as ProgramMovementV2[] }));
     const blockIds = allBlocks.map((b) => b.id);
+    // The purpose note of each conditioning piece, read on its own (see
+    // stimulusNotes.ts): metcon blocks only, and never blocks the page.
+    const stimulusNotes = await loadStimulusNotes(allBlocks.filter((b) => b.block_type === 'metcon').map((b) => b.id));
+    for (const b of allBlocks) (b as { stimulus_note?: string | null }).stimulus_note = stimulusNotes.get(b.id) ?? null;
     // Only in-progress logs need block tallies; completed ones just need the id.
     const inProgress = logs.filter((l) => l.status === 'in_progress' && l.source_id);
 
@@ -1965,6 +1972,13 @@ function V3BlockCard({ block, onUpdateMovement, onUpdateBlock, onAddMovement, on
         />
       ) : (
         block.block_scheme && <div style={schemeStyle}>{block.block_scheme}</div>
+      )}
+      {/* The piece's purpose and pacing, written for the athlete (2026-11-24).
+          It used to be saved only in block_notes, which is never shown. */}
+      {block.block_type === 'metcon' && block.stimulus_note && !editing && (
+        <div style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.5, margin: '4px 0 8px' }}>
+          <span style={{ fontWeight: 700, color: 'var(--text)' }}>Purpose: </span>{block.stimulus_note}
+        </div>
       )}
       {/* block_notes is the writer's internal reasoning (load math, percentile/
           ratio justification) — kept in the DB for admin/eval, not shown to the
