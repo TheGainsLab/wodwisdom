@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import {
   checkDaysPerWeek, DAYS_PER_WEEK_MESSAGE, draftFieldsToRestore, GOAL_BOX_MAX_CHARS,
   intakeSaveAction, sameEquipment, type DraftFields,
-  generateOutcomeMessage, GENERATE_FAILED_MESSAGE, GENERATE_NOT_STARTED_MESSAGE, GENERATE_UNKNOWN_MESSAGE,
+  generateOutcomeMessage, GENERATE_FAILED_MESSAGE, GENERATE_NOT_STARTED_MESSAGE, afterLostContact,
   freshEvaluationNote, generateReminder, FRESH_EVALUATION_NOTE, GENERATE_REMINDER, GENERATE_REMINDER_WITH_FRESH_EVALUATION,
 } from '../src/lib/profileFormRules';
 
@@ -122,13 +122,6 @@ test('a failed build is described in plain words, and says the team was notified
   assert.match(GENERATE_FAILED_MESSAGE, /team has been notified/);
 });
 
-test('losing track of a build does not claim it failed or that anyone was notified', () => {
-  const m = generateOutcomeMessage({ kind: 'unknown' });
-  assert.equal(m, GENERATE_UNKNOWN_MESSAGE);
-  assert.doesNotMatch(m, /notified/);
-  assert.match(m, /may still be on its way/);
-});
-
 test("a refusal the server worded for the member is shown as written", () => {
   assert.equal(generateOutcomeMessage({ kind: 'refused', code: 'EVALUATION_REQUIRED', message: 'Run your evaluation first — your new program is built from it.' }),
     'Run your evaluation first — your new program is built from it.');
@@ -139,4 +132,24 @@ test('any other refusal never shows internal text, and does not claim the team w
   assert.equal(m, GENERATE_NOT_STARTED_MESSAGE);
   assert.doesNotMatch(m, /notified|TypeError/);
   assert.equal(generateOutcomeMessage({ kind: 'refused', message: '  ' }), GENERATE_NOT_STARTED_MESSAGE);
+});
+
+// ── The page lost contact with a build ─────────────────────────────────────
+const lost = { hasProgram: false, jobStatus: 'processing', jobIsFresh: true, rewatches: 0 };
+
+test('lost contact: a finished program is opened, whatever the job says', () => {
+  assert.equal(afterLostContact({ ...lost, hasProgram: true }), 'go_to_program');
+  assert.equal(afterLostContact({ ...lost, hasProgram: true, jobStatus: null }), 'go_to_program');
+});
+
+test('lost contact: a build that is still running keeps the button on Generating', () => {
+  assert.equal(afterLostContact(lost), 'keep_watching');
+});
+
+test('lost contact: the member is told only when the build failed', () => {
+  assert.equal(afterLostContact({ ...lost, jobStatus: 'failed' }), 'show_failed');
+  // Unknown, gone quiet, or watched three times already: reset, say nothing.
+  assert.equal(afterLostContact({ ...lost, jobStatus: null }), 'reset_quietly');
+  assert.equal(afterLostContact({ ...lost, jobIsFresh: false }), 'reset_quietly');
+  assert.equal(afterLostContact({ ...lost, rewatches: 3 }), 'reset_quietly');
 });

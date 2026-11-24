@@ -14,6 +14,7 @@ import { isSinceArchive, sinceArchive } from '../lib/programArchive';
 import {
   checkDaysPerWeek, draftFieldsToRestore, GOAL_BOX_MAX_CHARS, intakeSaveAction,
   freshEvaluationNote, generateReminder, generateOutcomeMessage,
+  afterLostContact, STATUS_CHECK_FAILURES_BEFORE_LOOKUP,
   type DraftFields, type StoredDraft,
 } from '../lib/profileFormRules';
 
@@ -912,52 +913,90 @@ export default function AthletePage({ session }: { session: Session }) {
   // Polls a generation job to completion and lands the athlete on the program.
   // Shared by the click path and the load-time reattach below: owns the
   // error/loading lifecycle so both entry points behave identically.
-  const pollGenerationJob = async (jobId: string) => {
+  // The page lost contact with a build: look up what really happened and act
+  // on it. The member is told something only when the build failed.
+  const resolveLostBuild = async (jobId: string, rewatches: number): Promise<void> => {
+    let hasProgram = false;
+    let programId: string | null = null;
+    let jobStatus: string | null = null;
+    let jobIsFresh = false;
     try {
-      // Backoff: 3s, 4s, 5s, ... capped at 8s. Budget must exceed the real
-      // end-to-end job time: a 4-day athlete runs ~13 min wall-clock, a heavy
-      // 6-day athlete longer. 150 attempts × ~8s ≈ 20 min, comfortably clear.
-      let delay = 3000;
-      const maxDelay = 8000;
-      const maxAttempts = 150; // ~20 min worth of polling
-      for (let i = 0; i < maxAttempts; i++) {
-        await new Promise((r) => setTimeout(r, delay));
-        const { data: status, error: statusErr } = await supabase.functions.invoke('program-job-status', {
-          body: { job_id: jobId },
-        });
-        // A status check that cannot be made is not a failed build: the job
-        // may still be running. Say so, without claiming it failed.
-        if (statusErr || (status?.error && status?.status !== 'failed')) {
-          console.error('[AthletePage] generation status check failed:', statusErr?.message ?? status?.error);
-          setGenerateNotice(generateOutcomeMessage({ kind: 'unknown' }));
-          return;
-        }
-
-        if (status?.status === 'complete') {
-          if (status.program_id) {
-            navigate(`/programs/${status.program_id}`);
-            return;
-          }
-          console.error('[AthletePage] generation completed with no program id');
-          setGenerateNotice(generateOutcomeMessage({ kind: 'unknown' }));
-          return;
-        }
-        if (status?.status === 'failed') {
-          // The raw error is for the console; the server has emailed the team.
-          console.error('[AthletePage] generation failed:', status.error);
-          setGenerateNotice(generateOutcomeMessage({ kind: 'failed' }));
-          return;
-        }
-        // Still pending/processing — back off slightly
-        delay = Math.min(delay + 1000, maxDelay);
-      }
-      setGenerateNotice(generateOutcomeMessage({ kind: 'unknown' }));
+      const [progRes, jobRes] = await Promise.all([
+        supabase.from('programs').select('id').eq('user_id', session.user.id)
+          .eq('source', 'generated').is('archived_at', null)
+          .order('created_at', { ascending: false }).limit(1),
+        supabase.from('program_jobs').select('status, updated_at').eq('id', jobId).maybeSingle(),
+      ]);
+      programId = progRes.data?.[0]?.id ?? null;
+      hasProgram = !!programId;
+      jobStatus = (jobRes.data?.status as string | undefined) ?? null;
+      const updated = jobRes.data?.updated_at ? Date.parse(jobRes.data.updated_at as string) : NaN;
+      // Same 30-minute "still running" window the server uses.
+      jobIsFresh = Number.isFinite(updated) && Date.now() - updated < 30 * 60 * 1000;
     } catch (err) {
-      console.error('[AthletePage] generation polling threw:', err);
-      setGenerateNotice(generateOutcomeMessage({ kind: 'unknown' }));
-    } finally {
-      setGenerateLoading(false);
+      console.error('[AthletePage] could not look up the build:', err);
     }
+    const action = afterLostContact({ hasProgram, jobStatus, jobIsFresh, rewatches });
+    if (action === 'go_to_program' && programId) {
+      setHasGeneratedProgram(true);
+      navigate(`/programs/${programId}`);
+      return;
+    }
+    if (action === 'keep_watching') {
+      await pollGenerationJob(jobId, rewatches + 1);
+      return;
+    }
+    if (action === 'show_failed') setGenerateNotice(generateOutcomeMessage({ kind: 'failed' }));
+    setGenerateLoading(false);
+  };
+
+  // Polls a generation job to completion and lands the athlete on the program.
+  // Shared by the click path and the load-time reattach below: owns the
+  // error/loading lifecycle so both entry points behave identically.
+  const pollGenerationJob = async (jobId: string, rewatches = 0): Promise<void> => {
+    // Backoff: 3s, 4s, 5s, ... capped at 8s. Budget must exceed the real
+    // end-to-end job time: a 4-day athlete runs ~13 min wall-clock, a heavy
+    // 6-day athlete longer. 150 attempts × ~8s ≈ 20 min, comfortably clear.
+    let delay = 3000;
+    const maxDelay = 8000;
+    const maxAttempts = 150; // ~20 min worth of polling
+    let failedChecks = 0;
+    for (let i = 0; i < maxAttempts; i++) {
+      await new Promise((r) => setTimeout(r, delay));
+      delay = Math.min(delay + 1000, maxDelay);
+      let status: { status?: string; program_id?: string; error?: string } | null = null;
+      let checkFailed = false;
+      try {
+        const res = await supabase.functions.invoke('program-job-status', { body: { job_id: jobId } });
+        status = res.data;
+        checkFailed = !!res.error || (!!status?.error && status?.status !== 'failed');
+      } catch {
+        checkFailed = true;
+      }
+      // One dropped request must not end the watch (2026-11-24): keep
+      // checking, and only after several in a row look the build up directly.
+      if (checkFailed) {
+        failedChecks++;
+        if (failedChecks >= STATUS_CHECK_FAILURES_BEFORE_LOOKUP) break;
+        continue;
+      }
+      failedChecks = 0;
+
+      if (status?.status === 'complete' && status.program_id) {
+        navigate(`/programs/${status.program_id}`);
+        return;
+      }
+      if (status?.status === 'complete') break; // no id returned: look it up
+      if (status?.status === 'failed') {
+        // The raw error is for the console; the server has emailed the team.
+        console.error('[AthletePage] generation failed:', status.error);
+        setGenerateNotice(generateOutcomeMessage({ kind: 'failed' }));
+        setGenerateLoading(false);
+        return;
+      }
+      // Still pending/processing.
+    }
+    await resolveLostBuild(jobId, rewatches);
   };
 
   const loadProfile = useCallback(() => {
@@ -1407,10 +1446,23 @@ export default function AthletePage({ session }: { session: Session }) {
       // error surfacing, clearing the loading state).
       await pollGenerationJob(jobId);
     } catch (err) {
-      // The request itself could not be made (no connection).
+      // The request threw. It may still have started a build on the server
+      // (a timeout after the job was created), so look before saying anything.
       console.error('[AthletePage] generation request threw:', err);
-      setGenerateNotice(generateOutcomeMessage({ kind: 'unknown' }));
-      setGenerateLoading(false);
+      let inFlightId: string | null = null;
+      try {
+        const { data } = await supabase.from('program_jobs').select('id')
+          .eq('user_id', session.user.id).eq('status', 'processing')
+          .gte('updated_at', new Date(Date.now() - 30 * 60 * 1000).toISOString())
+          .order('created_at', { ascending: false }).limit(1).maybeSingle();
+        inFlightId = data?.id ?? null;
+      } catch { /* no connection: fall through */ }
+      if (inFlightId) {
+        await pollGenerationJob(inFlightId);
+      } else {
+        setGenerateNotice(generateOutcomeMessage({ kind: 'refused' }));
+        setGenerateLoading(false);
+      }
     }
   };
 

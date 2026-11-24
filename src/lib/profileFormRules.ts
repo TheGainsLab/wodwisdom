@@ -154,12 +154,6 @@ export function generateReminder(f: FirstBuildFacts): string | null {
  *  happens, so "has been notified" is true. */
 export const GENERATE_FAILED_MESSAGE =
   'Generation not completed. Tap Generate to try again. Our team has been notified.';
-/** The page stopped hearing about the build (it ran long, or the connection
- *  dropped). The build may still finish, and no alert was sent, so this must
- *  not claim either a failure or a notification. */
-export const GENERATE_UNKNOWN_MESSAGE =
-  'This is taking longer than usual. Your program may still be on its way. Refresh this page in a few minutes before trying again.';
-
 /** The build never started (the request was rejected or errored before a job
  *  existed). No alert is sent for this, so it must not say the team knows. */
 export const GENERATE_NOT_STARTED_MESSAGE = 'Generation not completed. Tap Generate to try again.';
@@ -171,15 +165,46 @@ const MEMBER_WORDED_REFUSALS = new Set(['EVALUATION_REQUIRED', 'PROGRAM_ARCHIVED
 export type GenerateOutcome =
   /** The job ended as failed. */
   | { kind: 'failed' }
-  /** Polling ran out or a status check could not be made. */
-  | { kind: 'unknown' }
   /** The server did not start a build. `code` is its error code. */
   | { kind: 'refused'; code?: string | null; message?: string | null };
 
 /** What the member is shown beside the Generate button. Never the raw error. */
 export function generateOutcomeMessage(o: GenerateOutcome): string {
   if (o.kind === 'failed') return GENERATE_FAILED_MESSAGE;
-  if (o.kind === 'unknown') return GENERATE_UNKNOWN_MESSAGE;
   const m = (o.message ?? '').trim();
   return m && MEMBER_WORDED_REFUSALS.has(o.code ?? '') ? m : GENERATE_NOT_STARTED_MESSAGE;
+}
+
+/** How many status checks in a row may fail before the page stops trusting
+ *  its own watch and looks the build up directly. One dropped request on a
+ *  phone must not end the watch. */
+export const STATUS_CHECK_FAILURES_BEFORE_LOOKUP = 5;
+
+/**
+ * The page lost contact with a build (status checks kept failing, or the
+ * watch ran its full time). It looks up the real state and acts on it; the
+ * member is told something ONLY when the build failed (founder, 2026-11-24).
+ *
+ *  - a program exists           → go to it
+ *  - the build is still running → keep watching (button stays on Generating…)
+ *  - the build failed           → the failure message
+ *  - nothing can be established → reset the button, say nothing
+ */
+export type LostContactAction = 'go_to_program' | 'keep_watching' | 'show_failed' | 'reset_quietly';
+
+export function afterLostContact(facts: {
+  /** A live generated program now exists for the member. */
+  hasProgram: boolean;
+  /** The job's status as read directly, or null if it could not be read. */
+  jobStatus: string | null;
+  /** The job reported progress within the server's own "still running" window. */
+  jobIsFresh: boolean;
+  /** How many times the page has already gone back to watching this build. */
+  rewatches: number;
+}): LostContactAction {
+  if (facts.hasProgram) return 'go_to_program';
+  if (facts.jobStatus === 'failed') return 'show_failed';
+  const running = facts.jobStatus === 'processing' || facts.jobStatus === 'pending';
+  if (running && facts.jobIsFresh && facts.rewatches < 3) return 'keep_watching';
+  return 'reset_quietly';
 }
