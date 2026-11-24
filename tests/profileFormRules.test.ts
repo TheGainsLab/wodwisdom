@@ -7,6 +7,8 @@ import assert from 'node:assert/strict';
 import {
   checkDaysPerWeek, DAYS_PER_WEEK_MESSAGE, draftFieldsToRestore, GOAL_BOX_MAX_CHARS,
   intakeSaveAction, sameEquipment, type DraftFields,
+  generateOutcomeMessage, GENERATE_FAILED_MESSAGE, GENERATE_NOT_STARTED_MESSAGE, afterLostContact,
+  freshEvaluationNote, generateReminder, FRESH_EVALUATION_NOTE, GENERATE_REMINDER, GENERATE_REMINDER_WITH_FRESH_EVALUATION,
 } from '../src/lib/profileFormRules';
 
 // ── Days per week ──────────────────────────────────────────────────────────
@@ -89,4 +91,65 @@ test('draft: equipment is compared by its ticks, not by the order the keys come 
 
 test('draft: one written before the base was recorded restores as it always did', () => {
   assert.deepEqual(draftFieldsToRestore({ goal: 'typed', days: '4' }, STORED), { goal: 'typed' });
+});
+
+// ── Before the first build ─────────────────────────────────────────────────
+const newMember = { hasProgramming: true, hasProgram: false, hasEvaluation: true, evalCredits: 1 };
+
+test('a new Programming member with an old evaluation is told a fresh one is available', () => {
+  assert.equal(freshEvaluationNote(newMember), FRESH_EVALUATION_NOTE);
+  assert.equal(generateReminder(newMember), GENERATE_REMINDER_WITH_FRESH_EVALUATION);
+});
+
+test('the fresh-evaluation note is not shown to a free member, a member with a program, or one with no credit', () => {
+  assert.equal(freshEvaluationNote({ ...newMember, hasProgramming: false }), null);
+  assert.equal(freshEvaluationNote({ ...newMember, hasProgram: true }), null);
+  assert.equal(freshEvaluationNote({ ...newMember, evalCredits: 0 }), null);
+  // Never ran one: the ordinary run card already asks them to; no "fresh" wording.
+  assert.equal(freshEvaluationNote({ ...newMember, hasEvaluation: false }), null);
+});
+
+test('every member about to build their first program is reminded to review their profile', () => {
+  assert.equal(generateReminder({ ...newMember, evalCredits: 0 }), GENERATE_REMINDER);
+  assert.equal(generateReminder({ ...newMember, hasProgram: true }), null);
+  assert.equal(generateReminder({ ...newMember, hasProgramming: false }), null);
+});
+
+// ── A first build that did not finish ──────────────────────────────────────
+test('a failed build is described in plain words, and says the team was notified', () => {
+  assert.equal(generateOutcomeMessage({ kind: 'failed' }), GENERATE_FAILED_MESSAGE);
+  assert.match(GENERATE_FAILED_MESSAGE, /Tap Generate to try again/);
+  assert.match(GENERATE_FAILED_MESSAGE, /team has been notified/);
+});
+
+test("a refusal the server worded for the member is shown as written", () => {
+  assert.equal(generateOutcomeMessage({ kind: 'refused', code: 'EVALUATION_REQUIRED', message: 'Run your evaluation first — your new program is built from it.' }),
+    'Run your evaluation first — your new program is built from it.');
+});
+
+test('any other refusal never shows internal text, and does not claim the team was notified', () => {
+  const m = generateOutcomeMessage({ kind: 'refused', code: 'GENERATION_FAILED', message: 'TypeError: cannot read properties of undefined' });
+  assert.equal(m, GENERATE_NOT_STARTED_MESSAGE);
+  assert.doesNotMatch(m, /notified|TypeError/);
+  assert.equal(generateOutcomeMessage({ kind: 'refused', message: '  ' }), GENERATE_NOT_STARTED_MESSAGE);
+});
+
+// ── The page lost contact with a build ─────────────────────────────────────
+const lost = { hasProgram: false, jobStatus: 'processing', jobIsFresh: true, rewatches: 0 };
+
+test('lost contact: a finished program is opened, whatever the job says', () => {
+  assert.equal(afterLostContact({ ...lost, hasProgram: true }), 'go_to_program');
+  assert.equal(afterLostContact({ ...lost, hasProgram: true, jobStatus: null }), 'go_to_program');
+});
+
+test('lost contact: a build that is still running keeps the button on Generating', () => {
+  assert.equal(afterLostContact(lost), 'keep_watching');
+});
+
+test('lost contact: the member is told only when the build failed', () => {
+  assert.equal(afterLostContact({ ...lost, jobStatus: 'failed' }), 'show_failed');
+  // Unknown, gone quiet, or watched three times already: reset, say nothing.
+  assert.equal(afterLostContact({ ...lost, jobStatus: null }), 'reset_quietly');
+  assert.equal(afterLostContact({ ...lost, jobIsFresh: false }), 'reset_quietly');
+  assert.equal(afterLostContact({ ...lost, rewatches: 3 }), 'reset_quietly');
 });

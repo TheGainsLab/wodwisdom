@@ -13,8 +13,11 @@ import { ATHLETEDATA_PUBLIC_TIER } from '../lib/featureFlags';
 import { isSinceArchive, sinceArchive } from '../lib/programArchive';
 import {
   checkDaysPerWeek, draftFieldsToRestore, GOAL_BOX_MAX_CHARS, intakeSaveAction,
+  freshEvaluationNote, generateReminder, generateOutcomeMessage,
+  afterLostContact, STATUS_CHECK_FAILURES_BEFORE_LOOKUP,
   type DraftFields, type StoredDraft,
 } from '../lib/profileFormRules';
+import { changedBySave, saveEffectNotes, NO_SAVE_EFFECT, type SaveEffectNotes } from '../lib/profileSaveEffect';
 
 /** The session length the slider shows before the athlete touches it — and what is saved if they never do. */
 const DEFAULT_SESSION_LENGTH_MINUTES = 60;
@@ -773,6 +776,9 @@ export default function AthletePage({ session }: { session: Session }) {
   const [t3IntroSeenAt, setT3IntroSeenAt] = useState<string | null>('pending');
   const [condSectionOpen, setCondSectionOpen] = useState(false);
   const [generateLoading, setGenerateLoading] = useState(false);
+  // What happened to the last first-build attempt, in member words, shown
+  // beside the Generate button (never the raw server error).
+  const [generateNotice, setGenerateNotice] = useState('');
   const [hasGeneratedProgram, setHasGeneratedProgram] = useState(false);
   // "This cycle's plan" — the coach-state priorities, rendered next to the
   // evaluation (founder, 2026-10-13: the program page is for examining the
@@ -830,6 +836,9 @@ export default function AthletePage({ session }: { session: Session }) {
   // Each draft records them, so a later load can tell "the member typed over
   // this value" from "this value changed underneath an old draft" (2026-11-23).
   const serverBaseRef = useRef<DraftFields>({ days: '', len: '', goal: '', injuries: '', equipment: {} });
+  // After a save by a member whose program is running: what the save changes
+  // and when, shown under the card it belongs to (src/lib/profileSaveEffect).
+  const [saveEffect, setSaveEffect] = useState<SaveEffectNotes>(NO_SAVE_EFFECT);
   const [intakeSaving, setIntakeSaving] = useState(false);
   const [intakeError, setIntakeError] = useState('');
 
@@ -908,41 +917,90 @@ export default function AthletePage({ session }: { session: Session }) {
   // Polls a generation job to completion and lands the athlete on the program.
   // Shared by the click path and the load-time reattach below: owns the
   // error/loading lifecycle so both entry points behave identically.
-  const pollGenerationJob = async (jobId: string) => {
+  // The page lost contact with a build: look up what really happened and act
+  // on it. The member is told something only when the build failed.
+  const resolveLostBuild = async (jobId: string, rewatches: number): Promise<void> => {
+    let hasProgram = false;
+    let programId: string | null = null;
+    let jobStatus: string | null = null;
+    let jobIsFresh = false;
     try {
-      // Backoff: 3s, 4s, 5s, ... capped at 8s. Budget must exceed the real
-      // end-to-end job time: a 4-day athlete runs ~13 min wall-clock, a heavy
-      // 6-day athlete longer. 150 attempts × ~8s ≈ 20 min, comfortably clear.
-      let delay = 3000;
-      const maxDelay = 8000;
-      const maxAttempts = 150; // ~20 min worth of polling
-      for (let i = 0; i < maxAttempts; i++) {
-        await new Promise((r) => setTimeout(r, delay));
-        const { data: status, error: statusErr } = await supabase.functions.invoke('program-job-status', {
-          body: { job_id: jobId },
-        });
-        if (statusErr) throw new Error(statusErr.message || 'Failed to check job status');
-        if (status?.error && status?.status !== 'failed') throw new Error(status.error);
-
-        if (status?.status === 'complete') {
-          if (status.program_id) {
-            navigate(`/programs/${status.program_id}`);
-            return;
-          }
-          throw new Error('Program completed but no ID returned');
-        }
-        if (status?.status === 'failed') {
-          throw new Error(status.error || 'Program generation failed');
-        }
-        // Still pending/processing — back off slightly
-        delay = Math.min(delay + 1000, maxDelay);
-      }
-      throw new Error('Program generation timed out');
+      const [progRes, jobRes] = await Promise.all([
+        supabase.from('programs').select('id').eq('user_id', session.user.id)
+          .eq('source', 'generated').is('archived_at', null)
+          .order('created_at', { ascending: false }).limit(1),
+        supabase.from('program_jobs').select('status, updated_at').eq('id', jobId).maybeSingle(),
+      ]);
+      programId = progRes.data?.[0]?.id ?? null;
+      hasProgram = !!programId;
+      jobStatus = (jobRes.data?.status as string | undefined) ?? null;
+      const updated = jobRes.data?.updated_at ? Date.parse(jobRes.data.updated_at as string) : NaN;
+      // Same 30-minute "still running" window the server uses.
+      jobIsFresh = Number.isFinite(updated) && Date.now() - updated < 30 * 60 * 1000;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to generate program');
-    } finally {
-      setGenerateLoading(false);
+      console.error('[AthletePage] could not look up the build:', err);
     }
+    const action = afterLostContact({ hasProgram, jobStatus, jobIsFresh, rewatches });
+    if (action === 'go_to_program' && programId) {
+      setHasGeneratedProgram(true);
+      navigate(`/programs/${programId}`);
+      return;
+    }
+    if (action === 'keep_watching') {
+      await pollGenerationJob(jobId, rewatches + 1);
+      return;
+    }
+    if (action === 'show_failed') setGenerateNotice(generateOutcomeMessage({ kind: 'failed' }));
+    setGenerateLoading(false);
+  };
+
+  // Polls a generation job to completion and lands the athlete on the program.
+  // Shared by the click path and the load-time reattach below: owns the
+  // error/loading lifecycle so both entry points behave identically.
+  const pollGenerationJob = async (jobId: string, rewatches = 0): Promise<void> => {
+    // Backoff: 3s, 4s, 5s, ... capped at 8s. Budget must exceed the real
+    // end-to-end job time: a 4-day athlete runs ~13 min wall-clock, a heavy
+    // 6-day athlete longer. 150 attempts × ~8s ≈ 20 min, comfortably clear.
+    let delay = 3000;
+    const maxDelay = 8000;
+    const maxAttempts = 150; // ~20 min worth of polling
+    let failedChecks = 0;
+    for (let i = 0; i < maxAttempts; i++) {
+      await new Promise((r) => setTimeout(r, delay));
+      delay = Math.min(delay + 1000, maxDelay);
+      let status: { status?: string; program_id?: string; error?: string } | null = null;
+      let checkFailed = false;
+      try {
+        const res = await supabase.functions.invoke('program-job-status', { body: { job_id: jobId } });
+        status = res.data;
+        checkFailed = !!res.error || (!!status?.error && status?.status !== 'failed');
+      } catch {
+        checkFailed = true;
+      }
+      // One dropped request must not end the watch (2026-11-24): keep
+      // checking, and only after several in a row look the build up directly.
+      if (checkFailed) {
+        failedChecks++;
+        if (failedChecks >= STATUS_CHECK_FAILURES_BEFORE_LOOKUP) break;
+        continue;
+      }
+      failedChecks = 0;
+
+      if (status?.status === 'complete' && status.program_id) {
+        navigate(`/programs/${status.program_id}`);
+        return;
+      }
+      if (status?.status === 'complete') break; // no id returned: look it up
+      if (status?.status === 'failed') {
+        // The raw error is for the console; the server has emailed the team.
+        console.error('[AthletePage] generation failed:', status.error);
+        setGenerateNotice(generateOutcomeMessage({ kind: 'failed' }));
+        setGenerateLoading(false);
+        return;
+      }
+      // Still pending/processing.
+    }
+    await resolveLostBuild(jobId, rewatches);
   };
 
   const loadProfile = useCallback(() => {
@@ -1337,6 +1395,7 @@ export default function AthletePage({ session }: { session: Session }) {
   const handleGenerateProgram = async () => {
     setGenerateLoading(true);
     setError('');
+    setGenerateNotice('');
     // Unsaved edits ride along: the last-call flow sends athletes to the
     // goal box right before generating, and a goal typed but not saved
     // must never be silently missing from the program it was written for.
@@ -1367,19 +1426,47 @@ export default function AthletePage({ session }: { session: Session }) {
         if (body?.error === 'GENERATION_IN_PROGRESS' && body.job_id) {
           jobId = body.job_id;
         } else {
-          throw new Error(body?.message || error.message || 'Failed to generate program');
+          // The server refused to start. Its `message` is written for the
+          // member ("Run your evaluation first…"); anything else stays in the console.
+          console.error('[AthletePage] generation refused:', body?.error ?? error.message);
+          setGenerateNotice(generateOutcomeMessage({ kind: 'refused', code: body?.error, message: body?.message }));
+          setGenerateLoading(false);
+          return;
         }
       } else if (data?.error) {
-        throw new Error(data.message || data.error || 'Failed to generate program');
+        console.error('[AthletePage] generation refused:', data.error);
+        setGenerateNotice(generateOutcomeMessage({ kind: 'refused', code: data.error, message: data.message }));
+        setGenerateLoading(false);
+        return;
       }
-      if (!jobId) throw new Error('No job ID returned');
+      if (!jobId) {
+        console.error('[AthletePage] generation started with no job id');
+        setGenerateNotice(generateOutcomeMessage({ kind: 'refused' }));
+        setGenerateLoading(false);
+        return;
+      }
 
       // Shared poller owns the rest of the lifecycle (progress → navigate,
       // error surfacing, clearing the loading state).
       await pollGenerationJob(jobId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to generate program');
-      setGenerateLoading(false);
+      // The request threw. It may still have started a build on the server
+      // (a timeout after the job was created), so look before saying anything.
+      console.error('[AthletePage] generation request threw:', err);
+      let inFlightId: string | null = null;
+      try {
+        const { data } = await supabase.from('program_jobs').select('id')
+          .eq('user_id', session.user.id).eq('status', 'processing')
+          .gte('updated_at', new Date(Date.now() - 30 * 60 * 1000).toISOString())
+          .order('created_at', { ascending: false }).limit(1).maybeSingle();
+        inFlightId = data?.id ?? null;
+      } catch { /* no connection: fall through */ }
+      if (inFlightId) {
+        await pollGenerationJob(inFlightId);
+      } else {
+        setGenerateNotice(generateOutcomeMessage({ kind: 'refused' }));
+        setGenerateLoading(false);
+      }
     }
   };
 
@@ -1396,6 +1483,7 @@ export default function AthletePage({ session }: { session: Session }) {
   const saveProfile = async (overrides?: { equipment?: Record<string, boolean>; review?: boolean }): Promise<boolean> => {
     setSaving(true);
     setError('');
+    setSaveEffect(NO_SAVE_EFFECT);
 
     // Only store non-zero lifts
     const cleanLifts: Record<string, number> = {};
@@ -1543,6 +1631,7 @@ export default function AthletePage({ session }: { session: Session }) {
     // Step 3 summaries may now show green.
     setSavedSched({ days: daysPerWeek, len: sessionLengthMinutes });
     setSavedGoal(goal);
+    const storedBefore = serverBaseRef.current;
     // What is stored now — the base of any draft typed after this save.
     serverBaseRef.current = {
       days: payload.days_per_week != null ? String(payload.days_per_week) : '',
@@ -1551,6 +1640,28 @@ export default function AthletePage({ session }: { session: Session }) {
       injuries: injuriesVal === 'None' ? '' : injuriesVal,
       equipment: payload.equipment,
     };
+    // A member whose program is running is told what this save changes and
+    // when (2026-11-24). Best-effort: the save has already succeeded, so a
+    // failed lookup shows nothing rather than an error.
+    if (hasGeneratedProgram) {
+      const change = changedBySave(storedBefore, serverBaseRef.current);
+      if (Object.values(change).some(Boolean)) {
+        void (async () => {
+          try {
+            const { data: prog } = await supabase.from('programs').select('id, weekly_mode')
+              .eq('user_id', session.user.id).eq('source', 'generated').is('archived_at', null)
+              .order('created_at', { ascending: false }).limit(1).maybeSingle();
+            if (!prog?.id) return;
+            const { data: outline } = await supabase.from('program_workouts')
+              .select('week_num, month_number').eq('program_id', prog.id).eq('status', 'outline');
+            const weeks = new Set((outline ?? []).map((r) => `${r.month_number}-${r.week_num}`));
+            setSaveEffect(saveEffectNotes(change, { weekly: prog.weekly_mode === true, outlineWeeksLeft: weeks.size }));
+          } catch (err) {
+            console.error('[AthletePage] save-effect lookup failed:', err);
+          }
+        })();
+      }
+    }
     // Step 2 completes only via a review save — a plain save leaves the
     // stamp (and the tier state) exactly as it was.
     if (reviewedAtIso) setAthleticReviewedAt(reviewedAtIso);
@@ -1914,6 +2025,21 @@ export default function AthletePage({ session }: { session: Session }) {
                             </div>
                             <div style={{ fontSize: 15, fontWeight: 600 }}>Your evaluation is ready</div>
                             {when && <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>Last run: {when}</div>}
+                            {(() => {
+                              // A fresh evaluation came with their Programming plan: say so,
+                              // and ask for a profile review first (2026-11-24).
+                              const note = freshEvaluationNote({
+                                hasProgramming: hasFeature('programming'),
+                                hasProgram: hasGeneratedProgram,
+                                hasEvaluation: true,
+                                evalCredits: evalCreditsRemaining,
+                              });
+                              return note ? (
+                                <div style={{ fontSize: 13, color: 'var(--accent)', marginTop: 6, lineHeight: 1.5, maxWidth: 460 }}>
+                                  {note}
+                                </div>
+                              ) : null;
+                            })()}
                             {!hasEvalCredit && (
                               <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 4 }}>
                                 Subscribers receive ongoing monthly analysis automatically.
@@ -2528,6 +2654,12 @@ export default function AthletePage({ session }: { session: Session }) {
                       amber demand went 2026-10-12 — required-ness is already
                       enforced by the step badge and the Generate gate, and
                       three matching rows read as the checklist they are). */}
+                  {saveEffect.schedule.length > 0 && (
+                    <div role="status" style={{ margin: '8px 2px 0', padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 10, fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.5 }}>
+                      <strong style={{ color: 'var(--text)' }}>Saved.</strong>{' '}
+                      {saveEffect.schedule.join(' ')}
+                    </div>
+                  )}
                   <div className="settings-card" style={{ ...T3_CARD, marginTop: 16 }}>
                     <button
                       type="button"
@@ -2598,6 +2730,12 @@ export default function AthletePage({ session }: { session: Session }) {
                   {/* Card 3 — YOUR COACH: ALL the free-text / voice. One
                       "Save & analyze" persists goals/injuries (via the full
                       profile save) AND runs the intake extraction. */}
+                  {saveEffect.equipment.length > 0 && (
+                    <div role="status" style={{ margin: '8px 2px 0', padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 10, fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.5 }}>
+                      <strong style={{ color: 'var(--text)' }}>Saved.</strong>{' '}
+                      {saveEffect.equipment.join(' ')}
+                    </div>
+                  )}
                   <div className="settings-card" style={{ ...T3_CARD, marginTop: 16 }}>
                     <button
                       type="button"
@@ -2806,6 +2944,12 @@ export default function AthletePage({ session }: { session: Session }) {
                     {intakeError && <div className="auth-error" style={{ display: 'block', marginTop: 12 }}>{intakeError}</div>}
                     </div>)}
                   </div>
+                  {saveEffect.coach.length > 0 && (
+                    <div role="status" style={{ margin: '8px 2px 0', padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 10, fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.5 }}>
+                      <strong style={{ color: 'var(--text)' }}>Saved.</strong>{' '}
+                      {saveEffect.coach.join(' ')}
+                    </div>
+                  )}
                   </>
                   )}
                 </TierCard>
@@ -2945,11 +3089,30 @@ export default function AthletePage({ session }: { session: Session }) {
                       >
                         {generateLoading ? 'Generating...' : ready ? 'Generate Program →' : 'Generate Program'}
                       </button>
+                      {generateNotice && !generateLoading && (
+                        <div role="alert" style={{ fontSize: 13, fontWeight: 600, color: '#e5484d', lineHeight: 1.5 }}>
+                          {generateNotice}
+                        </div>
+                      )}
                       {(ready || generateLoading) && (
                         <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -6 }}>
                           Generation takes a few minutes — your full month, warm-ups to cool-downs.
                         </span>
                       )}
+                      {(() => {
+                        // Review the profile before the first build (2026-11-24).
+                        const reminder = ready ? generateReminder({
+                          hasProgramming: hasFeature('programming'),
+                          hasProgram: hasGeneratedProgram,
+                          hasEvaluation: currentEvaluations.length > 0,
+                          evalCredits: evalCreditsRemaining,
+                        }) : null;
+                        return reminder ? (
+                          <span style={{ fontSize: 12, color: 'var(--text)', marginTop: -2, lineHeight: 1.5 }}>
+                            {reminder}
+                          </span>
+                        ) : null;
+                      })()}
                       {ready && !goal.trim() && (
                         <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -6 }}>
                           No goal set — add one in Make it Personal above and the program builds toward it.

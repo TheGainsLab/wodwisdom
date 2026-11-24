@@ -105,3 +105,106 @@ export function draftFieldsToRestore(draft: StoredDraft, server: DraftFields): P
   }
   return out;
 }
+
+// ── Before the first build ─────────────────────────────────────────────────
+// (2026-11-24) When Programming access is granted to someone with no program
+// yet, the server sets their evaluation count to one (migration
+// 20261124000000). They have to be TOLD: a member who rushed the free
+// evaluation months ago would otherwise build their first program from it.
+
+export const FRESH_EVALUATION_NOTE =
+  'Your Programming plan includes one fresh evaluation. Review and update your profile first, then tap Run New. Your program is built from it.';
+export const GENERATE_REMINDER_WITH_FRESH_EVALUATION =
+  'Before you generate: review and update your profile, then run your fresh evaluation above. Your program is built from it.';
+export const GENERATE_REMINDER =
+  'Before you generate: review your profile and update anything that has changed. Your program is built from it.';
+
+export interface FirstBuildFacts {
+  /** Holds Programming access (not counting admin override). */
+  hasProgramming: boolean;
+  /** A live generated program exists. */
+  hasProgram: boolean;
+  /** At least one evaluation is on file. */
+  hasEvaluation: boolean;
+  /** Evaluation credits left (the real count, not the admin bypass). */
+  evalCredits: number;
+}
+
+/** The note on the evaluation card: only for a Programming member with no
+ *  program yet who already has an evaluation AND a credit to run a new one. */
+export function freshEvaluationNote(f: FirstBuildFacts): string | null {
+  return f.hasProgramming && !f.hasProgram && f.hasEvaluation && f.evalCredits > 0 ? FRESH_EVALUATION_NOTE : null;
+}
+
+/** The reminder beside Generate: every member about to build their first
+ *  program is reminded to review their profile; one with a fresh evaluation
+ *  waiting is pointed at it. Null once a program exists. */
+export function generateReminder(f: FirstBuildFacts): string | null {
+  if (!f.hasProgramming || f.hasProgram) return null;
+  return freshEvaluationNote(f) ? GENERATE_REMINDER_WITH_FRESH_EVALUATION : GENERATE_REMINDER;
+}
+
+// ── A first build that did not finish ──────────────────────────────────────
+// (2026-11-24) A failed build reset the button and put the server's raw error
+// ("Signal timed out.", "[save-v3] program_workouts insert failed…") at the
+// top of the page, far from the button. The member now gets plain words
+// beside the button; the raw text goes to the console and the team's alert.
+
+/** The build failed on the server. The server emails the team when this
+ *  happens, so "has been notified" is true. */
+export const GENERATE_FAILED_MESSAGE =
+  'Generation not completed. Tap Generate to try again. Our team has been notified.';
+/** The build never started (the request was rejected or errored before a job
+ *  existed). No alert is sent for this, so it must not say the team knows. */
+export const GENERATE_NOT_STARTED_MESSAGE = 'Generation not completed. Tap Generate to try again.';
+
+/** Refusals whose server message is written for the member. Any other
+ *  refusal carries internal text and is never shown. */
+const MEMBER_WORDED_REFUSALS = new Set(['EVALUATION_REQUIRED', 'PROGRAM_ARCHIVED']);
+
+export type GenerateOutcome =
+  /** The job ended as failed. */
+  | { kind: 'failed' }
+  /** The server did not start a build. `code` is its error code. */
+  | { kind: 'refused'; code?: string | null; message?: string | null };
+
+/** What the member is shown beside the Generate button. Never the raw error. */
+export function generateOutcomeMessage(o: GenerateOutcome): string {
+  if (o.kind === 'failed') return GENERATE_FAILED_MESSAGE;
+  const m = (o.message ?? '').trim();
+  return m && MEMBER_WORDED_REFUSALS.has(o.code ?? '') ? m : GENERATE_NOT_STARTED_MESSAGE;
+}
+
+/** How many status checks in a row may fail before the page stops trusting
+ *  its own watch and looks the build up directly. One dropped request on a
+ *  phone must not end the watch. */
+export const STATUS_CHECK_FAILURES_BEFORE_LOOKUP = 5;
+
+/**
+ * The page lost contact with a build (status checks kept failing, or the
+ * watch ran its full time). It looks up the real state and acts on it; the
+ * member is told something ONLY when the build failed (founder, 2026-11-24).
+ *
+ *  - a program exists           → go to it
+ *  - the build is still running → keep watching (button stays on Generating…)
+ *  - the build failed           → the failure message
+ *  - nothing can be established → reset the button, say nothing
+ */
+export type LostContactAction = 'go_to_program' | 'keep_watching' | 'show_failed' | 'reset_quietly';
+
+export function afterLostContact(facts: {
+  /** A live generated program now exists for the member. */
+  hasProgram: boolean;
+  /** The job's status as read directly, or null if it could not be read. */
+  jobStatus: string | null;
+  /** The job reported progress within the server's own "still running" window. */
+  jobIsFresh: boolean;
+  /** How many times the page has already gone back to watching this build. */
+  rewatches: number;
+}): LostContactAction {
+  if (facts.hasProgram) return 'go_to_program';
+  if (facts.jobStatus === 'failed') return 'show_failed';
+  const running = facts.jobStatus === 'processing' || facts.jobStatus === 'pending';
+  if (running && facts.jobIsFresh && facts.rewatches < 3) return 'keep_watching';
+  return 'reset_quietly';
+}

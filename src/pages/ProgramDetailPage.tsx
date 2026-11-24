@@ -11,6 +11,7 @@ import { loadCoachNotes, type CoachNote } from '../lib/coachNotes';
 import WorkoutBlocksDisplay, { BlockContent } from '../components/WorkoutBlocksDisplay';
 import { BlockCoachingBody, coachingForBlockType, formatReviewMarkdown, CHEVRON_DOWN, type ReviewBlock } from '../components/reviewCoaching';
 import { useWorkoutReview } from '../lib/useWorkoutReview';
+import { weekArrivalText } from '../lib/weekSchedule';
 import BlockLog, { type DayLogController, type SavedBlockSnapshot, loggedMovementNames, blockFullyLogged, isLoggableBlock, isRowLoggerBlock } from '../components/blockLog';
 import { formatArchiveDate } from '../lib/programArchive';
 import { formatMovementName } from '../lib/movementName';
@@ -47,6 +48,8 @@ interface SkeletonDayOutline {
 }
 interface MonthSkeletonRow {
   month_number: number;
+  /** When the month was built: the weekly clock starts here. */
+  created_at?: string | null;
   skeleton: { weeks?: Array<{ week_num: number; focus?: string; days?: Array<SkeletonDayOutline & { day_num: number }> }> };
 }
 
@@ -253,6 +256,27 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
   // server refuses those anyway; this is about not showing dead buttons.
   const archived = !!program?.archived_at;
   const [allWorkouts, setAllWorkouts] = useState<ProgramWorkout[]>([]);
+  // When an unwritten week arrives, in the one wording used by the banner,
+  // the week headers and the day rows (src/lib/weekSchedule.ts).
+  const arrivalFor = (month: number, weekInMonth: number): string => {
+    const lowestOutline = Math.min(...allWorkouts
+      .filter((w) => (w.month_number ?? 1) === month && w.status === 'outline')
+      .map((w) => w.week_num));
+    return weekArrivalText({
+      monthStartedAt: monthSkeletons.find((r) => r.month_number === month)?.created_at ?? null,
+      weekInMonth,
+      previousWeekLabel: (month - 1) * 4 + weekInMonth - 1,
+      isNext: weekInMonth === lowestOutline,
+    });
+  };
+  // The next week to be written: the lowest unwritten week of the earliest month that has one.
+  const nextArrival = (() => {
+    const outline = allWorkouts.filter((w) => w.status === 'outline');
+    if (outline.length === 0) return null;
+    const month = Math.min(...outline.map((w) => w.month_number ?? 1));
+    const week = Math.min(...outline.filter((w) => (w.month_number ?? 1) === month).map((w) => w.week_num));
+    return arrivalFor(month, week);
+  })();
   // The week in progress = the latest WRITTEN week of the program (outline
   // weeks don't count). Only this week carries the "tell your coach" box;
   // it stays here through the hour between the last log and the next fill.
@@ -551,7 +575,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
     if ((wk ?? []).some((w) => w.status === 'outline')) {
       const { data: sk } = await supabase
         .from('program_month_skeletons')
-        .select('month_number, skeleton')
+        .select('month_number, skeleton, created_at')
         .eq('program_id', id);
       setMonthSkeletons((sk ?? []) as MonthSkeletonRow[]);
     }
@@ -877,7 +901,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                 )}
                 {program?.weekly_mode && !archived && (
                   <div style={{ margin: '10px 0 2px', padding: '10px 14px', border: '1px dashed var(--border)', borderRadius: 10, fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.5 }}>
-                    <strong style={{ color: 'var(--text)' }}>This is a starting point.</strong> Week 1 is written; the weeks after it are written one at a time from how you train and what you tell your coach. Your next week is written once you&rsquo;ve logged something on each day of this one, or 7 days in, whichever comes first. Tell your coach what you&rsquo;d change and next week is written from it.
+                    <strong style={{ color: 'var(--text)' }}>This is a starting point.</strong> Week 1 is written; the weeks after it are written one at a time from how you train and what you tell your coach. {nextArrival ? <>Your next week: {nextArrival.charAt(0).toLowerCase() + nextArrival.slice(1)} </> : null}Tell your coach what you&rsquo;d change and next week is written from it.
                   </div>
                 )}
                 {/* "Tell your coach" notes live under each week's days; this is
@@ -1045,7 +1069,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                           <span style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 600 }}>
                             {(() => { const c = coachNotes.filter((n) => n.week_num === week.weekNum).length; return c > 0 ? `${c} note${c === 1 ? '' : 's'} · ` : ''; })()}
                             {week.days.every((d) => d.status === 'outline')
-                              ? `${archived ? 'not written' : `written when you finish week ${week.weekNum - 1}`} ${weekOpen ? '▲' : '▼'}`
+                              ? `${archived ? 'not written' : 'not written yet'} ${weekOpen ? '▲' : '▼'}`
                               : `${doneCount}/${week.days.length} logged ${weekOpen ? '▲' : '▼'}`}
                           </span>
                         </button>
@@ -1053,7 +1077,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                           const first = skeletonDay(week.days[0]);
                           return (
                             <div style={{ padding: '10px 14px 2px', fontSize: 12.5, color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                              {archived ? 'Outline only — this week was never written.' : 'Tentative.'}{first?.weekFocus ? <span style={{ color: 'var(--text-dim)' }}> {first.weekFocus}.</span> : null}
+                              {archived ? 'Outline only — this week was never written.' : `Tentative. ${arrivalFor(month, week.days[0].week_num)}`}{first?.weekFocus ? <span style={{ color: 'var(--text-dim)' }}> {first.weekFocus}.</span> : null}
                             </div>
                           );
                         })()}
@@ -1078,7 +1102,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                                       </div>
                                       <div className="program-day-summary-lines">
                                         <div className="program-day-summary-line">
-                                          <span className="program-day-summary-text">{parts.length ? parts.join(' · ') : (sk?.day_intent ?? (archived ? 'Not written.' : 'Written once you log each day of the week before, or 7 days in.'))}</span>
+                                          <span className="program-day-summary-text">{parts.length ? parts.join(' · ') : (sk?.day_intent ?? (archived ? 'Not written.' : arrivalFor(month, w.week_num)))}</span>
                                         </div>
                                       </div>
                                     </div>

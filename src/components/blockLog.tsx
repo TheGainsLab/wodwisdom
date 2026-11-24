@@ -358,10 +358,18 @@ function CoachNoteChips({ faults, checked, onToggle, showLabel = true }: { fault
   );
 }
 
+/** Shown in the panel when a block did not save (2026-11-24). A failed save
+ *  used to say nothing: the button went back to "Save block" and a member
+ *  mid-workout assumed it was recorded. What they typed is kept, so a second
+ *  tap is all it takes. */
+const SAVE_FAILED_MESSAGE = "Couldn't save — check your connection and tap again.";
+
 /** Additional notes + Save. Save lights up once anything is asserted. */
-function SaveFooter({ saving, canSave, onSave, notes, onNotes }: {
+function SaveFooter({ saving, canSave, onSave, notes, onNotes, failed }: {
   saving: boolean; canSave: boolean; onSave: () => void;
   notes: string; onNotes: (v: string) => void;
+  /** The last save attempt for this block did not go through. */
+  failed?: boolean;
 }) {
   return (
     // Dashed divider above the notes field, matching the line between
@@ -377,6 +385,11 @@ function SaveFooter({ saving, canSave, onSave, notes, onNotes }: {
       <button type="button" className="auth-btn" style={{ width: '100%', marginTop: 10, opacity: canSave ? 1 : 0.45 }} onClick={onSave} disabled={saving || !canSave}>
         {saving ? 'Saving…' : 'Save block'}
       </button>
+      {failed && !saving && (
+        <div role="alert" style={{ marginTop: 8, fontSize: 13, fontWeight: 600, color: '#e5484d', textAlign: 'center' }}>
+          {SAVE_FAILED_MESSAGE}
+        </div>
+      )}
     </div>
   );
 }
@@ -498,6 +511,7 @@ function RowLogger({ block, controller, coaching, label, type, showWeight, onSav
   onSaved: () => void;
 }) {
   const saving = controller.saving === block.sort_order;
+  const [saveFailed, setSaveFailed] = useState(false);
   const tasks: ProgramMovementV2[][] = useMemo(
     () => (type === 'strength' ? [block.movements] : block.movements.map((m) => [m])),
     [block, type],
@@ -567,13 +581,14 @@ function RowLogger({ block, controller, coaching, label, type, showWeight, onSav
       }
     }
     const rpes = claimedTasks.map((t) => states[taskKey(t)].rpe).filter((v): v is number => v != null);
+    setSaveFailed(false);
     controller.saveBlock({
       label: block.block_label || label, type, text: blockText(block), score: null,
       rx: claimedTasks.length > 0 && claimedTasks.every((t) => states[taskKey(t)].claim === 'rx'),
       notes: notes.trim() || null,
       sort_order: block.sort_order, entries, capped: false, capped_reps: null,
       rpe: rpes.length ? Math.max(...rpes) : null,
-    }).then((res) => { if (res) onSaved(); });
+    }).then((res) => { if (res) onSaved(); else setSaveFailed(true); }, () => setSaveFailed(true));
   };
 
   return (
@@ -621,7 +636,7 @@ function RowLogger({ block, controller, coaching, label, type, showWeight, onSav
           </div>
         );
       })}
-      <SaveFooter saving={saving} canSave={anythingAsserted} onSave={save} notes={notes} onNotes={setNotes} />
+      <SaveFooter failed={saveFailed} saving={saving} canSave={anythingAsserted} onSave={save} notes={notes} onNotes={setNotes} />
     </div>
   );
 }
@@ -631,6 +646,7 @@ function MetconLog({ block, controller, coaching, onSaved }: {
   block: ProgramBlockV2; controller: DayLogController; coaching: ReviewBlock | null; onSaved: () => void;
 }) {
   const saving = controller.saving === block.sort_order;
+  const [saveFailed, setSaveFailed] = useState(false);
   const snap = controller.savedSnapshot?.(block.sort_order) ?? null;
   const [score, setScore] = useState(snap?.score ?? '');
   const [capped, setCapped] = useState(snap?.capped ?? false);
@@ -697,6 +713,7 @@ function MetconLog({ block, controller, coaching, onSaved }: {
     const text = [block.block_scheme, block.block_label].filter(Boolean).join('\n');
     const scoring = !capped && score.trim() && benchmark ? scoreMetcon(score.trim(), wType, benchmark) : null;
     const cappedScore = block.time_cap_seconds != null ? formatClock(block.time_cap_seconds) : null;
+    setSaveFailed(false);
     controller.saveBlock({
       label: block.block_label || 'Metcon', type: 'metcon', text: blockText(block),
       score: capped ? cappedScore : (score.trim() || null), rx: claim === 'rx', notes: notes.trim() || null,
@@ -707,7 +724,7 @@ function MetconLog({ block, controller, coaching, onSaved }: {
       median_benchmark: benchmark && benchmark.medianScore !== '--' ? benchmark.medianScore : null,
       excellent_benchmark: benchmark && benchmark.excellentScore !== '--' ? benchmark.excellentScore : null,
       time_domain: deriveTimeDomain(wType, text, benchmark?.medianScore ?? null),
-    }).then((res) => { if (res) onSaved(); });
+    }).then((res) => { if (res) onSaved(); else setSaveFailed(true); }, () => setSaveFailed(true));
   };
   return (
     <div className="block-log">
@@ -778,7 +795,7 @@ function MetconLog({ block, controller, coaching, onSaved }: {
           })}
         </div>
       )}
-      <SaveFooter saving={saving} canSave={anythingAsserted} onSave={save} notes={notes} onNotes={setNotes} />
+      <SaveFooter failed={saveFailed} saving={saving} canSave={anythingAsserted} onSave={save} notes={notes} onNotes={setNotes} />
     </div>
   );
 }
@@ -786,6 +803,7 @@ function MetconLog({ block, controller, coaching, onSaved }: {
 // ── Cardio: machine avg watts + work time (power) ──
 function CardioLog({ block, controller, onSaved }: { block: ProgramBlockV2; controller: DayLogController; onSaved: () => void }) {
   const saving = controller.saving === block.sort_order;
+  const [saveFailed, setSaveFailed] = useState(false);
   const snap = controller.savedSnapshot?.(block.sort_order) ?? null;
   const [watts, setWatts] = useState('');
   const [time, setTime] = useState('');
@@ -793,11 +811,12 @@ function CardioLog({ block, controller, onSaved }: { block: ProgramBlockV2; cont
   const [notes, setNotes] = useState(snap?.notes ?? '');
   const save = () => {
     const entries: LogEntry[] = block.movements.map((m) => emptyEntry(m.movement, { distance: m.distance ?? null, distance_unit: m.distance_unit ?? null, rpe }));
+    setSaveFailed(false);
     controller.saveBlock({
       label: block.block_label || 'Cardio', type: 'cardio', text: blockText(block), score: null, rx: false, notes: notes.trim() || null,
       sort_order: block.sort_order, entries, capped: false, capped_reps: null, rpe,
       cardio_avg_watts: numOrNull(watts), cardio_work_seconds: parseClock(time), cardio_modality: null,
-    }).then((res) => { if (res) onSaved(); });
+    }).then((res) => { if (res) onSaved(); else setSaveFailed(true); }, () => setSaveFailed(true));
   };
   const canSave = watts.trim() !== '' || time.trim() !== '' || rpe != null || notes.trim() !== '';
   return (
@@ -809,7 +828,7 @@ function CardioLog({ block, controller, onSaved }: { block: ProgramBlockV2; cont
       <div style={{ marginTop: 8 }}>
         <RpeStepper value={rpe} onChange={setRpe} />
       </div>
-      <SaveFooter saving={saving} canSave={canSave} onSave={save} notes={notes} onNotes={setNotes} />
+      <SaveFooter failed={saveFailed} saving={saving} canSave={canSave} onSave={save} notes={notes} onNotes={setNotes} />
     </div>
   );
 }
