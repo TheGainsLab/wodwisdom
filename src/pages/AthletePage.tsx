@@ -13,7 +13,7 @@ import { ATHLETEDATA_PUBLIC_TIER } from '../lib/featureFlags';
 import { isSinceArchive, sinceArchive } from '../lib/programArchive';
 import {
   checkDaysPerWeek, draftFieldsToRestore, GOAL_BOX_MAX_CHARS, intakeSaveAction,
-  freshEvaluationNote, generateReminder,
+  freshEvaluationNote, generateReminder, generateOutcomeMessage,
   type DraftFields, type StoredDraft,
 } from '../lib/profileFormRules';
 
@@ -774,6 +774,9 @@ export default function AthletePage({ session }: { session: Session }) {
   const [t3IntroSeenAt, setT3IntroSeenAt] = useState<string | null>('pending');
   const [condSectionOpen, setCondSectionOpen] = useState(false);
   const [generateLoading, setGenerateLoading] = useState(false);
+  // What happened to the last first-build attempt, in member words, shown
+  // beside the Generate button (never the raw server error).
+  const [generateNotice, setGenerateNotice] = useState('');
   const [hasGeneratedProgram, setHasGeneratedProgram] = useState(false);
   // "This cycle's plan" — the coach-state priorities, rendered next to the
   // evaluation (founder, 2026-10-13: the program page is for examining the
@@ -922,25 +925,36 @@ export default function AthletePage({ session }: { session: Session }) {
         const { data: status, error: statusErr } = await supabase.functions.invoke('program-job-status', {
           body: { job_id: jobId },
         });
-        if (statusErr) throw new Error(statusErr.message || 'Failed to check job status');
-        if (status?.error && status?.status !== 'failed') throw new Error(status.error);
+        // A status check that cannot be made is not a failed build: the job
+        // may still be running. Say so, without claiming it failed.
+        if (statusErr || (status?.error && status?.status !== 'failed')) {
+          console.error('[AthletePage] generation status check failed:', statusErr?.message ?? status?.error);
+          setGenerateNotice(generateOutcomeMessage({ kind: 'unknown' }));
+          return;
+        }
 
         if (status?.status === 'complete') {
           if (status.program_id) {
             navigate(`/programs/${status.program_id}`);
             return;
           }
-          throw new Error('Program completed but no ID returned');
+          console.error('[AthletePage] generation completed with no program id');
+          setGenerateNotice(generateOutcomeMessage({ kind: 'unknown' }));
+          return;
         }
         if (status?.status === 'failed') {
-          throw new Error(status.error || 'Program generation failed');
+          // The raw error is for the console; the server has emailed the team.
+          console.error('[AthletePage] generation failed:', status.error);
+          setGenerateNotice(generateOutcomeMessage({ kind: 'failed' }));
+          return;
         }
         // Still pending/processing — back off slightly
         delay = Math.min(delay + 1000, maxDelay);
       }
-      throw new Error('Program generation timed out');
+      setGenerateNotice(generateOutcomeMessage({ kind: 'unknown' }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to generate program');
+      console.error('[AthletePage] generation polling threw:', err);
+      setGenerateNotice(generateOutcomeMessage({ kind: 'unknown' }));
     } finally {
       setGenerateLoading(false);
     }
@@ -1338,6 +1352,7 @@ export default function AthletePage({ session }: { session: Session }) {
   const handleGenerateProgram = async () => {
     setGenerateLoading(true);
     setError('');
+    setGenerateNotice('');
     // Unsaved edits ride along: the last-call flow sends athletes to the
     // goal box right before generating, and a goal typed but not saved
     // must never be silently missing from the program it was written for.
@@ -1368,18 +1383,33 @@ export default function AthletePage({ session }: { session: Session }) {
         if (body?.error === 'GENERATION_IN_PROGRESS' && body.job_id) {
           jobId = body.job_id;
         } else {
-          throw new Error(body?.message || error.message || 'Failed to generate program');
+          // The server refused to start. Its `message` is written for the
+          // member ("Run your evaluation first…"); anything else stays in the console.
+          console.error('[AthletePage] generation refused:', body?.error ?? error.message);
+          setGenerateNotice(generateOutcomeMessage({ kind: 'refused', code: body?.error, message: body?.message }));
+          setGenerateLoading(false);
+          return;
         }
       } else if (data?.error) {
-        throw new Error(data.message || data.error || 'Failed to generate program');
+        console.error('[AthletePage] generation refused:', data.error);
+        setGenerateNotice(generateOutcomeMessage({ kind: 'refused', code: data.error, message: data.message }));
+        setGenerateLoading(false);
+        return;
       }
-      if (!jobId) throw new Error('No job ID returned');
+      if (!jobId) {
+        console.error('[AthletePage] generation started with no job id');
+        setGenerateNotice(generateOutcomeMessage({ kind: 'refused' }));
+        setGenerateLoading(false);
+        return;
+      }
 
       // Shared poller owns the rest of the lifecycle (progress → navigate,
       // error surfacing, clearing the loading state).
       await pollGenerationJob(jobId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to generate program');
+      // The request itself could not be made (no connection).
+      console.error('[AthletePage] generation request threw:', err);
+      setGenerateNotice(generateOutcomeMessage({ kind: 'unknown' }));
       setGenerateLoading(false);
     }
   };
@@ -2961,6 +2991,11 @@ export default function AthletePage({ session }: { session: Session }) {
                       >
                         {generateLoading ? 'Generating...' : ready ? 'Generate Program →' : 'Generate Program'}
                       </button>
+                      {generateNotice && !generateLoading && (
+                        <div role="alert" style={{ fontSize: 13, fontWeight: 600, color: '#e5484d', lineHeight: 1.5 }}>
+                          {generateNotice}
+                        </div>
+                      )}
                       {(ready || generateLoading) && (
                         <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -6 }}>
                           Generation takes a few minutes — your full month, warm-ups to cool-downs.

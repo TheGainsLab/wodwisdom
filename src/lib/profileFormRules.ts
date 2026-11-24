@@ -143,3 +143,43 @@ export function generateReminder(f: FirstBuildFacts): string | null {
   if (!f.hasProgramming || f.hasProgram) return null;
   return freshEvaluationNote(f) ? GENERATE_REMINDER_WITH_FRESH_EVALUATION : GENERATE_REMINDER;
 }
+
+// ── A first build that did not finish ──────────────────────────────────────
+// (2026-11-24) A failed build reset the button and put the server's raw error
+// ("Signal timed out.", "[save-v3] program_workouts insert failed…") at the
+// top of the page, far from the button. The member now gets plain words
+// beside the button; the raw text goes to the console and the team's alert.
+
+/** The build failed on the server. The server emails the team when this
+ *  happens, so "has been notified" is true. */
+export const GENERATE_FAILED_MESSAGE =
+  'Generation not completed. Tap Generate to try again. Our team has been notified.';
+/** The page stopped hearing about the build (it ran long, or the connection
+ *  dropped). The build may still finish, and no alert was sent, so this must
+ *  not claim either a failure or a notification. */
+export const GENERATE_UNKNOWN_MESSAGE =
+  'This is taking longer than usual. Your program may still be on its way. Refresh this page in a few minutes before trying again.';
+
+/** The build never started (the request was rejected or errored before a job
+ *  existed). No alert is sent for this, so it must not say the team knows. */
+export const GENERATE_NOT_STARTED_MESSAGE = 'Generation not completed. Tap Generate to try again.';
+
+/** Refusals whose server message is written for the member. Any other
+ *  refusal carries internal text and is never shown. */
+const MEMBER_WORDED_REFUSALS = new Set(['EVALUATION_REQUIRED', 'PROGRAM_ARCHIVED']);
+
+export type GenerateOutcome =
+  /** The job ended as failed. */
+  | { kind: 'failed' }
+  /** Polling ran out or a status check could not be made. */
+  | { kind: 'unknown' }
+  /** The server did not start a build. `code` is its error code. */
+  | { kind: 'refused'; code?: string | null; message?: string | null };
+
+/** What the member is shown beside the Generate button. Never the raw error. */
+export function generateOutcomeMessage(o: GenerateOutcome): string {
+  if (o.kind === 'failed') return GENERATE_FAILED_MESSAGE;
+  if (o.kind === 'unknown') return GENERATE_UNKNOWN_MESSAGE;
+  const m = (o.message ?? '').trim();
+  return m && MEMBER_WORDED_REFUSALS.has(o.code ?? '') ? m : GENERATE_NOT_STARTED_MESSAGE;
+}

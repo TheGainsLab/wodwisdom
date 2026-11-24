@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import {
   checkDaysPerWeek, DAYS_PER_WEEK_MESSAGE, draftFieldsToRestore, GOAL_BOX_MAX_CHARS,
   intakeSaveAction, sameEquipment, type DraftFields,
+  generateOutcomeMessage, GENERATE_FAILED_MESSAGE, GENERATE_NOT_STARTED_MESSAGE, GENERATE_UNKNOWN_MESSAGE,
   freshEvaluationNote, generateReminder, FRESH_EVALUATION_NOTE, GENERATE_REMINDER, GENERATE_REMINDER_WITH_FRESH_EVALUATION,
 } from '../src/lib/profileFormRules';
 
@@ -112,4 +113,30 @@ test('every member about to build their first program is reminded to review thei
   assert.equal(generateReminder({ ...newMember, evalCredits: 0 }), GENERATE_REMINDER);
   assert.equal(generateReminder({ ...newMember, hasProgram: true }), null);
   assert.equal(generateReminder({ ...newMember, hasProgramming: false }), null);
+});
+
+// ── A first build that did not finish ──────────────────────────────────────
+test('a failed build is described in plain words, and says the team was notified', () => {
+  assert.equal(generateOutcomeMessage({ kind: 'failed' }), GENERATE_FAILED_MESSAGE);
+  assert.match(GENERATE_FAILED_MESSAGE, /Tap Generate to try again/);
+  assert.match(GENERATE_FAILED_MESSAGE, /team has been notified/);
+});
+
+test('losing track of a build does not claim it failed or that anyone was notified', () => {
+  const m = generateOutcomeMessage({ kind: 'unknown' });
+  assert.equal(m, GENERATE_UNKNOWN_MESSAGE);
+  assert.doesNotMatch(m, /notified/);
+  assert.match(m, /may still be on its way/);
+});
+
+test("a refusal the server worded for the member is shown as written", () => {
+  assert.equal(generateOutcomeMessage({ kind: 'refused', code: 'EVALUATION_REQUIRED', message: 'Run your evaluation first — your new program is built from it.' }),
+    'Run your evaluation first — your new program is built from it.');
+});
+
+test('any other refusal never shows internal text, and does not claim the team was notified', () => {
+  const m = generateOutcomeMessage({ kind: 'refused', code: 'GENERATION_FAILED', message: 'TypeError: cannot read properties of undefined' });
+  assert.equal(m, GENERATE_NOT_STARTED_MESSAGE);
+  assert.doesNotMatch(m, /notified|TypeError/);
+  assert.equal(generateOutcomeMessage({ kind: 'refused', message: '  ' }), GENERATE_NOT_STARTED_MESSAGE);
 });
