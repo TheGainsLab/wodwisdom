@@ -183,3 +183,8 @@ Deno.test("the instruction says a pull is \"none\", so the lift's ceiling is nev
   // And with "none" code leaves a pull's weight alone, however heavy.
   assertEquals(liftKeyOf({ movement: "Snatch Pull", counts_toward: "none", on_barbell: true }), undefined);
 });
+
+Deno.test("the instruction says a progression toward a skill is not the skill", () => {
+  for (const w of ["negatives", "holds", "transitions", "banded", "jumping"]) assert(COUNTS_TOWARD_INSTRUCTION.includes(w), w);
+  assert(/Strict Pull-Up Negatives are not strict pull-ups/.test(COUNTS_TOWARD_INSTRUCTION));
+});
