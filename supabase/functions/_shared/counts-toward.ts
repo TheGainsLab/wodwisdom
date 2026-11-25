@@ -71,5 +71,9 @@ export const COUNTS_TOWARD_INSTRUCTION =
   "(a Pause Back Squat counts toward back_squat, a Hang Power Clean toward power_clean, a Split Jerk toward jerk). " +
   "A SKILL key when it is that gymnastics skill or a direct form of it " +
   "(Chest To Bar counts toward chest_to_bar_pull_ups, a Ring Muscle Up toward muscle_ups, a Handstand Push Up toward hspu). " +
-  "\"none\" for everything else: dumbbell, kettlebell and machine work, running, carries, accessory and core work, and scaled progressions that are not the skill itself. " +
+  "\"none\" for everything else: dumbbell, kettlebell and machine work, running, carries, accessory and core work, and anything that is a progression or drill toward a skill but is not the skill itself: negatives, holds, transitions, banded, jumping, tucked or partial versions (Strict Pull-Up Negatives are not strict pull-ups; an L-Sit Tuck Hold is not an L-sit; a Ring Muscle-Up Transition is not a muscle-up). " +
+  // 2026-11-25: a lift key makes code hold the weight under that lift's
+  // ceiling. A pull or a balance drill can be loaded ABOVE the lift it is named after, so
+  // it must not carry the lift's key; its weight is the AI's own judgment.
+  "Also \"none\": a pull, a balance drill or a partial lift that can be loaded at or above the lift it is named after (a Snatch Pull, a Clean Pull, a Snatch Balance, a Jerk Balance, a rack pull) — its weight is not limited by that lift's max. " +
   "You decide by what the movement IS; the name's spelling does not matter.";
