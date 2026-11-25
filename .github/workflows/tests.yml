@@ -45,3 +45,13 @@ jobs:
       # itself; tsconfig.app.json is the one that covers src/.
       - run: npx tsc --noEmit -p tsconfig.app.json
       - run: npm run test:calculators
+      # EVERY MEMBER SCREEN IS OPENED, with realistic data, for every kind of
+      # member (2026-11-25). A release crashed the program page for everyone
+      # with an unwritten week; the type check, the build and every test above
+      # passed, because none of them ever rendered a page. These do.
+      - run: npm run test:pages
+      # Nothing new may be used before it is declared: the exact mistake behind
+      # that crash, which the type check does not catch.
+      - run: npm run check:declared
+      # The app must actually build.
+      - run: npm run build
