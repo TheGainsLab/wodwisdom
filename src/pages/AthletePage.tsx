@@ -1205,9 +1205,6 @@ export default function AthletePage({ session }: { session: Session }) {
   // who hasn't typed anything.
   const interactedRef = useRef(false);
   const markDirty = () => { interactedRef.current = true; setIsDirty(true); };
-  // True while a lift, skill or conditioning number has been edited and not
-  // yet saved. The floating pill then saves the way Save My Numbers does.
-  const step2TouchedRef = useRef(false);
 
   // A pending avoidance sign-off must never hide inside a collapsed goals
   // card — the parse lands after the save that collapsed it, so reopen.
@@ -1313,18 +1310,15 @@ export default function AthletePage({ session }: { session: Session }) {
     const num = clampLift(value, units); // clamp to [0, sane cap] — no 3,000 lb squats
     if (isNaN(num)) return;
     setLifts(prev => ({ ...prev, [key]: num }));
-    step2TouchedRef.current = true;
     markDirty();
   };
 
   const setSkill = (key: string, level: SkillLevel) => {
     setSkills(prev => ({ ...prev, [key]: level }));
-    step2TouchedRef.current = true;
     markDirty();
   };
 
   const setConditioningVal = (key: string, value: string | number) => {
-    step2TouchedRef.current = true;
     if (value === '' || value === null || value === undefined) {
       setConditioning(prev => {
         const next = { ...prev };
@@ -1640,7 +1634,6 @@ export default function AthletePage({ session }: { session: Session }) {
     if (isNewUser) setIsNewUser(false);
     setIsDirty(false);
     setSavedCount((n) => n + 1);
-    step2TouchedRef.current = false;
     // Saved-state mirrors: what was just persisted is what the collapsed
     // Step 3 summaries may now show green.
     setSavedSched({ days: daysPerWeek, len: sessionLengthMinutes });
@@ -1843,9 +1836,10 @@ export default function AthletePage({ session }: { session: Session }) {
   const step2Sparse =
     ['back_squat', 'deadlift', 'bench_press', 'snatch', 'clean_and_jerk'].some((k) => !(lifts[k] > 0)) ||
     condRequiredMissing;
-  /** THE Step 2 save: the two-choice dialog first when core numbers are
-   *  blank, otherwise a save that completes Step 2. Save My Numbers and the
-   *  floating pill both call it, so the two can never do different things. */
+  /** THE Step 2 save (Save My Numbers): the two-choice dialog first when
+   *  core numbers are blank, otherwise a save that completes Step 2. The
+   *  floating pill is a PARTIAL save by design (founder, 2026-11-25): it
+   *  stores what is typed and never completes a step. */
   const saveNumbers = async () => {
     if (!athleticReviewedAt && step2Sparse) { setSparseModalOpen(true); return; }
     await saveProfile({ review: true });
@@ -1929,9 +1923,9 @@ export default function AthletePage({ session }: { session: Session }) {
           <button
             type="button"
             className="unsaved-pill"
-            onClick={() => { void (step2TouchedRef.current && !athleticReviewedAt ? saveNumbers() : saveProfile()); }}
+            onClick={() => { void saveProfile(); }}
           >
-            Unsaved changes — tap to save
+            Save work in progress
           </button>
         )}
         {/* Sparse Step-2 save: two honest choices instead of OK/Cancel.
@@ -2141,7 +2135,14 @@ export default function AthletePage({ session }: { session: Session }) {
                     !savedStatus.canRunEval &&
                     savedStatus.tier1.complete &&
                     savedStatus.tier2.missing.every((m) => m === 'conditioning');
-                  if (canRun || (hasEvalCredit && onlyCondBlocking)) {
+                  // The evaluation is offered only once Step 2 is complete
+                  // (2026-11-25). It used to appear as soon as numbers were
+                  // saved, even by the work-in-progress pill; the server
+                  // refuses an evaluation until Step 2 is complete, so the
+                  // member tapped Run and was told to finish numbers they
+                  // had already entered.
+                  void onlyCondBlocking;
+                  if (canRun) {
                     const showRequired = evalCheckpoint === 'required' && condRequiredMissing;
                     const showSoft = evalCheckpoint === 'soft' && !condRequiredMissing && softGapPhrases.length > 0;
                     return (
@@ -2468,16 +2469,26 @@ export default function AthletePage({ session }: { session: Session }) {
                 {(() => {
                   const numbersSaved = !isDirty && savedStatus.tier2.complete;
                   return (
-                    <button
-                      type="button"
-                      className="auth-btn"
-                      style={{ marginTop: 16, ...(numbersSaved && !saving ? { background: '#2ec486', color: 'white' } : null) }}
-                      disabled={saving}
-                      ref={numbersBtnRef}
-                      onClick={() => { void saveNumbers(); }}
-                    >
-                      {saving ? 'Saving...' : numbersSaved ? 'Saved ✓' : 'Save My Numbers'}
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        className="auth-btn"
+                        style={{ marginTop: 16, ...(numbersSaved && !saving ? { background: '#2ec486', color: 'white' } : null) }}
+                        disabled={saving}
+                        ref={numbersBtnRef}
+                        onClick={() => { void saveNumbers(); }}
+                      >
+                        {saving ? 'Saving...' : numbersSaved ? 'Saved ✓' : 'Section complete — save my numbers'}
+                      </button>
+                      {/* Two saves, said plainly (founder, 2026-11-25): the
+                          floating pill stores work in progress; this button
+                          is the one that finishes the step. */}
+                      {!savedStatus.tier2.complete && (
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.5 }}>
+                          Not finished? "Save work in progress" keeps what you've entered so you can come back. Tap this button when the section is done to unlock your evaluation.
+                        </div>
+                      )}
+                    </>
                   );
                 })()}
                 </TierCard>

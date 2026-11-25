@@ -15,12 +15,13 @@ export interface FakeData {
   rpc?: Record<string, unknown>;
 }
 
-function builder(rows: Row[], writes: { table: string; op: string; payload: unknown }[], table: string) {
+function builder(rows: Row[], writes: { table: string; op: string; payload: unknown }[], table: string, failing: () => boolean = () => false) {
   let out = rows.slice();
   let single: 'one' | 'maybe' | null = null;
   let head = false;
   let wantCount = false;
   let limitN: number | null = null;
+  let wrote = false;
   const q: Record<string, unknown> = {};
   const filt = (fn: (r: Row) => boolean) => { out = out.filter(fn); return q; };
   const plain = (c: string) => !c.includes('->') && !c.includes('.') && !c.includes('(');
@@ -51,10 +52,12 @@ function builder(rows: Row[], writes: { table: string; op: string; payload: unkn
     single() { single = 'one'; return q; },
     maybeSingle() { single = 'maybe'; return q; },
     insert(payload: unknown) { writes.push({ table, op: 'insert', payload }); out = Array.isArray(payload) ? (payload as Row[]) : [payload as Row]; return q; },
-    upsert(payload: unknown) { writes.push({ table, op: 'upsert', payload }); out = Array.isArray(payload) ? (payload as Row[]) : [payload as Row]; return q; },
+    upsert(payload: unknown) { wrote = true; writes.push({ table, op: 'upsert', payload }); out = Array.isArray(payload) ? (payload as Row[]) : [payload as Row]; return q; },
     update(payload: unknown) { writes.push({ table, op: 'update', payload }); return q; },
     delete() { writes.push({ table, op: 'delete', payload: null }); return q; },
     then(resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) {
+      // A test can make saves to a table fail, to check the page says so.
+      if (wrote && failing()) return Promise.resolve({ data: null, error: { message: 'write refused (test)' } }).then(resolve, reject);
       const list = limitN != null ? out.slice(0, limitN) : out;
       const res = head
         ? { data: null, error: null, count: list.length }
@@ -69,14 +72,17 @@ function builder(rows: Row[], writes: { table: string; op: string; payload: unkn
 
 export function fakeSupabase(d: FakeData) {
   const writes: { table: string; op: string; payload: unknown }[] = [];
+  /** Tables whose upserts fail. A test adds a name to make saves fail. */
+  const failUpserts = new Set<string>();
   const session = { access_token: 'test-token', user: { id: d.userId, email: d.email ?? 'member@example.com' } };
   const channel: Record<string, unknown> = {};
   Object.assign(channel, { on: () => channel, subscribe: () => channel, unsubscribe: () => Promise.resolve() });
   return {
     writes,
+    failUpserts,
     session,
     client: {
-      from: (table: string) => builder(d.tables[table] ?? [], writes, table),
+      from: (table: string) => builder(d.tables[table] ?? [], writes, table, () => failUpserts.has(table)),
       rpc: (name: string) => Promise.resolve({ data: d.rpc?.[name] ?? null, error: null }),
       functions: { invoke: (name: string) => Promise.resolve({ data: d.functions?.[name] ?? null, error: null }) },
       auth: {
