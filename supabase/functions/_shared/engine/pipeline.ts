@@ -334,6 +334,10 @@ export async function callWeekFill(
       payload.training_context.injuries_structured?.do_not_program,
       athleteWordsElsewhere(payload.athlete_model?.self_report, payload.training_context.coach_notes),
     ) || "- The athlete has stated no injury, pain or physical limit, and has no avoid list.",
+    // Which weights are barbell weights (2026-11-24): plate rounding used to
+    // hit every weight, turning a 24 kg kettlebell into 25 kg. The writer says
+    // which is which; code only rounds what it is told is a barbell.
+    "- EVERY movement that has a weight also carries on_barbell: true when the weight is loaded on a barbell, false for a fixed implement or a machine (dumbbell, kettlebell, wall ball, medicine ball, sandbag, vest, sled, machine). Barbell weights are rounded to loadable plates after you. Implement weights are kept EXACTLY, so write a size that exists — a 24 kg or 53 lb kettlebell, a 9 kg or 20 lb wall ball — never a barbell-style number for an implement.",
     // Session-budget phase: honor the skeleton's time allocation when it
     // emitted one. Guidance only — nothing checks or enforces it.
     ...((payload.training_context.session_length_minutes ?? 0) > 0
@@ -611,9 +615,12 @@ export function auditOutput(
   payload: WriterPayload,
   skeleton: SkeletonOutput,
   pack: DomainPack,
+  /** Weeks the output should hold: 4 for a month, 1 for a weekly job. */
+  expectedWeeks = 4,
 ) {
   return pack.audits.runHard({
     output,
+    expectedWeeks,
     daysPerWeek: payload.training_context.days_per_week,
     lifts: payload.lifts,
     vocabulary: payload.vocabulary,

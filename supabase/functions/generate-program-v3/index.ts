@@ -193,13 +193,18 @@ const PACK = getDomainPack("crossfit@3");
  * dropped or swapped); nothing audits their output, so this check cannot flag
  * or undo what they did. Keep it that way: never call this after the gates.
  */
+/** The most repair passes a job may take before it ships with what remains. */
+export const MAX_SURGICAL_PASSES = 6;
+
 function auditOutput(
   output: WriterOutput,
   payload: WriterPayload,
   skeleton: SkeletonOutput,
   pack: typeof PACK,
+  /** Weeks the output should hold: 4 for a month, 1 for a weekly job. */
+  expectedWeeks = 4,
 ) {
-  return withPlanChecks(auditOutputHard(output, payload, skeleton, pack), output, skeleton);
+  return withPlanChecks(auditOutputHard(output, payload, skeleton, pack, expectedWeeks), output, skeleton);
 }
 
 /** Transition from surgical (or benchmark_audit) into safety_review: drop the
@@ -436,6 +441,14 @@ async function stageSkeleton(
         `\nCURRENT SKELETON:\n${JSON.stringify(store.skeleton)}`;
       try {
         const fresh = await generateSkeletonWithAudits(tdi, PACK, undefined, replanDoc);
+        // An Engine-entitled athlete never receives a cardio block. This used
+        // to be applied on a first build only, so a re-planned month could
+        // carry one (2026-11-24). Same rule, same place in the order: on the
+        // plan, before anything is written from it.
+        if (tdi.cardio_allowed === false) {
+          const strippedOnReplan = stripCardioBlocks(fresh);
+          if (strippedOnReplan.length) console.log(`[generate-program-v3] week ${weekNum}: re-plan cardio removed from ${strippedOnReplan.join(", ")} (athlete holds an Engine entitlement)`);
+        }
         // Keep written weeks from the stored skeleton whatever the writer did.
         skeleton = {
           ...fresh,
@@ -803,7 +816,7 @@ async function stageBenchmarkAudit(
   // invocation, then the first hard audit + any programmatic patches.
   let pendingFailures = await recomputeBenchmarks(output, gender, [], PACK);
 
-  let auditResult = auditOutput(output, payload, skeleton, PACK);
+  let auditResult = auditOutput(output, payload, skeleton, PACK, rs.weekly ? 1 : 4);
   console.log(`[generate-program-v3] audits: ${summarizeAuditRun(auditResult)}`);
   if (auditResult.passed) return { next: "safety_review", resumeState: toSafety(rs, output, []), displayStage: "safety_review" };
 
@@ -816,7 +829,7 @@ async function stageBenchmarkAudit(
       console.log(`[generate-program-v3] programmatic patches applied: ${patch.patched}`);
       for (const line of patch.log) console.log(`  - ${line}`);
       pendingFailures = await recomputeBenchmarks(output, gender, pendingFailures, PACK, []);
-      auditResult = auditOutput(output, payload, skeleton, PACK);
+      auditResult = auditOutput(output, payload, skeleton, PACK, rs.weekly ? 1 : 4);
       console.log(`[generate-program-v3] audits after patch: ${summarizeAuditRun(auditResult)}`);
       if (auditResult.passed) return { next: "safety_review", resumeState: toSafety(rs, output, []), displayStage: "safety_review" };
       byKind = classifyFailuresByKind(auditResult.failures);
@@ -855,8 +868,19 @@ async function stageSurgical(
   let pendingFailures = cursor.pendingFailures;
   const pass = cursor.pass + 1;
 
+  // A hard ceiling on passes (2026-11-24). The stall rule below stops only
+  // when the failing-block count is the same three passes running; a count
+  // that goes up and down (a rewrite can introduce a new failure) never
+  // triggered it, so nothing bounded the loop. Past the ceiling the program
+  // ships with what remains logged, as on a stall.
+  if (pass > MAX_SURGICAL_PASSES) {
+    const remaining = auditOutput(output, payload, skeleton, PACK, rs.weekly ? 1 : 4);
+    console.log(`[generate-program-v3] surgical stopped at the pass ceiling (${MAX_SURGICAL_PASSES}); shipping residuals`);
+    return { next: "safety_review", resumeState: toSafety(rs, output, remaining.passed ? [] : remaining.failures), displayStage: "safety_review" };
+  }
+
   // Re-derive current failures (audits are pure + cheap — no LLM).
-  let auditResult = auditOutput(output, payload, skeleton, PACK);
+  let auditResult = auditOutput(output, payload, skeleton, PACK, rs.weekly ? 1 : 4);
   if (auditResult.passed) return { next: "safety_review", resumeState: toSafety(rs, output, []), displayStage: "safety_review" };
   let byKind = classifyFailuresByKind(auditResult.failures);
   if (byKind["block-local"].length === 0) {
@@ -875,7 +899,7 @@ async function stageSurgical(
   }
 
   pendingFailures = await recomputeBenchmarks(output, gender, pendingFailures, PACK, sg.locations);
-  auditResult = auditOutput(output, payload, skeleton, PACK);
+  auditResult = auditOutput(output, payload, skeleton, PACK, rs.weekly ? 1 : 4);
   console.log(`[generate-program-v3] audits after surgical pass ${pass}: ${summarizeAuditRun(auditResult)}`);
   if (auditResult.passed) return { next: "safety_review", resumeState: toSafety(rs, output, []), displayStage: "safety_review" };
   byKind = classifyFailuresByKind(auditResult.failures);
@@ -886,7 +910,7 @@ async function stageSurgical(
     if (patch2.patched > 0) {
       for (const line of patch2.log) console.log(`  - ${line}`);
       pendingFailures = await recomputeBenchmarks(output, gender, pendingFailures, PACK, []);
-      auditResult = auditOutput(output, payload, skeleton, PACK);
+      auditResult = auditOutput(output, payload, skeleton, PACK, rs.weekly ? 1 : 4);
       if (auditResult.passed) return { next: "safety_review", resumeState: toSafety(rs, output, []), displayStage: "safety_review" };
       byKind = classifyFailuresByKind(auditResult.failures);
     }

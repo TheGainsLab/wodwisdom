@@ -142,3 +142,43 @@ Deno.test("if the purpose-note column is not there yet, the week still saves, wi
   assertEquals(blocks.length, 6);
   assertEquals(blocks.some((b: Any) => "stimulus_note" in b), false);
 });
+
+// ── Plate rounding is for barbells only (2026-11-24) ────────────────────────
+import { weightToStore } from "./save-program-v3.ts";
+
+Deno.test("a fixed implement keeps the weight it was given; a barbell is rounded to plates", () => {
+  // The three real cases: stored as 25, 10 and 32.5 kg before this.
+  assertEquals(weightToStore(24, "kg", false), 24);
+  assertEquals(weightToStore(9, "kg", false), 9);
+  assertEquals(weightToStore(32, "kg", false), 32);
+  assertEquals(weightToStore(53, "lbs", false), 53);
+  // A barbell still snaps to a loadable weight.
+  assertEquals(weightToStore(49, "kg", true), 50);
+  assertEquals(weightToStore(208, "lbs", true), 210);
+  // The writer did not say: the old rounding applies, nothing gets worse.
+  assertEquals(weightToStore(49, "kg", undefined), 50);
+  assertEquals(weightToStore(null, "kg", false), null);
+});
+
+Deno.test("saved movements follow the writer's on_barbell: kettlebell kept, barbell rounded", async () => {
+  const db = start();
+  const wk: Any = {
+    week_num: 2,
+    days: DAYS.map((d) => ({ day_num: d, blocks: [
+      { block_type: "strength", scheme_format: { format: "work_sets" }, movements: [{ movement: "Strict Press", sets: 5, reps: 5, weight: 49, weight_unit: "kg", on_barbell: true }] },
+      { block_type: "metcon", scheme_format: { format: "amrap", minutes: 12 }, movements: [
+        { movement: "Kettlebell Swing", rep_scheme: [15], weight: 24, weight_unit: "kg", on_barbell: false },
+        { movement: "Wall Ball", rep_scheme: [20], weight: 9, weight_unit: "kg", on_barbell: false },
+      ] },
+    ] })),
+  };
+  await saveWeek(db.supa, wk);
+  const ids = new Set(rowsOf(db, 2).map((r: Any) => r.id));
+  const blockIds = new Set(db.tables.program_blocks_v2.filter((b: Any) => ids.has(b.program_workout_id)).map((b: Any) => b.id));
+  const weightOf = (name: string) => [...new Set(db.tables.program_movements_v2.filter((m: Any) => blockIds.has(m.block_id) && m.movement === name).map((m: Any) => m.weight))];
+  assertEquals(weightOf("Kettlebell Swing"), [24]);
+  assertEquals(weightOf("Wall Ball"), [9]);
+  assertEquals(weightOf("Strict Press"), [50]);
+  // The flag is a save-time instruction, not a stored column.
+  assertEquals(db.tables.program_movements_v2.some((m: Any) => "on_barbell" in m), false);
+});

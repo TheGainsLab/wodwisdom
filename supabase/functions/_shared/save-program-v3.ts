@@ -28,11 +28,25 @@ interface InsertedWorkout {
  * kg → nearest 2.5. Null and non-positive weights pass through unchanged
  * (bodyweight / distance-only / time-only movements).
  */
-function roundToPlateMath(w: number | null, unit: string | null): number | null {
+export function roundToPlateMath(w: number | null, unit: string | null): number | null {
   if (w == null) return null;
   if (!Number.isFinite(w) || w <= 0) return w;
   const step = unit === 'kg' ? 2.5 : 5;
   return Math.round(w / step) * step;
+}
+
+/**
+ * The weight to store for a movement (2026-11-24).
+ *
+ * Plate rounding is for BARBELLS. It was applied to every weight, so a 24 kg
+ * kettlebell was stored as 25 kg, a 9 kg wall ball as 10 kg and a 32 kg carry
+ * as 32.5 kg — sizes no gym has. The writer now says whether a weight goes on
+ * a barbell (`on_barbell`): a fixed implement or machine keeps the weight it
+ * was given, exactly. When the writer did not say (a block from before this
+ * field, or an omission), the old rounding applies, so nothing gets worse.
+ */
+export function weightToStore(w: number | null, unit: string | null, onBarbell: boolean | null | undefined): number | null {
+  return onBarbell === false ? w : roundToPlateMath(w, unit);
 }
 
 /**
@@ -441,7 +455,7 @@ export async function saveProgramV3(
               sets: mv.sets ?? null,
               reps,
               rep_scheme,
-              weight: roundToPlateMath(mv.weight ?? null, mv.weight_unit ?? null),
+              weight: weightToStore(mv.weight ?? null, mv.weight_unit ?? null, (mv as { on_barbell?: boolean }).on_barbell),
               weight_unit: mv.weight_unit ?? null,
               rpe: mv.rpe ?? null,
               time_seconds: mv.time_seconds ?? null,
