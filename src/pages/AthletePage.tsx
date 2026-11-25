@@ -1844,16 +1844,6 @@ export default function AthletePage({ session }: { session: Session }) {
     if (!athleticReviewedAt && step2Sparse) { setSparseModalOpen(true); return; }
     await saveProfile({ review: true });
   };
-  // The pill hides while Save My Numbers is on screen: it sat on top of it.
-  const numbersBtnRef = useRef<HTMLButtonElement | null>(null);
-  const [numbersBtnInView, setNumbersBtnInView] = useState(false);
-  useEffect(() => {
-    const el = numbersBtnRef.current;
-    if (!t2Expanded || !el || typeof IntersectionObserver === 'undefined') { setNumbersBtnInView(false); return; }
-    const io = new IntersectionObserver(([entry]) => setNumbersBtnInView(entry.isIntersecting), { threshold: 0.6 });
-    io.observe(el);
-    return () => io.disconnect();
-  }, [t2Expanded, loading]);
   // Blank optional athletic fields, most-valuable first (conditioning depth,
   // then the non-required lifts), for the soft checkpoint's specifics line.
   const softGapPhrases: string[] = [];
@@ -1919,7 +1909,7 @@ export default function AthletePage({ session }: { session: Session }) {
         {/* Floating unsaved-changes reminder: visible from the moment the
             user edits anything until a save lands, wherever they've
             scrolled. Tapping it saves — no hunting for the right button. */}
-        {isDirty && interactedRef.current && !saving && !loading && !numbersBtnInView && (
+        {isDirty && interactedRef.current && !saving && !loading && (
           <button
             type="button"
             className="unsaved-pill"
@@ -1967,7 +1957,10 @@ export default function AthletePage({ session }: { session: Session }) {
           </div>
         )}
         <div className="page-body">
-          <div style={{ maxWidth: 600, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Room below the last card so anything can be scrolled clear of
+              the floating "Save work in progress" pill, which is always
+              available while there are unsaved edits (2026-11-25). */}
+          <div style={{ maxWidth: 600, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16, paddingBottom: 96 }}>
             {injuryMigrationPrompt && injuryShowback && (
               <div className="settings-card" style={{ borderColor: 'var(--accent)', background: 'var(--accent-glow)' }}>
                 <h2 className="settings-card-title" style={{ marginBottom: 6 }}>Confirm your avoidances</h2>
@@ -2475,7 +2468,6 @@ export default function AthletePage({ session }: { session: Session }) {
                         className="auth-btn"
                         style={{ marginTop: 16, ...(numbersSaved && !saving ? { background: '#2ec486', color: 'white' } : null) }}
                         disabled={saving}
-                        ref={numbersBtnRef}
                         onClick={() => { void saveNumbers(); }}
                       >
                         {saving ? 'Saving...' : numbersSaved ? 'Saved ✓' : 'Section complete — save my numbers'}
