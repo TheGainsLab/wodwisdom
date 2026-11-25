@@ -72,4 +72,8 @@ export const COUNTS_TOWARD_INSTRUCTION =
   "A SKILL key when it is that gymnastics skill or a direct form of it " +
   "(Chest To Bar counts toward chest_to_bar_pull_ups, a Ring Muscle Up toward muscle_ups, a Handstand Push Up toward hspu). " +
   "\"none\" for everything else: dumbbell, kettlebell and machine work, running, carries, accessory and core work, and scaled progressions that are not the skill itself. " +
+  // 2026-11-25: a lift key makes code hold the weight under that lift's
+  // ceiling. A pull is normally loaded ABOVE the lift it is named after, so
+  // it must not carry the lift's key; its weight is the AI's own judgment.
+  "Also \"none\": a pull or partial lift that is trained heavier than the lift it is named after (a Snatch Pull, a Clean Pull, a rack pull) — its weight is not limited by that lift's max. " +
   "You decide by what the movement IS; the name's spelling does not matter.";

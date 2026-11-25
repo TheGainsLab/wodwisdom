@@ -175,3 +175,10 @@ Deno.test("the load limit applies to a lift the AI labelled, whatever it is call
   const none = week({ movement: "Back Squat", weight: 100, counts_toward: "none" });
   assertEquals(applyLoadArithmetic(none, profile), []);
 });
+
+Deno.test("the instruction says a pull is \"none\", so the lift's ceiling is never applied to it", () => {
+  assert(/Snatch Pull/.test(COUNTS_TOWARD_INSTRUCTION) && /Clean Pull/.test(COUNTS_TOWARD_INSTRUCTION));
+  assert(/not limited by that lift's max/.test(COUNTS_TOWARD_INSTRUCTION));
+  // And with "none" code leaves a pull's weight alone, however heavy.
+  assertEquals(liftKeyOf({ movement: "Snatch Pull", counts_toward: "none", on_barbell: true }), undefined);
+});
