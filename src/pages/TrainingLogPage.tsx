@@ -12,6 +12,7 @@ import { loadUserProgress, getWorkoutsForProgram, getProgramMapping, getProgramR
 import { listActivities, deleteActivity, activityImageUrl, type AthleteActivity } from '../lib/activitiesService';
 import { scheduleProgramDay, scheduleEngineDay, unschedule } from '../lib/trainingSchedule';
 import { localDateString } from '../lib/localDate';
+import { liftCardFor, skillCardFor } from '../lib/trainingLogCards';
 import { formatMovementName } from '../lib/movementName';
 
 
@@ -208,6 +209,10 @@ interface WorkoutLogEntry {
   variation: string | null;
   faults_observed: string[] | null;
   sort_order: number;
+  /** What the AI said this movement counts toward (see counts-toward.ts);
+   *  absent on entries nobody has labelled. Loaded separately, so the page
+   *  works whether or not the column exists yet. */
+  counts_toward?: string | null;
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -1033,7 +1038,21 @@ export default function TrainingLogPage({ session }: { session: Session }) {
         const groupedEntries: Record<string, WorkoutLogEntry[]> = {};
         const dateMap = new Map(logRows.map(l => [l.id, l.workout_date]));
         const flatEntries: (WorkoutLogEntry & { workout_date: string })[] = [];
+        // What each entry counts toward, read on its own: if the column is not
+        // there yet this returns an error and every entry is simply unlabelled.
+        const labelById = new Map<string, string>();
+        try {
+          const { data: labelRows } = await supabase
+            .from('workout_log_entries')
+            .select('id, counts_toward')
+            .in('log_id', logIds)
+            .not('counts_toward', 'is', null);
+          for (const r of (labelRows as Array<{ id: string; counts_toward: string | null }> | null) ?? []) {
+            if (r.counts_toward) labelById.set(r.id, r.counts_toward);
+          }
+        } catch { /* unlabelled */ }
         for (const e of (entries as WorkoutLogEntry[]) || []) {
+          e.counts_toward = labelById.get(e.id) ?? null;
           if (!groupedEntries[e.log_id]) groupedEntries[e.log_id] = [];
           groupedEntries[e.log_id].push(e);
           flatEntries.push({ ...e, workout_date: dateMap.get(e.log_id) || '' });
@@ -1278,7 +1297,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
     for (const e of allEntries) {
       if (!e.block_id || blockTypeMap.get(e.block_id) !== 'strength') continue;
       if (e.workout_date < cutoffStr) continue;
-      const key = classifyLift(e.movement);
+      const key = liftCardFor(e, classifyLift);
       map.get(key)!.entries.push(e);
     }
 
@@ -1582,7 +1601,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
     for (const e of allEntries) {
       if (!e.block_id || blockTypeMap.get(e.block_id) !== 'skills') continue;
       if (e.workout_date < cutoffStr) continue;
-      const key = classifySkill(e.movement);
+      const key = skillCardFor(e, classifySkill);
       map.get(key)!.entries.push(e);
     }
 

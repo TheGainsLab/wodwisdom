@@ -25,6 +25,7 @@
  *   7. Movement vocabulary compliance (display_name match)
  */
 
+import { liftKeyOf } from "./lift-key.ts";
 import {
   BLOCK_TYPES,
   type WriterOutput,
@@ -914,27 +915,11 @@ export function auditDayCount(
  * movement weights (DB snatch, KB swing, wall ball, etc.) are NOT
  * checked here (they have no 1RM column to compare against).
  */
-// Exact display-name → canonical 1RM lift key. Exported so the domain pack can
-// hand it to the Engine's cohort scaler (single source of truth — the mirror in
-// programmatic-fixes.ts is still synced manually).
-export const DISPLAY_TO_LIFT_KEY: Record<string, string> = {
-  "Back Squat": "back_squat",
-  "Front Squat": "front_squat",
-  "Overhead Squat": "overhead_squat",
-  "Deadlift": "deadlift",
-  "Snatch": "snatch",
-  "Power Snatch": "power_snatch",
-  "Clean": "clean",
-  "Clean and Jerk": "clean_and_jerk",
-  "Clean & Jerk": "clean_and_jerk",
-  "Jerk": "jerk",
-  "Power Clean": "power_clean",
-  "Push Jerk": "push_jerk",
-  "Press": "press",
-  "Strict Press": "press",
-  "Push Press": "push_press",
-  "Bench Press": "bench_press",
-};
+// The lift-name list and the rule for which lift a movement is judged
+// against live in lift-key.ts (one copy; programmatic-fixes.ts used to keep a
+// second by hand). Re-exported for the domain pack's cohort scaler.
+export { DISPLAY_TO_LIFT_KEY } from "./lift-key.ts";
+
 
 /**
  * Two-layer weight check:
@@ -979,7 +964,7 @@ export function auditLoadSanity(
           if (m.weight == null || m.weight <= 0) continue;
           if (isAttempt) continue; // intentional max attempt
 
-          const liftKey = DISPLAY_TO_LIFT_KEY[m.movement];
+          const liftKey = liftKeyOf(m);
           if (liftKey) {
             const oneRM = lifts[liftKey];
             if (oneRM == null || oneRM <= 0) continue; // no 1RM to compare

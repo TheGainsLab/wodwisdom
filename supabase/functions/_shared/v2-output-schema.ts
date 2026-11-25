@@ -26,6 +26,8 @@
 // TypeScript types
 // ============================================================
 
+import { COUNTS_TOWARD_INSTRUCTION, COUNTS_TOWARD_VALUES } from "./counts-toward.ts";
+
 export type BlockType =
   | "warm-up"
   | "mobility"
@@ -114,6 +116,11 @@ export interface MovementPrescription {
    *  false for a fixed implement or machine, whose weight is kept exactly.
    *  Decided by the writer. Absent on blocks written before 2026-11-24. */
   on_barbell?: boolean;
+  /** Which of the athlete's profile lifts or skills this movement counts
+   *  toward: a key from counts-toward.ts, or "none". Decided by the AI that
+   *  wrote the movement; code reads it and never the name (2026-11-25).
+   *  Absent on movements written before then, until they are labelled. */
+  counts_toward?: string;
   /** Women's RX load when it differs (library/Open prescriptions carry
    *  the men's load in `weight`; the engine's gender slots split here —
    *  merged from workout_signatures.loads_women at measure time, or set
@@ -315,6 +322,7 @@ function buildMovementSchema(units: "lbs" | "kg") {
           "FALSE when it is a fixed implement or a machine — dumbbell, kettlebell, wall ball / medicine ball, sandbag, weight vest, sled, machine stack, carry handles: " +
           "its weight is kept EXACTLY as you write it, so write a size that exists (a 24 kg kettlebell, a 9 kg wall ball, a 22.5 kg dumbbell).",
       },
+      counts_toward: { type: "string", enum: [...COUNTS_TOWARD_VALUES], description: "SET THIS ON EVERY MOVEMENT. " + COUNTS_TOWARD_INSTRUCTION },
       rpe: { type: "integer", minimum: 1, maximum: 10 },
       time_seconds: { type: "integer", minimum: 1, maximum: 7200 },
       distance: { type: "number", minimum: 0, description: "PER-ROUND distance for distance-counted movements ('3 RFT: Row 250m' → 250, with sets: 3). Single-pass → the full distance, sets omitted." },
@@ -329,7 +337,7 @@ function buildMovementSchema(units: "lbs" | "kg") {
         description: "Optional % of 1RM for 1RM-anchored prescriptions (e.g. 72.5 for '@70-75%'). Strength + lift-variant accessory only.",
       },
     },
-    required: ["movement"],
+    required: ["movement", "counts_toward"],
     additionalProperties: false,
   };
 }

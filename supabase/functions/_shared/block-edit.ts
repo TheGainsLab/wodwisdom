@@ -40,6 +40,7 @@ import { composeBlockScheme } from "./compose-block-scheme.ts";
 import { blockSchemeFormatProblems } from "./audits.ts";
 import { normalizeGender } from "./metcon-workcalc.ts";
 import { isArchived } from "./program-archive.ts";
+import { storedCountsToward } from "./counts-toward.ts";
 
 // ---------------------------------------------------------------------------
 // Day blocks — what the coach may reference
@@ -365,11 +366,17 @@ export async function applyBlockProposal(
       cardio_modality: m.cardio_modality ?? null,
       scaling_note: m.scaling_note ?? null,
       target_pct_1rm: m.target_pct_1rm ?? null,
+      counts_toward: storedCountsToward(m.counts_toward),
       sort_order: i,
     };
   });
   if (inserts.length) {
-    const { error: iErr } = await supa.from("program_movements_v2").insert(inserts);
+    let { error: iErr } = await supa.from("program_movements_v2").insert(inserts);
+    // Deploy-order safety: before the counts_toward column exists, save without it.
+    if (iErr && /counts_toward/.test(iErr.message ?? "")) {
+      const without = inserts.map(({ counts_toward: _drop, ...rest }) => rest);
+      ({ error: iErr } = await supa.from("program_movements_v2").insert(without));
+    }
     if (iErr) throw new Error(`movement insert failed: ${iErr.message}`);
   }
 }

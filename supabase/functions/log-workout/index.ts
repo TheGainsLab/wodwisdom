@@ -7,6 +7,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { inferTimeDomain } from "../_shared/time-domain.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
+import { insertLogEntries } from "../_shared/log-counts-toward.ts";
 import { ARCHIVED_PROGRAM_ERROR, isLogOfArchivedProgram, isProgramDayArchived } from "../_shared/program-archive.ts";
 import { computeMetconPower, type MetconBlockInput } from "../_shared/metcon-workcalc.ts";
 import { computeCardioPower } from "../_shared/cardio-power.ts";
@@ -418,7 +419,8 @@ Deno.serve(async (req) => {
     }
 
     if (entries.length > 0) {
-      const { error: entriesErr } = await supa.from("workout_log_entries").insert(entries);
+      // Each entry carries what its movement counts toward (2026-11-25).
+      const entriesErr = await insertLogEntries(supa, entries, source_id);
       if (entriesErr) {
         console.error("log-workout entries insert error:", entriesErr);
       }

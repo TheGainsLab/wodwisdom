@@ -12,6 +12,7 @@ import { ARCHIVED_PROGRAM_ERROR, isLogOfArchivedProgram, isProgramDayArchived } 
 import { computeMetconPower, type MetconBlockInput } from "../_shared/metcon-workcalc.ts";
 import { computeCardioPower } from "../_shared/cardio-power.ts";
 import { UNCOUNTED_BLOCK_TYPES_FILTER } from "../_shared/day-block-count.ts";
+import { insertLogEntries } from "../_shared/log-counts-toward.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -428,9 +429,8 @@ Deno.serve(async (req) => {
       }));
 
     if (entries.length > 0) {
-      const { error: entriesErr } = await supa
-        .from("workout_log_entries")
-        .insert(entries);
+      // Each entry carries what its movement counts toward (2026-11-25).
+      const entriesErr = await insertLogEntries(supa, entries, body.source_id ?? null);
       if (entriesErr) {
         console.error("save-workout-block: entries insert error", entriesErr);
       }
