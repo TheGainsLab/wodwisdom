@@ -751,6 +751,12 @@ export default function AthletePage({ session }: { session: Session }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [isDirty, setIsDirty] = useState(true);
+  // Counts successful saves. The "last saved" snapshot the badges read is
+  // retaken on every one (2026-11-25): it used to be retaken only when
+  // isDirty flipped, so a save made while the form was already clean (the
+  // floating pill, then Save My Numbers) completed Step 2 in the database
+  // and left the screen showing it incomplete.
+  const [savedCount, setSavedCount] = useState(0);
   const [isNewUser, setIsNewUser] = useState(false);
   // Eval result is no longer read (v3 generation reads the eval from the DB; it
   // used to feed v1's evaluation_id). Setter kept for the eval-complete flow.
@@ -1627,6 +1633,7 @@ export default function AthletePage({ session }: { session: Session }) {
     // flow by unmounting the component mid-click.
     if (isNewUser) setIsNewUser(false);
     setIsDirty(false);
+    setSavedCount((n) => n + 1);
     // Saved-state mirrors: what was just persisted is what the collapsed
     // Step 3 summaries may now show green.
     setSavedSched({ days: daysPerWeek, len: sessionLengthMinutes });
@@ -1809,7 +1816,7 @@ export default function AthletePage({ session }: { session: Session }) {
   useEffect(() => {
     if (!loading && !loadError && !isDirty) setSavedTier(tierStatus);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDirty, loading, loadError]);
+  }, [isDirty, loading, loadError, savedCount]);
   const savedStatus = savedTier ?? tierStatus;
 
   // Sections always arrive COLLAPSED (founder, 2026-10-08): the user gets
@@ -1829,6 +1836,14 @@ export default function AthletePage({ session }: { session: Session }) {
   const step2Sparse =
     ['back_squat', 'deadlift', 'bench_press', 'snatch', 'clean_and_jerk'].some((k) => !(lifts[k] > 0)) ||
     condRequiredMissing;
+  /** THE Step 2 save (Save My Numbers): the two-choice dialog first when
+   *  core numbers are blank, otherwise a save that completes Step 2. The
+   *  floating pill is a PARTIAL save by design (founder, 2026-11-25): it
+   *  stores what is typed and never completes a step. */
+  const saveNumbers = async () => {
+    if (!athleticReviewedAt && step2Sparse) { setSparseModalOpen(true); return; }
+    await saveProfile({ review: true });
+  };
   // Blank optional athletic fields, most-valuable first (conditioning depth,
   // then the non-required lifts), for the soft checkpoint's specifics line.
   const softGapPhrases: string[] = [];
@@ -1900,7 +1915,7 @@ export default function AthletePage({ session }: { session: Session }) {
             className="unsaved-pill"
             onClick={() => { void saveProfile(); }}
           >
-            Unsaved changes — tap to save
+            Save work in progress
           </button>
         )}
         {/* Sparse Step-2 save: two honest choices instead of OK/Cancel.
@@ -1942,7 +1957,10 @@ export default function AthletePage({ session }: { session: Session }) {
           </div>
         )}
         <div className="page-body">
-          <div style={{ maxWidth: 600, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Room below the last card so anything can be scrolled clear of
+              the floating "Save work in progress" pill, which is always
+              available while there are unsaved edits (2026-11-25). */}
+          <div style={{ maxWidth: 600, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16, paddingBottom: 96 }}>
             {injuryMigrationPrompt && injuryShowback && (
               <div className="settings-card" style={{ borderColor: 'var(--accent)', background: 'var(--accent-glow)' }}>
                 <h2 className="settings-card-title" style={{ marginBottom: 6 }}>Confirm your avoidances</h2>
@@ -2110,7 +2128,14 @@ export default function AthletePage({ session }: { session: Session }) {
                     !savedStatus.canRunEval &&
                     savedStatus.tier1.complete &&
                     savedStatus.tier2.missing.every((m) => m === 'conditioning');
-                  if (canRun || (hasEvalCredit && onlyCondBlocking)) {
+                  // The evaluation is offered only once Step 2 is complete
+                  // (2026-11-25). It used to appear as soon as numbers were
+                  // saved, even by the work-in-progress pill; the server
+                  // refuses an evaluation until Step 2 is complete, so the
+                  // member tapped Run and was told to finish numbers they
+                  // had already entered.
+                  void onlyCondBlocking;
+                  if (canRun) {
                     const showRequired = evalCheckpoint === 'required' && condRequiredMissing;
                     const showSoft = evalCheckpoint === 'soft' && !condRequiredMissing && softGapPhrases.length > 0;
                     return (
@@ -2437,21 +2462,25 @@ export default function AthletePage({ session }: { session: Session }) {
                 {(() => {
                   const numbersSaved = !isDirty && savedStatus.tier2.complete;
                   return (
-                    <button
-                      type="button"
-                      className="auth-btn"
-                      style={{ marginTop: 16, ...(numbersSaved && !saving ? { background: '#2ec486', color: 'white' } : null) }}
-                      disabled={saving}
-                      onClick={async () => {
-                        if (!athleticReviewedAt && step2Sparse) {
-                          setSparseModalOpen(true);
-                          return;
-                        }
-                        await saveProfile({ review: true });
-                      }}
-                    >
-                      {saving ? 'Saving...' : numbersSaved ? 'Saved ✓' : 'Save My Numbers'}
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        className="auth-btn"
+                        style={{ marginTop: 16, ...(numbersSaved && !saving ? { background: '#2ec486', color: 'white' } : null) }}
+                        disabled={saving}
+                        onClick={() => { void saveNumbers(); }}
+                      >
+                        {saving ? 'Saving...' : numbersSaved ? 'Saved ✓' : 'Section complete — save my numbers'}
+                      </button>
+                      {/* Two saves, said plainly (founder, 2026-11-25): the
+                          floating pill stores work in progress; this button
+                          is the one that finishes the step. */}
+                      {!savedStatus.tier2.complete && (
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.5 }}>
+                          Not finished? "Save work in progress" keeps what you've entered so you can come back. Tap this button when the section is done to unlock your evaluation.
+                        </div>
+                      )}
+                    </>
                   );
                 })()}
                 </TierCard>
