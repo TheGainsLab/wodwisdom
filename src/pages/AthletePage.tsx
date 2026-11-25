@@ -751,6 +751,12 @@ export default function AthletePage({ session }: { session: Session }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [isDirty, setIsDirty] = useState(true);
+  // Counts successful saves. The "last saved" snapshot the badges read is
+  // retaken on every one (2026-11-25): it used to be retaken only when
+  // isDirty flipped, so a save made while the form was already clean (the
+  // floating pill, then Save My Numbers) completed Step 2 in the database
+  // and left the screen showing it incomplete.
+  const [savedCount, setSavedCount] = useState(0);
   const [isNewUser, setIsNewUser] = useState(false);
   // Eval result is no longer read (v3 generation reads the eval from the DB; it
   // used to feed v1's evaluation_id). Setter kept for the eval-complete flow.
@@ -1199,6 +1205,9 @@ export default function AthletePage({ session }: { session: Session }) {
   // who hasn't typed anything.
   const interactedRef = useRef(false);
   const markDirty = () => { interactedRef.current = true; setIsDirty(true); };
+  // True while a lift, skill or conditioning number has been edited and not
+  // yet saved. The floating pill then saves the way Save My Numbers does.
+  const step2TouchedRef = useRef(false);
 
   // A pending avoidance sign-off must never hide inside a collapsed goals
   // card — the parse lands after the save that collapsed it, so reopen.
@@ -1304,15 +1313,18 @@ export default function AthletePage({ session }: { session: Session }) {
     const num = clampLift(value, units); // clamp to [0, sane cap] — no 3,000 lb squats
     if (isNaN(num)) return;
     setLifts(prev => ({ ...prev, [key]: num }));
+    step2TouchedRef.current = true;
     markDirty();
   };
 
   const setSkill = (key: string, level: SkillLevel) => {
     setSkills(prev => ({ ...prev, [key]: level }));
+    step2TouchedRef.current = true;
     markDirty();
   };
 
   const setConditioningVal = (key: string, value: string | number) => {
+    step2TouchedRef.current = true;
     if (value === '' || value === null || value === undefined) {
       setConditioning(prev => {
         const next = { ...prev };
@@ -1627,6 +1639,8 @@ export default function AthletePage({ session }: { session: Session }) {
     // flow by unmounting the component mid-click.
     if (isNewUser) setIsNewUser(false);
     setIsDirty(false);
+    setSavedCount((n) => n + 1);
+    step2TouchedRef.current = false;
     // Saved-state mirrors: what was just persisted is what the collapsed
     // Step 3 summaries may now show green.
     setSavedSched({ days: daysPerWeek, len: sessionLengthMinutes });
@@ -1809,7 +1823,7 @@ export default function AthletePage({ session }: { session: Session }) {
   useEffect(() => {
     if (!loading && !loadError && !isDirty) setSavedTier(tierStatus);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDirty, loading, loadError]);
+  }, [isDirty, loading, loadError, savedCount]);
   const savedStatus = savedTier ?? tierStatus;
 
   // Sections always arrive COLLAPSED (founder, 2026-10-08): the user gets
@@ -1829,6 +1843,23 @@ export default function AthletePage({ session }: { session: Session }) {
   const step2Sparse =
     ['back_squat', 'deadlift', 'bench_press', 'snatch', 'clean_and_jerk'].some((k) => !(lifts[k] > 0)) ||
     condRequiredMissing;
+  /** THE Step 2 save: the two-choice dialog first when core numbers are
+   *  blank, otherwise a save that completes Step 2. Save My Numbers and the
+   *  floating pill both call it, so the two can never do different things. */
+  const saveNumbers = async () => {
+    if (!athleticReviewedAt && step2Sparse) { setSparseModalOpen(true); return; }
+    await saveProfile({ review: true });
+  };
+  // The pill hides while Save My Numbers is on screen: it sat on top of it.
+  const numbersBtnRef = useRef<HTMLButtonElement | null>(null);
+  const [numbersBtnInView, setNumbersBtnInView] = useState(false);
+  useEffect(() => {
+    const el = numbersBtnRef.current;
+    if (!t2Expanded || !el || typeof IntersectionObserver === 'undefined') { setNumbersBtnInView(false); return; }
+    const io = new IntersectionObserver(([entry]) => setNumbersBtnInView(entry.isIntersecting), { threshold: 0.6 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [t2Expanded, loading]);
   // Blank optional athletic fields, most-valuable first (conditioning depth,
   // then the non-required lifts), for the soft checkpoint's specifics line.
   const softGapPhrases: string[] = [];
@@ -1894,11 +1925,11 @@ export default function AthletePage({ session }: { session: Session }) {
         {/* Floating unsaved-changes reminder: visible from the moment the
             user edits anything until a save lands, wherever they've
             scrolled. Tapping it saves — no hunting for the right button. */}
-        {isDirty && interactedRef.current && !saving && !loading && (
+        {isDirty && interactedRef.current && !saving && !loading && !numbersBtnInView && (
           <button
             type="button"
             className="unsaved-pill"
-            onClick={() => { void saveProfile(); }}
+            onClick={() => { void (step2TouchedRef.current && !athleticReviewedAt ? saveNumbers() : saveProfile()); }}
           >
             Unsaved changes — tap to save
           </button>
@@ -2442,13 +2473,8 @@ export default function AthletePage({ session }: { session: Session }) {
                       className="auth-btn"
                       style={{ marginTop: 16, ...(numbersSaved && !saving ? { background: '#2ec486', color: 'white' } : null) }}
                       disabled={saving}
-                      onClick={async () => {
-                        if (!athleticReviewedAt && step2Sparse) {
-                          setSparseModalOpen(true);
-                          return;
-                        }
-                        await saveProfile({ review: true });
-                      }}
+                      ref={numbersBtnRef}
+                      onClick={() => { void saveNumbers(); }}
                     >
                       {saving ? 'Saving...' : numbersSaved ? 'Saved ✓' : 'Save My Numbers'}
                     </button>
