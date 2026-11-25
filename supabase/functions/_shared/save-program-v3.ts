@@ -13,6 +13,7 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import type { WriterOutput } from "./v2-output-schema.ts";
 import { composeBlockScheme } from "./compose-block-scheme.ts";
+import { storedCountsToward } from "./counts-toward.ts";
 import type { SkeletonOutput } from "./v3-output-schema.ts";
 import { rollBackFailedWeekSave } from "./week-save-rollback.ts";
 
@@ -468,6 +469,7 @@ export async function saveProgramV3(
               cardio_modality: mv.cardio_modality ?? null,
               scaling_note: mv.scaling_note ?? null,
               target_pct_1rm: mv.target_pct_1rm ?? null,
+              counts_toward: storedCountsToward((mv as { counts_toward?: string }).counts_toward),
               sort_order: m,
             });
           }
@@ -475,7 +477,14 @@ export async function saveProgramV3(
       }
     }
     if (movementInserts.length > 0) {
-      const { error: mvErr } = await supa.from("program_movements_v2").insert(movementInserts);
+      let { error: mvErr } = await supa.from("program_movements_v2").insert(movementInserts);
+      // Deploy-order safety: if this code runs before the counts_toward column
+      // exists, save the movements without it rather than fail the week.
+      if (mvErr && /counts_toward/.test(mvErr.message ?? "")) {
+        console.warn("[save-v3] counts_toward column missing; saving movements without it");
+        const without = movementInserts.map(({ counts_toward: _drop, ...rest }) => rest);
+        ({ error: mvErr } = await supa.from("program_movements_v2").insert(without));
+      }
       if (mvErr) throw new Error(`[save-v3] program_movements_v2 insert failed: ${mvErr.message}`);
     }
 

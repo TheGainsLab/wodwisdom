@@ -28,6 +28,7 @@ import type { Gender } from "../compute-benchmarks.ts";
 import type { DomainPack } from "../domain-packs/types.ts";
 import type { ComposedMetcon } from "../metcon-composer.ts";
 import { MODELS } from "../model-profiles.ts";
+import { COUNTS_TOWARD_INSTRUCTION } from "../counts-toward.ts";
 import { athleteWordsElsewhere, restrictionsForPrompt } from "../restriction-gate.ts";
 import { fitProfileFromPayload, fitRulesForWriter } from "../fit-gate.ts";
 
@@ -337,6 +338,10 @@ export async function callWeekFill(
     // Which weights are barbell weights (2026-11-24): plate rounding used to
     // hit every weight, turning a 24 kg kettlebell into 25 kg. The writer says
     // which is which; code only rounds what it is told is a barbell.
+    // What a movement counts toward (2026-11-25): code used to work this out
+    // from the name's spelling, and the profile and the catalogue spell the
+    // same skill differently. The writer says it; code reads it.
+    "- EVERY movement carries " + COUNTS_TOWARD_INSTRUCTION,
     "- EVERY movement that has a weight also carries on_barbell: true when the weight is loaded on a barbell, false for a fixed implement or a machine (dumbbell, kettlebell, wall ball, medicine ball, sandbag, vest, sled, machine). Barbell weights are rounded to loadable plates after you. Implement weights are kept EXACTLY, so write a size that exists — a 24 kg or 53 lb kettlebell, a 9 kg or 20 lb wall ball — never a barbell-style number for an implement.",
     // Session-budget phase: honor the skeleton's time allocation when it
     // emitted one. Guidance only — nothing checks or enforces it.

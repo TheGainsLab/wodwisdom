@@ -28,7 +28,8 @@
 import type { MovementPrescription, WriterOutput } from "./v2-output-schema.ts";
 import { DELOAD_MODIFIER, LOADING_CEILINGS, SYNTHETIC_LEVEL_ANCHOR } from "./diagnostic-constants.ts";
 import { classifyPerLiftLevel, type PerLiftLevel } from "./level-interpreter.ts";
-import { DISPLAY_TO_LIFT_KEY } from "./audits.ts";
+import { DISPLAY_TO_LIFT_KEY, liftKeyOf } from "./lift-key.ts";
+import { COUNTS_TOWARD_INSTRUCTION, COUNTS_TOWARD_VALUES } from "./counts-toward.ts";
 import { MODELS } from "./model-profiles.ts";
 import { applyFindings, type Finding, isRuledOutByName, removeByRule } from "./restriction-gate.ts";
 
@@ -191,7 +192,7 @@ export function applyLoadArithmetic(output: WriterOutput, profile: FitProfile): 
   const actions: string[] = [];
   eachMovement(output, (m, loc, block) => {
     if (m.weight == null || m.weight <= 0) return;
-    const key = DISPLAY_TO_LIFT_KEY[m.movement];
+    const key = liftKeyOf(m);
     if (!key) return; // not a lift the system can name: the AI's to judge
     const max = profile.lifts[key];
     if (typeof max !== "number" || max <= 0) {
@@ -286,6 +287,7 @@ const TOOL = {
                 time_seconds: { type: "integer", minimum: 1 }, distance: { type: "number", minimum: 1 },
                 distance_unit: { type: "string", enum: ["ft", "m"] }, calories: { type: "integer", minimum: 1 },
                 scaling_note: { type: "string", maxLength: 200 },
+                counts_toward: { type: "string", enum: [...COUNTS_TOWARD_VALUES], description: "For the REPLACEMENT movement. " + COUNTS_TOWARD_INSTRUCTION },
               },
               required: ["movement"], additionalProperties: false,
             },
@@ -353,7 +355,7 @@ export function compactForFit(output: WriterOutput): unknown {
             ...(blk.block_notes ? { notes: String(blk.block_notes).slice(0, 200) } : {}),
             movements: (blk.movements ?? []).map((m, mi) => ({
               movement_index: mi, movement: m.movement,
-              ...(DISPLAY_TO_LIFT_KEY[m.movement] ? { load: "checked" } : {}),
+              ...(liftKeyOf(m) ? { load: "checked" } : {}),
               ...(m.sets != null ? { sets: m.sets } : {}), ...(m.reps != null ? { reps: m.reps } : {}),
               ...(m.rep_scheme ? { rep_scheme: m.rep_scheme } : {}),
               ...(m.weight != null ? { weight: m.weight, unit: m.weight_unit } : {}),

@@ -19,27 +19,9 @@
  */
 
 import type { WriterOutput } from "./v2-output-schema.ts";
+import { liftKeyOf } from "./lift-key.ts";
 
-// Mirror of audits.ts DISPLAY_TO_LIFT_KEY — kept in sync manually. If the
-// audit's mapping changes, this must too.
-const DISPLAY_TO_LIFT_KEY: Record<string, string> = {
-  "Back Squat": "back_squat",
-  "Front Squat": "front_squat",
-  "Overhead Squat": "overhead_squat",
-  "Deadlift": "deadlift",
-  "Snatch": "snatch",
-  "Power Snatch": "power_snatch",
-  "Clean": "clean",
-  "Clean and Jerk": "clean_and_jerk",
-  "Clean & Jerk": "clean_and_jerk",
-  "Jerk": "jerk",
-  "Power Clean": "power_clean",
-  "Push Jerk": "push_jerk",
-  "Press": "press",
-  "Strict Press": "press",
-  "Push Press": "push_press",
-  "Bench Press": "bench_press",
-};
+// One copy of the lift rule: lift-key.ts.
 
 /**
  * Clamp every prescribed weight to the audit's load_sanity ceiling.
@@ -82,7 +64,7 @@ export function clampLoadSanity(
           if (m.weight == null || m.weight <= 0) continue;
 
           // Pick the ceiling per the audit's two-layer logic.
-          const liftKey = DISPLAY_TO_LIFT_KEY[m.movement];
+          const liftKey = liftKeyOf(m);
           let ceiling: number | null = null;
           let ceilingLabel = "";
           if (liftKey) {

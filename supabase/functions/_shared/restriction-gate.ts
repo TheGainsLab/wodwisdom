@@ -36,6 +36,7 @@
 
 import type { MovementPrescription, WriterOutput } from "./v2-output-schema.ts";
 import { MODELS } from "./model-profiles.ts";
+import { COUNTS_TOWARD_INSTRUCTION, COUNTS_TOWARD_VALUES, storedCountsToward } from "./counts-toward.ts";
 
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY_PIPELINE") ?? Deno.env.get("ANTHROPIC_API_KEY");
 const MODEL = MODELS.sonnet;
@@ -74,6 +75,8 @@ export interface Finding {
     distance_unit?: "ft" | "m";
     calories?: number;
     scaling_note?: string;
+    /** What the replacement counts toward (counts-toward.ts), from the AI. */
+    counts_toward?: string;
   } | null;
 }
 
@@ -235,8 +238,13 @@ function canonical(vocabulary: string[], name: string | null | undefined): strin
  *  replacement brings its own. Load and 1RM anchoring never carry over to a
  *  different movement. */
 function swap(row: MovementPrescription, to: string, r?: Finding["replacement"]): MovementPrescription {
-  const { weight: _w, weight_women: _ww, weight_unit: _wu, target_pct_1rm: _p, cardio_modality: _c, ...rest } = row;
+  // What the OLD movement counted toward, and whether it sat on a barbell, say
+  // nothing about the new one: the replacement carries its own answer from
+  // the AI, or none (it is then labelled later, like any unlabelled row).
+  const { weight: _w, weight_women: _ww, weight_unit: _wu, target_pct_1rm: _p, cardio_modality: _c, counts_toward: _ct, on_barbell: _ob, ...rest } = row;
   const next: MovementPrescription = { ...rest, movement: to };
+  const label = storedCountsToward(r?.counts_toward);
+  if (label) next.counts_toward = label;
   const brings = r && (r.sets != null || r.reps != null || r.time_seconds != null || r.distance != null || r.calories != null);
   if (brings) {
     delete next.sets; delete next.reps; delete next.rep_scheme; delete next.cal_scheme; delete next.distance_scheme;
@@ -367,6 +375,7 @@ const JUDGE_TOOL = {
                 distance_unit: { type: "string", enum: ["ft", "m"] },
                 calories: { type: "integer", minimum: 1 },
                 scaling_note: { type: "string", maxLength: 200 },
+                counts_toward: { type: "string", enum: [...COUNTS_TOWARD_VALUES], description: "For the REPLACEMENT movement. " + COUNTS_TOWARD_INSTRUCTION },
               },
               required: ["movement"],
               additionalProperties: false,
