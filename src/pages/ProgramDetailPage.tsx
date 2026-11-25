@@ -269,6 +269,13 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
   // server refuses those anyway; this is about not showing dead buttons.
   const archived = !!program?.archived_at;
   const [allWorkouts, setAllWorkouts] = useState<ProgramWorkout[]>([]);
+  // DECLARED HERE, ABOVE arrivalFor (2026-11-25): arrivalFor reads it and is
+  // called straight away for the banner. It was declared further down, so
+  // every program with an unwritten week crashed the page with "Cannot
+  // access before initialization" from the 2026-11-24 release until this fix.
+  // The week a running week job is writing, so its row can say "Being
+  // written now" instead of looking like it is still waiting (2026-11-24).
+  const [writingWeek, setWritingWeek] = useState<{ month: number; week: number } | null>(null);
   // When an unwritten week arrives, in the one wording used by the banner,
   // the week headers and the day rows (src/lib/weekSchedule.ts).
   const arrivalFor = (month: number, weekInMonth: number): string => {
@@ -321,9 +328,6 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
   // Generation poll handle — one poller at a time, cleared on unmount.
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [generatingNextMonth, setGeneratingNextMonth] = useState(false);
-  // The week a running week job is writing, so its row can say "Being
-  // written now" instead of looking like it is still waiting (2026-11-24).
-  const [writingWeek, setWritingWeek] = useState<{ month: number; week: number } | null>(null);
   // Coach's notes (founder, 2026-10-09): the delivered program opens with the
   // same ranked priorities the generator was handed, so deliberate emphases —
   // and by implication what's parked this cycle — land as a decision explained
