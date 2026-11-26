@@ -35,7 +35,7 @@ import { localDateString } from '../lib/localDate';
 import EnginePaywall from '../components/engine/EnginePaywall';
 import { useEntitlements } from '../hooks/useEntitlements';
 import { ChevronLeft, ChevronRight, ChevronDown, Play, Pause, Square, Check, RotateCcw, AlertTriangle, Share2, Lock } from 'lucide-react';
-import { buildBreakdown, breakdownLines, type BreakdownBlock, type BreakdownRow } from '../lib/engineBreakdown';
+import { buildBreakdown, breakdownLines, workRowAt, type BreakdownBlock, type BreakdownRow } from '../lib/engineBreakdown';
 import { describeWorkout } from '../lib/engineStructure';
 
 // ── Types & Constants ────────────────────────────────────────────────
@@ -1921,9 +1921,20 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
       const bp = raw as unknown as BlockParams | null;
       const rollingAdj = effectiveRollingMult(workout, performanceMetrics);
       if (bp) {
-        // ordinal among same-label work segments of this block, as the snapshot is keyed
-        const ordinal = segments.slice(0, segIndex).filter((x) => x.type === 'work' && x.blockIndex === seg.blockIndex && x.label === seg.label).length;
-        currentGoal = goalFor(bp, seg.duration, seg.label, seg.blockIndex, ordinal, baseline?.calculated_rpm ?? 0, rollingAdj);
+        // The goal for this part is the one Workout Details showed for it:
+        // the same row (2026-11-26). Work parts are generated in the same
+        // order as the rows, so the n-th work part of the block is the n-th
+        // work row. If the two ever disagree on the part's length, fall back
+        // to the earlier calculation rather than show another part's goal.
+        const nthWork = segments.slice(0, segIndex).filter((x) => x.type === 'work' && x.blockIndex === seg.blockIndex).length;
+        const row = workRowAt(breakdownFor(getBlocks()), seg.blockIndex, nthWork);
+        if (row && row.durationSeconds === seg.duration) {
+          currentGoal = row.goal;
+        } else {
+          // ordinal among same-label work segments of this block, as the snapshot is keyed
+          const ordinal = segments.slice(0, segIndex).filter((x) => x.type === 'work' && x.blockIndex === seg.blockIndex && x.label === seg.label).length;
+          currentGoal = goalFor(bp, seg.duration, seg.label, seg.blockIndex, ordinal, baseline?.calculated_rpm ?? 0, rollingAdj);
+        }
       }
     }
 

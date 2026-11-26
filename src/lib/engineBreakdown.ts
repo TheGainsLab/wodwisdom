@@ -169,6 +169,18 @@ export function buildBreakdown<P extends BreakdownParams>(
 }
 
 /**
+ * The row for the n-th work part of a block (0-based, counting work parts
+ * only). The live timer uses it so the goal it shows during a part is the goal
+ * Workout Details showed for that part. The timer used to work its goal out
+ * separately and gave every rising round the same midpoint, and every flux
+ * stage the same pace, while Workout Details showed them stepping up.
+ */
+export function workRowAt(breakdown: BreakdownBlock[], blockIdx: number, nthWork: number): BreakdownRow | null {
+  const block = breakdown.find((b) => b.blockIdx === blockIdx);
+  return block?.rows.filter((r) => r.kind === 'work')[nthWork] ?? null;
+}
+
+/**
  * The same rows as text for the AI Coach, one line per part, in screen order.
  * `goalText` is the page's own formatter for a computed target (the string in
  * the row's goal column), so the wording matches the screen character for

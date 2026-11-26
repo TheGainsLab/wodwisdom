@@ -4,7 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { buildBreakdown, breakdownLines, type BreakdownHelpers, type BreakdownParams } from '../src/lib/engineBreakdown.ts';
+import { buildBreakdown, breakdownLines, workRowAt, type BreakdownHelpers, type BreakdownParams } from '../src/lib/engineBreakdown.ts';
 
 // The page's helpers, reduced: a baseline of 20 per minute, no rolling adjustment.
 const BASELINE = 20;
@@ -98,4 +98,19 @@ test('a time trial is saved per machine AND unit', () => {
   const svc = readFileSync(new URL('../src/lib/engineService.ts', import.meta.url), 'utf8');
   const save = svc.slice(svc.indexOf('export async function saveTimeTrial'), svc.indexOf('// ─── Modality preferences'));
   assert.ok(/\.eq\('modality', trial\.modality\)\s*\.eq\('units', trial\.units\)\s*\.eq\('is_current', true\)/.test(save));
+});
+
+test('the live timer takes each part\'s goal from the same row Workout Details showed', () => {
+  const rising = buildBreakdown([{ index: 0, bp: { rounds: 3, workDuration: 120, restDuration: 60, paceRange: [0.7, 0.9], paceProgression: 'increasing' } }], helpers);
+  // Round by round, not the midpoint for every round (which is what the timer used to show).
+  assert.deepEqual([0, 1, 2].map((n) => workRowAt(rising, 0, n)?.goal), [28, 32, 36]);
+  const stages = buildBreakdown([{ index: 2, bp: { workProgression: 'progressive_flux_intensity', workDuration: 720, baseDuration: 300, fluxDuration: 60, paceRange: [0.7, 0.7], fluxStartIntensity: 0.8, fluxIncrement: 0.1 } }], helpers);
+  // Work parts in order: WORK, FLUX, WORK, FLUX. Rest rows are not counted.
+  assert.deepEqual([0, 1, 2, 3].map((n) => workRowAt(stages, 2, n)?.label), ['WORK', 'FLUX', 'WORK', 'FLUX']);
+  assert.deepEqual([1, 3].map((n) => workRowAt(stages, 2, n)?.goal), [16, 18]);
+  assert.equal(workRowAt(stages, 2, 4), null);
+  assert.equal(workRowAt(stages, 0, 0), null);
+  const page = readFileSync(new URL('../src/pages/EngineTrainingDayPage.tsx', import.meta.url), 'utf8');
+  assert.ok(page.includes('const row = workRowAt(breakdownFor(getBlocks()), seg.blockIndex, nthWork);'));
+  assert.ok(page.includes('if (row && row.durationSeconds === seg.duration) {'));
 });
