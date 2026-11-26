@@ -16,7 +16,7 @@ import {
 } from "../_shared/block-edit.ts";
 import type { BlockPrescription } from "../_shared/v2-output-schema.ts";
 import { fetchAndFormatRecentHistory, formatDate, localDateAnchor, relativeDayMarker } from "../_shared/training-history.ts";
-import { buildConditioningState } from "../_shared/conditioning-state.ts";
+import { conditioningForCoach } from "../_shared/engine-assessment.ts";
 import { buildActivityChatContext, fetchOutsideTraining } from "../_shared/athlete-activities.ts";
 import { fetchAndFormatProgramContext } from "../_shared/training-program.ts";
 import { isArchived, isSinceArchive, loadArchiveCutoff } from "../_shared/program-archive.ts";
@@ -552,7 +552,7 @@ async function buildEngineCoachingContext(
   // Aggregated conditioning state (energy-system mastery roll-up). No-ops to ""
   // when the athlete has no Engine performance metrics yet.
   try {
-    const conditioning = await buildConditioningState(supa, userId);
+    const conditioning = await conditioningForCoach(supa, userId);
     if (conditioning) parts.push(conditioning);
   } catch (err) {
     console.error("[chat] buildConditioningState failed:", err);
@@ -747,7 +747,7 @@ async function buildEngineAthleteCard(
     }
   }
   try {
-    const conditioning = await buildConditioningState(supa, userId);
+    const conditioning = await conditioningForCoach(supa, userId);
     if (conditioning) parts.push(conditioning);
   } catch (err) {
     console.error("[chat] buildConditioningState (athlete card) failed:", err);

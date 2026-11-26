@@ -14,13 +14,25 @@
  * states no targets (the day page computes those).
  *
  * Coach only to start (founder, 2026-11-26): no member-facing screen shows it.
+ *
+ * STAGE 2 (2026-11-26): the read is STORED (engine_assessments, append-only)
+ * and REUSED until what it was written from has moved on: five more sessions,
+ * a new time trial, a changed goal or program, an Engine reset, or new
+ * instructions. On a rewrite the AI is shown its previous read and keeps each
+ * part of it unless the facts have changed enough to change it, so a priority
+ * does not flip for no reason. The chat coach, the workout review and the
+ * sequencer are all given the stored read.
  */
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { buildConditioningState } from "./conditioning-state.ts";
 import { flagGuide, REGIONS } from "./engine-continuum.ts";
 import { MODELS } from "./model-profiles.ts";
 
-export const ENGINE_ASSESSMENT_BUILDER_VERSION = "v1.2";
+export const ENGINE_ASSESSMENT_BUILDER_VERSION = "v1.3";
+
+/** A stored read is rewritten once this many sessions have been logged since
+ *  it was written (founder, 2026-11-26). Change it here. */
+export const REWRITE_AFTER_SESSIONS = 5;
 
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY_PIPELINE") ?? Deno.env.get("ANTHROPIC_API_KEY");
 const MODEL = MODELS.fable;
@@ -81,6 +93,8 @@ WHAT TO WRITE
   - retest: name a machine only when a flag or the trial's age justifies it, with the reason. Otherwise null.
   - confidence: high only when measured bands with solid evidence agree; medium when the picture is mixed or partly unmeasured; low when it rests on little data.
   - unknowns: one sentence on what the read cannot yet tell, or empty.
+
+WHEN YOU ARE SHOWN YOUR PREVIOUS READ. It is what this athlete's coaches have been working from. Keep each priority, its rank, each strength and the headline's substance UNLESS the facts now in front of you have changed enough to change it: a position label that moved, a new time trial, a range that has since been measured, a clear change in how often they train. Do not reword for its own sake and do not reorder priorities that are still equally supported. Where you do change something, the evidence for that item must say what changed. If nothing material has changed, return the previous read with its figures brought up to date.
 
 VOICE: write every field TO THE ATHLETE, in the second person ("you", "your"), as their coach speaking to them. Never "the athlete" or "this athlete". Plain words, no analyst vocabulary in "headline", "note", "why", "action", "reason" or "unknowns" (no "M", "n=", "ratio", "band state", no flag names). The figures belong in "evidence", which is the one field written for the record rather than to the athlete.`;
 
@@ -218,4 +232,162 @@ export function renderEngineAssessment(a: EngineAssessment): string {
   if (a.retest) lines.push(`Retest: ${a.retest.machine} — ${a.retest.reason}`);
   lines.push(`Confidence: ${a.confidence}.${a.unknowns ? ` Not yet known: ${a.unknowns}` : ""}`);
   return lines.join("\n");
+}
+
+
+// ─── Stage 2: stored, reused, rewritten when its basis moves on ─────────────
+
+/** What a read was written from. Compared, never interpreted. */
+export interface AssessmentBasis {
+  /** Completed Engine sessions on record when it was written. */
+  sessions: number;
+  /** created_at of the athlete's newest time trial, or null. */
+  latest_trial_at: string | null;
+  goal: string;
+  program: string;
+  /** The Engine reset marker, or "" when the athlete never reset. */
+  reset_at: string;
+  builder_version: string;
+}
+
+export interface StoredAssessment {
+  assessment: EngineAssessment;
+  basis: AssessmentBasis;
+  created_at: string;
+}
+
+/** True while the stored read still stands for the athlete as they are now. */
+export function assessmentIsCurrent(stored: AssessmentBasis | null | undefined, now: AssessmentBasis): boolean {
+  if (!stored) return false;
+  return stored.builder_version === now.builder_version &&
+    stored.program === now.program &&
+    stored.goal === now.goal &&
+    stored.reset_at === now.reset_at &&
+    (stored.latest_trial_at ?? null) === (now.latest_trial_at ?? null) &&
+    now.sessions - stored.sessions < REWRITE_AFTER_SESSIONS &&
+    now.sessions >= stored.sessions; // fewer sessions than when it was written: something was removed, read again
+}
+
+/** The athlete's basis as of now, or null when they have no Engine program. */
+export async function currentBasis(supa: SupabaseClient, userId: string): Promise<AssessmentBasis | null> {
+  const { data: prof } = await supa
+    .from("athlete_profiles").select("engine_program_version, engine_goal, engine_reset_at").eq("user_id", userId).maybeSingle();
+  const p = (prof ?? {}) as { engine_program_version?: string | null; engine_goal?: string | null; engine_reset_at?: unknown };
+  if (!p.engine_program_version) return null;
+  const [{ count }, { data: trial }] = await Promise.all([
+    supa.from("engine_workout_sessions").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("completed", true),
+    supa.from("engine_time_trials").select("created_at").eq("user_id", userId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+  ]);
+  return {
+    sessions: count ?? 0,
+    latest_trial_at: (trial as { created_at?: string | null } | null)?.created_at ?? null,
+    goal: (p.engine_goal ?? "").trim(),
+    program: p.engine_program_version,
+    reset_at: p.engine_reset_at == null ? "" : typeof p.engine_reset_at === "string" ? p.engine_reset_at : JSON.stringify(p.engine_reset_at),
+    builder_version: ENGINE_ASSESSMENT_BUILDER_VERSION,
+  };
+}
+
+/** The athlete's latest stored read, or null. Never throws (a missing table,
+ *  before the migration, reads as "none"). */
+export async function loadStoredAssessment(supa: SupabaseClient, userId: string): Promise<StoredAssessment | null> {
+  try {
+    const { data, error } = await supa
+      .from("engine_assessments").select("assessment, basis, created_at").eq("user_id", userId)
+      .order("created_at", { ascending: false }).limit(1).maybeSingle();
+    if (error || !data) return null;
+    const assessment = parseEngineAssessment((data as { assessment: unknown }).assessment);
+    if (!assessment) return null;
+    return { assessment, basis: (data as { basis: AssessmentBasis }).basis, created_at: (data as { created_at: string }).created_at };
+  } catch {
+    return null;
+  }
+}
+
+/** What the AI is shown of its previous read on a rewrite. */
+export function previousReadBlock(prev: StoredAssessment, now: AssessmentBasis): string {
+  const since = Math.max(0, now.sessions - prev.basis.sessions);
+  const trial = (prev.basis.latest_trial_at ?? null) !== (now.latest_trial_at ?? null) ? " A new time trial has been logged since." : "";
+  return (
+    `YOUR PREVIOUS READ (written ${prev.created_at.slice(0, 10)}; ${since} session${since === 1 ? "" : "s"} logged since.${trial}) — ` +
+    `keep it unless the facts above have changed enough to change it:\n` +
+    JSON.stringify(prev.assessment, null, 1)
+  );
+}
+
+export interface EnsuredAssessment {
+  assessment: EngineAssessment;
+  created_at: string;
+  /** "stored" = reused; "written" = a new read was written and stored;
+   *  "stale" = a rewrite was due but could not be written, the last one is used. */
+  source: "stored" | "written" | "stale";
+}
+
+/**
+ * The athlete's read, written now if there is none or its basis has moved on.
+ * Returns null when they have no Engine program or data, or no read could be
+ * written and none is stored. Never throws.
+ */
+export async function ensureEngineAssessment(supa: SupabaseClient, userId: string): Promise<EnsuredAssessment | null> {
+  try {
+    const now = await currentBasis(supa, userId);
+    if (!now) return null;
+    const stored = await loadStoredAssessment(supa, userId);
+    if (stored && assessmentIsCurrent(stored.basis, now)) return { assessment: stored.assessment, created_at: stored.created_at, source: "stored" };
+    const facts = await buildEngineAssessmentInputs(supa, userId, { curve: "fresh" });
+    if (!facts) return stored ? { assessment: stored.assessment, created_at: stored.created_at, source: "stale" } : null;
+    const written = await writeEngineAssessment(stored ? `${facts}\n\n${previousReadBlock(stored, now)}` : facts);
+    if (!written) return stored ? { assessment: stored.assessment, created_at: stored.created_at, source: "stale" } : null;
+    // Two requests can find it due at the same moment (a chat and a completed
+    // session). If the other one has stored its read already, use that one.
+    const again = await loadStoredAssessment(supa, userId);
+    if (again && again.created_at !== stored?.created_at && assessmentIsCurrent(again.basis, now)) return { assessment: again.assessment, created_at: again.created_at, source: "stored" };
+    const created_at = new Date().toISOString();
+    const { error } = await supa.from("engine_assessments").insert({ user_id: userId, assessment: written, basis: now, builder_version: ENGINE_ASSESSMENT_BUILDER_VERSION, created_at });
+    if (error) console.error(`[engine-assessment] store failed for ${userId}: ${error.message}`);
+    return { assessment: written, created_at, source: "written" };
+  } catch (e) {
+    console.error(`[engine-assessment] ensure failed for ${userId}:`, e instanceof Error ? e.message : String(e));
+    return null;
+  }
+}
+
+/**
+ * For a reader that must not wait (the chat coach): the STORED read as a
+ * prompt block, and whether a rewrite is due. Reads only. `text` is "" when
+ * there is none; the caller then gives the coach what it gave before.
+ */
+export async function storedAssessmentForCoach(supa: SupabaseClient, userId: string): Promise<{ text: string; due: boolean }> {
+  try {
+    const [stored, now] = await Promise.all([loadStoredAssessment(supa, userId), currentBasis(supa, userId)]);
+    if (!now) return { text: "", due: false };
+    return { text: stored ? renderEngineAssessment(stored.assessment) : "", due: !stored || !assessmentIsCurrent(stored.basis, now) };
+  } catch {
+    return { text: "", due: false };
+  }
+}
+
+/** Write the read in the background when it is due, without making the
+ *  caller wait. Safe to call on every request: it does nothing unless due. */
+export function refreshAssessmentInBackground(supa: SupabaseClient, userId: string): void {
+  const work = ensureEngineAssessment(supa, userId).then(() => {}, () => {});
+  // deno-lint-ignore no-explicit-any
+  const waitUntil = (globalThis as any).EdgeRuntime?.waitUntil as ((p: Promise<unknown>) => void) | undefined;
+  if (waitUntil) waitUntil(work);
+}
+
+/**
+ * What the chat coach and the workout review are given about an Engine
+ * member's conditioning: the stored assessment first, then the numbers as the
+ * detail behind it. With no stored assessment it is exactly what they were
+ * given before. Never waits on the AI: a missing or out-of-date read is
+ * written in the background for next time. Throws only what
+ * buildConditioningState throws (its callers already catch).
+ */
+export async function conditioningForCoach(supa: SupabaseClient, userId: string): Promise<string> {
+  const { text, due } = await storedAssessmentForCoach(supa, userId);
+  const signals = await buildConditioningState(supa, userId, { underAssessment: !!text });
+  if (due && signals) refreshAssessmentInBackground(supa, userId);
+  if (!signals) return "";
+  return text ? `\n\n${text}${signals}` : signals;
 }

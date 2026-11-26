@@ -27,6 +27,7 @@
  * Deploy: supabase functions deploy engine-continuum-backfill --no-verify-jwt
  */
 
+import { refreshAssessmentInBackground } from "../_shared/engine-assessment.ts";
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { requireCronKey } from "../_shared/cron-auth.ts";
@@ -135,6 +136,10 @@ Deno.serve(async (req) => {
     }
     if (!userId) return json({ error: "user_id, email, or all:true required" }, 400);
     const result = await computeAthlete(supa, userId, curves, { write: body.dry_run !== true });
+    // A completed session can make the stored assessment due (five sessions, a
+    // new time trial). Write it now, in the background, so it is ready before
+    // the member next talks to the coach.
+    if (body.dry_run !== true) refreshAssessmentInBackground(supa, userId);
     return json(result);
   } catch (e) {
     console.error("[engine-continuum-backfill]", e);

@@ -1,8 +1,11 @@
-// The Engine assessment: the shape of the read, and that phase 1 stores nothing.
+// The Engine assessment: the shape of the read, when a stored one is reused,
+// and that every reader is given the stored one.
 import { assert, assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import {
-  ASSESSMENT_FOCUSES, ENGINE_ASSESSMENT_SYSTEM, ENGINE_ASSESSMENT_TOOL, parseEngineAssessment, renderEngineAssessment, STRENGTH_FOCUSES,
+  ASSESSMENT_FOCUSES, type AssessmentBasis, assessmentIsCurrent, ENGINE_ASSESSMENT_BUILDER_VERSION, ENGINE_ASSESSMENT_SYSTEM, ENGINE_ASSESSMENT_TOOL,
+  ensureEngineAssessment, parseEngineAssessment, previousReadBlock, renderEngineAssessment, REWRITE_AFTER_SESSIONS, storedAssessmentForCoach, STRENGTH_FOCUSES,
 } from "./engine-assessment.ts";
+import { formatConditioningState, SIGNALS_HEADER_RAW, SIGNALS_HEADER_UNDER_ASSESSMENT } from "./conditioning-state.ts";
 import { REGIONS } from "./engine-continuum.ts";
 // deno-lint-ignore no-explicit-any
 type Any = any;
@@ -73,63 +76,116 @@ Deno.test("the instructions: unmeasured is unknown, not weak; no targets or sess
   assert(ENGINE_ASSESSMENT_SYSTEM.includes("Do not compare a pace on one machine, or in one unit, with a pace on another"));
 });
 
-Deno.test("phase 1 is a dry run: nothing is stored and no coach or sequencer reads it yet", async () => {
+Deno.test("the dry run still stores nothing; storing happens in one place", async () => {
   const fn = await Deno.readTextFile(new URL("../engine-assessment/index.ts", import.meta.url));
-  const shared = await Deno.readTextFile(new URL("./engine-assessment.ts", import.meta.url));
-  for (const src of [fn, shared]) for (const write of [".insert(", ".update(", ".upsert(", ".delete(", ".rpc("]) assert(!src.includes(write), `phase 1 must not write: found ${write}`);
+  for (const write of [".insert(", ".update(", ".upsert(", ".delete(", ".rpc("]) assert(!fn.includes(write), `the function must not write directly: found ${write}`);
   assert(fn.includes("dry_run: true, stored: false"));
-  // The curve is computed fresh for the read and not stored by a dry run.
   assert(fn.includes('buildEngineAssessmentInputs(supa, userId, { curve: "fresh_unsaved" })'));
+  assert(fn.includes('params.get("mode") ?? "dry_run"'));
+  const shared = await Deno.readTextFile(new URL("./engine-assessment.ts", import.meta.url));
+  // Append-only: one insert, never an update or delete of a stored read.
+  assertEquals(shared.split(".insert(").length - 1, 1);
+  for (const write of [".update(", ".upsert(", ".delete("]) assert(!shared.includes(write), `a stored read is never changed: found ${write}`);
   const cs = await Deno.readTextFile(new URL("./conditioning-state.ts", import.meta.url));
   assert(cs.includes('write: curveMode === "fresh"'));
   assert(cs.includes("{ write: opts.write !== false }"));
-  for (const reader of ["../chat/index.ts", "./run-resequence.ts"]) {
-    const src = await Deno.readTextFile(new URL(reader, import.meta.url));
-    assert(!src.includes("engine-assessment"), `${reader} already reads the assessment`);
-  }
 });
 
-import { currentUncalibratedOnly } from "./conditioning-state.ts";
+const BASIS: AssessmentBasis = { sessions: 20, latest_trial_at: "2026-11-01T10:00:00Z", goal: "row faster", program: "p1", reset_at: "", builder_version: ENGINE_ASSESSMENT_BUILDER_VERSION };
 
-Deno.test("a stored 'uncalibrated' flag is never passed to the coach when the athlete's trials contradict it", async () => {
-  const trials = [{ modality: "c2_row_erg", units: "cal" }, { modality: "echo_bike", units: "cal" }];
-  const stored = ["UNCALIBRATED:c2_row_erg|cal", "UNCALIBRATED:c2_row_erg|meters", "UNCALIBRATED:track_run|meters", "AWAITING_RIGHT_ANCHOR", "TRIAL_STALE:echo_bike|cal"];
-  assertEquals(currentUncalibratedOnly(stored, trials), [
-    "UNCALIBRATED:c2_row_erg|meters", // same machine, a unit with no trial: still true
-    "UNCALIBRATED:track_run|meters",  // no trial at all: still true
-    "AWAITING_RIGHT_ANCHOR", "TRIAL_STALE:echo_bike|cal", // every other flag untouched
-  ]);
-  assertEquals(currentUncalibratedOnly([], trials), []);
-  // The stored-curve path (what chat reads) applies it before the text is built.
-  const cs = await Deno.readTextFile(new URL("./conditioning-state.ts", import.meta.url));
-  assert(cs.includes("const storedFlags = currentUncalibratedOnly(stored.flags ?? [], trials);"));
-  assert(cs.includes("flags: storedFlags,"));
+Deno.test("a stored read is reused until its basis moves on", () => {
+  assertEquals(REWRITE_AFTER_SESSIONS, 5);
+  assert(assessmentIsCurrent(BASIS, BASIS));
+  assert(assessmentIsCurrent(BASIS, { ...BASIS, sessions: 24 }), "four more sessions: still current");
+  assert(!assessmentIsCurrent(BASIS, { ...BASIS, sessions: 25 }), "five more sessions: rewrite");
+  assert(!assessmentIsCurrent(BASIS, { ...BASIS, latest_trial_at: "2026-11-20T10:00:00Z" }), "new time trial");
+  assert(!assessmentIsCurrent({ ...BASIS, latest_trial_at: null }, BASIS), "first time trial");
+  assert(!assessmentIsCurrent(BASIS, { ...BASIS, goal: "bike faster" }), "goal changed");
+  assert(!assessmentIsCurrent(BASIS, { ...BASIS, program: "p2" }), "program changed");
+  assert(!assessmentIsCurrent(BASIS, { ...BASIS, reset_at: "2026-11-25" }), "Engine reset");
+  assert(!assessmentIsCurrent({ ...BASIS, builder_version: "v0" }, BASIS), "new instructions");
+  assert(!assessmentIsCurrent(BASIS, { ...BASIS, sessions: 19 }), "sessions removed");
+  assert(!assessmentIsCurrent(null, BASIS));
 });
 
-import { CURVE_GUIDE_FOR_COACH, FLAG_MEANINGS, flagGuide } from "./engine-continuum.ts";
-
-Deno.test("every flag the curve can raise has one meaning, and every AI shown the flags is shown it", async () => {
-  // The flags replayCurve can raise.
-  const ec = await Deno.readTextFile(new URL("./engine-continuum.ts", import.meta.url));
-  const raised = new Set([...ec.matchAll(/flags\.push\((?:"|`)([A-Z_]+)/g)].map((m) => m[1]));
-  const explained = new Set(Object.keys(FLAG_MEANINGS).map((k) => k.split(":")[0]));
-  assertEquals([...raised].sort(), [...explained].sort());
-  // The chat coach's guide and the assessment's instructions both carry them.
-  for (const k of Object.keys(FLAG_MEANINGS)) {
-    assert(CURVE_GUIDE_FOR_COACH.includes(k), `coach guide lacks ${k}`);
-    assert(ENGINE_ASSESSMENT_SYSTEM.includes(k), `assessment lacks ${k}`);
-  }
-  assert(flagGuide().split("\n").length === Object.keys(FLAG_MEANINGS).length);
-  // The coach is told what the states and positions mean, and to keep the codes to itself.
-  assert(CURVE_GUIDE_FOR_COACH.includes("never say \"M\", \"n\", a state word or a flag name to the athlete"));
-  assert(CURVE_GUIDE_FOR_COACH.includes("it is unknown, not a weakness"));
-  assert(CURVE_GUIDE_FOR_COACH.includes("\"slightly behind\" is a mild gap and never a strength"));
+Deno.test("a rewrite is shown the previous read and told to keep it unless the facts changed", () => {
+  const prev = { assessment: parseEngineAssessment(GOOD)!, basis: BASIS, created_at: "2026-11-10T09:00:00Z" };
+  const block = previousReadBlock(prev, { ...BASIS, sessions: 25, latest_trial_at: "2026-11-20T10:00:00Z" });
+  assert(block.startsWith("YOUR PREVIOUS READ (written 2026-11-10; 5 sessions logged since. A new time trial has been logged since.)"));
+  assert(block.includes("keep it unless the facts above have changed enough to change it"));
+  assert(block.includes(prev.assessment.headline));
+  assert(ENGINE_ASSESSMENT_SYSTEM.includes("WHEN YOU ARE SHOWN YOUR PREVIOUS READ"));
+  assert(ENGINE_ASSESSMENT_SYSTEM.includes("Do not reword for its own sake and do not reorder priorities that are still equally supported"));
 });
 
-Deno.test("the coach's conditioning text carries the guide and the position labels; the assessment's does not repeat the guide", async () => {
-  const cs = await Deno.readTextFile(new URL("./conditioning-state.ts", import.meta.url));
-  assert(cs.includes("positions: true });"));
-  assert(cs.includes('const guide = continuum.text && !opts?.forAssessment ? "\\n" + CURVE_GUIDE_FOR_COACH : "";'));
-  const ea = await Deno.readTextFile(new URL("./engine-assessment.ts", import.meta.url));
-  assert(ea.includes("forAssessment: true"));
+Deno.test("the coach, the workout review, the sequencer and session completion all use the stored read", async () => {
+  const read = (p: string) => Deno.readTextFile(new URL(p, import.meta.url));
+  const chat = await read("../chat/index.ts");
+  assertEquals(chat.split("await conditioningForCoach(supa, userId)").length - 1, 2);
+  assert(!chat.includes("buildConditioningState("), "the chat must not read the numbers without the assessment");
+  const review = await read("../workout-review/index.ts");
+  assert(review.includes("conditioningForCoach(supa, user.id)"));
+  assert(!review.includes("buildConditioningState("));
+  const seq = await read("./run-resequence.ts");
+  assert(seq.includes("await ensureEngineAssessment(supa, userId)"));
+  assert(seq.includes("assessmentText +\n    `${diagnosis}"));
+  assert(seq.includes("Never write a \"reason\" that contradicts"));
+  const done = await read("../engine-continuum-backfill/index.ts");
+  assert(done.includes("if (body.dry_run !== true) refreshAssessmentInBackground(supa, userId);"));
+});
+
+Deno.test("with a stored read the numbers are presented as its detail, not as something to re-read", () => {
+  const inputs = { metrics: [{ day_type: "endurance", modality: "row", rolling_avg_ratio: 1, rolling_count: 3, last_5_ratios: [1, 1, 1], learned_max_pace: null }], timeTrials: [], sessions: [], daysPerWeek: null };
+  // deno-lint-ignore no-explicit-any
+  const raw = formatConditioningState(inputs as any);
+  // deno-lint-ignore no-explicit-any
+  const under = formatConditioningState(inputs as any, { underAssessment: true });
+  assert(raw.startsWith(SIGNALS_HEADER_RAW) && raw.includes("judge each system's state"));
+  assert(under.startsWith(SIGNALS_HEADER_UNDER_ASSESSMENT));
+  assert(!under.includes("interpret yourself") && !under.includes("judge each system's state"));
+  assert(under.includes("The overall read of these numbers is the ENGINE ASSESSMENT above."));
+});
+
+// A fake database: enough of the query builder for the reads and the one insert.
+function fakeSupa(tables: Record<string, unknown[]>, opts: { count?: number } = {}) {
+  const inserted: Array<{ table: string; row: unknown }> = [];
+  const from = (table: string) => {
+    const result = () => ({ data: (tables[table] ?? [])[0] ?? null, error: null, count: opts.count ?? 0 });
+    // deno-lint-ignore no-explicit-any
+    const q: any = {
+      select: () => q, eq: () => q, order: () => q, limit: () => q,
+      maybeSingle: () => Promise.resolve(result()),
+      insert: (row: unknown) => { inserted.push({ table, row }); return Promise.resolve({ error: null }); },
+      then: (ok: (v: unknown) => unknown) => Promise.resolve(result()).then(ok),
+    };
+    return q;
+  };
+  return { supa: { from } as unknown as Parameters<typeof storedAssessmentForCoach>[0], inserted };
+}
+
+Deno.test("the coach is given the stored read without waiting, and told when a rewrite is due", async () => {
+  const profile = { engine_program_version: "p1", engine_goal: "row faster", engine_reset_at: null };
+  const trial = { created_at: "2026-11-01T10:00:00Z" };
+  const row = { assessment: GOOD, basis: BASIS, created_at: "2026-11-10T09:00:00Z" };
+  const current = await storedAssessmentForCoach(fakeSupa({ athlete_profiles: [profile], engine_time_trials: [trial], engine_assessments: [row] }, { count: 22 }).supa, "u");
+  assert(current.text.startsWith("ENGINE ASSESSMENT (the standing read"));
+  assertEquals(current.due, false);
+  const stale = await storedAssessmentForCoach(fakeSupa({ athlete_profiles: [profile], engine_time_trials: [trial], engine_assessments: [row] }, { count: 25 }).supa, "u");
+  assert(stale.text.startsWith("ENGINE ASSESSMENT"), "an out-of-date read is still used until the new one is written");
+  assertEquals(stale.due, true);
+  const none = await storedAssessmentForCoach(fakeSupa({ athlete_profiles: [profile], engine_time_trials: [trial] }, { count: 3 }).supa, "u");
+  assertEquals(none, { text: "", due: true });
+  const notEngine = await storedAssessmentForCoach(fakeSupa({ athlete_profiles: [{ engine_program_version: null }] }).supa, "u");
+  assertEquals(notEngine, { text: "", due: false });
+});
+
+Deno.test("a current stored read is returned as is: no AI call, nothing written", async () => {
+  const f = fakeSupa({
+    athlete_profiles: [{ engine_program_version: "p1", engine_goal: "row faster", engine_reset_at: null }],
+    engine_time_trials: [{ created_at: "2026-11-01T10:00:00Z" }],
+    engine_assessments: [{ assessment: GOOD, basis: BASIS, created_at: "2026-11-10T09:00:00Z" }],
+  }, { count: 21 });
+  const e = await ensureEngineAssessment(f.supa, "u");
+  assertEquals(e?.source, "stored");
+  assertEquals(f.inserted.length, 0);
 });

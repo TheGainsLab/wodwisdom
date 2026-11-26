@@ -13,7 +13,7 @@
  */
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { buildEngineAssessmentInputs, ENGINE_ASSESSMENT_BUILDER_VERSION, renderEngineAssessment, writeEngineAssessment } from "../_shared/engine-assessment.ts";
+import { assessmentIsCurrent, buildEngineAssessmentInputs, currentBasis, ensureEngineAssessment, ENGINE_ASSESSMENT_BUILDER_VERSION, loadStoredAssessment, renderEngineAssessment, writeEngineAssessment } from "../_shared/engine-assessment.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -46,6 +46,29 @@ Deno.serve(async (req) => {
     const seen: string[] = [];
     for (const r of (recent ?? []) as Array<{ user_id: string }>) if (!seen.includes(r.user_id)) seen.push(r.user_id);
     userIds = seen.slice(offset, offset + limit);
+  }
+
+  // mode=read: what is stored for each member, and whether it is still current.
+  // Reads only. mode=store: write and store the read for each member where it
+  // is missing or out of date (what the coach and the sequencer do on their
+  // own). Default: a dry run that stores nothing.
+  const mode = params.get("mode") ?? "dry_run";
+  if (mode === "read" || mode === "store") {
+    const out = await Promise.all(userIds.map(async (userId) => {
+      try {
+        if (mode === "store") {
+          const e = await ensureEngineAssessment(supa, userId);
+          if (!e) return { user_id: userId, skipped: "no Engine program or data, or no read could be written" };
+          return { user_id: userId, source: e.source, created_at: e.created_at, assessment: e.assessment, rendered: renderEngineAssessment(e.assessment) };
+        }
+        const [stored, now] = await Promise.all([loadStoredAssessment(supa, userId), currentBasis(supa, userId)]);
+        if (!stored) return { user_id: userId, stored: false, has_engine_program: !!now };
+        return { user_id: userId, stored: true, current: !!now && assessmentIsCurrent(stored.basis, now), created_at: stored.created_at, basis: stored.basis, basis_now: now, assessment: stored.assessment, rendered: renderEngineAssessment(stored.assessment) };
+      } catch (e) {
+        return { user_id: userId, failed: e instanceof Error ? e.message : String(e) };
+      }
+    }));
+    return json({ mode, builder_version: ENGINE_ASSESSMENT_BUILDER_VERSION, count: out.length, results: out });
   }
 
   const results = await Promise.all(userIds.map(async (userId) => {
