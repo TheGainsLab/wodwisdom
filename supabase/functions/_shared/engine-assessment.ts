@@ -20,7 +20,7 @@ import { buildConditioningState } from "./conditioning-state.ts";
 import { REGIONS } from "./engine-continuum.ts";
 import { MODELS } from "./model-profiles.ts";
 
-export const ENGINE_ASSESSMENT_BUILDER_VERSION = "v1.0";
+export const ENGINE_ASSESSMENT_BUILDER_VERSION = "v1.1";
 
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY_PIPELINE") ?? Deno.env.get("ANTHROPIC_API_KEY");
 const MODEL = MODELS.fable;
@@ -28,6 +28,10 @@ const MODEL = MODELS.fable;
 /** The effort-duration bands of the conditioning curve, plus the two things a
  *  priority can be about that are not a band. The AI picks from these. */
 export const ASSESSMENT_FOCUSES: readonly string[] = [...REGIONS.map((r) => r[2]), "calibration", "consistency"];
+/** A strength is a band or consistency. "calibration" is a priority only: a
+ *  fresh baseline is not something the athlete is good at (the first batch used
+ *  it for "paced work is landing where it should", which is execution). */
+export const STRENGTH_FOCUSES: readonly string[] = [...REGIONS.map((r) => r[2]), "consistency"];
 
 export interface EngineAssessment {
   /** One sentence: the read of this athlete's conditioning. */
@@ -50,7 +54,7 @@ YOU ARE GIVEN FACTS. They are computed by the app from the athlete's own session
   - ENGINE CONDITIONING SIGNALS: days since the last session; adherence; for each day type and machine the rolling ratio of actual pace to target pace over the last five sessions (1.0 = on target; a max-effort type is measured against the time-trial baseline instead and sits well above 1.0); and the age and history of each machine's time trial, which every target is derived from.
   - ENGINE ANALYTICS: the figures on the athlete's own Analytics page (paces against the time trial, the anaerobic-to-max-aerobic ratio, targets against actual by day type, records, pace by work-to-rest ratio, heart rate when logged).
   - ATHLETE CONDITIONING CURVE: seven bands of EFFORT DURATION, from 20–40 min on the left to ≤30 s on the right. M is this athlete against a balanced athlete at their own time-trial level: 1.0 = balanced, below = that band lags, above = that band is ahead of their trial. state: "measured" = a max effort proved it; "floor" = only sub-maximal days have landed there, so M is a lower bound, not a weakness; "blank" = nothing has landed there, which is an unknown, not a weakness. n = how much evidence. Efforts of 40 minutes or more are zone 2 and are not scored.
-  - FLAGS on the curve: AEROBIC_SIDE_BEHIND_SPRINT (short max efforts sit above the curve relative to the trial; read it with the trial history: a low or stalled trial means the aerobic side is the gap, a rising trial means a fast athlete whose level is catching up). GLYCOLYTIC_BELOW_BALANCED (short hard work is the gap). TRIAL_LOW (they sustained longer than balanced at trial pace: the baseline is stale and understates them). TRIAL_STALE:<machine> (that trial is over 40 days old and still in use). UNCALIBRATED:<machine> (no trial on that machine: its targets are not personal). AWAITING_RIGHT_ANCHOR (a recent retest: the sprint bands are provisional).
+  - FLAGS on the curve: AEROBIC_SIDE_BEHIND_SPRINT (short max efforts sit above the curve relative to the trial; read it with the trial history: a low or stalled trial means the aerobic side is the gap, a rising trial means a fast athlete whose level is catching up). GLYCOLYTIC_BELOW_BALANCED (short hard work is the gap). TRIAL_LOW (they sustained longer than balanced at trial pace: the baseline is stale and understates them). TRIAL_STALE:<machine> (that trial is over 40 days old and still in use). UNCALIBRATED:<machine> (a machine in current use with no time trial at all: its targets are not personal). AWAITING_RIGHT_ANCHOR (a recent retest: the sprint bands are provisional).
 
 HOW TO READ
   - Weight the four middle bands, 30 seconds to 10 minutes, most: that is where mixed workouts live. A gap at 1–4 minutes outranks a gap at ≤30 s.
@@ -62,14 +66,14 @@ HOW TO READ
   - The Engine does not train sprint power of a few seconds. Do not infer it.
 
 WHAT TO WRITE
-  - headline: one sentence a coach would say to this athlete about where their conditioning stands.
-  - strengths: up to two, each tied to a band or to consistency, with the reason in a sentence.
-  - priorities: one to three, ranked. For each: the focus (a band, "calibration" when the baseline itself is the problem, or "consistency" when there is too little recent training to judge anything else), the evidence (the specific figures from the facts that support it, quoted as given), why it matters for this athlete (connect to their stated goal when they gave one), and the action (what kind of work or step addresses it, in plain words; no session prescriptions, no paces, no targets).
+  - headline: one sentence about where their conditioning stands.
+  - strengths: up to two, each tied to a band or to consistency (never "calibration": a fresh baseline is not a strength), with the reason in a sentence.
+  - priorities: one to three, ranked. For each: the focus (a band, "calibration" when the baseline itself is the problem, or "consistency" when there is too little recent training to judge anything else), the evidence (the specific figures from the facts that support it, quoted as given), why it matters for them (connect to their stated goal when they gave one), and the action (what kind of work or step addresses it, in plain words; no session prescriptions, no paces, no targets).
   - retest: name a machine only when a flag or the trial's age justifies it, with the reason. Otherwise null.
   - confidence: high only when measured bands with solid evidence agree; medium when the picture is mixed or partly unmeasured; low when it rests on little data.
   - unknowns: one sentence on what the read cannot yet tell, or empty.
 
-Write to be read by another coach: plain words, no analyst vocabulary in "headline", "why" or "action" (no "M", "n=", "ratio", "band state"). The figures belong in "evidence".`;
+VOICE: write every field TO THE ATHLETE, in the second person ("you", "your"), as their coach speaking to them. Never "the athlete" or "this athlete". Plain words, no analyst vocabulary in "headline", "note", "why", "action", "reason" or "unknowns" (no "M", "n=", "ratio", "band state", no flag names). The figures belong in "evidence", which is the one field written for the record rather than to the athlete.`;
 
 export const ENGINE_ASSESSMENT_TOOL = {
   name: "emit_engine_assessment",
@@ -82,7 +86,7 @@ export const ENGINE_ASSESSMENT_TOOL = {
         type: "array", maxItems: 2,
         items: {
           type: "object",
-          properties: { focus: { type: "string", enum: [...ASSESSMENT_FOCUSES] }, note: { type: "string", minLength: 5, maxLength: 300 } },
+          properties: { focus: { type: "string", enum: [...STRENGTH_FOCUSES] }, note: { type: "string", minLength: 5, maxLength: 300 } },
           required: ["focus", "note"], additionalProperties: false,
         },
       },
@@ -126,7 +130,7 @@ export function parseEngineAssessment(input: unknown): EngineAssessment | null {
     .slice(0, 3)
     .map((p, i) => ({ ...p, rank: i + 1 }));
   if (priorities.length === 0) return null;
-  const strengths = (Array.isArray(a.strengths) ? a.strengths : []).filter((s) => s && ok(s.focus) && typeof s.note === "string").slice(0, 2);
+  const strengths = (Array.isArray(a.strengths) ? a.strengths : []).filter((s) => s && typeof s.focus === "string" && STRENGTH_FOCUSES.includes(s.focus) && typeof s.note === "string").slice(0, 2);
   const retest = a.retest && typeof a.retest.machine === "string" && typeof a.retest.reason === "string" ? { machine: a.retest.machine, reason: a.retest.reason } : null;
   const confidence = a.confidence === "high" || a.confidence === "medium" || a.confidence === "low" ? a.confidence : "low";
   return { headline: a.headline.trim(), strengths, priorities, retest, confidence, unknowns: typeof a.unknowns === "string" ? a.unknowns.trim() : "" };
@@ -134,7 +138,7 @@ export function parseEngineAssessment(input: unknown): EngineAssessment | null {
 
 /** The facts the assessment is written from, as one text block, or "" when the
  *  athlete has no Engine data to read. */
-export async function buildEngineAssessmentInputs(supa: SupabaseClient, userId: string): Promise<string> {
+export async function buildEngineAssessmentInputs(supa: SupabaseClient, userId: string, opts: { curve?: "fresh" | "fresh_unsaved" } = {}): Promise<string> {
   const { data: prof } = await supa
     .from("athlete_profiles")
     .select("age, engine_program_version, engine_goal, engine_current_day, engine_ai_sequencing")
@@ -144,7 +148,10 @@ export async function buildEngineAssessmentInputs(supa: SupabaseClient, userId: 
   if (!p.engine_program_version) return "";
   const { data: program } = await supa.from("engine_programs").select("name, days_per_week").eq("id", p.engine_program_version).maybeSingle();
   const pr = (program ?? {}) as { name?: string | null; days_per_week?: number | null };
-  const conditioning = await buildConditioningState(supa, userId, { daysPerWeek: pr.days_per_week ?? null });
+  // The curve is recomputed now, so a session or time trial from this morning
+  // is in the facts (the stored copy can be a day behind). A dry run computes
+  // it without storing it.
+  const conditioning = await buildConditioningState(supa, userId, { daysPerWeek: pr.days_per_week ?? null, curve: opts.curve ?? "fresh" });
   if (!conditioning.trim()) return "";
   const header = [
     `ATHLETE: ${p.age ? `age ${p.age}` : "age not given"}.`,
