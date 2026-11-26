@@ -281,7 +281,7 @@ export function removeByRule(output: WriterOutput, locs: Array<Loc & { movement:
 
 // NO EXAMPLES OF AN INJURY, A BODY PART OR A MOVEMENT IN THIS TEXT, EVER
 // (founder, 2026-11-26). See restrictionsForPrompt. A test fails if one returns.
-export const JUDGE_SYSTEM = `You check AI-written training against ONE athlete's physical restrictions. Nothing else is your job: not variety, not balance, not difficulty, not whether a movement is on a list, not whether a row is complete.
+export const JUDGE_SYSTEM = `You check AI-written training against ONE athlete's physical restrictions. Nothing else is your job: not variety, not balance, not difficulty, not whether a movement is on a list, not whether an entry is complete.
 
 You receive the athlete's restrictions (what they wrote under injuries, what they said elsewhere — signup answers and notes to their coach — and a list of movements never to program), a list of movement names for spelling, and the written training as JSON.
 
