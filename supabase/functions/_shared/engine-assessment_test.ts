@@ -63,6 +63,10 @@ Deno.test("the instructions: unmeasured is unknown, not weak; no targets or sess
   assert(ENGINE_ASSESSMENT_SYSTEM.includes(`"floor" and "blank" are things you do not know yet`));
   assert(ENGINE_ASSESSMENT_SYSTEM.includes("no session prescriptions, no paces, no targets"));
   assert(ENGINE_ASSESSMENT_SYSTEM.includes("never scold"));
+  // Where a measured band stands is given by the app; the AI does not re-judge the number.
+  assert(ENGINE_ASSESSMENT_SYSTEM.includes("POSITIONS ARE GIVEN, NOT YOURS TO DECIDE"));
+  assert(ENGINE_ASSESSMENT_SYSTEM.includes('"slightly behind": a mild gap. It may be a priority, usually a lower one. NEVER a strength.'));
+  assert(ENGINE_ASSESSMENT_SYSTEM.includes("the same number must always read the same way"));
   // Written to the athlete, as their coach.
   assert(ENGINE_ASSESSMENT_SYSTEM.includes('write every field TO THE ATHLETE, in the second person'));
   assert(ENGINE_ASSESSMENT_SYSTEM.includes('Never "the athlete" or "this athlete"'));

@@ -352,7 +352,7 @@ const EMPTY_CONTINUUM: ContinuumBlock = { text: "", primaryCurve: ECHO_BIKE_CAL_
  * loudly), never to "". `refresh: false` (the Coach, latency-sensitive) reads
  * what the daily tick stored.
  */
-export async function buildContinuumBlock(supa: SupabaseClient, userId: string, opts: { refresh: boolean; write?: boolean }): Promise<ContinuumBlock> {
+export async function buildContinuumBlock(supa: SupabaseClient, userId: string, opts: { refresh: boolean; write?: boolean; positions?: boolean }): Promise<ContinuumBlock> {
   let curves: PdCurves | null = null;
   let refreshFailed = false;
   if (opts.refresh) {
@@ -362,7 +362,7 @@ export async function buildContinuumBlock(supa: SupabaseClient, userId: string, 
       const r = await computeAthleteContinuum(supa, userId, curves, { write: opts.write !== false });
       if (!r) return EMPTY_CONTINUUM;
       const primary = primaryMachine(r.trials, r.results.map((x) => `${x.modality}|${x.units ?? ""}`), curves);
-      return { text: formatCurveForPrompt(r.curve, r.regions, r.trials), ...primary };
+      return { text: formatCurveForPrompt(r.curve, r.regions, r.trials, { positions: opts.positions }), ...primary };
     } catch (err) {
       refreshFailed = true;
       console.error(JSON.stringify({ tag: "continuum_refresh_failed", user: userId, error: err instanceof Error ? err.message : String(err) }));
@@ -394,7 +394,7 @@ export async function buildContinuumBlock(supa: SupabaseClient, userId: string, 
   const curve: EngineCurve = { version: stored.version, nodes: stored.nodes, flags: stored.flags ?? [], as_of: stored.as_of ?? null, awaiting_right_anchor: stored.awaiting_right_anchor ?? false };
   const regions = summarizeCurve(curve, results);
   const primary = primaryMachine(trials, machines, loaded);
-  const text = formatCurveForPrompt(curve, regions, trials) + (refreshFailed ? "\n(stored curve — inline refresh failed; see the function log)" : "");
+  const text = formatCurveForPrompt(curve, regions, trials, { positions: opts.positions }) + (refreshFailed ? "\n(stored curve — inline refresh failed; see the function log)" : "");
   return { text, ...primary };
 }
 
@@ -421,7 +421,7 @@ function primaryMachine(trials: TrialInput[], sessionMachines: string[], curves:
 export async function buildConditioningState(
   supa: SupabaseClient,
   userId: string,
-  opts?: { recentDays?: number; daysPerWeek?: number | null; curve?: "stored" | "fresh" | "fresh_unsaved" },
+  opts?: { recentDays?: number; daysPerWeek?: number | null; curve?: "stored" | "fresh" | "fresh_unsaved"; positions?: boolean },
 ): Promise<string> {
   // recentDays bounds the days-since / adherence windows only; the analytics
   // block (below) and the session list use every completed session, as the
@@ -480,7 +480,7 @@ export async function buildConditioningState(
   // A caller that is not latency-sensitive (the Engine assessment) asks for
   // the curve recomputed now, stored or not.
   const curveMode = opts?.curve ?? "stored";
-  const continuum = await buildContinuumBlock(supa, userId, { refresh: curveMode !== "stored", write: curveMode === "fresh" });
+  const continuum = await buildContinuumBlock(supa, userId, { refresh: curveMode !== "stored", write: curveMode === "fresh", positions: opts?.positions === true });
   return signals + analytics + (continuum.text ? "\n\n" + continuum.text : "");
 }
 
