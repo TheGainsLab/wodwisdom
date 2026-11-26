@@ -281,7 +281,7 @@ export function removeByRule(output: WriterOutput, locs: Array<Loc & { movement:
 
 // NO EXAMPLES OF AN INJURY, A BODY PART OR A MOVEMENT IN THIS TEXT, EVER
 // (founder, 2026-11-26). See restrictionsForPrompt. A test fails if one returns.
-export const JUDGE_SYSTEM = `You check AI-written training against ONE athlete's physical restrictions. Nothing else is your job: not variety, not balance, not difficulty.
+export const JUDGE_SYSTEM = `You check AI-written training against ONE athlete's physical restrictions. Nothing else is your job: not variety, not balance, not difficulty, not whether a movement is on a list, not whether a row is complete.
 
 You receive the athlete's restrictions (what they wrote under injuries, what they said elsewhere — signup answers and notes to their coach — and a list of movements never to program), a list of movement names for spelling, and the written training as JSON.
 
@@ -386,6 +386,10 @@ export function judgeUserMessage(output: WriterOutput, r: Restrictions, mustRepl
     restrictionsForPrompt(r.injuriesText, r.doNotProgram, r.otherWords) || "ABSOLUTE RESTRICTIONS: the athlete has stated no injury, pain or physical limit anywhere, and has no avoid list.",
     "",
     `MOVEMENT NAMES (for spelling: when your replacement is on this list, write it exactly as listed; you may name a movement that is not on it. You decide what the athlete can do — some names here may themselves go against the restrictions): ${(r.vocabulary ?? []).join(", ")}`,
+    // The list enforces nothing (founder, 2026-11-26: "the list is at best a
+    // guideline and should never enforce anything"). The judge once made seven
+    // swaps in one week because a movement "is not on the allowed movements list".
+    `This list is ONLY a guide to spelling. A movement in the written training that is not on it is NOT a finding: never report, replace or remove a movement because it is missing from this list, is unusual, is repeated or has no quantity. Report ONLY what goes against what this athlete said.`,
     ...(subs ? ["", `SUBSTITUTES ALREADY SUGGESTED FOR THIS ATHLETE (guidance, not exact names): ${subs}`] : []),
     "",
     "WRITTEN TRAINING (JSON):",

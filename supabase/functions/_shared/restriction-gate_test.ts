@@ -64,6 +64,10 @@ Deno.test("the judge is given the athlete's words and the whole movement list as
   for (const name of VOCAB) assert(list.includes(name), `${name} missing from the list given to the judge`);
   assert(list.includes("you may name a movement that is not on it"));
   assert(list.includes("You decide what the athlete can do"));
+  // The list enforces nothing (founder, 2026-11-26).
+  assert(msg.includes("never report, replace or remove a movement because it is missing from this list"));
+  assert(msg.includes("Report ONLY what goes against what this athlete said."));
+  assert(JUDGE_SYSTEM.includes("not whether a movement is on a list"));
 });
 
 Deno.test("a judge's replacement is applied; load and percentage do not carry over", () => {
