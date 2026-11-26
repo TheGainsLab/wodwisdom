@@ -1,7 +1,7 @@
 // deno test supabase/functions/_shared/restriction-gate_test.ts --no-check --allow-env
 import { assert, assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import {
-  applyFindings, athleteWordsElsewhere, type Finding, hasInjuryText, judgeUserMessage,
+  applyFindings, athleteWordsElsewhere, type Finding, hasInjuryText, JUDGE_SYSTEM, judgeUserMessage,
   removeByRule, type Restrictions, restrictionsForPrompt, runRestrictionGate,
 } from "./restriction-gate.ts";
 // deno-lint-ignore no-explicit-any
@@ -248,4 +248,42 @@ Deno.test("GATE — a clean week is left exactly as written, after one reading",
   let calls = 0;
   const rep = await runRestrictionGate(o, { ...ERIC, injuriesText: "Sore left wrist", doNotProgram: [] }, { judge: () => { calls++; return Promise.resolve([]); } });
   assertEquals(JSON.stringify(o), before); assertEquals(rep.actions, []); assertEquals(calls, 1);
+});
+
+// ── No examples in what the AI is told about an athlete (founder, 2026-11-26) ──
+// A member with no injury had handstand push-ups and a shuttle run removed
+// "because the athlete reported shoulder pain" and "running is banned": the AI
+// had read the instructions' own worked examples as facts about the member.
+// "Remove them and never put them back."
+
+const EXAMPLE_WORDS = [
+  "run", "runs", "running", "runner", "runner's", "jog", "sprint", "shoulder", "knee", "wrist", "elbow", "hip", "ankle", "lunge", "squat", "muscle-up", "muscle up",
+  "handstand", "hspu", "overhead", "rotator", "meniscus", "pull-up", "pull up", "press", "deadlift", "row", "bike", "machine",
+  "e.g.", "for example", "such as",
+];
+const wordsFound = (text: string) => EXAMPLE_WORDS.filter((w) => new RegExp(`(^|[^a-z])${w.replace(/[.]/g, "\\.")}([^a-z]|$)`, "i").test(text));
+
+Deno.test("the restrictions block holds the athlete's own words and rules only: no injury, body part or movement of our own", () => {
+  // Inputs that contain none of the words, so anything found came from us.
+  const block = restrictionsForPrompt("Sore left thumb", ["Farmer Carry"], ['Note to the coach: "thumb still sore"']);
+  assertEquals(wordsFound(block), []);
+  assert(block.includes('"Sore left thumb"') && block.includes("Never program: Farmer Carry."));
+  assert(block.includes("Do not add a restriction they did not state."));
+});
+
+Deno.test("the judge's instructions name no injury, body part or movement", () => {
+  assertEquals(wordsFound(JUDGE_SYSTEM), []);
+  assert(JUDGE_SYSTEM.includes("If the athlete has stated nothing, report nothing."));
+});
+
+Deno.test("what the judge is sent for a member with no restrictions carries nothing but the fact that there are none", () => {
+  const msg = judgeUserMessage({ weeks: [] } as Any, { injuriesText: "None", doNotProgram: [], suggestedSubs: [], vocabulary: [] });
+  const head = msg.split("MOVEMENT NAMES")[0];
+  assertEquals(wordsFound(head), []);
+  assert(head.includes("the athlete has stated no injury, pain or physical limit anywhere, and has no avoid list"));
+});
+
+Deno.test("the writer's instructions carry no example injury either", () => {
+  const writer = Deno.readTextFileSync(new URL("./v2-system-prompt.ts", import.meta.url));
+  for (const gone of ["torn rotator cuff", 'who wrote "no running"']) assert(!writer.includes(gone), gone);
 });

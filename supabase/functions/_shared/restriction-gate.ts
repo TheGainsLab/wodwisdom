@@ -119,12 +119,21 @@ export function restrictionsForPrompt(
     for (const w of other) lines.push(`    - ${w}`);
   }
   if (list.length > 0) lines.push(`  Never program: ${list.join(", ")}.`);
+  // NO EXAMPLES HERE, EVER (founder, 2026-11-26: "Remove them and never put
+  // them back"). This text sits directly under the athlete's own words. It
+  // used to carry two worked examples ("no running" bans Run, Shuttle Run...;
+  // "pain in shoulder on muscle-ups" means no handstand push-ups). The AI read
+  // them as facts about the athlete in front of it: a member with no injury
+  // had handstand push-ups and a shuttle run taken out "because the athlete
+  // reported shoulder pain" and "running is banned". Rules only, with no
+  // movement, body part or injury named. A test fails if one comes back.
   lines.push(
-    "  - A banned movement is banned in EVERY form and under EVERY name: any distance, load, tempo or variation of it (\"no running\" bans Run, 400m Run, Shuttle Run, Treadmill Run, a jog in a cool-down).",
+    "  - A listed movement is ruled out in EVERY form and under EVERY name: any distance, load, tempo or variation of it.",
     "  - This covers EVERY block: warm-up, mobility, skills, strength, accessory, metcon and cool-down alike.",
-    "  - Do NOT scale, shorten or lighten a banned movement — REPLACE it with a different movement that does not load the injured area.",
+    "  - Do NOT scale, shorten or lighten a ruled-out movement — REPLACE it with a different movement that does not go against what the athlete said.",
     "  - If the athlete's words rule out something the list does not name, their words win.",
-    "  - Pain in a body part restricts that body part, not only the movement they named: \"pain in shoulder on muscle-ups\" means go easy on the shoulder — no heavy or high-skill overhead loading (e.g. strict handstand push-ups) while it hurts.",
+    "  - Pain in a body part restricts that body part, not only the movement they mentioned it with.",
+    "  - The lines above are everything this athlete has said. Do not add a restriction they did not state.",
   );
   return lines.join("\n");
 }
@@ -270,23 +279,25 @@ export function removeByRule(output: WriterOutput, locs: Array<Loc & { movement:
 
 // ── The judge ──────────────────────────────────────────────────────────────
 
-const JUDGE_SYSTEM = `You check AI-written training against ONE athlete's physical restrictions. Nothing else is your job: not variety, not balance, not difficulty.
+// NO EXAMPLES OF AN INJURY, A BODY PART OR A MOVEMENT IN THIS TEXT, EVER
+// (founder, 2026-11-26). See restrictionsForPrompt. A test fails if one returns.
+export const JUDGE_SYSTEM = `You check AI-written training against ONE athlete's physical restrictions. Nothing else is your job: not variety, not balance, not difficulty.
 
 You receive the athlete's restrictions (what they wrote under injuries, what they said elsewhere — signup answers and notes to their coach — and a list of movements never to program), a list of movement names for spelling, and the written training as JSON.
 
-Pain, injury or a physical limit counts wherever the athlete mentioned it, not only under injuries. A statement about one movement tells you about the body part: "pain in shoulder on muscle-ups" means the shoulder is the problem, so heavy or high-skill overhead loading of that shoulder goes against it too. Statements that are only likes, dislikes or goals are NOT restrictions.
+Pain, injury or a physical limit counts wherever the athlete mentioned it, not only under injuries. A statement of pain during one movement tells you about the body part, so other work that loads that body part the same way goes against it too. Statements that are only likes, dislikes or goals are NOT restrictions.
 
 Flag a movement when doing it would go against what the athlete said:
-  - It is on the never-program list, under any name, distance, load or variation. "No running" rules out Run, 400m Run, Shuttle Run, Treadmill Run and an easy jog alike.
-  - The athlete's own words rule it out even though the list does not name it ("runner's knee, no lunges" rules out every lunge and split-squat variation).
+  - It is on the never-program list, under any name, distance, load or variation.
+  - The athlete's own words rule it out even though the list does not name it.
   - It plainly loads an injured area the athlete asked to protect.
-Check EVERY block: warm-up, mobility, skills, strength, accessory, metcon, cool-down. An easy version is still a version: "easy pace" does not make a banned movement acceptable.
+Check EVERY block: warm-up, mobility, skills, strength, accessory, metcon, cool-down. An easy version is still a version: a lighter or slower form of a ruled-out movement is still ruled out.
 
 Do NOT flag:
   - Movements that are merely near a restriction but do not load the area the athlete named.
-  - Anything the athlete did not ask to avoid. Their words are the ground truth; do not invent restrictions.
+  - Anything the athlete did not ask to avoid. Their words are the ground truth; do not invent restrictions. If the athlete has stated nothing, report nothing.
 
-For every flagged movement give a replacement the athlete CAN do, that keeps the block's purpose (an easy cardio flush stays an easy cardio flush on a different machine; a pulling accessory stays a pull). The replacement must not itself go against the restrictions. Give its quantity when the original quantity would not make sense for it (for example a time in seconds for a machine in place of a distance run).
+For every flagged movement give a replacement the athlete CAN do, that keeps the block's purpose. The replacement must not itself go against the restrictions. Give its quantity when the original quantity would not make sense for it.
 
 Report through the report tool. Locations use the JSON's own week_num and day_num, block_index = the block's position in that day's blocks array (first is 0), movement_index = the movement's position in that block's movements array (first is 0), and movement = the name exactly as written.`;
 

@@ -313,7 +313,7 @@ AUDIT RULES (echoed so you can self-check before output):
   - output must contain exactly 4 weeks × days_per_week days.
   - every block must contain at least one movement; movements in strength / accessory / metcon / skills blocks must have at least one of {sets, reps, weight, time, distance}.
 
-A separate safety review will read your output alongside the raw injuries and goal text. If you program a movement that conflicts with a stated injury (e.g., overhead pressing on an athlete with a torn rotator cuff, or an easy run for an athlete who wrote "no running"), it will be taken out of your program and replaced. Read the injuries text carefully on the first pass — when in doubt, choose a different movement.
+A separate safety review will read your output alongside the raw injuries and goal text. If you program a movement that conflicts with an injury this athlete stated, it will be taken out of your program and replaced. Read the injuries text carefully on the first pass — when in doubt, choose a different movement.
 
 WRITE THE PROGRAM.
 `;
