@@ -105,3 +105,31 @@ Deno.test("a stored 'uncalibrated' flag is never passed to the coach when the at
   assert(cs.includes("const storedFlags = currentUncalibratedOnly(stored.flags ?? [], trials);"));
   assert(cs.includes("flags: storedFlags,"));
 });
+
+import { CURVE_GUIDE_FOR_COACH, FLAG_MEANINGS, flagGuide } from "./engine-continuum.ts";
+
+Deno.test("every flag the curve can raise has one meaning, and every AI shown the flags is shown it", async () => {
+  // The flags replayCurve can raise.
+  const ec = await Deno.readTextFile(new URL("./engine-continuum.ts", import.meta.url));
+  const raised = new Set([...ec.matchAll(/flags\.push\((?:"|`)([A-Z_]+)/g)].map((m) => m[1]));
+  const explained = new Set(Object.keys(FLAG_MEANINGS).map((k) => k.split(":")[0]));
+  assertEquals([...raised].sort(), [...explained].sort());
+  // The chat coach's guide and the assessment's instructions both carry them.
+  for (const k of Object.keys(FLAG_MEANINGS)) {
+    assert(CURVE_GUIDE_FOR_COACH.includes(k), `coach guide lacks ${k}`);
+    assert(ENGINE_ASSESSMENT_SYSTEM.includes(k), `assessment lacks ${k}`);
+  }
+  assert(flagGuide().split("\n").length === Object.keys(FLAG_MEANINGS).length);
+  // The coach is told what the states and positions mean, and to keep the codes to itself.
+  assert(CURVE_GUIDE_FOR_COACH.includes("never say \"M\", \"n\", a state word or a flag name to the athlete"));
+  assert(CURVE_GUIDE_FOR_COACH.includes("it is unknown, not a weakness"));
+  assert(CURVE_GUIDE_FOR_COACH.includes("\"slightly behind\" is a mild gap and never a strength"));
+});
+
+Deno.test("the coach's conditioning text carries the guide and the position labels; the assessment's does not repeat the guide", async () => {
+  const cs = await Deno.readTextFile(new URL("./conditioning-state.ts", import.meta.url));
+  assert(cs.includes("positions: true });"));
+  assert(cs.includes('const guide = continuum.text && !opts?.forAssessment ? "\\n" + CURVE_GUIDE_FOR_COACH : "";'));
+  const ea = await Deno.readTextFile(new URL("./engine-assessment.ts", import.meta.url));
+  assert(ea.includes("forAssessment: true"));
+});

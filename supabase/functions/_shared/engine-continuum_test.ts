@@ -278,7 +278,7 @@ Deno.test("a measured band's position follows the fixed lines; an unmeasured ban
   assertEquals(bandPosition(null, "measured"), null);
 });
 
-Deno.test("the position line is added only when asked for: the coach's and the sequencer's curve text is unchanged", () => {
+Deno.test("the position line is added only when asked for: the sequencer's curve text is unchanged", () => {
   const { curve, sessions } = replayCurve(fixture.sessions, fixture.trials, CURVES);
   const regions = summarizeCurve(curve, sessions);
   const plain = formatCurveForPrompt(curve, regions, fixture.trials);

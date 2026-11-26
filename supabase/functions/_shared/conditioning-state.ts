@@ -26,7 +26,7 @@ import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { type AnalyticsSession, type AnalyticsTrial, computeEngineAnalytics, formatEngineAnalytics } from "./engine-analytics.ts";
 import { computeAthleteContinuum, loadCurves, type PdCurves, type StoredCurve } from "./engine-continuum-io.ts";
 import { resetCutoff, sinceReset } from "./engine-reset.ts";
-import { ECHO_BIKE_CAL_CURVE_V1, type EngineCurve, formatCurveForPrompt, type PdCurvePoint, type ReplayResult, summarizeCurve, type TrialInput } from "./engine-continuum.ts";
+import { CURVE_GUIDE_FOR_COACH, ECHO_BIKE_CAL_CURVE_V1, type EngineCurve, formatCurveForPrompt, type PdCurvePoint, type ReplayResult, summarizeCurve, type TrialInput } from "./engine-continuum.ts";
 
 // ─── Competency-graph metadata (taxonomy, not judgment) ──────────────────────
 
@@ -435,7 +435,7 @@ function primaryMachine(trials: TrialInput[], sessionMachines: string[], curves:
 export async function buildConditioningState(
   supa: SupabaseClient,
   userId: string,
-  opts?: { recentDays?: number; daysPerWeek?: number | null; curve?: "stored" | "fresh" | "fresh_unsaved"; positions?: boolean },
+  opts?: { recentDays?: number; daysPerWeek?: number | null; curve?: "stored" | "fresh" | "fresh_unsaved"; forAssessment?: boolean },
 ): Promise<string> {
   // recentDays bounds the days-since / adherence windows only; the analytics
   // block (below) and the session list use every completed session, as the
@@ -494,8 +494,12 @@ export async function buildConditioningState(
   // A caller that is not latency-sensitive (the Engine assessment) asks for
   // the curve recomputed now, stored or not.
   const curveMode = opts?.curve ?? "stored";
-  const continuum = await buildContinuumBlock(supa, userId, { refresh: curveMode !== "stored", write: curveMode === "fresh", positions: opts?.positions === true });
-  return signals + analytics + (continuum.text ? "\n\n" + continuum.text : "");
+  const continuum = await buildContinuumBlock(supa, userId, { refresh: curveMode !== "stored", write: curveMode === "fresh", positions: true });
+  // Every reader gets the position labels. A coach talking to the athlete also
+  // gets the guide to the curve and its flags; the assessment's own
+  // instructions carry it, so it is not repeated there.
+  const guide = continuum.text && !opts?.forAssessment ? "\n" + CURVE_GUIDE_FOR_COACH : "";
+  return signals + analytics + (continuum.text ? "\n\n" + continuum.text + guide : "");
 }
 
 /**

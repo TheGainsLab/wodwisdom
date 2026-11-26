@@ -536,6 +536,41 @@ export function bandPosition(m: number | null, state: NodeState): BandPosition |
   return "behind";
 }
 
+/**
+ * What each flag on the curve means, in one place. Every AI that is shown the
+ * flags is shown these meanings (2026-11-26: the chat coach was sent the bare
+ * flag words — "TRIAL_STALE:echo_bike|cal" — with no explanation, while the
+ * sequencer and the assessment were each given their own).
+ */
+export const FLAG_MEANINGS: Record<string, string> = {
+  AEROBIC_SIDE_BEHIND_SPRINT:
+    "short all-out efforts sit well above the curve relative to the time trial. The flag carries its own reading in brackets: a trial that is flat or falling means the aerobic side is the gap; a trial that is rising means a fast athlete whose level is catching up, not an aerobic problem.",
+  GLYCOLYTIC_BELOW_BALANCED: "short hard work (about 30 seconds) is the gap.",
+  TRIAL_LOW: "the athlete held trial pace for longer than a balanced athlete would, so the time-trial baseline understates them and targets may be too easy. A retest is justified.",
+  "TRIAL_STALE:<machine|unit>": "that machine's time trial is over 40 days old and the machine is still being trained on. Targets may no longer fit. A retest is justified.",
+  "UNCALIBRATED:<machine|unit>": "the athlete trains on that machine, in that unit, and has NO time trial on it. Its targets are not personal yet. A time trial on it fixes this.",
+  AWAITING_RIGHT_ANCHOR: "the athlete retested recently, so the readings for the shortest efforts are provisional until their next all-out short session.",
+};
+
+/** The flag meanings as prompt lines. */
+export function flagGuide(): string {
+  return Object.entries(FLAG_MEANINGS).map(([k, v]) => `  - ${k}: ${v}`).join("\n");
+}
+
+/**
+ * How a COACH talking to the athlete reads the curve block. Appended to the
+ * curve wherever the chat coach (or the workout review) is shown it.
+ */
+export const CURVE_GUIDE_FOR_COACH = [
+  "HOW TO READ THE CURVE ABOVE (this is for you: never say \"M\", \"n\", a state word or a flag name to the athlete; say what it means in plain words):",
+  "  - state \"measured\": an all-out effort proved it. \"floor\": only sub-maximal work has landed in that range, so the athlete can do AT LEAST this; it is not a weakness. \"blank\": nothing has landed there; it is unknown, not a weakness.",
+  "  - n: how much evidence there is. A small n is one or two sessions: say it tentatively or not at all.",
+  "  - position (measured ranges only): \"ahead\", \"balanced\", \"slightly behind\" or \"behind\", worked out by the app from fixed lines. Use these words for where a range stands and do not re-judge the number yourself. \"slightly behind\" is a mild gap and never a strength; \"balanced\" is neither a gap nor a standout strength. A range shown as \"—\" is not measured and has no position.",
+  "  - Flags (\"Flags: none\" means none apply):",
+  flagGuide(),
+  "  Each machine and unit is its own ruler: never compare a pace on one with a pace on another.",
+].join("\n");
+
 /** Effort-duration bands, short on the right as on the chart. */
 export const REGIONS: Array<[number, number | null, string]> = [
   [1200, 2400, "20–40 min"],
