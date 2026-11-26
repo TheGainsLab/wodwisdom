@@ -26,7 +26,7 @@ import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { type AnalyticsSession, type AnalyticsTrial, computeEngineAnalytics, formatEngineAnalytics } from "./engine-analytics.ts";
 import { computeAthleteContinuum, loadCurves, type PdCurves, type StoredCurve } from "./engine-continuum-io.ts";
 import { resetCutoff, sinceReset } from "./engine-reset.ts";
-import { ECHO_BIKE_CAL_CURVE_V1, type EngineCurve, formatCurveForPrompt, type PdCurvePoint, type ReplayResult, summarizeCurve, type TrialInput } from "./engine-continuum.ts";
+import { CURVE_GUIDE_FOR_COACH, ECHO_BIKE_CAL_CURVE_V1, type EngineCurve, formatCurveForPrompt, type PdCurvePoint, type ReplayResult, summarizeCurve, type TrialInput } from "./engine-continuum.ts";
 
 // ─── Competency-graph metadata (taxonomy, not judgment) ──────────────────────
 
@@ -352,7 +352,7 @@ const EMPTY_CONTINUUM: ContinuumBlock = { text: "", primaryCurve: ECHO_BIKE_CAL_
  * loudly), never to "". `refresh: false` (the Coach, latency-sensitive) reads
  * what the daily tick stored.
  */
-export async function buildContinuumBlock(supa: SupabaseClient, userId: string, opts: { refresh: boolean; write?: boolean }): Promise<ContinuumBlock> {
+export async function buildContinuumBlock(supa: SupabaseClient, userId: string, opts: { refresh: boolean; write?: boolean; positions?: boolean }): Promise<ContinuumBlock> {
   let curves: PdCurves | null = null;
   let refreshFailed = false;
   if (opts.refresh) {
@@ -362,7 +362,7 @@ export async function buildContinuumBlock(supa: SupabaseClient, userId: string, 
       const r = await computeAthleteContinuum(supa, userId, curves, { write: opts.write !== false });
       if (!r) return EMPTY_CONTINUUM;
       const primary = primaryMachine(r.trials, r.results.map((x) => `${x.modality}|${x.units ?? ""}`), curves);
-      return { text: formatCurveForPrompt(r.curve, r.regions, r.trials), ...primary };
+      return { text: formatCurveForPrompt(r.curve, r.regions, r.trials, { positions: opts.positions }), ...primary };
     } catch (err) {
       refreshFailed = true;
       console.error(JSON.stringify({ tag: "continuum_refresh_failed", user: userId, error: err instanceof Error ? err.message : String(err) }));
@@ -391,11 +391,25 @@ export async function buildContinuumBlock(supa: SupabaseClient, userId: string, 
   const machines = rows.map((x) => `${x.modality ?? "unknown"}|${x.units ?? ""}`);
   const trials: TrialInput[] = sinceReset((tts ?? []) as Array<{ modality: string; units: string | null; calculated_rpm: number; date: string; created_at: string | null }>, resetAt)
     .map((t) => ({ modality: t.modality, units: t.units, pace: Number(t.calculated_rpm), date: t.date }));
-  const curve: EngineCurve = { version: stored.version, nodes: stored.nodes, flags: stored.flags ?? [], as_of: stored.as_of ?? null, awaiting_right_anchor: stored.awaiting_right_anchor ?? false };
+  // A stored curve can carry an UNCALIBRATED flag for a machine that HAS a
+  // time trial: curves computed before 2026-11-26 raised it for any session
+  // logged ahead of the first trial, and a stored curve is only recomputed
+  // when the athlete next trains. The trials are loaded right here, so a flag
+  // they contradict is never passed on (2026-11-26: bad information from the
+  // coach costs the member's trust).
+  const storedFlags = currentUncalibratedOnly(stored.flags ?? [], trials);
+  const curve: EngineCurve = { version: stored.version, nodes: stored.nodes, flags: storedFlags, as_of: stored.as_of ?? null, awaiting_right_anchor: stored.awaiting_right_anchor ?? false };
   const regions = summarizeCurve(curve, results);
   const primary = primaryMachine(trials, machines, loaded);
-  const text = formatCurveForPrompt(curve, regions, trials) + (refreshFailed ? "\n(stored curve — inline refresh failed; see the function log)" : "");
+  const text = formatCurveForPrompt(curve, regions, trials, { positions: opts.positions }) + (refreshFailed ? "\n(stored curve — inline refresh failed; see the function log)" : "");
   return { text, ...primary };
+}
+
+/** Stored flags with any UNCALIBRATED:<machine|unit> removed when that machine
+ *  and unit has a time trial. Every other flag is passed through untouched. */
+export function currentUncalibratedOnly(flags: string[], trials: Array<{ modality: string; units: string | null }>): string[] {
+  const withTrial = new Set(trials.map((t) => `${t.modality}|${t.units ?? ""}`));
+  return flags.filter((f) => !(f.startsWith("UNCALIBRATED:") && withTrial.has(f.slice("UNCALIBRATED:".length))));
 }
 
 /** The machine the athlete is sequenced on: the most recent trial's machine
@@ -421,7 +435,7 @@ function primaryMachine(trials: TrialInput[], sessionMachines: string[], curves:
 export async function buildConditioningState(
   supa: SupabaseClient,
   userId: string,
-  opts?: { recentDays?: number; daysPerWeek?: number | null; curve?: "stored" | "fresh" | "fresh_unsaved" },
+  opts?: { recentDays?: number; daysPerWeek?: number | null; curve?: "stored" | "fresh" | "fresh_unsaved"; forAssessment?: boolean },
 ): Promise<string> {
   // recentDays bounds the days-since / adherence windows only; the analytics
   // block (below) and the session list use every completed session, as the
@@ -480,8 +494,12 @@ export async function buildConditioningState(
   // A caller that is not latency-sensitive (the Engine assessment) asks for
   // the curve recomputed now, stored or not.
   const curveMode = opts?.curve ?? "stored";
-  const continuum = await buildContinuumBlock(supa, userId, { refresh: curveMode !== "stored", write: curveMode === "fresh" });
-  return signals + analytics + (continuum.text ? "\n\n" + continuum.text : "");
+  const continuum = await buildContinuumBlock(supa, userId, { refresh: curveMode !== "stored", write: curveMode === "fresh", positions: true });
+  // Every reader gets the position labels. A coach talking to the athlete also
+  // gets the guide to the curve and its flags; the assessment's own
+  // instructions carry it, so it is not repeated there.
+  const guide = continuum.text && !opts?.forAssessment ? "\n" + CURVE_GUIDE_FOR_COACH : "";
+  return signals + analytics + (continuum.text ? "\n\n" + continuum.text + guide : "");
 }
 
 /**

@@ -17,10 +17,10 @@
  */
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { buildConditioningState } from "./conditioning-state.ts";
-import { REGIONS } from "./engine-continuum.ts";
+import { flagGuide, REGIONS } from "./engine-continuum.ts";
 import { MODELS } from "./model-profiles.ts";
 
-export const ENGINE_ASSESSMENT_BUILDER_VERSION = "v1.1";
+export const ENGINE_ASSESSMENT_BUILDER_VERSION = "v1.2";
 
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY_PIPELINE") ?? Deno.env.get("ANTHROPIC_API_KEY");
 const MODEL = MODELS.fable;
@@ -54,11 +54,20 @@ YOU ARE GIVEN FACTS. They are computed by the app from the athlete's own session
   - ENGINE CONDITIONING SIGNALS: days since the last session; adherence; for each day type and machine the rolling ratio of actual pace to target pace over the last five sessions (1.0 = on target; a max-effort type is measured against the time-trial baseline instead and sits well above 1.0); and the age and history of each machine's time trial, which every target is derived from.
   - ENGINE ANALYTICS: the figures on the athlete's own Analytics page (paces against the time trial, the anaerobic-to-max-aerobic ratio, targets against actual by day type, records, pace by work-to-rest ratio, heart rate when logged).
   - ATHLETE CONDITIONING CURVE: seven bands of EFFORT DURATION, from 20–40 min on the left to ≤30 s on the right. M is this athlete against a balanced athlete at their own time-trial level: 1.0 = balanced, below = that band lags, above = that band is ahead of their trial. state: "measured" = a max effort proved it; "floor" = only sub-maximal days have landed there, so M is a lower bound, not a weakness; "blank" = nothing has landed there, which is an unknown, not a weakness. n = how much evidence. Efforts of 40 minutes or more are zone 2 and are not scored.
-  - FLAGS on the curve: AEROBIC_SIDE_BEHIND_SPRINT (short max efforts sit above the curve relative to the trial; read it with the trial history: a low or stalled trial means the aerobic side is the gap, a rising trial means a fast athlete whose level is catching up). GLYCOLYTIC_BELOW_BALANCED (short hard work is the gap). TRIAL_LOW (they sustained longer than balanced at trial pace: the baseline is stale and understates them). TRIAL_STALE:<machine> (that trial is over 40 days old and still in use). UNCALIBRATED:<machine> (a machine in current use with no time trial at all: its targets are not personal). AWAITING_RIGHT_ANCHOR (a recent retest: the sprint bands are provisional).
+  - FLAGS on the curve, and what each means:
+${flagGuide()}
+
+POSITIONS ARE GIVEN, NOT YOURS TO DECIDE. The curve carries a "position" line: for each MEASURED band, where it stands against balanced, worked out by the app from fixed lines: "ahead", "balanced", "slightly behind" or "behind". A band shown as "—" is not measured and has no position.
+  - "ahead": you may name it as a strength. Never a weakness.
+  - "balanced": neither a strength nor a weakness on its own. Do not present it as a gap, and do not present it as a standout strength.
+  - "slightly behind": a mild gap. It may be a priority, usually a lower one. NEVER a strength.
+  - "behind": a real gap. Make it a priority unless something else clearly outranks it (say what).
+  Use these words for where a band stands. Do not re-judge the number yourself: the same number must always read the same way.
 
 HOW TO READ
   - Weight the four middle bands, 30 seconds to 10 minutes, most: that is where mixed workouts live. A gap at 1–4 minutes outranks a gap at ≤30 s.
-  - A band is a weakness only when it is MEASURED and below balanced. "floor" and "blank" are things you do not know yet: say so, and where it matters make finding out the priority.
+  - A band is a weakness only when it is MEASURED and its position is "slightly behind" or "behind". "floor" and "blank" are things you do not know yet: say so, and where it matters make finding out the priority.
+  - A strength must be a band whose position is "ahead", or consistency, or a band where the athlete is reliably at or above target on real evidence and whose position is not "slightly behind" or "behind".
   - Thin evidence (small n, one or two sessions) supports a tentative read at most. Do not build a priority on one session.
   - Each ratio series steps when the athlete retests, because the ruler changed. Read trends between retests.
   - Machines are separate rulers. Do not compare a pace on one machine, or in one unit, with a pace on another.
@@ -151,7 +160,7 @@ export async function buildEngineAssessmentInputs(supa: SupabaseClient, userId: 
   // The curve is recomputed now, so a session or time trial from this morning
   // is in the facts (the stored copy can be a day behind). A dry run computes
   // it without storing it.
-  const conditioning = await buildConditioningState(supa, userId, { daysPerWeek: pr.days_per_week ?? null, curve: opts.curve ?? "fresh" });
+  const conditioning = await buildConditioningState(supa, userId, { daysPerWeek: pr.days_per_week ?? null, curve: opts.curve ?? "fresh", forAssessment: true });
   if (!conditioning.trim()) return "";
   const header = [
     `ATHLETE: ${p.age ? `age ${p.age}` : "age not given"}.`,

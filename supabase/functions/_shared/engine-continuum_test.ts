@@ -1,6 +1,6 @@
 // deno test -A supabase/functions/_shared/engine-continuum_test.ts --no-check
 import { assert, assertAlmostEquals, assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { applyRetest, balancedBout, balancedCeiling, balancedPaceMultiple, C2_CAL_CURVE_V1, C2_METERS_CURVE_V1, comparablePace, type ContinuumSessionInput, ECHO_BIKE_CAL_CURVE_V1, formatCurveForPrompt, newCurve, replayCurve, sessionBout, sessionContinuum, summarizeCurve, type TrialInput, qualifyFlag } from "./engine-continuum.ts";
+import { applyRetest, balancedBout, BAND_POSITION_LINES, bandPosition, balancedCeiling, balancedPaceMultiple, C2_CAL_CURVE_V1, C2_METERS_CURVE_V1, comparablePace, type ContinuumSessionInput, ECHO_BIKE_CAL_CURVE_V1, formatCurveForPrompt, newCurve, replayCurve, sessionBout, sessionContinuum, summarizeCurve, type TrialInput, qualifyFlag } from "./engine-continuum.ts";
 
 const fixture = JSON.parse(await Deno.readTextFile(new URL("./fixtures/continuum_athlete.json", import.meta.url))) as {
   trials: TrialInput[];
@@ -259,4 +259,34 @@ Deno.test("UNCALIBRATED: a machine trained in the last 28 days with no trial at 
   const old = { ...onRower, date: "2025-01-01" };
   const { curve: c2 } = replayCurve([old, base], fixture.trials, { ...CURVES, "c2_row_erg|cal": C2_CAL_CURVE_V1 });
   assert(!c2.flags.some((f) => f.startsWith("UNCALIBRATED")), `flags: ${c2.flags}`);
+});
+
+// ── Band positions: the same number always reads the same way ───────────────
+
+Deno.test("a measured band's position follows the fixed lines; an unmeasured band has none", () => {
+  assertEquals(BAND_POSITION_LINES, { AHEAD_FROM: 1.05, BALANCED_FROM: 0.95, BEHIND_BELOW: 0.90 });
+  const at = (m: number) => bandPosition(m, "measured");
+  assertEquals([at(1.20), at(1.05)], ["ahead", "ahead"]);
+  assertEquals([at(1.049), at(1.0), at(0.95)], ["balanced", "balanced", "balanced"]);
+  assertEquals([at(0.949), at(0.93), at(0.90)], ["slightly behind", "slightly behind", "slightly behind"]);
+  assertEquals([at(0.899), at(0.75)], ["behind", "behind"]);
+  // The case that read both ways: 0.93 measured is "slightly behind", every time.
+  assertEquals(at(0.93), "slightly behind");
+  // A floor is a lower bound and a blank is nothing: no position.
+  assertEquals(bandPosition(0.93, "floor"), null);
+  assertEquals(bandPosition(1.0, "blank"), null);
+  assertEquals(bandPosition(null, "measured"), null);
+});
+
+Deno.test("the position line is added only when asked for: the sequencer's curve text is unchanged", () => {
+  const { curve, sessions } = replayCurve(fixture.sessions, fixture.trials, CURVES);
+  const regions = summarizeCurve(curve, sessions);
+  const plain = formatCurveForPrompt(curve, regions, fixture.trials);
+  assert(!plain.includes("position:"));
+  const withPos = formatCurveForPrompt(curve, regions, fixture.trials, { positions: true });
+  const line = withPos.split("\n").find((l) => l.startsWith("position: "))!;
+  assertEquals(line.split(" | ").length, 7);
+  for (const r of regions) assert(line.includes(`${r.label}: ${bandPosition(r.m, r.state) ?? "—"}`));
+  // Everything else is the same text.
+  assertEquals(withPos.split("\n").filter((l) => !l.startsWith("position: ")).join("\n"), plain);
 });

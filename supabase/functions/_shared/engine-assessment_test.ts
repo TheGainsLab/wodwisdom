@@ -63,6 +63,10 @@ Deno.test("the instructions: unmeasured is unknown, not weak; no targets or sess
   assert(ENGINE_ASSESSMENT_SYSTEM.includes(`"floor" and "blank" are things you do not know yet`));
   assert(ENGINE_ASSESSMENT_SYSTEM.includes("no session prescriptions, no paces, no targets"));
   assert(ENGINE_ASSESSMENT_SYSTEM.includes("never scold"));
+  // Where a measured band stands is given by the app; the AI does not re-judge the number.
+  assert(ENGINE_ASSESSMENT_SYSTEM.includes("POSITIONS ARE GIVEN, NOT YOURS TO DECIDE"));
+  assert(ENGINE_ASSESSMENT_SYSTEM.includes('"slightly behind": a mild gap. It may be a priority, usually a lower one. NEVER a strength.'));
+  assert(ENGINE_ASSESSMENT_SYSTEM.includes("the same number must always read the same way"));
   // Written to the athlete, as their coach.
   assert(ENGINE_ASSESSMENT_SYSTEM.includes('write every field TO THE ATHLETE, in the second person'));
   assert(ENGINE_ASSESSMENT_SYSTEM.includes('Never "the athlete" or "this athlete"'));
@@ -83,4 +87,49 @@ Deno.test("phase 1 is a dry run: nothing is stored and no coach or sequencer rea
     const src = await Deno.readTextFile(new URL(reader, import.meta.url));
     assert(!src.includes("engine-assessment"), `${reader} already reads the assessment`);
   }
+});
+
+import { currentUncalibratedOnly } from "./conditioning-state.ts";
+
+Deno.test("a stored 'uncalibrated' flag is never passed to the coach when the athlete's trials contradict it", async () => {
+  const trials = [{ modality: "c2_row_erg", units: "cal" }, { modality: "echo_bike", units: "cal" }];
+  const stored = ["UNCALIBRATED:c2_row_erg|cal", "UNCALIBRATED:c2_row_erg|meters", "UNCALIBRATED:track_run|meters", "AWAITING_RIGHT_ANCHOR", "TRIAL_STALE:echo_bike|cal"];
+  assertEquals(currentUncalibratedOnly(stored, trials), [
+    "UNCALIBRATED:c2_row_erg|meters", // same machine, a unit with no trial: still true
+    "UNCALIBRATED:track_run|meters",  // no trial at all: still true
+    "AWAITING_RIGHT_ANCHOR", "TRIAL_STALE:echo_bike|cal", // every other flag untouched
+  ]);
+  assertEquals(currentUncalibratedOnly([], trials), []);
+  // The stored-curve path (what chat reads) applies it before the text is built.
+  const cs = await Deno.readTextFile(new URL("./conditioning-state.ts", import.meta.url));
+  assert(cs.includes("const storedFlags = currentUncalibratedOnly(stored.flags ?? [], trials);"));
+  assert(cs.includes("flags: storedFlags,"));
+});
+
+import { CURVE_GUIDE_FOR_COACH, FLAG_MEANINGS, flagGuide } from "./engine-continuum.ts";
+
+Deno.test("every flag the curve can raise has one meaning, and every AI shown the flags is shown it", async () => {
+  // The flags replayCurve can raise.
+  const ec = await Deno.readTextFile(new URL("./engine-continuum.ts", import.meta.url));
+  const raised = new Set([...ec.matchAll(/flags\.push\((?:"|`)([A-Z_]+)/g)].map((m) => m[1]));
+  const explained = new Set(Object.keys(FLAG_MEANINGS).map((k) => k.split(":")[0]));
+  assertEquals([...raised].sort(), [...explained].sort());
+  // The chat coach's guide and the assessment's instructions both carry them.
+  for (const k of Object.keys(FLAG_MEANINGS)) {
+    assert(CURVE_GUIDE_FOR_COACH.includes(k), `coach guide lacks ${k}`);
+    assert(ENGINE_ASSESSMENT_SYSTEM.includes(k), `assessment lacks ${k}`);
+  }
+  assert(flagGuide().split("\n").length === Object.keys(FLAG_MEANINGS).length);
+  // The coach is told what the states and positions mean, and to keep the codes to itself.
+  assert(CURVE_GUIDE_FOR_COACH.includes("never say \"M\", \"n\", a state word or a flag name to the athlete"));
+  assert(CURVE_GUIDE_FOR_COACH.includes("it is unknown, not a weakness"));
+  assert(CURVE_GUIDE_FOR_COACH.includes("\"slightly behind\" is a mild gap and never a strength"));
+});
+
+Deno.test("the coach's conditioning text carries the guide and the position labels; the assessment's does not repeat the guide", async () => {
+  const cs = await Deno.readTextFile(new URL("./conditioning-state.ts", import.meta.url));
+  assert(cs.includes("positions: true });"));
+  assert(cs.includes('const guide = continuum.text && !opts?.forAssessment ? "\\n" + CURVE_GUIDE_FOR_COACH : "";'));
+  const ea = await Deno.readTextFile(new URL("./engine-assessment.ts", import.meta.url));
+  assert(ea.includes("forAssessment: true"));
 });
