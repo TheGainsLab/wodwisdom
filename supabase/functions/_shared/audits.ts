@@ -718,7 +718,7 @@ export function auditSchemeFormat(output: WriterOutput): AuditResult {
 // auditDoNotProgram REMOVED 2026-11-26 (founder: "Remove it from individual
 // and gym classes"). It compared each movement's exact name with the avoid
 // list and sent a match for a block rewrite. The writer is told the avoid list
-// and the athlete's own words; the restriction check reads the week by meaning.
+// and the athlete's own words. Nothing changes the week after it is written.
 
 // ============================================================
 // Rule 4c — metcon duration matches the labeled time-domain bucket

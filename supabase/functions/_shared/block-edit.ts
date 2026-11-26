@@ -265,7 +265,7 @@ export function validateBlockProposal(
     return problems;
   }
   // The avoid-list name check that stood here was removed 2026-11-26: it
-  // compared exact names. The restriction check reads the proposal by meaning.
+  // compared exact names. The coach is told the athlete's restrictions.
   for (const m of movements) {
     const name = (m.movement ?? "").trim();
     if (!name) {

@@ -8,7 +8,6 @@ import {
 import { ALL_LIFT_KEYS, ALL_SKILL_KEYS } from "./tier-status.ts";
 import { DISPLAY_TO_LIFT_KEY, liftKeyOf } from "./lift-key.ts";
 import { buildEmitBlockTool } from "./v2-output-schema.ts";
-import { applyFindings, type Finding, type Restrictions } from "./restriction-gate.ts";
 import { countsTowardForDay, insertLogEntries } from "./log-counts-toward.ts";
 // deno-lint-ignore no-explicit-any
 type Any = any;
@@ -72,24 +71,6 @@ Deno.test("which lift a weight is judged against follows the AI's answer, not th
   assertEquals(liftKeyOf({ movement: "Clean And Jerk" }), undefined);
 });
 
-Deno.test("a swapped-in movement carries its own answer, never the old movement's", () => {
-  const r: Restrictions = { injuriesText: "shoulder", doNotProgram: [], suggestedSubs: [], vocabulary: ["Ring Row", "Strict Pull Up"] } as Any;
-  const mk = () => ({ weeks: [{ week_num: 1, days: [{ day_num: 1, blocks: [{ block_type: "skills", movements: [{ movement: "Strict Pull Up", sets: 4, reps: 6, counts_toward: "strict_pull_ups", on_barbell: false }] }] }] }] }) as Any;
-  const f = (replacement: Any): Finding[] => [{ week_num: 1, day_num: 1, block_index: 0, movement_index: 0, movement: "Strict Pull Up", reason: "shoulder", replacement }];
-
-  const withAnswer = mk();
-  applyFindings(withAnswer, f({ movement: "Ring Row", counts_toward: "none" }), r);
-  assertEquals(withAnswer.weeks[0].days[0].blocks[0].movements[0], { movement: "Ring Row", sets: 4, reps: 6, counts_toward: "none" });
-
-  const noAnswer = mk();
-  applyFindings(noAnswer, f({ movement: "Ring Row" }), r);
-  assertEquals(noAnswer.weeks[0].days[0].blocks[0].movements[0], { movement: "Ring Row", sets: 4, reps: 6 });
-
-  const junk = mk();
-  applyFindings(junk, f({ movement: "Ring Row", counts_toward: "pull ups" }), r);
-  assertEquals("counts_toward" in junk.weeks[0].days[0].blocks[0].movements[0], false);
-});
-
 // A stand-in database for the log helpers.
 function fakeDb(opts: { movements?: Any[]; movementsError?: string; failLabelledInsert?: boolean }) {
   const inserts: Any[][] = [];
@@ -140,40 +121,6 @@ Deno.test("logging works exactly as before when the column is not there yet, or 
   const noDay = fakeDb({ movements: [{ movement: "Row", counts_toward: "none" }] });
   await insertLogEntries(noDay.supa, [{ movement: "Row" }], null);
   assertEquals(noDay.inserts, [[{ movement: "Row" }]]);
-});
-
-import { applyLoadArithmetic, type FitProfile, liftLevelsFor } from "./fit-gate.ts";
-
-Deno.test("the load limit applies to a lift the AI labelled, whatever it is called", () => {
-  const lifts = { back_squat: 100, clean_and_jerk: 80, power_clean: 70, bench_press: null };
-  const profile: FitProfile = {
-    units: "kg", lifts, liftLevels: liftLevelsFor({ lifts, bodyweight: 87, gender: "male", age: 37 }),
-    equipment: { barbell: true }, skills: {}, sessionMinutes: 60, deloadWeeks: [], conditioning: {}, vocabulary: [], avoidNames: [],
-  } as Any;
-  const week = (m: Any) => ({ weeks: [{ week_num: 1, days: [{ day_num: 1, blocks: [{ block_type: "strength", movements: [{ sets: 5, reps: 2, weight_unit: "kg", ...m }] }] }] }] }) as Any;
-  const first = (o: Any) => o.weeks[0].days[0].blocks[0].movements[0];
-
-  // "Clean And Jerk" at 100% of the max: unlabelled it was not recognised…
-  const unlabelled = week({ movement: "Clean And Jerk", weight: 80 });
-  assertEquals(applyLoadArithmetic(unlabelled, profile), []);
-  // …labelled, it is lowered to the ceiling for the athlete's level.
-  const labelled = week({ movement: "Clean And Jerk", weight: 80, counts_toward: "clean_and_jerk", on_barbell: true });
-  assertEquals(applyLoadArithmetic(labelled, profile).length, 1);
-  assert(first(labelled).weight < 80);
-
-  // A variation is judged against the lift the AI named.
-  const hang = week({ movement: "Hang Power Clean", weight: 70, counts_toward: "power_clean", on_barbell: true });
-  applyLoadArithmetic(hang, profile);
-  assert(first(hang).weight < 70);
-
-  // No max on file for the lift it counts toward: prescribed by effort, no number.
-  const noMax = week({ movement: "Close Grip Bench Press", weight: 60, counts_toward: "bench_press", on_barbell: true });
-  applyLoadArithmetic(noMax, profile);
-  assertEquals(first(noMax).weight, undefined);
-
-  // "none": code leaves it for the fit check's own reading.
-  const none = week({ movement: "Back Squat", weight: 100, counts_toward: "none" });
-  assertEquals(applyLoadArithmetic(none, profile), []);
 });
 
 Deno.test("the instruction says a pull is \"none\", so the lift's ceiling is never applied to it", () => {

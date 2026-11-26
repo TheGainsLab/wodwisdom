@@ -7,7 +7,6 @@ import { assert, assertEquals } from "https://deno.land/std@0.224.0/assert/mod.t
 import { auditPlanBlockTypes, auditWeekAgainstPlan, withPlanChecks } from "./plan-fidelity.ts";
 import { AUDIT_KIND } from "./audits.ts";
 import { classifyFailuresByKind, runAudits } from "./audit-runner.ts";
-import { applyTimeTrims } from "./fit-gate.ts";
 // deno-lint-ignore no-explicit-any
 type Any = any;
 
@@ -107,15 +106,4 @@ Deno.test("nothing checks the week against its plan once the gates have run, so 
   // The gates' stage goes straight to saving; it cannot send the week back to the audits.
   const safety = stage("stageSafetyReview", "stageSaving");
   assertEquals((safety.match(/next: "[a-z_]+"/g) ?? []), ['next: "saving"']);
-});
-
-Deno.test("the fit gate's accessory drop for a short session is a difference from the plan that only exists after the check has run", () => {
-  const out = written(DAY1());
-  assertEquals(auditWeekAgainstPlan(out, PLAN).map((r) => r.passed), [true]); // what the check sees: the week as written
-  // Then the fit gate, on purpose, for a 40-minute session:
-  const actions = applyTimeTrims(out, [{ week_num: 2, day_num: 1, block_index: 2, op: "drop_block", reason: "over time" } as Any], { sessionMinutes: 40 } as Any);
-  assertEquals(actions.length, 1);
-  assertEquals(out.weeks[0].days[0].blocks.map((b: Any) => b.block_type), ["warm-up", "strength", "metcon", "cool-down"]);
-  // This is exactly what the check would call a missing block — which is why it must never run here.
-  assertEquals(auditPlanBlockTypes(out, PLAN).passed, false);
 });

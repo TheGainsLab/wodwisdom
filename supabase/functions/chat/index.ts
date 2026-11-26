@@ -33,9 +33,6 @@ import {
 import { reassembleV3WorkoutText } from "../_shared/v3-workout-prose.ts";
 import { buildProfileOnFileBlock } from "../_shared/profile-on-file.ts";
 import { fetchTier4Bundle, type Tier4Bundle } from "../_shared/fetch-tier4-bundle.ts";
-import { gateBlock } from "../_shared/restriction-gate.ts";
-import { isDeloadWeek, loadFitProfile, loadRestrictions } from "../_shared/restriction-load.ts";
-import { fitBlock } from "../_shared/fit-gate.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -1900,49 +1897,10 @@ Deno.serve(async (req) => {
                 answer("That block no longer exists — do not propose against it.", true);
                 continue;
               }
-              // THE RESTRICTION GATE, coach-edit route (2026-11-23). A change
-              // the coach proposes to a day is read against everything the
-              // athlete has said about their body, exactly as a generated
-              // week is, BEFORE the card is drawn — the name check above only
-              // catches exact spellings. Injury-derived names only: on
-              // equipment the coach takes the athlete's word. If the check
-              // itself cannot run, nothing unchecked is offered.
-              let gateNote = "";
-              try {
-                const restrictions = await loadRestrictions(supa, userId, { injuryNamesOnly: true });
-                // THE FIT GATE first: loads against their maxes and level, no
-                // number where there is no max, equipment they have unticked,
-                // skills at their level. Not time: one block cannot be judged
-                // against a whole session. It can only lower or swap.
-                const fitProfile = await loadFitProfile(supa, userId, restrictions.doNotProgram, restrictions.vocabulary);
-                const deload = workout_id
-                  ? await supa.from("program_workouts").select("program_id, month_number, week_num").eq("id", workout_id).maybeSingle()
-                    .then(({ data: w }) => w ? isDeloadWeek(supa, w.program_id as string, w.month_number as number | null, w.week_num as number) : false)
-                    .catch(() => false)
-                  : false;
-                const fitted = await fitBlock(input.block, fitProfile, { deloadWeek: deload });
-                const fitActions = fitted.block ? fitted.actions : [];
-                if (fitted.block) input.block = fitted.block;
-                const gated = await gateBlock(input.block, restrictions);
-                gated.actions.unshift(...fitActions);
-                if (gated.block == null) {
-                  invalidBounces++;
-                  answer(
-                    `Proposal rejected: every movement in it goes against this athlete's injuries or avoid list (${gated.actions.join("; ")}). ` +
-                    (invalidBounces > 1 ? "Do NOT propose again this turn — explain to the athlete in text instead." : "Propose a block built from movements they can do, or explain instead."),
-                    true,
-                  );
-                  continue;
-                }
-                input.block = gated.block;
-                if (gated.actions.length > 0) {
-                  gateNote = ` NOTE: the card differs from what you proposed, because part of it did not fit this athlete (their injuries, maxes, equipment or skill level): ${gated.actions.join("; ")}. Tell the athlete plainly what was changed and why; do not describe a removed movement or the old weight as part of the block.`;
-                }
-              } catch (e) {
-                console.error("[chat] restriction gate failed for a block proposal:", e instanceof Error ? e.message : String(e));
-                answer("The proposal could not be checked against the athlete's injuries just now, so it was not offered. Explain the change in text and suggest they ask again in a moment.", true);
-                continue;
-              }
+              // The proposal is offered as the coach wrote it (founder,
+              // 2026-11-26): the two AI checks that used to rewrite it here
+              // (fit and restriction) are removed.
+              const gateNote = "";
               const { data: logRow, error: logErr } = await supa
                 .from("ai_edit_log")
                 .insert({

@@ -65,8 +65,6 @@ import {
   classifyFailuresByKind,
 } from "../_shared/audit-runner.ts";
 import { stripInternalMarkers, enforceNoLabelOnCoachedBlocks } from "../_shared/programmatic-fixes.ts";
-import { athleteWordsElsewhere, runRestrictionGate } from "../_shared/restriction-gate.ts";
-import { fitProfileFromPayload, runFitGate } from "../_shared/fit-gate.ts";
 import { saveProgramV3 } from "../_shared/save-program-v3.ts";
 import { refreshAvoidListForBuild } from "../_shared/injury-refresh.ts";
 import { type BlockLocation, missingBenchmarkLines } from "../_shared/compute-block-benchmark.ts";
@@ -185,11 +183,7 @@ const PACK = getDomainPack("crossfit@3");
  * A missing block type is logged as a residual. (The main-lift name check was
  * removed 2026-11-26: see plan-fidelity.ts.)
  *
- * This is called ONLY from the benchmark_audit and surgical stages, which run
- * BEFORE safety_review. The fit gate and the restriction gate there remove on
- * purpose (an accessory block for a session under 45 minutes, a movement
- * dropped or swapped); nothing audits their output, so this check cannot flag
- * or undo what they did. Keep it that way: never call this after the gates.
+ * This is called ONLY from the benchmark_audit and surgical stages.
  */
 /** The most repair passes a job may take before it ships with what remains. */
 export const MAX_SURGICAL_PASSES = 6;
@@ -231,7 +225,7 @@ async function stagePayloadBuilding(
   // confirmation guard below is the actual gate.
   // Three tries (2026-11-24: it was one, and a single failed call left the
   // build on the old list). Still non-fatal: after three failures the old
-  // list is kept and the weekly restriction check reads the note itself.
+  // list is kept; the writer is also given the athlete's own words.
   await refreshAvoidListForBuild(userId, "generate-program-v3.refresh", { url: SUPABASE_URL, serviceKey: SUPABASE_SERVICE_KEY });
 
   // Guard (handoff 1.3): block generation past a non-empty-but-unconfirmed injury
@@ -923,79 +917,22 @@ async function stageSurgical(
 }
 
 async function stageSafetyReview(
-  supa: SupabaseClient,
-  job: ProgramJobRow,
+  _supa: SupabaseClient,
+  _job: ProgramJobRow,
   rs: ResumeState,
 ): Promise<StageOutcome> {
-  // THE RESTRICTION GATE (2026-11-23) — no longer advisory, never skipped. The
-  // written output is read against everything the athlete has said about
-  // their body (injury box, signup answers, notes) and their avoid list; anything
-  // that goes against them is replaced, and whatever could not be replaced is
-  // taken out by rule. It always returns and the week always goes on to save:
-  // nothing is withheld and nobody is alerted. See _shared/restriction-gate.ts.
-  const payload = rs.payload!;
-  const output = rs.output!;
-  const injuries = payload.training_context.injuries_structured;
-
-  // THE FIT GATE first (2026-11-23): loads against the athlete's maxes and
-  // level, no number where there is no max, nothing needing equipment they
-  // have unticked, the session inside their time, skills at their level. It
-  // can only lower, shorten or swap. The restriction gate runs AFTER it and
-  // has the last word, so nothing the fit gate swaps in can go against an
-  // injury. See _shared/fit-gate.ts.
-  const fit = await runFitGate(output, fitProfileFromPayload(payload, rs.skeleton ?? null, injuries?.do_not_program ?? []));
-  if (fit.actions.length > 0) {
-    console.warn(`[generate-program-v3] fit gate made ${fit.actions.length} change(s):`);
-    for (const a of fit.actions) console.warn(`  - ${a}`);
-  }
-  await logGenerationAudit(supa, {
-    user_id: job.user_id,
-    program_id: rs.continuation?.programId ?? null,
-    month_number: rs.continuation?.monthNumber ?? null,
-    stage: "fit_gate",
-    violations: fit.actions,
-    warnings: fit.judgeUnavailable ? ["judge unavailable; arithmetic rules only (equipment, time and skill not enforced this week)"] : [],
-    retried: fit.reviews > 1,
-    meta: { reviews: fit.reviews },
-  }).catch((e) => console.warn("[generate-program-v3] fit_gate log failed (non-fatal):", e));
-
-  const gate = await runRestrictionGate(output, {
-    injuriesText: payload.training_context.injuries_constraints_text ?? null,
-    doNotProgram: injuries?.do_not_program ?? [],
-    otherWords: athleteWordsElsewhere(payload.athlete_model?.self_report, payload.training_context.coach_notes),
-    suggestedSubs: injuries?.suggested_subs ?? [],
-    vocabulary: payload.vocabulary ?? [],
-  });
-
-  if (gate.actions.length > 0 || fit.actions.length > 0) {
-    // Headers are rendered from the movement rows; re-render so a swapped or
-    // removed movement does not linger in a block's header.
-    for (const wk of output.weeks ?? []) renderWeekSchemesInPlace(wk);
-    console.warn(`[generate-program-v3] restriction gate changed ${gate.actions.length} movement(s):`);
-    for (const a of gate.actions) console.warn(`  - ${a}`);
-  }
-  if (gate.judgeUnavailable) console.warn("[generate-program-v3] restriction gate: judge unavailable; rule step applied");
-  await logGenerationAudit(supa, {
-    user_id: job.user_id,
-    program_id: rs.continuation?.programId ?? null,
-    month_number: rs.continuation?.monthNumber ?? null,
-    stage: "restriction_gate",
-    violations: gate.actions,
-    warnings: gate.judgeUnavailable ? ["judge unavailable; rule step only"] : [],
-    retried: gate.reviews > 1,
-    meta: { reviews: gate.reviews },
-  }).catch((e) => console.warn("[generate-program-v3] restriction_gate log failed (non-fatal):", e));
-
+  // NOTHING CHANGES THE WRITTEN WEEK HERE (founder, 2026-11-26). This stage
+  // held two AI checks built on 2026-11-23 — the restriction gate and the fit
+  // gate — that read the finished week and swapped, trimmed or removed
+  // movements. Both are removed (see _shared/athlete-file-text.ts for why).
+  // The week goes to the save exactly as the writer and the earlier stages
+  // left it. The stage itself stays so the job's stage order is unchanged.
   return {
     next: "saving",
     resumeState: {
       ...rs,
-      output,
-      safety: {
-        safe: true,
-        reasoning: gate.actions.length ? `Restriction gate changed ${gate.actions.length} movement(s).` : "Restriction gate: nothing to change.",
-        errored: gate.judgeUnavailable,
-      },
+      output: rs.output!,
+      safety: { safe: true, reasoning: "No post-write checks run.", errored: false },
     },
     displayStage: "saving",
   };

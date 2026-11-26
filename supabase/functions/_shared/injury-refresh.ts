@@ -8,8 +8,8 @@
  *
  * Why the retries (2026-11-24): the build tried once and carried on with the
  * old list if that one call failed. Three tries, then carry on: the old list
- * is kept (never dropped), and the weekly restriction check still reads the
- * note itself.
+ * is kept (never dropped), and the writer is also given the athlete's own
+ * words.
  */
 
 export const INJURY_REFRESH_ATTEMPTS = 3;

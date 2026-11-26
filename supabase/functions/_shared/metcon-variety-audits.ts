@@ -440,8 +440,7 @@ export function auditMetconVariety(
   //    judgment"). Code no longer compares a composed movement's name with the
   //    avoid list or the movement list, and no longer reads a machine out of a
   //    name ("throw" contains "row") to check it against equipment. The
-  //    composer is told all three; the fit check and the restriction check
-  //    read the written week by meaning.
+  //    composer is told all three. Nothing changes the week after it is written.
 
   // ── Athlete-match rules (2026-08-31) — the objective's deterministic floor ──
 
