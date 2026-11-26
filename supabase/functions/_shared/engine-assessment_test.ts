@@ -88,3 +88,20 @@ Deno.test("phase 1 is a dry run: nothing is stored and no coach or sequencer rea
     assert(!src.includes("engine-assessment"), `${reader} already reads the assessment`);
   }
 });
+
+import { currentUncalibratedOnly } from "./conditioning-state.ts";
+
+Deno.test("a stored 'uncalibrated' flag is never passed to the coach when the athlete's trials contradict it", async () => {
+  const trials = [{ modality: "c2_row_erg", units: "cal" }, { modality: "echo_bike", units: "cal" }];
+  const stored = ["UNCALIBRATED:c2_row_erg|cal", "UNCALIBRATED:c2_row_erg|meters", "UNCALIBRATED:track_run|meters", "AWAITING_RIGHT_ANCHOR", "TRIAL_STALE:echo_bike|cal"];
+  assertEquals(currentUncalibratedOnly(stored, trials), [
+    "UNCALIBRATED:c2_row_erg|meters", // same machine, a unit with no trial: still true
+    "UNCALIBRATED:track_run|meters",  // no trial at all: still true
+    "AWAITING_RIGHT_ANCHOR", "TRIAL_STALE:echo_bike|cal", // every other flag untouched
+  ]);
+  assertEquals(currentUncalibratedOnly([], trials), []);
+  // The stored-curve path (what chat reads) applies it before the text is built.
+  const cs = await Deno.readTextFile(new URL("./conditioning-state.ts", import.meta.url));
+  assert(cs.includes("const storedFlags = currentUncalibratedOnly(stored.flags ?? [], trials);"));
+  assert(cs.includes("flags: storedFlags,"));
+});
