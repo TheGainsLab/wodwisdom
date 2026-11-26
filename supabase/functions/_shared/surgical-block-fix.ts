@@ -17,6 +17,7 @@ import type { BlockPrescription, WriterOutput } from "./v2-output-schema.ts";
 import { buildEmitBlockTool } from "./v2-output-schema.ts";
 import type { SkeletonOutput } from "./v3-output-schema.ts";
 import type { WriterPayload } from "./build-writer-payload.ts";
+import type { ComposedMetcon } from "./metcon-composer.ts";
 import { MODELS } from "./model-profiles.ts";
 
 const MODEL = MODELS.sonnet;
@@ -29,7 +30,7 @@ interface ClaudeResponse {
   usage?: { input_tokens?: number; output_tokens?: number };
 }
 
-const SURGICAL_SYSTEM_PROMPT = `You are revising a single block in a 4-week CrossFit training program. The structural skeleton has already decided the day's intent (block types, primary lift, metcon focus, skill focus). Your job is to rewrite ONE block to fix specific audit violations while honoring the skeleton's intent.
+export const SURGICAL_SYSTEM_PROMPT = `You are revising a single block in a 4-week CrossFit training program. The structural skeleton has already decided the day's intent (block types, primary lift, metcon focus, skill focus). Your job is to rewrite ONE block to fix specific audit violations while honoring the skeleton's intent.
 
 You will receive:
   - The skeleton's metadata for THIS day (the design contract)
@@ -41,7 +42,8 @@ You will emit: ONE corrected block via the \`emit_block\` tool, matching the sam
 
 RULES (honor every one):
 - Stay true to the skeleton's intent. If metcon_focus says "long aerobic chipper", the rewrite is still a long aerobic chipper — just one that fixes the violations.
-- Time-domain match: if the skeleton's metcon_focus includes "short" / "medium" / "long" (or "aerobic" / "sprint" / "power"), the prescribed work MUST complete in that bucket. short = under 9 min, medium = 7-16 min, long = 14+ min. The audit will reject rewrites whose computed duration falls outside the bucket — when the violation message says "completes in ~X:XX" for a "long" focus, add MORE work (longer ladder like 50-40-30-20-10, more rounds, a 1500-2000m row leg, more bodyweight reps). For a "short" focus completing too slowly, trim volume.
+- Time domain: the skeleton's metcon_focus STARTS with the time domain (short / medium / long). Keep the block in it: short = under 9 min, medium = 7-16 min, long = 14+ min. Take the time domain from that first word only; other words in the line (aerobic, sprint, power) describe the feel, not the length. No check rewrites a block for its duration.
+- COMPOSED METCON: when the user message carries a COMPOSED PIECE, the block is a metcon that a month-sighted composer already designed. It is NOT yours to redesign. Keep its movements, format, scheme, duration and purpose exactly, and change ONLY what the audit violations name (a missing field, a misplaced max_effort flag, a format field that does not match the rows). If a violation can only be fixed by changing a movement, change that one movement and nothing else.
 - Honor injuries / do-not-program list.
 - All weights in the athlete's units.
 - Plate math: lbs → nearest 5, kg → nearest 2.5.
@@ -72,7 +74,7 @@ function findSkeletonDay(skeleton: SkeletonOutput, weekNum: number, dayNum: numb
 }
 
 /** Build the per-call user message — skeleton intent + bad block + violations + slim athlete context. */
-function buildSurgicalUserMessage(
+export function buildSurgicalUserMessage(
   payload: WriterPayload,
   skeletonDay: ReturnType<typeof findSkeletonDay>,
   weekNum: number,
@@ -80,6 +82,7 @@ function buildSurgicalUserMessage(
   blockIndex: number,
   originalBlock: BlockPrescription,
   violations: string[],
+  composed: ComposedMetcon | null = null,
 ): string {
   const slimAthlete = {
     units: payload.basics.units ?? "lbs",
@@ -101,6 +104,9 @@ function buildSurgicalUserMessage(
     "",
     violationBlock,
     "",
+    ...(composed
+      ? [`COMPOSED PIECE (the metcon as its composer designed it — keep it; change only what the violations name):\n${JSON.stringify(composed, null, 2)}`, ""]
+      : []),
     `ATHLETE CONTEXT (slim — for vocabulary, loads, do-not-program):\n${JSON.stringify(slimAthlete, null, 2)}`,
     "",
     "Emit the corrected block via the emit_block tool. Same block_type as the original unless the violation requires a type change. Honor the skeleton's intent.",
@@ -120,6 +126,8 @@ export async function surgicallyRewriteBlock(
   blockIndex: number,
   originalBlock: BlockPrescription,
   violations: string[],
+  /** The composer's piece when the block is a composed metcon; else null. */
+  composed: ComposedMetcon | null = null,
 ): Promise<BlockPrescription | null> {
   if (!ANTHROPIC_API_KEY) {
     console.warn("[surgical-block-fix] ANTHROPIC_API_KEY not configured; skipping surgical");
@@ -130,7 +138,7 @@ export async function surgicallyRewriteBlock(
   const sessionLengthMinutes = payload.training_context.session_length_minutes ?? null;
   const skeletonDay = findSkeletonDay(skeleton, weekNum, dayNum);
   const userMessage = buildSurgicalUserMessage(
-    payload, skeletonDay, weekNum, dayNum, blockIndex, originalBlock, violations,
+    payload, skeletonDay, weekNum, dayNum, blockIndex, originalBlock, violations, composed,
   );
 
   try {

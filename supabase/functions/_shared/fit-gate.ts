@@ -256,13 +256,13 @@ const SYSTEM = `You check AI-written training against ONE athlete's file. You ar
 
 1. LOADS. For each weighted barbell or loaded movement, decide which of the athlete's one-rep maxes it should be judged against (a Hang Power Clean against the power clean or clean; a Thruster against the front squat or push press; a Romanian Deadlift against the deadlift). The weight must not exceed that max times the ceiling for the athlete's level on that lift (table given), and must be consistent with any percentage written beside it. If it is too heavy, give a lower weight in the athlete's units. Lifts already judged by name are marked "checked": leave those alone.
 2. NO MAX. If the lift it should be judged against has no max on file, or the number on file is plainly not a real max, the movement must be prescribed by effort with no number: set by_effort.
-3. EQUIPMENT. The athlete's equipment list says what they have (true) and what they have unticked (false). A movement that needs something unticked must be replaced with one they can do that keeps the block's purpose, chosen from the allowed list.
-4. SKILL. The athlete rated each skill (none, beginner, intermediate, advanced). A skill movement above their rated level, or one rated "none", must be replaced with an easier version or progression of it from the allowed list. A skill they did not rate is not a miss.
+3. EQUIPMENT. The athlete's equipment list says what they have (true) and what they have unticked (false). A movement that needs something unticked must be replaced with one they can do that keeps the block's purpose, chosen from the replacement names.
+4. SKILL. The athlete rated each skill (none, beginner, intermediate, advanced). A skill movement above their rated level, or one rated "none", must be replaced with an easier version or progression of it from the replacement names. A skill they did not rate is not a miss.
 5. PACE. If the athlete has no conditioning benchmarks on file, a machine or running piece must not carry a specific pace or split it could not know: give an effort_note that prescribes by effort instead (for example "Hard but repeatable: you could say a few words"). Leave distances, calories and times as written.
 
 TIME (only when asked). Estimate each day's real length in minutes: warm-up, every block including rest between sets and rounds, transitions of about two minutes between blocks, cool-down. If a day is over the athlete's limit by more than the stated allowance, give trims that bring it inside: fewer sets, fewer rounds, fewer minutes, shorter rest, or a movement dropped. When the athlete's limit is under 45 minutes the accessory block may be dropped whole; otherwise never drop a block. Trims may only make a day shorter. Protect the day's main strength lift and its metcon; trim accessory, skills volume and rest first.
 
-Locations use the JSON's own week_num and day_num; block_index and movement_index count from 0 in the order given; movement is the name exactly as written. Report nothing that fits.`;
+Locations use the JSON's own week_num and day_num; block_index and movement_index count from 0 in the order given; movement is the name exactly as written. Report nothing that fits. The five points above are the ONLY reasons to report anything: a movement being absent from the replacement names is never one of them.`;
 
 const TOOL = {
   name: "report_fit_check",
@@ -272,7 +272,7 @@ const TOOL = {
     properties: {
       swaps: {
         type: "array",
-        description: "Equipment and skill misses, each with a replacement from the allowed list.",
+        description: "Equipment and skill misses, each with a replacement from the replacement names.",
         items: {
           type: "object",
           properties: {
@@ -397,7 +397,11 @@ export function fitJudgeMessage(output: WriterOutput, profile: FitProfile, opts:
       ? `TIME: the athlete's limit is ${profile.sessionMinutes} minutes a session. A day may run to ${Math.floor(profile.sessionMinutes * TIME_TOLERANCE)} minutes, no further.${profile.sessionMinutes < SHORT_SESSION_MINUTES ? " Their limit is under 45 minutes, so an accessory block may be dropped whole." : " Never drop a whole block."} Give days and trims.`
       : `TIME: not checked on this request. Return days and trims as empty lists.`,
     ``,
-    `ALLOWED MOVEMENTS (choose replacements only from these): ${allowed.join(", ")}`,
+    // The list is for REPLACEMENTS only (2026-11-26): the judge once swapped
+    // "Good Morning" out because it "is not in the allowed movements list".
+    // It is a set of names to replace with, never a rule about what was written.
+    `REPLACEMENT NAMES (when you replace a movement, choose the replacement from these): ${allowed.join(", ")}`,
+    `This list is ONLY for choosing a replacement. A movement in the written training that is not on it is NOT a miss: never report, replace or remove a movement because it is missing from this list.`,
     ``,
     `WRITTEN TRAINING (JSON):`,
     JSON.stringify(compactForFit(output)),

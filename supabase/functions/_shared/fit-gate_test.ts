@@ -112,8 +112,11 @@ Deno.test("the judge is given the athlete's file: maxes, levels, ceilings, equip
   assert(msg.includes("limit is 60 minutes") && msg.includes("may run to 66 minutes") && msg.includes("Never drop a whole block"));
   assert(msg.includes("Conditioning benchmarks on file: NONE"));
   assert(msg.includes('"load":"checked"')); // named lifts are marked as settled
-  const allowed = msg.split("ALLOWED MOVEMENTS")[1].split("\n")[0];
+  const allowed = msg.split("REPLACEMENT NAMES")[1].split("\n")[0];
   assert(!/\bRun\b/.test(allowed)); // a replacement can never be something the injuries rule out
+  // The list is for replacements only: being off it is never a reason to change a movement (2026-11-26).
+  assert(!msg.includes("ALLOWED MOVEMENTS"));
+  assert(msg.includes("A movement in the written training that is not on it is NOT a miss: never report, replace or remove a movement because it is missing from this list."));
   assert(fitJudgeMessage(day([]), { ...BEN, sessionMinutes: 40 }, { checkTime: true }).includes("accessory block may be dropped whole"));
   assert(fitJudgeMessage(day([]), BEN, { checkTime: false }).includes("TIME: not checked"));
 });

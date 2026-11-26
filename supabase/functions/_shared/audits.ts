@@ -1144,7 +1144,10 @@ export const ALL_AUDITS = [
   (ctx: AuditContext): AuditResult => auditMaxEffort(ctx.output),
   (ctx: AuditContext): AuditResult => auditSchemeFormat(ctx.output),
   (ctx: AuditContext): AuditResult => auditWorkupTopSet(ctx.output),
-  (ctx: AuditContext): AuditResult => auditMetconDuration(ctx.output, ctx.skeleton),
+  // metcon_duration_matches_focus moved to SOFT_AUDITS 2026-11-26 (founder):
+  // log only, no rewrite. Its 15 logged failures were not fixed by a rewrite,
+  // 148 of 229 metcons have no estimate to check, and the estimate is for a
+  // typical Open athlete, not this one.
   (ctx: AuditContext): AuditResult => auditDayCount(ctx.output, ctx.daysPerWeek, ctx.expectedWeeks ?? 4),
   (ctx: AuditContext): AuditResult => auditLoadSanity(ctx.output, ctx.lifts),
   // vocabulary_compliance dropped 2026-05-14 — see chat log. v1 had no
@@ -1172,16 +1175,11 @@ export const AUDIT_KIND: Record<string, AuditKind> = {
   metcon_one_monostructural: "block-local",
   metcon_no_drills: "block-local",
   metcon_barbell_one_load: "block-local",
-  metcon_duration_matches_focus: "block-local",
   required_fields: "block-local",
   max_effort_placement: "block-local",
   scheme_format_valid: "block-local",
   workup_top_set: "block-local",
   do_not_program: "block-local",
-  // The written week against its plan (2026-11-23, plan-fidelity.ts; run by
-  // generate-program-v3 with the hard audits, before the fit and restriction
-  // gates): a wrong main lift is one block to rewrite.
-  plan_primary_lift: "block-local",
   // Structural — whole-program issues; only writer-retry can fix
   // (metcon_presence: a MISSING block has nothing for a surgical
   // block-local call to rewrite).
@@ -1200,4 +1198,6 @@ export const AUDIT_KIND: Record<string, AuditKind> = {
 // plate-math; the soft audit is a regression safety net).
 export const SOFT_AUDITS = [
   (ctx: AuditContext): AuditResult => auditPlateMath(ctx.output),
+  // Needs ctx.skeleton; passes untouched where there is none.
+  (ctx: AuditContext): AuditResult => auditMetconDuration(ctx.output, ctx.skeleton),
 ] as const;
