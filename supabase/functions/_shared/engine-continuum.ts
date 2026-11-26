@@ -420,7 +420,6 @@ export function replayCurve(
   const ordered = [...sessions].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
   const out: ReplayResult["sessions"] = [];
   const lastTrialByKey = new Map<string, number>();
-  const uncalibrated = new Set<string>();
   let trialLow = false;
   // the athlete's short max efforts against each machine's OWN curve
   let ceilingRatio: number | null = null;
@@ -435,7 +434,6 @@ export function replayCurve(
       lastTrialByKey.set(key, t.pace);
     }
     const c = sessionContinuum(s, t?.pace ?? null, pdc);
-    if (c.evidence === "no_trial") uncalibrated.add(key);
     if (c.evidence === "ceiling" && c.r != null && c.sustain != null && c.effort_seconds != null && pdc) {
       // TRIAL_LOW: sustained longer than the balanced max on a long bout at
       // or just above trial pace — only possible if the level is wrong.
@@ -459,18 +457,27 @@ export function replayCurve(
   // athlete's fast-twitch capacity (founder, 2026-11-16). Named accordingly.
   if (ceilingRatio != null && ceilingRatio >= 1.05) flags.push("AEROBIC_SIDE_BEHIND_SPRINT");
   else if (ceilingRatio != null && ceilingRatio <= 0.9) flags.push("GLYCOLYTIC_BELOW_BALANCED");
-  for (const k of uncalibrated) flags.push(`UNCALIBRATED:${k}`);
+  // The machines (with their unit) trained in the last 28 days, and each
+  // machine's latest trial date.
+  const recentMachines = curve.as_of
+    ? new Set(ordered.filter((s) => daysBetween(s.date, curve.as_of!) <= 28).map((s) => `${s.modality}|${s.units ?? ""}`))
+    : new Set<string>();
+  const latestTrial = new Map<string, string>();
+  for (const t of trials) {
+    const k = `${t.modality}|${t.units ?? ""}`;
+    if (!latestTrial.has(k) || latestTrial.get(k)! < t.date) latestTrial.set(k, t.date);
+  }
+  // UNCALIBRATED: a machine in current use with NO time trial at all, so its
+  // targets are not personal. Until 2026-11-26 this was raised if ANY session
+  // in the athlete's history had been logged before a trial existed, and it
+  // never cleared: 21 of the 29 flags stored were on a machine that had a
+  // trial, and the coach and the sequencer were told it had none.
+  for (const k of recentMachines) if (!latestTrial.has(k)) flags.push(`UNCALIBRATED:${k}`);
   if (curve.awaiting_right_anchor) flags.push("AWAITING_RIGHT_ANCHOR");
   // Stale trial (Phase 2, spec §7): a machine trained in the last 28 days whose
   // latest trial is older than TRIAL_STALE_DAYS — the ruler has aged under
   // training; an early retest is justified (the sequencer reads it like TRIAL_LOW).
   if (curve.as_of) {
-    const recentMachines = new Set(ordered.filter((s) => daysBetween(s.date, curve.as_of!) <= 28).map((s) => `${s.modality}|${s.units ?? ""}`));
-    const latestTrial = new Map<string, string>();
-    for (const t of trials) {
-      const k = `${t.modality}|${t.units ?? ""}`;
-      if (!latestTrial.has(k) || latestTrial.get(k)! < t.date) latestTrial.set(k, t.date);
-    }
     for (const k of recentMachines) {
       const d = latestTrial.get(k);
       if (d && daysBetween(d, curve.as_of) > TRIAL_STALE_DAYS) flags.push(`TRIAL_STALE:${k}`);

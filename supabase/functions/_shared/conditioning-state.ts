@@ -352,13 +352,14 @@ const EMPTY_CONTINUUM: ContinuumBlock = { text: "", primaryCurve: ECHO_BIKE_CAL_
  * loudly), never to "". `refresh: false` (the Coach, latency-sensitive) reads
  * what the daily tick stored.
  */
-export async function buildContinuumBlock(supa: SupabaseClient, userId: string, opts: { refresh: boolean }): Promise<ContinuumBlock> {
+export async function buildContinuumBlock(supa: SupabaseClient, userId: string, opts: { refresh: boolean; write?: boolean }): Promise<ContinuumBlock> {
   let curves: PdCurves | null = null;
   let refreshFailed = false;
   if (opts.refresh) {
     try {
       curves = await loadCurves(supa);
-      const r = await computeAthleteContinuum(supa, userId, curves, { write: true });
+      // write:false computes the same fresh curve and stores nothing (a dry run).
+      const r = await computeAthleteContinuum(supa, userId, curves, { write: opts.write !== false });
       if (!r) return EMPTY_CONTINUUM;
       const primary = primaryMachine(r.trials, r.results.map((x) => `${x.modality}|${x.units ?? ""}`), curves);
       return { text: formatCurveForPrompt(r.curve, r.regions, r.trials), ...primary };
@@ -420,7 +421,7 @@ function primaryMachine(trials: TrialInput[], sessionMachines: string[], curves:
 export async function buildConditioningState(
   supa: SupabaseClient,
   userId: string,
-  opts?: { recentDays?: number; daysPerWeek?: number | null },
+  opts?: { recentDays?: number; daysPerWeek?: number | null; curve?: "stored" | "fresh" | "fresh_unsaved" },
 ): Promise<string> {
   // recentDays bounds the days-since / adherence windows only; the analytics
   // block (below) and the session list use every completed session, as the
@@ -476,7 +477,10 @@ export async function buildConditioningState(
   );
   // The Coach reads the athlete's conditioning curve too (founder, 2026-11-17);
   // the stored one — chat is latency-sensitive and the daily tick keeps it fresh.
-  const continuum = await buildContinuumBlock(supa, userId, { refresh: false });
+  // A caller that is not latency-sensitive (the Engine assessment) asks for
+  // the curve recomputed now, stored or not.
+  const curveMode = opts?.curve ?? "stored";
+  const continuum = await buildContinuumBlock(supa, userId, { refresh: curveMode !== "stored", write: curveMode === "fresh" });
   return signals + analytics + (continuum.text ? "\n\n" + continuum.text : "");
 }
 

@@ -236,3 +236,27 @@ Deno.test("state reach: a 45-s max effort ridden at 1.74× (a 61-s effort) marks
   const band = summarizeCurve(r.curve, r.sessions).find((x) => x.label === "30–60 s")!;
   assertEquals(band.state, "measured");
 });
+
+// ── UNCALIBRATED: a machine in current use with no time trial at all ─────────
+
+Deno.test("UNCALIBRATED is about NOW: a session logged before the first trial does not flag a machine that has since been tested", () => {
+  const base = byDate(fixture.sessions.filter((x) => x.day_type !== "time_trial").at(-1)!.date);
+  const trial = fixture.trials.at(-1)!;
+  // A session a week BEFORE any trial existed, then normal training after it.
+  const before = { ...base, date: "2026-01-01" };
+  const { curve, sessions } = replayCurve([before, base], [{ ...trial, modality: base.modality, units: base.units, date: "2026-01-08" }], CURVES);
+  assertEquals(sessions[0].evidence, "no_trial"); // that session still cannot be scored…
+  assert(!curve.flags.some((f) => f.startsWith("UNCALIBRATED")), `flags: ${curve.flags}`); // …but the machine IS calibrated now
+});
+
+Deno.test("UNCALIBRATED: a machine trained in the last 28 days with no trial at all is flagged, with its unit", () => {
+  const base = byDate(fixture.sessions.filter((x) => x.day_type !== "time_trial").at(-1)!.date);
+  const onRower = { ...base, modality: "c2_row_erg", units: "cal" };
+  const { curve } = replayCurve([base, onRower], fixture.trials, { ...CURVES, "c2_row_erg|cal": C2_CAL_CURVE_V1 });
+  assert(curve.flags.includes("UNCALIBRATED:c2_row_erg|cal"), `flags: ${curve.flags}`);
+  assert(!curve.flags.includes(`UNCALIBRATED:${base.modality}|${base.units ?? ""}`));
+  // A machine last used long ago is not in current use: no flag.
+  const old = { ...onRower, date: "2025-01-01" };
+  const { curve: c2 } = replayCurve([old, base], fixture.trials, { ...CURVES, "c2_row_erg|cal": C2_CAL_CURVE_V1 });
+  assert(!c2.flags.some((f) => f.startsWith("UNCALIBRATED")), `flags: ${c2.flags}`);
+});

@@ -50,7 +50,8 @@ Deno.serve(async (req) => {
 
   const results = await Promise.all(userIds.map(async (userId) => {
     try {
-      const facts = await buildEngineAssessmentInputs(supa, userId);
+      // Dry run: the curve is computed fresh and NOT stored.
+      const facts = await buildEngineAssessmentInputs(supa, userId, { curve: "fresh_unsaved" });
       if (!facts) return { user_id: userId, skipped: "no Engine program or no Engine data" };
       const assessment = await writeEngineAssessment(facts);
       if (!assessment) return { user_id: userId, failed: "the AI gave no usable answer", ...(withFacts ? { facts } : {}) };

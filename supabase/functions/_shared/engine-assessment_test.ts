@@ -1,7 +1,7 @@
 // The Engine assessment: the shape of the read, and that phase 1 stores nothing.
 import { assert, assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import {
-  ASSESSMENT_FOCUSES, ENGINE_ASSESSMENT_SYSTEM, ENGINE_ASSESSMENT_TOOL, parseEngineAssessment, renderEngineAssessment,
+  ASSESSMENT_FOCUSES, ENGINE_ASSESSMENT_SYSTEM, ENGINE_ASSESSMENT_TOOL, parseEngineAssessment, renderEngineAssessment, STRENGTH_FOCUSES,
 } from "./engine-assessment.ts";
 import { REGIONS } from "./engine-continuum.ts";
 // deno-lint-ignore no-explicit-any
@@ -25,6 +25,11 @@ Deno.test("a priority's focus is one of the curve's seven bands, calibration or 
   const props = (ENGINE_ASSESSMENT_TOOL.input_schema as Any).properties;
   assertEquals(props.priorities.items.properties.focus.enum, [...ASSESSMENT_FOCUSES]);
   assertEquals(props.priorities.maxItems, 3);
+  // A strength is a band or consistency; "calibration" is a priority only.
+  assertEquals(STRENGTH_FOCUSES, [...REGIONS.map((r) => r[2]), "consistency"]);
+  assertEquals(props.strengths.items.properties.focus.enum, [...STRENGTH_FOCUSES]);
+  const a = parseEngineAssessment({ ...GOOD, strengths: [{ focus: "calibration", note: "Fresh trial." }, GOOD.strengths[0]] })!;
+  assertEquals(a.strengths.map((s) => s.focus), ["30–60 s"]);
 });
 
 Deno.test("a usable answer is kept, ranked 1..n in order", () => {
@@ -58,6 +63,9 @@ Deno.test("the instructions: unmeasured is unknown, not weak; no targets or sess
   assert(ENGINE_ASSESSMENT_SYSTEM.includes(`"floor" and "blank" are things you do not know yet`));
   assert(ENGINE_ASSESSMENT_SYSTEM.includes("no session prescriptions, no paces, no targets"));
   assert(ENGINE_ASSESSMENT_SYSTEM.includes("never scold"));
+  // Written to the athlete, as their coach.
+  assert(ENGINE_ASSESSMENT_SYSTEM.includes('write every field TO THE ATHLETE, in the second person'));
+  assert(ENGINE_ASSESSMENT_SYSTEM.includes('Never "the athlete" or "this athlete"'));
   assert(ENGINE_ASSESSMENT_SYSTEM.includes("Do not compare a pace on one machine, or in one unit, with a pace on another"));
 });
 
@@ -66,7 +74,12 @@ Deno.test("phase 1 is a dry run: nothing is stored and no coach or sequencer rea
   const shared = await Deno.readTextFile(new URL("./engine-assessment.ts", import.meta.url));
   for (const src of [fn, shared]) for (const write of [".insert(", ".update(", ".upsert(", ".delete(", ".rpc("]) assert(!src.includes(write), `phase 1 must not write: found ${write}`);
   assert(fn.includes("dry_run: true, stored: false"));
-  for (const reader of ["../chat/index.ts", "./run-resequence.ts", "./conditioning-state.ts"]) {
+  // The curve is computed fresh for the read and not stored by a dry run.
+  assert(fn.includes('buildEngineAssessmentInputs(supa, userId, { curve: "fresh_unsaved" })'));
+  const cs = await Deno.readTextFile(new URL("./conditioning-state.ts", import.meta.url));
+  assert(cs.includes('write: curveMode === "fresh"'));
+  assert(cs.includes("{ write: opts.write !== false }"));
+  for (const reader of ["../chat/index.ts", "./run-resequence.ts"]) {
     const src = await Deno.readTextFile(new URL(reader, import.meta.url));
     assert(!src.includes("engine-assessment"), `${reader} already reads the assessment`);
   }
