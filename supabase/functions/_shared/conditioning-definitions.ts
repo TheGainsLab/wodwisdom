@@ -1,3 +1,5 @@
+import { SKILL_DISPLAY_NAMES } from "./tier-status.ts";
+
 /**
  * conditioning-definitions.ts
  *
@@ -11,7 +13,7 @@
  *   1. Time domains (short / medium / long) — the slot buckets.
  *   2. Cycling load bands — what light/moderate/heavy mean as a fraction of
  *      THIS athlete's 1RM in the parent lift, per movement class, with the
- *      parent-lift proxy chain for missing 1RMs and DB/KB tier defaults.
+ *      parent-lift proxy chain for missing 1RMs and DB/KB defaults by load band.
  *   3. Skill volume bands under fatigue — per-round rep ranges and caps by
  *      the athlete's self-reported tier.
  *
@@ -86,7 +88,7 @@ export const CYCLING_LOAD_CLASSES: Record<string, LoadClassDef> = {
   },
 };
 
-/** DB/KB tier defaults (lbs; DB per hand / KB) when no benchmark exists.
+/** DB/KB defaults by load band (lbs; DB per hand / KB) when no benchmark exists.
  *  The fill may override upward when the athlete's data supports it. */
 export const IMPLEMENT_TIER_DEFAULTS = {
   dumbbell: { beginner: 35, intermediate: 50, advanced: 70 },
@@ -118,47 +120,57 @@ export function bandRange(cls: string, band: LoadBand): [number, number] | null 
 // ============================================================
 
 export type SkillTier = "beginner" | "intermediate" | "advanced";
+/** The athlete's own rating of one skill. */
+export type SkillRating = "none" | SkillTier;
+
+/**
+ * What each rating means: the founder's definitions, word for word, as shown
+ * to the athlete on the profile page (AthletePage.tsx SKILL_LEVEL_LEGEND).
+ * A rating belongs to ONE skill and never says anything about another
+ * (founder, 2026-11-26: "Skills never affect each other").
+ */
+export const SKILL_RATING_MEANINGS: Record<SkillRating, string> = {
+  none: "can't do it yet",
+  beginner: "small sets only, not consistent",
+  intermediate: "can do it comfortably in workouts",
+  advanced: "big unbroken sets even under fatigue",
+};
 
 export interface SkillFatigueDef {
+  /** The ONE profile skill this band belongs to. Its rating is the only one read. */
+  skillKey: string;
   /** Normalized keywords the movement matches by. */
   match: string[];
-  /** payload.skills keys consulted for the athlete's tier, first non-null wins. */
-  skillKeys: string[];
-  /** Per-round rep band by tier. null = not under fatigue at that tier. */
-  perRound: Record<SkillTier, [number, number] | null>;
+  /** Per-round rep band by rating. "none" is never under fatigue: progressions only. */
+  perRound: Record<SkillTier, [number, number]>;
 }
 
+// One band per rated skill (2026-11-26). They used to be grouped by family, and
+// one skill's rating set another's volume (the toes-to-bar rating governed
+// pull-ups; an HSPU rating governed wall walks). Beginner is allowed in metcons
+// in small sets (founder, 2026-11-26); the beginner muscle-up and HSPU bands
+// were "not under fatigue" before.
+const PULL: Record<SkillTier, [number, number]> = { beginner: [3, 6], intermediate: [6, 12], advanced: [10, 20] };
+const MU: Record<SkillTier, [number, number]> = { beginner: [1, 2], intermediate: [2, 5], advanced: [5, 10] };
+const HSPU: Record<SkillTier, [number, number]> = { beginner: [1, 3], intermediate: [3, 8], advanced: [8, 15] };
+const ROPE: Record<SkillTier, [number, number]> = { beginner: [1, 1], intermediate: [1, 2], advanced: [2, 3] };
+
 export const SKILL_FATIGUE_BANDS: Record<string, SkillFatigueDef> = {
-  toes_to_bar: {
-    match: ["toes to bar", "chest to bar", "kipping pull up", "pull up", "knee raise"],
-    skillKeys: ["toes_to_bar", "chest_to_bar_pull_ups", "kipping_pull_ups", "strict_pull_ups"],
-    perRound: { beginner: [3, 6], intermediate: [6, 12], advanced: [10, 20] },
-  },
-  muscle_up: {
-    match: ["bar muscle up", "ring muscle up", "muscle up"],
-    skillKeys: ["bar_muscle_ups", "muscle_ups", "strict_ring_muscle_ups"],
-    perRound: { beginner: null, intermediate: [2, 5], advanced: [5, 10] },
-  },
-  hspu: {
-    match: ["handstand push up", "hspu"],
-    skillKeys: ["hspu", "strict_hspu", "deficit_hspu", "wall_facing_hspu"],
-    perRound: { beginner: null, intermediate: [3, 8], advanced: [8, 15] },
-  },
-  double_under: {
-    match: ["double under"],
-    skillKeys: ["double_unders"],
-    perRound: { beginner: [15, 30], intermediate: [30, 50], advanced: [50, 100] },
-  },
-  rope_climb: {
-    match: ["rope climb"],
-    skillKeys: ["rope_climbs", "legless_rope_climbs"],
-    perRound: { beginner: [1, 1], intermediate: [1, 2], advanced: [2, 3] },
-  },
-  wall_walk: {
-    match: ["wall walk"],
-    skillKeys: ["wall_facing_hspu", "hspu", "strict_hspu"],
-    perRound: { beginner: [1, 2], intermediate: [2, 4], advanced: [4, 6] },
-  },
+  toes_to_bar: { skillKey: "toes_to_bar", match: ["toes to bar"], perRound: PULL },
+  chest_to_bar_pull_ups: { skillKey: "chest_to_bar_pull_ups", match: ["chest to bar"], perRound: PULL },
+  kipping_pull_ups: { skillKey: "kipping_pull_ups", match: ["kipping pull up", "pull up"], perRound: PULL },
+  strict_pull_ups: { skillKey: "strict_pull_ups", match: ["strict pull up"], perRound: PULL },
+  butterfly_pull_ups: { skillKey: "butterfly_pull_ups", match: ["butterfly pull up"], perRound: PULL },
+  bar_muscle_ups: { skillKey: "bar_muscle_ups", match: ["bar muscle up"], perRound: MU },
+  muscle_ups: { skillKey: "muscle_ups", match: ["ring muscle up", "muscle up"], perRound: MU },
+  strict_ring_muscle_ups: { skillKey: "strict_ring_muscle_ups", match: ["strict ring muscle up", "strict muscle up"], perRound: MU },
+  hspu: { skillKey: "hspu", match: ["handstand push up", "hspu"], perRound: HSPU },
+  strict_hspu: { skillKey: "strict_hspu", match: ["strict handstand push up", "strict hspu"], perRound: HSPU },
+  deficit_hspu: { skillKey: "deficit_hspu", match: ["deficit handstand push up", "deficit hspu"], perRound: HSPU },
+  wall_facing_hspu: { skillKey: "wall_facing_hspu", match: ["wall facing handstand push up", "wall facing hspu"], perRound: HSPU },
+  double_unders: { skillKey: "double_unders", match: ["double under"], perRound: { beginner: [15, 30], intermediate: [30, 50], advanced: [50, 100] } },
+  rope_climbs: { skillKey: "rope_climbs", match: ["rope climb"], perRound: ROPE },
+  legless_rope_climbs: { skillKey: "legless_rope_climbs", match: ["legless rope climb"], perRound: ROPE },
 };
 
 /** Find the skill-fatigue definition a movement falls under (longest keyword
@@ -174,41 +186,37 @@ export function skillFatigueDefForMovement(movement: string): SkillFatigueDef | 
   return best?.def ?? null;
 }
 
-/** The athlete's tier for a banded skill from their skills map — first
- *  non-null skillKey wins; "none" reads as beginner-with-caution (legality /
- *  vocabulary gates handle true inability). NULL when the athlete's map holds
- *  no value for any of the skill's keys — absence is NEUTRAL: the audit skips
- *  rather than assuming a tier.
- *
- *  Key matching is NORMALIZED with an inclusion fallback because the writer
- *  payload's skills map is keyed by DISPLAY NAMES ("Toes-to-Bar", "HSPU
- *  (kipping)") while skillKeys are snake_case profile keys — the exact-key
- *  lookup alone silently never matched in production (2026-08-31). Exact
- *  normalized equality wins over inclusion so "strict_hspu" prefers "Strict
- *  HSPU" over any other HSPU variant. */
+/**
+ * The athlete's own rating of THIS skill, or null when they gave none.
+ * Only the def's own skill is read, never another (2026-11-26). The skills map
+ * may be keyed by profile key or by display name; both are matched exactly
+ * (normalized), never by one name sitting inside another — "hspu" sits inside
+ * "strict hspu", and those are two skills. "none" stays "none": it means the
+ * athlete can't do it yet (it used to be read as beginner).
+ */
 export function athleteTierFor(
   def: SkillFatigueDef,
   skills: Record<string, string | null>,
-): SkillTier | null {
-  const byNorm = new Map<string, string>();
+): SkillRating | null {
+  const want = new Set([normalize(def.skillKey), normalize(SKILL_DISPLAY_NAMES[def.skillKey] ?? def.skillKey)]);
   for (const [k, v] of Object.entries(skills)) {
-    if (typeof v === "string") byNorm.set(normalize(k), v);
-  }
-  const resolve = (key: string): string | undefined => {
-    const nk = normalize(key);
-    if (byNorm.has(nk)) return byNorm.get(nk);
-    for (const [k2, v2] of byNorm) {
-      if (k2.includes(nk) || nk.includes(k2)) return v2;
-    }
-    return undefined;
-  };
-  for (const k of def.skillKeys) {
-    const v = resolve(k);
-    if (v === "advanced" || v === "intermediate" || v === "beginner") return v;
-    if (v === "none") return "beginner";
+    if (!want.has(normalize(k))) continue;
+    if (v === "none" || v === "beginner" || v === "intermediate" || v === "advanced") return v;
   }
   return null;
 }
+
+/** The four ratings and what they mean for programming, for the composer and
+ *  the writer. Rules only: no example athlete, no movement named. */
+export const SKILL_RATINGS_PROMPT = [
+  "SKILL RATINGS — the athlete rated each skill in the payload's skills map. A rating belongs to THAT ONE SKILL and says nothing about any other skill: never use one skill's rating for another. What each rating means, in the athlete's own profile wording:",
+  `  - none: ${SKILL_RATING_MEANINGS.none}. Never program the movement itself — progressions toward it only.`,
+  `  - beginner: ${SKILL_RATING_MEANINGS.beginner}. Program it in small sets, metcons included; build volume gradually across the weeks and do not add harder variations while the base is being built.`,
+  `  - intermediate: ${SKILL_RATING_MEANINGS.intermediate}. Program it normally in workouts, with moderate volume and progression.`,
+  `  - advanced: ${SKILL_RATING_MEANINGS.advanced}. Full volume and progression.`,
+  "  - not rated: use your judgment from the rest of the athlete's data.",
+  "A LOW rating means the skill is worth developing — program it often with quality reps — not that it gets the most volume.",
+].join("\n");
 
 // ============================================================
 // Rounding + prompt renders
@@ -227,17 +235,19 @@ export const CYCLING_LOAD_BANDS_PROMPT = [
       .join(" · ");
     return `  - ${cls} (parent 1RM: ${def.parents.join(" else ")}): ${bands}`;
   }),
-  `  - dumbbell / kettlebell (no barbell parent): tier defaults ${IMPLEMENT_TIER_DEFAULTS.dumbbell.beginner}/${IMPLEMENT_TIER_DEFAULTS.dumbbell.intermediate}/${IMPLEMENT_TIER_DEFAULTS.dumbbell.advanced} lb DB · ${IMPLEMENT_TIER_DEFAULTS.kettlebell.beginner}/${IMPLEMENT_TIER_DEFAULTS.kettlebell.intermediate}/${IMPLEMENT_TIER_DEFAULTS.kettlebell.advanced} lb KB (beginner/intermediate/advanced), overridable when a benchmark exists.`,
+  // By the piece's load band, not by an athlete "tier": the athlete has no
+  // overall tier (2026-11-26). Light / moderate / heavy take the three values.
+  `  - dumbbell / kettlebell (no barbell parent), by load band: light ${IMPLEMENT_TIER_DEFAULTS.dumbbell.beginner} · moderate ${IMPLEMENT_TIER_DEFAULTS.dumbbell.intermediate} · heavy ${IMPLEMENT_TIER_DEFAULTS.dumbbell.advanced} lb per dumbbell; light ${IMPLEMENT_TIER_DEFAULTS.kettlebell.beginner} · moderate ${IMPLEMENT_TIER_DEFAULTS.kettlebell.intermediate} · heavy ${IMPLEMENT_TIER_DEFAULTS.kettlebell.advanced} lb kettlebell (convert for kg), overridable when the athlete's data supports more.`,
   `  Rounding: ${ROUNDING_RULE}`,
 ].join("\n");
 
 /** The skill volume table rendered for prompts. */
 export const SKILL_FATIGUE_BANDS_PROMPT = [
-  "SKILL VOLUME BANDS UNDER FATIGUE (per-round reps by the athlete's tier; volume inside the band is presumptively defensible, above it needs a written justification in the piece's stimulus_note):",
+  "SKILL VOLUME BANDS UNDER FATIGUE (per-round reps by the athlete's rating of THAT skill — each skill uses only its own rating; volume inside the band is presumptively defensible, above it needs a written justification in the piece's stimulus_note):",
   ...Object.entries(SKILL_FATIGUE_BANDS).map(([key, def]) => {
-    const tiers = (Object.entries(def.perRound) as Array<[SkillTier, [number, number] | null]>)
-      .map(([t, r]) => `${t} ${r ? `${r[0]}-${r[1]}` : "not under fatigue"}`)
-      .join(" · ");
+    const tiers = (Object.entries(def.perRound) as Array<[SkillTier, [number, number]]>)
+      .map(([t, r]) => `${t} ${r[0]}-${r[1]}`)
+      .join(" · ") + " · none: never the movement itself, progressions only";
     return `  - ${key.replace(/_/g, " ")}: ${tiers}`;
   }),
 ].join("\n");

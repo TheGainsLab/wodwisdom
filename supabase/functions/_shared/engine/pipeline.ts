@@ -323,8 +323,8 @@ export async function callWeekFill(
     `- Emit EXACTLY week ${weekNum}: week_num=${weekNum} with ${daysPerWeek} days (day_num 1..${daysPerWeek}).`,
     `- All weights in ${units}.`,
     "- Honor THIS WEEK's skeleton: each day's block_types, primary_lift, strength_scheme, metcon_focus, skill_focus are already decided. Fill in movement-level prescriptions only.",
-    "- Prescribed barbell weight ≤ athlete's 1RM for that lift, unless block_scheme/notes mention a 1RM attempt.",
-    "- At most one metcon block per day. Every metcon block must declare a block_scheme.",
+    "- Prescribed barbell weight ≤ athlete's 1RM for that lift, unless the block's notes mark it a 1RM attempt.",
+    "- At most one metcon block per day.",
     "- Every movement in strength / accessory / metcon / skills blocks must populate at least one of {sets, reps, weight, time_seconds, distance} > 0.",
     // The athlete's restrictions, in their own words, stated as an absolute
     // (2026-11-23): the old one-line "substitute or scale" let an easy run
@@ -358,7 +358,7 @@ export async function callWeekFill(
       ]
       : []),
     hasComposed
-      ? "- Metcons for days listed in COMPOSED METCONS are PRE-COMPOSED: emit each EXACTLY — same movements, same scheme, same format, same duration. Your job on those is exact loads from the athlete's 1RMs, calories/distances from their pacing, and the typed per-movement fields. NEVER redesign, swap, add, or drop a composed movement. If a metcon day is NOT in the list (its piece was removed), compose that day's metcon YOURSELF from the skeleton's metcon_focus and the athlete's allowed movements — distinct from the composed pieces, expected time inside the focus window."
+      ? "- Metcons for days listed in COMPOSED METCONS are PRE-COMPOSED: emit each EXACTLY — same movements, same scheme, same format, same duration. Your job on those is exact loads from the athlete's 1RMs, calories/distances from their pacing, and the typed per-movement fields. NEVER redesign, swap, add, or drop a composed movement. If a metcon day is NOT in the list (its piece was removed), compose that day's metcon YOURSELF from the skeleton's metcon_focus and the athlete's data — distinct from the composed pieces, expected time inside the focus window."
       : "- The metcon's EXPECTED completion time must land inside the skeleton's stated metcon_focus window; a time cap may sit above it as a ceiling, never below.",
     priorWeeks.length > 0
       ? `- PROGRESS from the prior weeks below per the month_plan's arc (add load/volume, advance schemes) — do NOT copy them verbatim. ` +

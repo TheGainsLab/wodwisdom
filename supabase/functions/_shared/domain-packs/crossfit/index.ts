@@ -42,8 +42,8 @@ export const CROSSFIT_PACK: DomainPack = {
     buildSkeletonTool: (daysPerWeek) => buildEmitSkeletonTool(daysPerWeek),
     buildWeekTool: (daysPerWeek, units, sessionLen) =>
       buildEmitWeekTool(daysPerWeek, units, sessionLen),
-    // BYTE-FOR-BYTE the recap that lived in pipeline.callSkeletonWriter before
-    // the pack seam — retail behavior is unchanged by the move.
+    // The skills block is on every training day without exception (founder,
+    // 2026-11-26); this line used to allow skills on only some days.
     skeletonRuleRecap: (daysPerWeek, tdi) => [
       "=== KEY RULES (re-check before emit) ===",
       `- Output exactly 4 weeks × ${daysPerWeek} days. day_num is 1..${daysPerWeek}.`,
@@ -66,8 +66,8 @@ export const CROSSFIT_PACK: DomainPack = {
         : [
           "- NO dedicated cardio blocks this cycle — never emit the cardio block type. Aerobic work lives in the metcon time domains.",
         ]),
-      "- Every training day includes strength + accessory + metcon block types. Skills 2–4 days per week.",
-      "- Emit STRUCTURE ONLY — no sets / reps / weight / movement names. Those are filled in subsequent per-week calls.",
+      "- Every training day includes skills + strength + accessory + metcon block types. The skills block is on every training day, without exception.",
+      "- Emit STRUCTURE ONLY — no sets / reps / weight. Name a movement only in primary_lift and skill_focus; everything else is filled in subsequent per-week calls.",
       "- primary_lift uses canonical display names (Back Squat, Deadlift, Snatch, Clean and Jerk, etc.) or a complex description.",
       "- ALLOCATE the given priorities/maintain/deprioritize — never invent, promote, or drop one. Every priority must appear in the structure; no block built around a deprioritized focus.",
       "- Honor do_not_program when picking primary_lift / metcon_focus / skill_focus.",

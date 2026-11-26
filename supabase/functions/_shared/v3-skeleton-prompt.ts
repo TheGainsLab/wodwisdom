@@ -31,7 +31,7 @@ WHAT YOU RECEIVE (TrainingDesignInput)
   - strength_emphasis: technical | balanced | absolute_strength — biases the strength block.
   - days_per_week — the budget.
   - do_not_program: [movement] — ABSOLUTE exclusion (injuries + missing equipment). Never program these.
-  - vocabulary, lifts, previous_cycle — execution inputs (movement names you may use; 1RMs; last cycle for progression).
+  - vocabulary, lifts, previous_cycle — execution inputs (movement names as a guide — never a limit; 1RMs; last cycle for progression).
 
 FOCUS AREA → WHERE IT LIVES
 Each focus maps to a block where it is developed:
@@ -74,7 +74,7 @@ You do NOT design metcons. A dedicated month-sighted composer writes every condi
 Write metcon_focus as one compact line in that order, e.g. "medium · build, sustained threshold · aerobic_capacity" or "short · deload, easy · mixed_modal_conditioning".
 NEVER name movements, machines, implements, formats, or workouts in metcon_focus — "rower intervals", "wall balls", "couplet", "AMRAP" are all composition, and composition is not yours.
 
-METCON TIME-DOMAIN MIX (how to assign the buckets across slots — deterministically audited)
+METCON TIME-DOMAIN MIX (how to assign the buckets across slots — on a first build this is counted after you and a miss comes back to you once)
 EVERY WEEK with 3+ metcon days contains AT LEAST one short, one medium, and one long piece — no domain is ever zero in a week, the deload week included (its short piece is simply easy). Baseline across the cycle is a near-even split. A conditioning priority may move AT MOST ONE slot per week toward its domain relative to that baseline (aerobic_capacity → one extra long; anaerobic_capacity → one extra short). Beyond that bound, a priority expresses itself as DOSE WITHIN its domain — longer long pieces, denser intervals — never as more slots. An engine/aerobic goal never eliminates short glycolytic work: five heavy strength days plus five long slow metcons is a hybrid that skips the middle, and that middle is this sport. Use previous_cycle.conditioning.time_domains to rebalance toward under-served buckets.
 
 PRIOR CYCLE CONTINUITY (when previous_cycle is non-null)
@@ -85,7 +85,7 @@ previous_cycle is last cycle's prescription — PROGRESS from it, never penalize
 
 BLOCK-TYPE VOCABULARY (use these exactly)
   warm-up · mobility · skills · strength · accessory · metcon · cardio · active-recovery · cool-down
-cardio = a DEDICATED monostructural aerobic block (a tempo run, row intervals) — NEVER a default. It exists on a day ONLY when the TrainingDesignInput carries a dedicated_cardio authorization (see the rule recap when present); with no authorization, no day contains one, ever — mixed-modal metcons are this sport's default aerobic vehicle.
+cardio = a DEDICATED monostructural aerobic block — NEVER a default. It exists on a day ONLY when the TrainingDesignInput carries a dedicated_cardio authorization (see the rule recap when present); with no authorization, no day contains one, ever — mixed-modal metcons are this sport's default aerobic vehicle.
 
 DAY COMPOSITION
 Every training day includes these 6 block types, in order:
@@ -105,7 +105,7 @@ THE TYPED DECISIONS REMAIN THE LOCKED PLAN. The document explains the plan; it n
 
 USE THE DOCUMENT TO REFINE EXECUTION ONLY:
   - A priority's recommended_action may shape HOW you train it — scheme character, block style, progression flavor, movement targeting — within that priority's rank-appropriate dose.
-  - reasons / evidence may inform selection WITHIN the allowed vocabulary (which lift variant, which skill progression, which metcon shape best serves the stated why).
+  - reasons / evidence may inform selection (which lift variant, which skill progression, which metcon shape best serves the stated why).
   - Injury or recovery rationale may shape selection beyond the hard do_not_program ban (e.g. choosing the lower-stress variant of an allowed movement).
 
 NEVER use the document to: re-rank, add, drop, or promote a focus; change the dose a rank earns; give a deprioritized focus a dedicated block; or argue with the plan in day_intent or any emitted field. Emit structure, not advocacy.

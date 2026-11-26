@@ -97,7 +97,7 @@ Deno.test("the athlete's file for the writer is facts only: no ceiling by level,
     equipment: { rower: true, ski_erg: false, ghd: false },
     sessionMinutes: 60,
   });
-  assert(text.startsWith("THIS ATHLETE'S FILE (yours to get right — nothing changes the week after you):"));
+  assert(text.startsWith("THIS ATHLETE'S FILE (yours to get right — nothing checks these after you):"));
   assert(text.includes("NO MAX ON FILE for: Deadlift, Press.") && text.includes(EFFORT_NOTE)); // Press once, not twice
   assert(text.includes("No conditioning benchmarks on file"));
   assert(text.includes("is 60 minutes"));
@@ -110,4 +110,44 @@ Deno.test("the writer is given both texts", () => {
   const pipeline = read("_shared/engine/pipeline.ts");
   assert(pipeline.includes("athleteFileForWriter({") && pipeline.includes("restrictionsForPrompt("));
   assert(!pipeline.includes("fitRulesForWriter") && !pipeline.includes("a check after you enforces"));
+});
+
+// ── The full instruction audit of 2026-11-26: none of this comes back ──────
+
+Deno.test("no example athlete, injury, quote or invented concept in any generator instruction", () => {
+  const files = [
+    "_shared/coach-state-prompt.ts", "_shared/coach-state.ts", "_shared/v3-skeleton-prompt.ts", "_shared/weekly-fill.ts",
+    "_shared/v2-system-prompt.ts", "_shared/metcon-composer-prompt.ts", "_shared/conditioning-definitions.ts",
+    "_shared/program-evidence.ts", "_shared/engine/pipeline.ts", "_shared/v2-output-schema.ts", "chat/index.ts",
+    "_shared/domain-packs/crossfit/index.ts",
+  ];
+  const gone = [
+    "shoulder rehab", "shoulder felt off", "had another round in me", "more chest-to-bar", "riding 5 extra hours", "an FTP test",
+    "3x-bodyweight deadlift", "HYROX", "run twice a week", "improve my 5k row", "my top goal is my running", "270 for easy sets",
+    "your bench is right at bodyweight", "19:35 5k", "injury-prone", "hotel gym", "a travel week", "3 days from now on",
+    "no rower →", "a beginner at GHD Sit-Ups", "a beginner at Deficit HSPU", "Ring Row if no strict Pull Up", "Ring Row — Pull Up scaled",
+    "just activate shoulders", "coming off a hard competition", "preference in disguise", "to go for a run", "more squatting",
+    "Critical/High-frequency", "tier default", "intermediate-or-better capacity", "for an advanced athlete",
+    "A separate safety review", "Skills 2–4 days", "Display name from the vocabulary list", "display_name strings from the vocabulary",
+    "the athlete's allowed movements", "must declare a block_scheme", "legality were audited", "deterministically audited",
+    "abundant by construction", "Athletes have one machine", "belong in Strength", "(that's Strength)",
+  ];
+  for (const f of files) {
+    const src = read(f);
+    for (const g of gone) assert(!src.includes(g), `"${g}" is back in ${f}`);
+  }
+  assertEquals(exists("_shared/v2-profile-analysis-prompt.ts"), false);
+});
+
+Deno.test("skill ratings: each rating is defined in the founder's words, and none means progressions only", async () => {
+  const { SKILL_RATINGS_PROMPT, SKILL_RATING_MEANINGS } = await import("./conditioning-definitions.ts");
+  assertEquals(SKILL_RATING_MEANINGS, {
+    none: "can't do it yet", beginner: "small sets only, not consistent",
+    intermediate: "can do it comfortably in workouts", advanced: "big unbroken sets even under fatigue",
+  });
+  assert(SKILL_RATINGS_PROMPT.includes("never use one skill's rating for another"));
+  assert(SKILL_RATINGS_PROMPT.includes("Never program the movement itself — progressions toward it only."));
+  assert(SKILL_RATINGS_PROMPT.includes("metcons included"));
+  assert(read("_shared/v2-system-prompt.ts").includes("${SKILL_RATINGS_PROMPT}"));
+  assert(read("_shared/metcon-composer-prompt.ts").includes("${SKILL_RATINGS_PROMPT}"));
 });

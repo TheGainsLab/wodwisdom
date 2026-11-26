@@ -473,20 +473,21 @@ export function auditMetconVariety(
         const def = skillFatigueDefForMovement(mv?.movement ?? "");
         if (!def) continue;
         const tier = athleteTierFor(def, opts.skills);
-        if (tier == null) continue; // absence is neutral — no tier, no check
-        const band = def.perRound[tier];
-        if (band == null) {
+        if (tier == null) continue; // not rated — no check
+        if (tier === "none") {
+          // Rated none = can't do it yet: progressions only (founder, 2026-11-26).
           violations.push(
-            `${at(m)}: "${mv.movement}" under fatigue for a ${tier}-tier athlete — this skill is not programmed under fatigue at that tier.`,
+            `${at(m)}: "${mv.movement}" — the athlete rated this skill none (can't do it yet). Never the movement itself: use a progression toward it, or a different movement.`,
           );
           continue;
         }
+        const band = def.perRound[tier];
         const reps = parsePerRoundReps(mv.prescription);
         if (reps != null && reps > band[1]) {
           const justified = norm(m.stimulus_note ?? "").includes(norm(mv.movement).split(" ")[0]);
           if (!justified) {
             violations.push(
-              `${at(m)}: "${mv.movement}" at ${reps}/round exceeds the ${tier} band (${band[0]}-${band[1]}) with no justification in stimulus_note — bring it in band or justify it.`,
+              `${at(m)}: "${mv.movement}" at ${reps}/round exceeds the band for the athlete's ${tier} rating of this skill (${band[0]}-${band[1]}) with no justification in stimulus_note — bring it in band or justify it.`,
             );
           }
         }

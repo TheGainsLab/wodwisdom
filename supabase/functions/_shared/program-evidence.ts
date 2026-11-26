@@ -89,8 +89,8 @@ export function summarizeEvidence(days: EvidenceDay[], now: Date = new Date()): 
   ].filter(Boolean).join(" ");
   return (
     `WHAT THE ATHLETE ACTUALLY DID in this program so far (progress from what was LIFTED, not what was planned; ` +
-    `a day or block not done is not progressed from; skip reasons are data — "no time" says trim the session, ` +
-    `"too tired" says hold the load, anything else is a preference in disguise; after a layoff of a week or more, ease back in):\n` +
+    `a day or block not done is not progressed from; the athlete's skip reasons are in their own words — read each one for what it says; ` +
+    `after a layoff of a week or more, ease back in):\n` +
     lines.join("\n") + (footer ? `\n  ${footer}` : "") + "\n"
   );
 }

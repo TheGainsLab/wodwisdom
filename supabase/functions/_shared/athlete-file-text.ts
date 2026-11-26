@@ -119,5 +119,5 @@ export function athleteFileForWriter(p: {
   if (p.sessionMinutes && p.sessionMinutes > 0) lines.push(`  - The whole session, warm-up to cool-down with rest and transitions, is ${p.sessionMinutes} minutes. Size every block to fit it.`);
   const lack = Object.entries(p.equipment ?? {}).filter(([, v]) => v === false).map(([k]) => k.replace(/_/g, " "));
   if (lack.length) lines.push(`  - They do NOT have: ${lack.join(", ")}. Nothing that needs these, in any block.`);
-  return lines.length ? ["THIS ATHLETE'S FILE (yours to get right — nothing changes the week after you):", ...lines].join("\n") : "";
+  return lines.length ? ["THIS ATHLETE'S FILE (yours to get right — nothing checks these after you):", ...lines].join("\n") : "";
 }
