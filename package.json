@@ -9,7 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "seed:movements": "tsx scripts/seed-movements.ts",
-    "test:calculators": "tsx --test tests/calculators.test.ts tests/visitorSource.test.ts tests/profileFormRules.test.ts tests/engineGoalRules.test.ts tests/weekSchedule.test.ts tests/profileSaveEffect.test.ts tests/metconLogKind.test.ts tests/dayBlockCount.test.ts tests/coachCards.test.ts tests/trainingLogCards.test.ts",
+    "test:calculators": "tsx --test tests/calculators.test.ts tests/visitorSource.test.ts tests/profileFormRules.test.ts tests/engineGoalRules.test.ts tests/weekSchedule.test.ts tests/profileSaveEffect.test.ts tests/metconLogKind.test.ts tests/dayBlockCount.test.ts tests/coachCards.test.ts tests/trainingLogCards.test.ts tests/engineBreakdown.test.ts",
     "test:pages": "vitest run",
     "check:declared": "node tests/checks/declared-before-use.mjs",
     "premerge": "tsc --noEmit -p tsconfig.app.json && npm run test:calculators && npm run test:pages && npm run check:declared && npm run build"

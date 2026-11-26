@@ -4,6 +4,7 @@ import { buildCoachNotesBlock, buildProposeCoachNoteTool, COACH_NOTE_PROMPT, loa
 import { noteReadBy } from "../_shared/note-readers.ts";
 import { nextMonthLine } from "../_shared/next-month-text.ts";
 import { renderCoachStateForChat, type CoachState } from "../_shared/coach-state.ts";
+import { cleanScreenTargets, screenTargetsBlock, screenTargetsKey } from "../_shared/engine-screen-targets.ts";
 import {
   type BlockEditContext,
   buildBlockEditContext,
@@ -278,10 +279,8 @@ async function buildEngineCoachingContext(
   scopedSeq: number,
   selectedModality: string | null,
   selectedUnits: string | null,
-  // The app's computed target pace for today (client passes what it displays).
-  // Authoritative when present — the model must coach TO it, never re-derive
-  // pacing from the raw baseline (July '26: coach said 21-22 cal/min against
-  // an on-screen target of 18 because it only had the baseline to work from).
+  // The app's average target pace for today, across all work. NOT what the
+  // screen shows part by part: see screenTargets.
   targetPace: number | null,
   // The athlete's IANA timezone (profiles.timezone, browser-synced on app
   // load). Anchors every "today"/"yesterday" label in this context — the
@@ -296,6 +295,9 @@ async function buildEngineCoachingContext(
   // Day 4" and invented history to back it up). When these differ, the coach
   // must say viewing vs. on, never assert the viewed day as their position.
   athleteCurrentDay: number | null,
+  // The day page's "Workout Details" rows, as the athlete sees them. The
+  // coach quotes these. Empty when an older copy of the app did not send them.
+  screenTargets: string[] = [],
 ): Promise<string> {
   // Mapping row for the scoped sequence position (unique per program).
   const { data: mapping } = await supa
@@ -496,15 +498,11 @@ async function buildEngineCoachingContext(
     );
   }
 
-  if (targetPace != null) {
-    parts.push(
-      `\nTODAY'S TARGET PACE (computed by the app from this athlete's baseline, today's intended intensity, and their recent performance — AUTHORITATIVE): ` +
-        `${Number(targetPace.toFixed(2))}${selectedUnits ? ` ${selectedUnits}/min` : " per minute"} for the work intervals. ` +
-        `This is the number on the athlete's screen. Coach TO this target — never derive a different pacing number from the raw time-trial baseline. ` +
-        `Use the baseline only for color (e.g. what fraction of their max this represents). ` +
-        `ALWAYS express the target as per-piece arithmetic too — rate × interval length = the number to hit per interval (e.g. 9 cal/min over a 4:00 interval ≈ 36 cal per interval) — never leave the athlete to convert mid-workout, and never equate a per-minute rate with a per-interval count. ` +
-        `If the athlete questions the target, explain how it is derived (baseline scaled to today's intended intensity, adjusted by recent performance) rather than proposing a different number.`,
-    );
+  // The screen's own rows when the page sent them; else the average, said to
+  // be an average. See engine-screen-targets.ts (2026-11-26).
+  const targetsBlock = screenTargetsBlock(screenTargets, targetPace, selectedUnits);
+  if (targetsBlock) {
+    parts.push(targetsBlock);
   } else if (selectedModality) {
     parts.push(
       `\nNo computed target pace is available for this exchange. If asked about pacing, reason from this modality's time-trial baseline scaled DOWN to today's intended intensity (never prescribe baseline pace for sub-maximal work), and tell the athlete the app shows their exact personalized target on the training day screen. EXCEPTION: if CURRENT TIME TRIAL BASELINES lists no baseline for this modality, there is NO personal target yet — say that first, and tell them to do the 10-minute time trial on this machine (Day 1, or re-do a time-trial day from the dashboard) or to pace today by feel at the day's intended effort. Never point an athlete to a target that is not there.`,
@@ -801,7 +799,7 @@ Deno.serve(async (req) => {
     // (Decision 10(b)), so its tier follows Engine access — not `ai_chat`. This applies
     // ONLY to day-scoped requests; a request without engine_program_day (the standalone
     // coach) is tiered exactly as before.
-    const { question, history = [], source_filter, workout_id, engine_program_day, engine_sequence_position, engine_modality, engine_units, engine_target_pace } = await req.json();
+    const { question, history = [], source_filter, workout_id, engine_program_day, engine_sequence_position, engine_modality, engine_units, engine_screen_targets, engine_target_pace } = await req.json();
     // SEQUENCE IDENTITY: the day scope is a program-sequence position.
     // engine_sequence_position is the current contract; engine_program_day is
     // the legacy field from pre-refactor cached bundles, which sent CATALOG
@@ -824,6 +822,7 @@ Deno.serve(async (req) => {
       engine_target_pace > 0 && engine_target_pace < 10000
         ? engine_target_pace
         : null;
+    const engineScreenTargets = cleanScreenTargets(engine_screen_targets);
     const engineDayCoachAccess = isEngineDayRequest && features.has("engine");
 
     const isFreeTier = !isAdmin && !features.has("ai_chat") && !engineDayCoachAccess;
@@ -959,7 +958,9 @@ Deno.serve(async (req) => {
       ? (ENGINE_CHIP_KEYS[(question || "").trim().toLowerCase()] ?? null)
       : null;
     const cacheKey = chipKey
-      ? (engineTargetPace != null ? `${chipKey}@${engineTargetPace.toFixed(1)}` : chipKey)
+      ? (engineScreenTargets.length > 0
+        ? `${chipKey}@s${screenTargetsKey(engineScreenTargets)}`
+        : engineTargetPace != null ? `${chipKey}@${engineTargetPace.toFixed(1)}` : chipKey)
       : null;
     const cacheModality = typeof engine_modality === "string" ? engine_modality : "";
     const cacheUnits = typeof engine_units === "string" ? engine_units : "";
@@ -1150,6 +1151,7 @@ Deno.serve(async (req) => {
           engineTargetPace,
           (profile?.timezone as string | null) || "UTC",
           engineAthleteCurrentDay,
+          engineScreenTargets,
         );
       } catch (err) {
         console.error("[chat] Engine coaching context failed:", err);

@@ -708,19 +708,22 @@ export async function loadAllTimeTrials(): Promise<EngineTimeTrial[]> {
   return data ?? [];
 }
 
-/** Save a new time trial result. Marks previous trials for this modality as not current. */
+/** Save a new time trial result. Marks previous trials for this machine IN THIS UNIT as not current.
+ *  A trial in calories and a trial in watts on the same machine are two baselines: until 2026-11-26
+ *  saving one retired the other, leaving the athlete with no target in that unit. */
 export async function saveTimeTrial(
   trial: Pick<EngineTimeTrial, 'modality' | 'total_output' | 'calculated_rpm' | 'units'>
 ): Promise<EngineTimeTrial> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
-  // Mark previous trials for this modality as not current
+  // Mark previous trials for this machine and unit as not current
   await supabase
     .from('engine_time_trials')
     .update({ is_current: false })
     .eq('user_id', user.id)
     .eq('modality', trial.modality)
+    .eq('units', trial.units)
     .eq('is_current', true);
 
   const { data, error } = await supabase

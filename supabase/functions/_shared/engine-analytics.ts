@@ -38,11 +38,21 @@ export interface AnalyticsTrial {
 // ─── Row helpers (moved from the page) ──────────────────────────────────────
 
 /** Pace for a session: the logged pace, else output over total work time. */
+/** A session's total work time in seconds. The day page saves it as
+ *  `total_work_time`; this file read `total_work_seconds`, which nothing
+ *  writes, so until 2026-11-26 every session's work time read as missing and
+ *  the heart-rate Load ignored duration (639 of 639 sessions with a heart
+ *  rate). Both names are read. */
+export function workSeconds(s: AnalyticsSession): number | null {
+  const wd = s.workout_data ?? null;
+  const v = wd?.total_work_time ?? wd?.total_work_seconds;
+  return typeof v === "number" && v > 0 ? v : null;
+}
+
 export function calculatePace(s: AnalyticsSession): number | null {
   if (s.actual_pace) return s.actual_pace;
-  const wd = s.workout_data ?? null;
-  const tws = wd?.total_work_seconds;
-  if (s.total_output && typeof tws === "number" && tws > 0) {
+  const tws = workSeconds(s);
+  if (s.total_output && tws != null && tws > 0) {
     return s.total_output / (tws / 60);
   }
   return null;
@@ -61,9 +71,14 @@ export function formatWorkRestRatio(decimal: number): string {
 
 const mean = (xs: number[]): number | null => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
 const regular = (sessions: AnalyticsSession[]) => sessions.filter((s) => s.day_type !== "time_trial");
-const latestTrialPace = (trials: AnalyticsTrial[], modality: string): number | null => {
+/** The latest time-trial pace for a machine IN A UNIT. Calories per minute
+ *  and watts are different rulers: until 2026-11-26 the latest trial on the
+ *  machine was used whatever its unit, so a session logged in one unit could
+ *  be divided by a trial in the other. `units` null = the unit is unknown;
+ *  only then is the machine's latest trial used. */
+const latestTrialPace = (trials: AnalyticsTrial[], modality: string, units: string | null = null): number | null => {
   const t = trials
-    .filter((x) => x.modality === modality && x.calculated_rpm && x.calculated_rpm > 0)
+    .filter((x) => x.modality === modality && (units == null || x.units === units) && x.calculated_rpm && x.calculated_rpm > 0)
     .sort((a, b) => b.date.localeCompare(a.date))[0];
   return t?.calculated_rpm ?? null;
 };
@@ -113,14 +128,29 @@ export interface EnergySystemPaces {
   units: string;
 }
 
+/** The unit a machine's figures are reported in: the unit of most of its
+ *  sessions; with no sessions, its latest trial's. Null when nothing says. */
+export function machineUnit(sessions: AnalyticsSession[], trials: AnalyticsTrial[], modality: string): string | null {
+  const counts = new Map<string, number>();
+  for (const s of regular(sessions)) if (s.modality === modality && s.units) counts.set(s.units, (counts.get(s.units) ?? 0) + 1);
+  if (counts.size > 0) return [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0];
+  const t = trials.filter((x) => x.modality === modality && x.units).sort((a, b) => b.date.localeCompare(a.date))[0];
+  return t?.units ?? null;
+}
+
 export function energySystemPaces(sessions: AnalyticsSession[], trials: AnalyticsTrial[], modality: string): EnergySystemPaces {
-  const reg = regular(sessions);
+  // One unit per machine: the one most of its sessions were logged in (else
+  // its latest trial's). Sessions and trials in another unit are left out, so
+  // no pace is ever divided by, or averaged with, a pace in a different unit.
+  const unit = machineUnit(sessions, trials, modality);
+  const sameUnit = (u: string | null | undefined) => unit == null || u == null || u === unit;
+  const reg = regular(sessions).filter((s) => sameUnit(s.units));
   const paces = (dt: string) => reg.filter((s) => s.day_type === dt && s.modality === modality && s.actual_pace && s.actual_pace > 0).map((s) => s.actual_pace as number);
   const anaerobicAvg = mean(paces("anaerobic"));
   const maxAerobicAvg = mean(paces("max_aerobic_power"));
-  const ttPace = latestTrialPace(trials, modality);
+  const ttPace = latestTrialPace(trials, modality, unit);
   const modSessions = reg.filter((s) => s.modality === modality && s.actual_pace && s.actual_pace > 0);
-  const modTrials = trials.filter((t) => t.modality === modality && t.calculated_rpm && t.calculated_rpm > 0);
+  const modTrials = trials.filter((t) => t.modality === modality && sameUnit(t.units) && t.calculated_rpm && t.calculated_rpm > 0);
   const all = [...modSessions.map((s) => s.actual_pace as number), ...modTrials.map((t) => t.calculated_rpm as number)].filter((p) => p > 0);
   return {
     glycolytic: anaerobicAvg && ttPace ? anaerobicAvg / ttPace : null,
@@ -128,7 +158,7 @@ export function energySystemPaces(sessions: AnalyticsSession[], trials: Analytic
     systems: anaerobicAvg && maxAerobicAvg ? anaerobicAvg / maxAerobicAvg : null,
     peak: all.length ? Math.max(...all) : null,
     average: mean(all),
-    units: modSessions[0]?.units ?? modTrials[0]?.units ?? "cal",
+    units: unit ?? modSessions[0]?.units ?? modTrials[0]?.units ?? "cal",
   };
 }
 
@@ -200,11 +230,11 @@ export function heartRate(sessions: AnalyticsSession[], trials: AnalyticsTrial[]
     const efficiencies: number[] = []; const loads: number[] = [];
     for (const s of dtSessions) {
       const pace = calculatePace(s); const avgHR = s.average_heart_rate;
-      const tws = s.workout_data?.total_work_seconds;
-      const durMin = typeof tws === "number" ? tws / 60 : 0;
+      const tws = workSeconds(s);
+      const durMin = tws != null ? tws / 60 : 0;
       if (pace && avgHR && avgHR > 0) {
         efficiencies.push((pace / avgHR) * 1000);
-        const baseline = latestTrialPace(trials, s.modality ?? "");
+        const baseline = latestTrialPace(trials, s.modality ?? "", s.units ?? null);
         const intensity = baseline && baseline > 0 ? pace / baseline : 1;
         loads.push(Math.pow(intensity, 3) * avgHR * Math.sqrt(durMin || 1));
       }

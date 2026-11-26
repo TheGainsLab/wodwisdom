@@ -35,6 +35,7 @@ import { localDateString } from '../lib/localDate';
 import EnginePaywall from '../components/engine/EnginePaywall';
 import { useEntitlements } from '../hooks/useEntitlements';
 import { ChevronLeft, ChevronRight, ChevronDown, Play, Pause, Square, Check, RotateCcw, AlertTriangle, Share2, Lock } from 'lucide-react';
+import { buildBreakdown, breakdownLines, type BreakdownBlock, type BreakdownRow } from '../lib/engineBreakdown';
 import { describeWorkout } from '../lib/engineStructure';
 
 // ── Types & Constants ────────────────────────────────────────────────
@@ -791,6 +792,34 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
     return calculateIntervalGoal(bp, segDuration, label, baselineRpm, rollingAdj, isRateUnit(selectedUnit), roundPaceOverride);
   };
 
+  /** The Workout Details rows for the day as it stands (machine, unit,
+   *  baseline and targets as loaded). One source for the screen and the coach. */
+  const breakdownFor = (blocks: Array<{ index: number; bp: BlockParams }>): BreakdownBlock[] => {
+    const baselineRpm = baseline?.calculated_rpm ?? 0;
+    const rollingAdj = effectiveRollingMult(workout, performanceMetrics);
+    return buildBreakdown(blocks, {
+      resolveNum, resolveRest, parseBurstTiming, formatPace,
+      goalFor: (bp, segDuration, label, blockIdx, ordinal, roundPaceOverride) =>
+        goalFor(bp, segDuration, label, blockIdx, ordinal, baselineRpm, rollingAdj, roundPaceOverride),
+      fluxStageGoal: (blockIdx, ordinal, fSeg, fluxIntensity) => {
+        const curveFluxPace = curveMode ? curveGoalMap.get(`${blockIdx}|Flux|${ordinal}`) : undefined;
+        return curveFluxPace != null
+          ? (isRateUnit(selectedUnit) ? Math.round(curveFluxPace * 10) / 10 : Math.round(curveFluxPace * (fSeg / 60) * 10) / 10)
+          : baselineRpm > 0
+          ? Math.round(baselineRpm * fluxIntensity * rollingAdj * (fSeg / 60) * 10) / 10
+          : null;
+      },
+    });
+  };
+
+  /** Those rows as text, for the AI Coach: what is on this screen, line by line. */
+  const screenTargetLines = (): string[] =>
+    breakdownLines(breakdownFor(getBlocks()), {
+      formatDuration,
+      goalText: (goal, durationSeconds) => formatGoalWithPace(goal, durationSeconds, selectedUnit, modality),
+      blockRestSeconds: workout?.set_rest_seconds ?? null,
+    });
+
   /** Run a 10-minute time trial on this machine in place of today's day. */
   const startCalibrationTrial = () => {
     if (!workout) return;
@@ -1433,7 +1462,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
 
   function renderPreview() {
     const blocks = getBlocks();
-    const baselineRpm = baseline?.calculated_rpm ?? 0;
+    const breakdown = breakdownFor(blocks);
 
     return (
       <div className="engine-page">
@@ -1550,233 +1579,49 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
 
               {breakdownExpanded && (
                 <div className="engine-breakdown">
-                  {blocks.map(({ index: blockIdx, bp }, blockArrayIdx) => {
-                    const rounds = resolveNum(bp.rounds, 1);
-                    const workDur = resolveNum(bp.workDuration, 0) || (bp.workDurationOptions?.[0] ?? 0);
-                    const restDur = resolveRest(bp.restDuration, workDur) || (bp.restDurationOptions?.[0] ?? 0);
-                    const pace = formatPace(bp.paceRange);
-                    const rollingAdj = effectiveRollingMult(workout, performanceMetrics);
-
+                  {/* The rows come from buildBreakdown (lib/engineBreakdown.ts), the same
+                      rows the AI Coach is sent, so the coach can never quote a
+                      target that differs from this screen (2026-11-26). */}
+                  {breakdown.map((block, blockArrayIdx) => {
+                    const renderRow = (row: BreakdownRow) => row.kind === 'rest' ? (
+                      <div key={row.key} className="engine-breakdown-row engine-breakdown-row--rest">
+                        <span className="engine-breakdown-label engine-breakdown-label--rest">REST</span>
+                        <span className="engine-breakdown-dur">{formatDuration(row.durationSeconds)}</span>
+                      </div>
+                    ) : (
+                      <div key={row.key} className={'engine-breakdown-row' + (row.variant ? ` engine-breakdown-row--${row.variant}` : '')}>
+                        <span className={'engine-breakdown-label' + (row.variant ? ` engine-breakdown-label--${row.variant}` : '')}>{row.label}</span>
+                        <span className="engine-breakdown-dur">{formatDuration(row.durationSeconds)}</span>
+                        <span className={'engine-breakdown-goal' + (row.variant ? ` engine-breakdown-goal--${row.variant}` : '')}>
+                          {row.goal != null ? <GoalWithPace goal={row.goal} durationSeconds={row.durationSeconds} unit={selectedUnit} modality={modality} /> : row.text}
+                        </span>
+                      </div>
+                    );
+                    // Rows of one round are wrapped together, as before.
+                    const out: React.ReactNode[] = [];
+                    for (let i = 0; i < block.rows.length; i++) {
+                      const row = block.rows[i];
+                      if (row.group == null) { out.push(renderRow(row)); continue; }
+                      const members = [row];
+                      while (i + 1 < block.rows.length && block.rows[i + 1].group === row.group) members.push(block.rows[++i]);
+                      out.push(<div key={`g-${row.group}`}>{members.map(renderRow)}</div>);
+                    }
                     return (
-                      <div key={blockIdx}>
+                      <div key={block.blockIdx}>
                         {/* Block header (only when multiple blocks) */}
-                        {blocks.length > 1 && (
+                        {breakdown.length > 1 && (
                           <div className="engine-breakdown-block-header">
-                            <span>Block {blockIdx + 1}</span>
-                            {pace && (
-                              <span className={'engine-badge ' + (pace === 'MAX' ? 'engine-badge--strength' : 'engine-badge--default')}>
-                                {pace}
+                            <span>Block {block.blockIdx + 1}</span>
+                            {block.pace && (
+                              <span className={'engine-badge ' + (block.pace === 'MAX' ? 'engine-badge--strength' : 'engine-badge--default')}>
+                                {block.pace}
                               </span>
                             )}
                           </div>
                         )}
-
-                        {/* Flux — alternating_paces: expand into WORK/FLUX segments */}
-                        {bp.workProgression === 'alternating_paces' && bp.baseDuration && bp.fluxDuration ? (() => {
-                          const baseDur = resolveNum(bp.baseDuration, 300);
-                          const fluxDur = resolveNum(bp.fluxDuration, 60);
-                          const rows: React.ReactNode[] = [];
-                          let remaining = workDur;
-                          let segIdx = 0;
-
-                          while (remaining > 0) {
-                            const bSeg = Math.min(baseDur, remaining);
-                            const baseGoal = goalFor(bp, bSeg, 'Base', blockIdx, segIdx, baselineRpm, rollingAdj);
-                            rows.push(
-                              <div key={`b-${segIdx}`} className="engine-breakdown-row">
-                                <span className="engine-breakdown-label">WORK</span>
-                                <span className="engine-breakdown-dur">{formatDuration(bSeg)}</span>
-                                <span className="engine-breakdown-goal">
-                                  {baseGoal != null ? <GoalWithPace goal={baseGoal} durationSeconds={bSeg} unit={selectedUnit} modality={modality} /> : pace || '—'}
-                                </span>
-                              </div>
-                            );
-                            remaining -= bSeg;
-                            if (remaining <= 0) break;
-
-                            const fSeg = Math.min(fluxDur, remaining);
-                            const fluxGoal = goalFor(bp, fSeg, 'Flux', blockIdx, segIdx, baselineRpm, rollingAdj);
-                            rows.push(
-                              <div key={`f-${segIdx}`} className="engine-breakdown-row engine-breakdown-row--flux">
-                                <span className="engine-breakdown-label engine-breakdown-label--flux">FLUX</span>
-                                <span className="engine-breakdown-dur">{formatDuration(fSeg)}</span>
-                                <span className="engine-breakdown-goal engine-breakdown-goal--flux">
-                                  {fluxGoal != null ? <GoalWithPace goal={fluxGoal} durationSeconds={fSeg} unit={selectedUnit} modality={modality} /> : formatPace(bp.fluxPaceRange ?? bp.paceRange) || '—'}
-                                </span>
-                              </div>
-                            );
-                            remaining -= fSeg;
-                            segIdx++;
-                          }
-
-                          if (restDur > 0) {
-                            rows.push(
-                              <div key="rest" className="engine-breakdown-row engine-breakdown-row--rest">
-                                <span className="engine-breakdown-label engine-breakdown-label--rest">REST</span>
-                                <span className="engine-breakdown-dur">{formatDuration(restDur)}</span>
-                              </div>
-                            );
-                          }
-
-                          return <div className="engine-breakdown-segments">{rows}</div>;
-                        })()
-
-                        /* Polarized — continuous_with_bursts: expand into Base/BURST segments */
-                        : bp.workProgression === 'continuous_with_bursts' && bp.burstTiming && bp.burstDuration ? (() => {
-                          const burstInterval = parseBurstTiming(bp.burstTiming);
-                          const burstDur = bp.burstDuration;
-                          const rows: React.ReactNode[] = [];
-                          let remaining = workDur;
-                          let segIdx = 0;
-
-                          while (remaining > 0) {
-                            const baseSeg = Math.min(burstInterval, remaining);
-                            const baseGoal = goalFor(bp, baseSeg, 'Base', blockIdx, segIdx, baselineRpm, rollingAdj);
-                            rows.push(
-                              <div key={`base-${segIdx}`} className="engine-breakdown-row">
-                                <span className="engine-breakdown-label">BASE</span>
-                                <span className="engine-breakdown-dur">{formatDuration(baseSeg)}</span>
-                                <span className="engine-breakdown-goal">
-                                  {baseGoal != null ? <GoalWithPace goal={baseGoal} durationSeconds={baseSeg} unit={selectedUnit} modality={modality} /> : pace || '—'}
-                                </span>
-                              </div>
-                            );
-                            remaining -= baseSeg;
-                            if (remaining <= 0) break;
-
-                            const bSeg = Math.min(burstDur, remaining);
-                            rows.push(
-                              <div key={`burst-${segIdx}`} className="engine-breakdown-row engine-breakdown-row--burst">
-                                <span className="engine-breakdown-label engine-breakdown-label--burst">BURST</span>
-                                <span className="engine-breakdown-dur">{formatDuration(bSeg)}</span>
-                                <span className="engine-breakdown-goal engine-breakdown-goal--burst">Max Effort</span>
-                              </div>
-                            );
-                            remaining -= bSeg;
-                            segIdx++;
-                          }
-
-                          if (restDur > 0) {
-                            rows.push(
-                              <div key="rest" className="engine-breakdown-row engine-breakdown-row--rest">
-                                <span className="engine-breakdown-label engine-breakdown-label--rest">REST</span>
-                                <span className="engine-breakdown-dur">{formatDuration(restDur)}</span>
-                              </div>
-                            );
-                          }
-
-                          return <div className="engine-breakdown-segments">{rows}</div>;
-                        })()
-
-                        /* Progressive flux intensity (Flux Stages): expand into WORK/FLUX with increasing intensity */
-                        : bp.workProgression === 'progressive_flux_intensity' && bp.baseDuration && bp.fluxDuration ? (() => {
-                          const baseDur = resolveNum(bp.baseDuration, 300);
-                          const fluxDur = resolveNum(bp.fluxDuration, 60);
-                          const startIntensity = bp.fluxStartIntensity ?? 0.75;
-                          const increment = bp.fluxIncrement ?? 0.05;
-                          const rows: React.ReactNode[] = [];
-                          let remaining = workDur;
-                          let segIdx = 0;
-
-                          while (remaining > 0) {
-                            const bSeg = Math.min(baseDur, remaining);
-                            const baseGoal = goalFor(bp, bSeg, 'Base', blockIdx, segIdx, baselineRpm, rollingAdj);
-                            rows.push(
-                              <div key={`b-${segIdx}`} className="engine-breakdown-row">
-                                <span className="engine-breakdown-label">WORK</span>
-                                <span className="engine-breakdown-dur">{formatDuration(bSeg)}</span>
-                                <span className="engine-breakdown-goal">
-                                  {baseGoal != null ? <GoalWithPace goal={baseGoal} durationSeconds={bSeg} unit={selectedUnit} modality={modality} /> : pace || '—'}
-                                </span>
-                              </div>
-                            );
-                            remaining -= bSeg;
-                            if (remaining <= 0) break;
-
-                            const fSeg = Math.min(fluxDur, remaining);
-                            const fluxIntensity = startIntensity + segIdx * increment;
-                            const curveFluxPace = curveMode ? curveGoalMap.get(`${blockIdx}|Flux|${segIdx}`) : undefined;
-                            const fluxGoal = curveFluxPace != null
-                              ? (isRateUnit(selectedUnit) ? Math.round(curveFluxPace * 10) / 10 : Math.round(curveFluxPace * (fSeg / 60) * 10) / 10)
-                              : baselineRpm > 0
-                              ? Math.round(baselineRpm * fluxIntensity * rollingAdj * (fSeg / 60) * 10) / 10
-                              : null;
-                            rows.push(
-                              <div key={`f-${segIdx}`} className="engine-breakdown-row engine-breakdown-row--flux">
-                                <span className="engine-breakdown-label engine-breakdown-label--flux">FLUX</span>
-                                <span className="engine-breakdown-dur">{formatDuration(fSeg)}</span>
-                                <span className="engine-breakdown-goal engine-breakdown-goal--flux">
-                                  {fluxGoal != null ? <GoalWithPace goal={fluxGoal} durationSeconds={fSeg} unit={selectedUnit} modality={modality} /> : `${Math.round(fluxIntensity * 100)}%`}
-                                </span>
-                              </div>
-                            );
-                            remaining -= fSeg;
-                            segIdx++;
-                          }
-
-                          return <div className="engine-breakdown-segments">{rows}</div>;
-                        })()
-
-                        /* Continuous (Atomic, Towers): single unbroken work block */
-                        /* When paceProgression is 'increasing', fall through to round-by-round rendering */
-                        : bp.workProgression === 'continuous' && bp.paceProgression !== 'increasing' ? (
-                          <div className="engine-breakdown-segments">
-                            <div className="engine-breakdown-row">
-                              <span className="engine-breakdown-label">WORK</span>
-                              <span className="engine-breakdown-dur">{formatDuration(workDur * rounds)}</span>
-                              <span className="engine-breakdown-goal">
-                                {(() => {
-                                  const totalDur = workDur * rounds;
-                                  const goal = goalFor(bp, totalDur, 'Work', blockIdx, 0, baselineRpm, rollingAdj);
-                                  const isMax = bp.paceRange === 'max_effort';
-                                  return isMax ? 'Max Effort' : goal != null ? <GoalWithPace goal={goal} durationSeconds={totalDur} unit={selectedUnit} modality={modality} /> : pace || '—';
-                                })()}
-                              </span>
-                            </div>
-                          </div>
-                        )
-
-                        /* Standard / Increasing / Decreasing intervals: round-by-round cards */
-                        : (
-                          <div className="engine-breakdown-segments">
-                            {Array.from({ length: rounds }, (_, r) => {
-                              const workInc = bp.workDurationIncrement ?? 0;
-                              const restInc = bp.restDurationIncrement ?? 0;
-                              const roundWorkDur = Math.max(0, workDur + r * workInc);
-                              const roundRestDur = Math.max(0, restDur + r * restInc);
-                              const effectivePaceInc = bp.paceIncrement
-                                ?? (bp.paceProgression === 'increasing' && Array.isArray(bp.paceRange) && rounds > 1
-                                  ? (bp.paceRange[1] - bp.paceRange[0]) / (rounds - 1)
-                                  : undefined);
-                              const roundPace = bp.paceProgression === 'increasing' && Array.isArray(bp.paceRange) && effectivePaceInc
-                                ? bp.paceRange[0] + r * effectivePaceInc
-                                : undefined;
-                              const intervalGoal = goalFor(bp, roundWorkDur, 'Work', blockIdx, r, baselineRpm, rollingAdj, roundPace);
-                              const isMax = bp.paceRange === 'max_effort';
-                              return (
-                                <div key={r}>
-                                  <div className="engine-breakdown-row">
-                                    <span className="engine-breakdown-label">R{r + 1}</span>
-                                    <span className="engine-breakdown-dur">{formatDuration(roundWorkDur)}</span>
-                                    <span className="engine-breakdown-goal">
-                                      {isMax ? 'Max Effort' : intervalGoal != null ? <GoalWithPace goal={intervalGoal} durationSeconds={roundWorkDur} unit={selectedUnit} modality={modality} /> : pace || '—'}
-                                    </span>
-                                  </div>
-                                  {roundRestDur > 0 && r < rounds - 1 && (
-                                    <div className="engine-breakdown-row engine-breakdown-row--rest">
-                                      <span className="engine-breakdown-label engine-breakdown-label--rest">REST</span>
-                                      <span className="engine-breakdown-dur">{formatDuration(roundRestDur)}</span>
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-
-
+                        <div className="engine-breakdown-segments">{out}</div>
                         {/* Block rest between blocks */}
-                        {workout?.set_rest_seconds && blockArrayIdx < blocks.length - 1 && (
+                        {workout?.set_rest_seconds && blockArrayIdx < breakdown.length - 1 && (
                           <div className="engine-breakdown-row engine-breakdown-row--block-rest">
                             <span className="engine-breakdown-label engine-breakdown-label--rest">BLOCK REST</span>
                             <span className="engine-breakdown-dur">{formatDuration(workout.set_rest_seconds)}</span>
@@ -1901,14 +1746,14 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button
                       className="engine-btn engine-btn-secondary"
-                      onClick={() => navigate(`/engine/training/${dayNumber}/review`, { state: { autoQuestion: 'Can you please suggest a warmup for today?', modality, units: selectedUnit, targetPace: workout ? computeTargetPace(generateSegments(workout)) : null } })}
+                      onClick={() => navigate(`/engine/training/${dayNumber}/review`, { state: { autoQuestion: 'Can you please suggest a warmup for today?', modality, units: selectedUnit, targetPace: workout ? computeTargetPace(generateSegments(workout)) : null, screenTargets: workout ? screenTargetLines() : null } })}
                       style={{ flex: 1, color: '#ffffff' }}
                     >
                       Warm-up
                     </button>
                     <button
                       className="engine-btn engine-btn-secondary"
-                      onClick={() => navigate(`/engine/training/${dayNumber}/review`, { state: { autoQuestion: 'How should I pace this?', modality, units: selectedUnit, targetPace: workout ? computeTargetPace(generateSegments(workout)) : null } })}
+                      onClick={() => navigate(`/engine/training/${dayNumber}/review`, { state: { autoQuestion: 'How should I pace this?', modality, units: selectedUnit, targetPace: workout ? computeTargetPace(generateSegments(workout)) : null, screenTargets: workout ? screenTargetLines() : null } })}
                       style={{ flex: 1, color: '#ffffff' }}
                     >
                       Pace this
@@ -1916,7 +1761,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                   </div>
                   <button
                     className="engine-btn engine-btn-secondary"
-                    onClick={() => navigate(`/engine/training/${dayNumber}/review`, { state: { modality, units: selectedUnit, targetPace: workout ? computeTargetPace(generateSegments(workout)) : null } })}
+                    onClick={() => navigate(`/engine/training/${dayNumber}/review`, { state: { modality, units: selectedUnit, targetPace: workout ? computeTargetPace(generateSegments(workout)) : null, screenTargets: workout ? screenTargetLines() : null } })}
                     style={{ width: '100%', marginTop: 8, color: '#ffffff' }}
                   >
                     AI Coach
