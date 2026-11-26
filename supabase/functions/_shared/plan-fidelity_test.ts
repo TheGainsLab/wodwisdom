@@ -4,7 +4,7 @@
 // gate and the restriction gate, so their deliberate removals are never
 // flagged or undone.
 import { assert, assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { auditPlanBlockTypes, auditPlanPrimaryLift, auditWeekAgainstPlan, isPlannedLift, withPlanChecks } from "./plan-fidelity.ts";
+import { auditPlanBlockTypes, auditWeekAgainstPlan, withPlanChecks } from "./plan-fidelity.ts";
 import { AUDIT_KIND } from "./audits.ts";
 import { classifyFailuresByKind, runAudits } from "./audit-runner.ts";
 import { applyTimeTrims } from "./fit-gate.ts";
@@ -26,8 +26,8 @@ const written = (day1: Any[], day2: Any[] = [block("warm-up", "Row"), block("ski
   ({ month_plan: {}, weeks: [{ week_num: 2, days: [{ day_num: 1, blocks: day1 }, { day_num: 2, blocks: day2 }] }] });
 const DAY1 = () => [block("warm-up", "Row"), block("strength", "Back Squat"), block("accessory", "Dumbbell Row"), block("metcon", "Burpee"), block("cool-down", "Walk")];
 
-Deno.test("a week written to its plan passes both checks", () => {
-  assertEquals(auditWeekAgainstPlan(written(DAY1()), PLAN).map((r) => r.passed), [true, true]);
+Deno.test("a week written to its plan passes the check", () => {
+  assertEquals(auditWeekAgainstPlan(written(DAY1()), PLAN).map((r) => r.passed), [true]);
 });
 
 Deno.test("a planned block type missing from a day is named, with the day", () => {
@@ -44,57 +44,38 @@ Deno.test("an extra block the plan did not list is not a violation", () => {
   assertEquals(auditPlanBlockTypes(written([...DAY1(), block("mobility", "Couch Stretch")]), PLAN).passed, true);
 });
 
-Deno.test("a strength block whose main lift is not the planned one is flagged at its block, so the block rewrite can repair it", () => {
+Deno.test("no code compares the planned lift's name with the written one (removed 2026-11-26)", () => {
+  // A different main lift from the planned one is NOT a finding: the writer is
+  // told the planned lift, and nothing matches the two names.
   const day1 = DAY1(); day1[1] = block("strength", "Front Squat", "Back Squat");
-  const r = auditPlanPrimaryLift(written(day1), PLAN);
-  assertEquals(r.passed, false);
-  assertEquals(r.violations.length, 1);
-  assert(r.violations[0].startsWith('Week 2 Day 1 block[1] (strength): the plan\'s primary_lift for this day is "Back Squat" but the block\'s main lift is "Front Squat".'));
-  // The surgical stage finds the block by this pattern (engine/pipeline.ts groupBlockLocalFailures).
-  assertEquals(r.violations[0].match(/Week (\d+) Day (\d+) block\[(\d+)\]/)!.slice(1), ["2", "1", "1"]);
+  assertEquals(auditWeekAgainstPlan(written(day1), PLAN).map((r) => [r.rule, r.passed]), [["plan_block_types", true]]);
+  assertEquals((AUDIT_KIND as Record<string, string>).plan_primary_lift, undefined);
+  const src = Deno.readTextFileSync(new URL("./plan-fidelity.ts", import.meta.url));
+  for (const gone of ["isPlannedLift", "auditPlanPrimaryLift", "const FAMILIES", "familiesOf("]) assert(!src.includes(gone), `${gone} is back`);
+  // The instruction to the writer is what remains.
+  const pipeline = Deno.readTextFileSync(new URL("./engine/pipeline.ts", import.meta.url));
+  assert(pipeline.includes("Honor THIS WEEK's skeleton: each day's block_types, primary_lift"));
 });
 
-Deno.test("the same lift under another spelling or variation is not flagged", () => {
-  for (const [planned, main] of [
-    ["Back Squat", "Back Squat"], ["Back Squat", "Pause Back Squat"], ["Back Squat", "Tempo Back Squats"], ["Clean and Jerk", "Clean & Jerk"],
-    ["Clean and Jerk", "Clean"], ["Overhead Press", "Strict Press"], ["Press", "Shoulder Press"], ["Snatch", "Hang Power Snatch"],
-    ["Snatch Pull + Hang Snatch + Overhead Squat (complex)", "Snatch Pull"], ["Hang Power Clean + Push Jerk", "Push Jerk"],
-    ["Bench Press", "Dumbbell Bench Press"], ["Deadlift", "Romanian Deadlift"], ["Weighted Pull-Up", "Weighted Pull-Ups"], ["Barbell Row", "Bent Over Row"],
-  ]) assertEquals(isPlannedLift(planned, main), true, `${planned} / ${main}`);
-});
-
-Deno.test("a different lift is flagged", () => {
-  for (const [planned, main] of [
-    ["Back Squat", "Front Squat"], ["Back Squat", "Deadlift"], ["Snatch", "Clean"], ["Deadlift", "Bench Press"], ["Press", "Push Press"],
-    ["Bench Press", "Strict Press"], ["Clean and Jerk", "Snatch"], ["Hip Thrust", "Box Jump"],
-  ]) assertEquals(isPlannedLift(planned, main), false, `${planned} / ${main}`);
-});
-
-Deno.test("days with no planned lift, no strength block, or no plan at all are left alone", () => {
-  assertEquals(auditPlanPrimaryLift(written(DAY1()), PLAN).passed, true); // day 2 has no primary_lift
+Deno.test("days with no plan at all are left alone; a missing block is logged, not rewritten", () => {
   const noStrength = DAY1().filter((b) => b.block_type !== "strength");
-  assertEquals(auditPlanPrimaryLift(written(noStrength), PLAN).passed, true); // that is the block-type check's finding
   assertEquals(auditPlanBlockTypes(written(noStrength), PLAN).passed, false);
-  assertEquals(auditWeekAgainstPlan(written([block("metcon", "Burpee")]), null).map((r) => r.passed), [true, true]);
-  assertEquals(auditWeekAgainstPlan(written(DAY1()), { weeks: [{ week_num: 3, days: [] }] }).map((r) => r.passed), [true, true]);
-});
-
-Deno.test("the wrong lift goes to the block rewrite; a missing block is logged — the framework's routing for each kind", () => {
-  assertEquals(AUDIT_KIND.plan_primary_lift, "block-local");
+  assertEquals(auditWeekAgainstPlan(written([block("metcon", "Burpee")]), null).map((r) => r.passed), [true]);
+  assertEquals(auditWeekAgainstPlan(written(DAY1()), { weeks: [{ week_num: 3, days: [] }] }).map((r) => r.passed), [true]);
   assertEquals(AUDIT_KIND.plan_block_types, "structural-writer");
-  const day1 = DAY1().filter((b) => b.block_type !== "accessory"); day1[1] = block("strength", "Deadlift");
+  const day1 = DAY1().filter((b) => b.block_type !== "accessory");
   const byKind = classifyFailuresByKind(auditWeekAgainstPlan(written(day1), PLAN).filter((r) => !r.passed));
-  assertEquals(byKind["block-local"].map((f) => f.rule), ["plan_primary_lift"]);
+  assertEquals(byKind["block-local"].length, 0);
   assertEquals(byKind["structural-writer"].map((f) => f.rule), ["plan_block_types"]);
 });
 
 Deno.test("the plan checks are folded into an audit run without disturbing its other results", () => {
   const clean: ReturnType<typeof runAudits> = { passed: true, failures: [], all: [{ rule: "x", passed: true, violations: [] }] };
   const good = withPlanChecks(clean, written(DAY1()), PLAN);
-  assertEquals([good.passed, good.failures.length, good.all.map((r) => r.rule)], [true, 0, ["x", "plan_block_types", "plan_primary_lift"]]);
-  const day1 = DAY1(); day1[1] = block("strength", "Deadlift");
+  assertEquals([good.passed, good.failures.length, good.all.map((r) => r.rule)], [true, 0, ["x", "plan_block_types"]]);
+  const day1 = DAY1().filter((b) => b.block_type !== "accessory");
   const bad = withPlanChecks(clean, written(day1), PLAN);
-  assertEquals([bad.passed, bad.failures.map((f) => f.rule)], [false, ["plan_primary_lift"]]);
+  assertEquals([bad.passed, bad.failures.map((f) => f.rule)], [false, ["plan_block_types"]]);
 });
 
 Deno.test("the plan checks are NOT part of the shared hard audits: other generators are unchanged", () => {
@@ -120,7 +101,7 @@ Deno.test("the plan check runs with the audits, in the stages BEFORE the fit gat
 
 Deno.test("nothing checks the week against its plan once the gates have run, so a deliberate removal cannot be flagged or undone", () => {
   const after = GEN.slice(GEN.indexOf("async function stageSafetyReview("), GEN.indexOf("async function runStage("));
-  for (const call of ["auditOutput(", "auditOutputHard(", "withPlanChecks(", "auditWeekAgainstPlan(", "auditPlanBlockTypes(", "auditPlanPrimaryLift(", "applySurgicalFixes("]) {
+  for (const call of ["auditOutput(", "auditOutputHard(", "withPlanChecks(", "auditWeekAgainstPlan(", "auditPlanBlockTypes(", "applySurgicalFixes("]) {
     assertEquals(after.includes(call), false, `${call} must not be called in or after the safety stage`);
   }
   // The gates' stage goes straight to saving; it cannot send the week back to the audits.
@@ -130,7 +111,7 @@ Deno.test("nothing checks the week against its plan once the gates have run, so 
 
 Deno.test("the fit gate's accessory drop for a short session is a difference from the plan that only exists after the check has run", () => {
   const out = written(DAY1());
-  assertEquals(auditWeekAgainstPlan(out, PLAN).map((r) => r.passed), [true, true]); // what the check sees: the week as written
+  assertEquals(auditWeekAgainstPlan(out, PLAN).map((r) => r.passed), [true]); // what the check sees: the week as written
   // Then the fit gate, on purpose, for a 40-minute session:
   const actions = applyTimeTrims(out, [{ week_num: 2, day_num: 1, block_index: 2, op: "drop_block", reason: "over time" } as Any], { sessionMinutes: 40 } as Any);
   assertEquals(actions.length, 1);

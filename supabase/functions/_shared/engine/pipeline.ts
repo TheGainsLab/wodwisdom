@@ -569,6 +569,11 @@ export async function applySurgicalFixes(
   payload: WriterPayload,
   skeleton: SkeletonOutput,
   pack: DomainPack,
+  /** This month's composed metcons. A metcon block being rewritten is shown
+   *  its composed piece and told to change only what the failed check names
+   *  (2026-11-26): the rewrite used to work from the planner's one line and
+   *  could return a different workout from the one the composer designed. */
+  composedMetcons: ComposedMetcon[] = [],
 ): Promise<{ rewritten: number; failed: number; locations: BlockLocation[] }> {
   const groups = groupBlockLocalFailures(blockLocalFailures);
   if (groups.length === 0) return { rewritten: 0, failed: 0, locations: [] };
@@ -582,10 +587,20 @@ export async function applySurgicalFixes(
     const block = day?.blocks?.[g.blockIdx];
     if (!block) { failed++; continue; }
 
+    const composed = block.block_type === "metcon"
+      ? composedMetcons.find((m) => m.week_num === g.week && m.day_num === g.day) ?? null
+      : null;
     const corrected = await pack.recovery.surgicallyRewriteBlock(
-      payload, skeleton, g.week, g.day, g.blockIdx, block, g.violations,
+      payload, skeleton, g.week, g.day, g.blockIdx, block, g.violations, composed,
     );
     if (!corrected) { failed++; continue; }
+    // The composed piece's purpose stays on the block: the rewrite emits a new
+    // block, and the purpose line is the composer's, not the rewriter's.
+    if (composed?.stimulus_note?.trim() && corrected.block_type === "metcon") {
+      const note = composed.stimulus_note.trim().slice(0, 500);
+      corrected.block_notes = note;
+      (corrected as { stimulus_note?: string }).stimulus_note = note;
+    }
     // Corrected blocks carry scheme_format; render the header before splicing
     // so re-audit and save see the final string.
     renderBlockSchemeInPlace(corrected);

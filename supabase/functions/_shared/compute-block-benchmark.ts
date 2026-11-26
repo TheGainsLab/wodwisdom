@@ -494,8 +494,13 @@ export async function attachBenchmarksToWriterOutput(
     while (cursor < queue.length) {
       const idx = cursor++;
       const { block, loc } = queue[idx];
-      const benchmark = await computeBlockBenchmark(block, gender);
+      // The reason is kept beside an empty estimate (2026-11-26): it used to
+      // go only to the function log, so nobody could tell a name the service
+      // could not resolve from a format this file cannot work out. It rides on
+      // the block in memory and is logged at save; it is not a stored column.
+      const { bench: benchmark, reason } = await computeBlockBenchmarkExplained(block, gender);
       block.expected_benchmark = benchmark;
+      block.expected_benchmark_reason = benchmark ? null : (reason ?? "unknown");
       if (benchmark) {
         computed++;
       } else {
@@ -511,4 +516,25 @@ export async function attachBenchmarksToWriterOutput(
   await Promise.all(workers);
 
   return { computed, skipped, failed, failedLocations };
+}
+
+/**
+ * One line per metcon in the written weeks that has no estimate, with why:
+ * "W1D2 block[4] (intervals): work_calc_404...". Pure. For the generation log.
+ */
+// deno-lint-ignore no-explicit-any
+export function missingBenchmarkLines(weeks: any[]): string[] {
+  const lines: string[] = [];
+  for (const week of weeks ?? []) {
+    for (const day of week.days ?? []) {
+      const blocks = day.blocks ?? [];
+      for (let bi = 0; bi < blocks.length; bi++) {
+        const b = blocks[bi];
+        if (b?.block_type !== "metcon" || b.expected_benchmark) continue;
+        const format = b.scheme_format?.format ?? "no format";
+        lines.push(`W${week.week_num}D${day.day_num} block[${bi}] (${format}): ${b.expected_benchmark_reason ?? "not computed"}`);
+      }
+    }
+  }
+  return lines;
 }

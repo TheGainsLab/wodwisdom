@@ -70,7 +70,7 @@ import { athleteWordsElsewhere, runRestrictionGate } from "../_shared/restrictio
 import { fitProfileFromPayload, runFitGate } from "../_shared/fit-gate.ts";
 import { saveProgramV3 } from "../_shared/save-program-v3.ts";
 import { refreshAvoidListForBuild } from "../_shared/injury-refresh.ts";
-import { type BlockLocation } from "../_shared/compute-block-benchmark.ts";
+import { type BlockLocation, missingBenchmarkLines } from "../_shared/compute-block-benchmark.ts";
 // Engine core — the extracted generation pipeline. This function now CONSUMES the
 // Engine (payload -> skeleton -> audits -> fill -> audit suite -> recovery)
 // instead of inlining it. See _shared/engine/pipeline.ts.
@@ -183,9 +183,8 @@ const PACK = getDomainPack("crossfit@3");
 /**
  * The hard audits PLUS the check of each written day against its skeleton day
  * (2026-11-23, _shared/plan-fidelity.ts): the planned block types are there,
- * and the strength block's main lift is the planned primary_lift. A wrong
- * lift is block-local, so the surgical stage repairs it; a missing block type
- * is logged as a residual.
+ * A missing block type is logged as a residual. (The main-lift name check was
+ * removed 2026-11-26: see plan-fidelity.ts.)
  *
  * This is called ONLY from the benchmark_audit and surgical stages, which run
  * BEFORE safety_review. The fit gate and the restriction gate there remove on
@@ -890,7 +889,7 @@ async function stageSurgical(
   // ONE surgical pass this invocation (fresh wall-clock). Each block ~30s,
   // sequential. A killed pass persists nothing → the reaper redoes it from the
   // last clean state.
-  const sg = await applySurgicalFixes(output, byKind["block-local"], payload, skeleton, PACK);
+  const sg = await applySurgicalFixes(output, byKind["block-local"], payload, skeleton, PACK, rs.composedMetcons ?? []);
   console.log(`[generate-program-v3] surgical pass ${pass}: rewritten=${sg.rewritten} failed=${sg.failed}`);
   if (sg.rewritten === 0) {
     // LLM call(s) failed — stall, ship with residuals.
@@ -1236,6 +1235,8 @@ async function stageSaving(
       daysPerWeek: payload.training_context.days_per_week,
       lifts: payload.lifts,
       vocabulary: payload.vocabulary,
+      // The metcon duration check is log only (2026-11-26) and needs the plan.
+      skeleton,
     });
     if (!soft.passed) {
       for (const failure of soft.failures) {
@@ -1256,6 +1257,21 @@ async function stageSaving(
     }
   } catch (softErr) {
     console.warn("[generate-program-v3] soft audit error (non-fatal):", softErr);
+  }
+
+  // Every metcon that ships with no estimate, and why (2026-11-26). The reason
+  // used to go only to the function log.
+  if (!alreadySaved) {
+    const missing = missingBenchmarkLines(output.weeks ?? []);
+    if (missing.length > 0) {
+      await logGenerationAudit(supa, {
+        user_id: userId,
+        program_id: programId,
+        month_number: monthNumber,
+        stage: "benchmark_missing",
+        warnings: missing,
+      }).catch((e) => console.warn("[generate-program-v3] benchmark_missing log failed (non-fatal):", e));
+    }
   }
 
   // Persist hard-audit residuals that surgical couldn't resolve (they already
