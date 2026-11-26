@@ -30,7 +30,6 @@ import { generateAndPersistCoachState } from "../_shared/generate-coach-state.ts
 import { buildCoachStateDocumentBlock } from "../_shared/coach-state.ts";
 import { deriveMetconSlots, type MetconComposerInputs } from "../_shared/metcon-composer.ts";
 import { isBarbellMetconMovement } from "../_shared/metcon-variety-audits.ts";
-import { trimWriterMovementAnnotations } from "../_shared/movement-name-repair.ts";
 import { buildStratifiedMetconExamples } from "../_shared/metcon-examples.ts";
 import { composeMetconsForSlots } from "../_shared/compose-metcons.ts";
 import {
@@ -620,8 +619,8 @@ async function stageSkeleton(
  * metcon_guidance, the athlete's full legal vocabulary, and stratified example
  * workouts. The set-level variety audit fences it (one retry); persistent
  * violations are accepted-with-log (programs must ship; the audit trail is the
- * fix signal), EXCEPT legality violations (bans/vocabulary/equipment) which are
- * hard failures — a banned movement must never reach the fill.
+ * fix signal). No composed piece is deleted, and no movement name is checked
+ * against the avoid list, the movement list or equipment (2026-11-26).
  */
 async function stageMetcons(
   supa: SupabaseClient,
@@ -754,29 +753,9 @@ async function stageFillWeek(
   // Render every header from scheme_format + rows BEFORE audits/benchmarks —
   // downstream stages read block_scheme text and must see the final strings.
   renderWeekSchemesInPlace(wk);
-  // Annotation-in-name repair, fill side (all block types): annotated names
-  // evade the exact-match do_not_program ban ("Deadlift (light)" vs banned
-  // "Deadlift") and drop out of benchmark/tracking matching. Trim to the
-  // legal name, keep the label in scaling_note, log. Runs BEFORE the audits
-  // so the ban check sees canonical names.
-  try {
-    const nameRepairs = trimWriterMovementAnnotations(
-      { weeks: [wk] } as Parameters<typeof trimWriterMovementAnnotations>[0],
-      payload.vocabulary,
-    );
-    if (nameRepairs.length) {
-      for (const r of nameRepairs) console.warn(`[generate-program-v3] fill movement name repaired: ${r}`);
-      await logGenerationAudit(supa, {
-        user_id: job.user_id,
-        program_id: rs.continuation.programId ?? null,
-        month_number: rs.continuation.monthNumber,
-        stage: "soft_audit",
-        warnings: nameRepairs.map((r) => `movement_name_trim: ${r}`),
-      });
-    }
-  } catch (e) {
-    console.warn("[generate-program-v3] fill name repair failed (non-fatal):", e);
-  }
+  // Movement names are left exactly as the writer wrote them (2026-11-26):
+  // the repair that trimmed a name back to a movement-list prefix is gone.
+  // The writer is told never to append notes to a name.
   // Persist each composed piece's stimulus into its metcon block's notes
   // (deterministic — never trust transcription for it). The note is the
   // workout's PURPOSE; it reaches storage, the athlete's UI, and the AI Coach

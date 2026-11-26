@@ -113,7 +113,8 @@ Deno.test("the judge is given the athlete's file: maxes, levels, ceilings, equip
   assert(msg.includes("Conditioning benchmarks on file: NONE"));
   assert(msg.includes('"load":"checked"')); // named lifts are marked as settled
   const allowed = msg.split("REPLACEMENT NAMES")[1].split("\n")[0];
-  assert(!/\bRun\b/.test(allowed)); // a replacement can never be something the injuries rule out
+  assert(/\bRun\b/.test(allowed)); // the whole list, as spellings: no name is hidden by matching it against the avoid list
+  assert(allowed.includes("you may name a movement that is not on it"));
   // The list is for replacements only: being off it is never a reason to change a movement (2026-11-26).
   assert(!msg.includes("ALLOWED MOVEMENTS"));
   assert(msg.includes("A movement in the written training that is not on it is NOT a miss: never report, replace or remove a movement because it is missing from this list."));
@@ -218,12 +219,21 @@ Deno.test("GATE — equipment: a row for an athlete with no rower is swapped; sk
   assertEquals(o.weeks[0].days[0].blocks[0].movements.map((m: Any) => m.movement), ["Bike", "Ring Row"]);
 });
 
-Deno.test("GATE — a replacement the athlete's injuries rule out is refused; unticked equipment with no usable swap is removed", async () => {
+Deno.test("GATE — the judge's replacement is applied as given, even a name on the avoid list: the restriction check runs next and has the last word", async () => {
   const o = day([{ block_type: "metcon", movements: [{ movement: "Row", calories: 15 }, { movement: "Push Up", rep_scheme: [10] }] }]);
   const judge = (out: Any) => Promise.resolve(out.weeks[0].days[0].blocks[0].movements.some((m: Any) => m.movement === "Row")
     ? { ...NONE, swaps: [{ week_num: 1, day_num: 1, block_index: 0, movement_index: 0, movement: "Row", kind: "equipment" as const, reason: "no rower", replacement: { movement: "Run" } }] }
     : NONE);
-  await runFitGate(o, BEN, { judge }); // "Run" is on his avoid list
+  await runFitGate(o, BEN, { judge }); // "Run" is on his avoid list; this gate does not match names against it
+  assertEquals(o.weeks[0].days[0].blocks[0].movements.map((m: Any) => m.movement), ["Run", "Push Up"]);
+});
+
+Deno.test("GATE — unticked equipment the judge names no replacement for is removed", async () => {
+  const o = day([{ block_type: "metcon", movements: [{ movement: "Row", calories: 15 }, { movement: "Push Up", rep_scheme: [10] }] }]);
+  const judge = (out: Any) => Promise.resolve(out.weeks[0].days[0].blocks[0].movements.some((m: Any) => m.movement === "Row")
+    ? { ...NONE, swaps: [{ week_num: 1, day_num: 1, block_index: 0, movement_index: 0, movement: "Row", kind: "equipment" as const, reason: "no rower", replacement: { movement: "" } }] }
+    : NONE);
+  await runFitGate(o, BEN, { judge });
   assertEquals(o.weeks[0].days[0].blocks[0].movements.map((m: Any) => m.movement), ["Push Up"]);
 });
 

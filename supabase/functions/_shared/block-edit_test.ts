@@ -22,10 +22,10 @@ Deno.test("a legal proposal passes", () => {
   assertEquals(validateBlockProposal(p, { doNotProgram: [] }), []);
 });
 
-Deno.test("do-not-program is absolute — even by exact name", () => {
+Deno.test("the format check does not match names against the avoid list (2026-11-26): the restriction check reads the proposal by meaning", () => {
   const p = proposal([{ movement: "Back Squat", sets: 4, reps: 5, weight: 225 }]);
-  const problems = validateBlockProposal(p, { doNotProgram: ["Back Squat"] });
-  assert(problems.some((s) => s.includes("do-not-program")));
+  assertEquals(validateBlockProposal(p, { doNotProgram: ["Back Squat"] }), []);
+  assertEquals(validateBlockProposal(p), []);
 });
 
 Deno.test("movement naming is free — off-catalog names pass (2026-09: Echo Bike / KB Row)", () => {

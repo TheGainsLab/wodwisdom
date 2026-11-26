@@ -31,7 +31,7 @@ import { classifyPerLiftLevel, type PerLiftLevel } from "./level-interpreter.ts"
 import { DISPLAY_TO_LIFT_KEY, liftKeyOf } from "./lift-key.ts";
 import { COUNTS_TOWARD_INSTRUCTION, COUNTS_TOWARD_VALUES } from "./counts-toward.ts";
 import { MODELS } from "./model-profiles.ts";
-import { applyFindings, type Finding, isRuledOutByName, removeByRule } from "./restriction-gate.ts";
+import { applyFindings, type Finding, removeByRule } from "./restriction-gate.ts";
 
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY_PIPELINE") ?? Deno.env.get("ANTHROPIC_API_KEY");
 
@@ -56,9 +56,10 @@ export interface FitProfile {
   /** week_nums planned as deload. */
   deloadWeeks: number[];
   conditioning: Record<string, string | number | null>;
-  /** Every movement name the writer may use. */
+  /** The movement list, as spellings for a replacement. Guidance only. */
   vocabulary: string[];
-  /** Names the restriction gate rules out — a replacement may never be one. */
+  /** The avoid list. Kept on the profile for callers; this gate no longer
+   *  matches names against it (2026-11-26). */
   avoidNames: string[];
 }
 
@@ -256,8 +257,8 @@ const SYSTEM = `You check AI-written training against ONE athlete's file. You ar
 
 1. LOADS. For each weighted barbell or loaded movement, decide which of the athlete's one-rep maxes it should be judged against (a Hang Power Clean against the power clean or clean; a Thruster against the front squat or push press; a Romanian Deadlift against the deadlift). The weight must not exceed that max times the ceiling for the athlete's level on that lift (table given), and must be consistent with any percentage written beside it. If it is too heavy, give a lower weight in the athlete's units. Lifts already judged by name are marked "checked": leave those alone.
 2. NO MAX. If the lift it should be judged against has no max on file, or the number on file is plainly not a real max, the movement must be prescribed by effort with no number: set by_effort.
-3. EQUIPMENT. The athlete's equipment list says what they have (true) and what they have unticked (false). A movement that needs something unticked must be replaced with one they can do that keeps the block's purpose, chosen from the replacement names.
-4. SKILL. The athlete rated each skill (none, beginner, intermediate, advanced). A skill movement above their rated level, or one rated "none", must be replaced with an easier version or progression of it from the replacement names. A skill they did not rate is not a miss.
+3. EQUIPMENT. The athlete's equipment list says what they have (true) and what they have unticked (false). A movement that needs something unticked must be replaced with one they can do that keeps the block's purpose, that the athlete can do.
+4. SKILL. The athlete rated each skill (none, beginner, intermediate, advanced). A skill movement above their rated level, or one rated "none", must be replaced with an easier version or progression of it. A skill they did not rate is not a miss.
 5. PACE. If the athlete has no conditioning benchmarks on file, a machine or running piece must not carry a specific pace or split it could not know: give an effort_note that prescribes by effort instead (for example "Hard but repeatable: you could say a few words"). Leave distances, calories and times as written.
 
 TIME (only when asked). Estimate each day's real length in minutes: warm-up, every block including rest between sets and rounds, transitions of about two minutes between blocks, cool-down. If a day is over the athlete's limit by more than the stated allowance, give trims that bring it inside: fewer sets, fewer rounds, fewer minutes, shorter rest, or a movement dropped. When the athlete's limit is under 45 minutes the accessory block may be dropped whole; otherwise never drop a block. Trims may only make a day shorter. Protect the day's main strength lift and its metcon; trim accessory, skills volume and rest first.
@@ -272,7 +273,7 @@ const TOOL = {
     properties: {
       swaps: {
         type: "array",
-        description: "Equipment and skill misses, each with a replacement from the replacement names.",
+        description: "Equipment and skill misses, each with a replacement.",
         items: {
           type: "object",
           properties: {
@@ -376,7 +377,10 @@ export function compactForFit(output: WriterOutput): unknown {
 export function fitJudgeMessage(output: WriterOutput, profile: FitProfile, opts: { checkTime: boolean }): string {
   const have = Object.entries(profile.equipment).filter(([, v]) => v !== false).map(([k]) => k.replace(/_/g, " "));
   const lack = Object.entries(profile.equipment).filter(([, v]) => v === false).map(([k]) => k.replace(/_/g, " "));
-  const allowed = (profile.vocabulary ?? []).filter((v) => !isRuledOutByName(v, profile.avoidNames));
+  // The whole list, as spellings (2026-11-26): names are no longer hidden from
+  // the judge by matching them against the avoid list. The restriction gate
+  // runs after this one and has the last word on the athlete's body.
+  const allowed = profile.vocabulary ?? [];
   const benchmarks = Object.entries(profile.conditioning ?? {}).filter(([, v]) => v != null && String(v).trim() !== "");
   const ceilings = Object.entries(LOADING_CEILINGS).map(([lift, t]) =>
     `${lift.replace(/_/g, " ")}: beginner ${Math.round(t.beginner * 100)}%, intermediate ${Math.round(t.intermediate * 100)}%, advanced ${Math.round(t.advanced * 100)}%`).join("; ");
@@ -400,7 +404,7 @@ export function fitJudgeMessage(output: WriterOutput, profile: FitProfile, opts:
     // The list is for REPLACEMENTS only (2026-11-26): the judge once swapped
     // "Good Morning" out because it "is not in the allowed movements list".
     // It is a set of names to replace with, never a rule about what was written.
-    `REPLACEMENT NAMES (when you replace a movement, choose the replacement from these): ${allowed.join(", ")}`,
+    `REPLACEMENT NAMES (for spelling: when your replacement is on this list, write it exactly as listed; you may name a movement that is not on it): ${allowed.join(", ")}`,
     `This list is ONLY for choosing a replacement. A movement in the written training that is not on it is NOT a miss: never report, replace or remove a movement because it is missing from this list.`,
     ``,
     `WRITTEN TRAINING (JSON):`,
@@ -575,10 +579,9 @@ export async function runFitGate(
       report.reviews++;
       const before = report.actions.length;
 
-      // Equipment and skill swaps: a replacement must be a real movement the
-      // restriction gate does not rule out.
-      const restr = { injuriesText: null, doNotProgram: profile.avoidNames, suggestedSubs: [], vocabulary: profile.vocabulary };
-      const { applied, unresolved } = applyFindings(output, verdict.swaps, restr);
+      // Equipment and skill swaps, applied as the judge gave them. The
+      // restriction gate reads the result afterwards.
+      const { applied, unresolved } = applyFindings(output, verdict.swaps);
       report.actions.push(...applied);
       // Unticked equipment with no usable replacement cannot be done at all: remove it.
       // (A skill with no usable easier version is left as written.)

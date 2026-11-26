@@ -145,56 +145,6 @@ export function stripStructuralRestRows(output: MetconComposerOutput): number {
 }
 
 /**
- * Drop composed pieces that remain ILLEGAL after the retry — the subtraction
- * that ends content-fatal generations (2026-09-01 founder ruling: "code is
- * the problem"; three paid runs died over a movement name). Mirrors rule 9's
- * legality checks exactly (banned / out-of-vocabulary / missing equipment).
- * A dropped piece's slot is rebuilt by the fill's own metcon fallback, so the
- * athlete still receives a complete day; the log carries the exact movement
- * so a good-but-missing movement gets added to the library. Mutates
- * output.metcons; returns human-readable drop lines.
- */
-export function dropIllegalComposedPieces(
-  output: MetconComposerOutput,
-  opts: {
-    vocabulary?: string[];
-    doNotProgram?: string[];
-    equipment?: Record<string, boolean>;
-  },
-): string[] {
-  const vocab = opts.vocabulary?.length ? new Set(opts.vocabulary.map(norm)) : null;
-  const bans = opts.doNotProgram?.length ? new Set(opts.doNotProgram.map(norm)) : null;
-  const dropped: string[] = [];
-  output.metcons = (output.metcons ?? []).filter((m) => {
-    for (const mv of m.movements ?? []) {
-      const x = norm(mv?.movement ?? "");
-      if (bans?.has(x)) {
-        dropped.push(`W${m.week_num}D${m.day_num} dropped: "${mv.movement}" is on the do-not-program list`);
-        return false;
-      }
-      if (vocab && !vocab.has(x)) {
-        dropped.push(`W${m.week_num}D${m.day_num} dropped: "${mv.movement}" not in vocabulary (add to movements table if legitimate)`);
-        return false;
-      }
-      if (opts.equipment && isMonoMovement(x)) {
-        for (const k of MONO_KEYWORDS) {
-          if (x.includes(k)) {
-            const eq = MACHINE_EQUIPMENT[k];
-            if (eq && !opts.equipment[eq]) {
-              dropped.push(`W${m.week_num}D${m.day_num} dropped: "${mv.movement}" requires ${eq} the athlete doesn't have`);
-              return false;
-            }
-            break;
-          }
-        }
-      }
-    }
-    return true;
-  });
-  return dropped;
-}
-
-/**
  * Normalize a raw composer emission into the audited shape. Anthropic's
  * tool-schema enforcement is imperfect (same class as the skeleton's
  * stringified month_plan, repaired in repairSkeletonEmission) — observed
@@ -292,11 +242,11 @@ export function auditMetconVariety(
     barbellCapable?: boolean;
     /** Normalized signatures of last cycle's pieces (never re-serve). */
     previousCycleSignatures?: string[];
-    /** Allowed movement display names — every composed movement must be one. */
+    /** No longer read (2026-11-26): names are not checked against a list. */
     vocabulary?: string[];
-    /** Hard bans — a banned movement anywhere is a violation. */
+    /** No longer read (2026-11-26). */
     doNotProgram?: string[];
-    /** Equipment map — machine movements require the owning equipment. */
+    /** No longer read (2026-11-26). */
     equipment?: Record<string, boolean>;
     /** Typed development axes (strength/gymnastics; conditioning axes excluded)
      *  — drives the weekly-expression and fit rules. */
@@ -486,36 +436,12 @@ export function auditMetconVariety(
     }
   }
 
-  // 9. Legality — every movement must be in the vocabulary, never banned, and
-  //    machine movements require the owning equipment. Belt-and-braces with the
-  //    prompt inputs: a banned or invented movement must never survive to the
-  //    fill (found 2026-08-11: a composed month used Ski Erg unchecked).
-  const vocab = opts.vocabulary?.length ? new Set(opts.vocabulary.map(norm)) : null;
-  const bans = opts.doNotProgram?.length ? new Set(opts.doNotProgram.map(norm)) : null;
-  for (const m of pieces) {
-    for (const mv of m.movements) {
-      const x = norm(mv.movement);
-      if (bans?.has(x)) {
-        violations.push(`${at(m)}: "${mv.movement}" is on this athlete's do-not-program list.`);
-        continue;
-      }
-      if (vocab && !vocab.has(x)) {
-        violations.push(`${at(m)}: "${mv.movement}" is not in this athlete's allowed vocabulary.`);
-        continue;
-      }
-      if (opts.equipment && isMonoMovement(x)) {
-        for (const k of MONO_KEYWORDS) {
-          if (x.includes(k)) {
-            const eq = MACHINE_EQUIPMENT[k];
-            if (eq && !opts.equipment[eq]) {
-              violations.push(`${at(m)}: "${mv.movement}" requires ${eq} the athlete doesn't have.`);
-            }
-            break;
-          }
-        }
-      }
-    }
-  }
+  // 9. Legality — REMOVED 2026-11-26 (founder: "code should not be checking AI
+  //    judgment"). Code no longer compares a composed movement's name with the
+  //    avoid list or the movement list, and no longer reads a machine out of a
+  //    name ("throw" contains "row") to check it against equipment. The
+  //    composer is told all three; the fit check and the restriction check
+  //    read the written week by meaning.
 
   // ── Athlete-match rules (2026-08-31) — the objective's deterministic floor ──
 

@@ -132,7 +132,7 @@ export interface MetconComposerInputs {
   slots: MetconSlot[];
   /** CoachState.metcon_guidance (v1.7). Empty string when unavailable. */
   metcon_guidance: string;
-  /** Allowed movement display names (the athlete's full legal vocabulary). */
+  /** The movement list: spellings to use. Guidance, not a fence. */
   vocabulary: string[];
   equipment: Record<string, boolean>;
   do_not_program: string[];
@@ -394,12 +394,14 @@ export function buildComposerUserMessage(inputs: MetconComposerInputs): string {
   if ((inputs.coach_notes ?? []).length > 0) {
     parts.push(
       `ATHLETE'S NOTES FOR THEIR COACH (what they asked for, in their words — honour them in this week's pieces within ` +
-        `each slot's time domain; never over an injury or outside the allowed movements):\n` +
+        `each slot's time domain; never over an injury):\n` +
         (inputs.coach_notes ?? []).map((n) => `  - "${n}"`).join("\n"),
     );
   }
   if (inputs.examples.trim()) parts.push(inputs.examples.trim());
-  parts.push(`ALLOWED MOVEMENTS (compose ONLY from these display names):\n${inputs.vocabulary.join(" · ")}`);
+  // Guidance, not a fence (founder, 2026-11-26): the composer names movements
+  // itself and uses these spellings when a movement is on the list.
+  parts.push(`MOVEMENT LIST (your guide to names: use these spellings when a movement is on it; you may use a movement that is not):\n${inputs.vocabulary.join(" · ")}`);
   return parts.join("\n\n");
 }
 

@@ -21,9 +21,6 @@ import {
 } from "../_shared/build-movements-context.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { ARCHIVED_PROGRAM_ERROR, isArchived } from "../_shared/program-archive.ts";
-import { isRuledOutByName } from "../_shared/restriction-gate.ts";
-import { loadRestrictions } from "../_shared/restriction-load.ts";
-import { reviewTextChanges } from "../_shared/restriction-text.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -280,21 +277,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    // THE RESTRICTION GATE, uploaded-program route (2026-11-23). This route
-    // never looked at the athlete's injuries at all. Injury-derived names
-    // only: this is the athlete's own program and their own equipment.
-    const restrictions = await loadRestrictions(supa, user.id, { injuryNamesOnly: true });
-    const ruledOut = selectedMovementDetails.filter((m) => isRuledOutByName(m.display_name, restrictions.doNotProgram));
-    if (ruledOut.length > 0) {
-      return new Response(
-        JSON.stringify({
-          error: `${ruledOut.map((m) => m.display_name).join(", ")} ${ruledOut.length === 1 ? "is" : "are"} on your avoid list, from your injury notes, so it can't be added. If that has changed, update your injury notes on your profile first.`,
-          code: "MOVEMENT_RULED_OUT",
-        }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
+    // No avoid-list handling on this route (founder, 2026-11-26): the athlete
+    // picks the movements to add to their OWN uploaded program. The pick is not
+    // refused by name, and the rewrite is not reviewed or dropped. This is how
+    // the route worked before 2026-11-23.
     const context = await retrieveContext(supa, selectedMovementDetails);
 
     const proposed = await callClaude(
@@ -303,18 +289,7 @@ Deno.serve(async (req) => {
       context
     );
 
-    // Every rewritten workout is read against what the athlete has said about
-    // their body; a conflict is corrected, and a rewrite that still adds an
-    // avoid-list movement is dropped (the original workout stays).
-    const originalTextById = new Map((workouts as Workout[]).map((w) => [w.id, w.workout_text]));
-    const reviewed = await reviewTextChanges(
-      proposed
-        .filter((m) => originalTextById.has(m.workout_id))
-        .map((m) => ({ ...m, id: m.workout_id, original_text: originalTextById.get(m.workout_id) ?? m.original_text ?? "" })),
-      restrictions,
-    );
-    if (reviewed.actions.length > 0) console.warn(`[incorporate-movements] restriction gate: ${reviewed.actions.join(" | ")}`);
-    const modifications = reviewed.kept;
+    const modifications = proposed;
 
     const { data: modRecord, error: modErr } = await supa
       .from("program_modifications")

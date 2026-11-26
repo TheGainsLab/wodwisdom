@@ -15,10 +15,10 @@ import {
   auditMetconOnePiece,
   auditMetconPresence,
   auditRequiredFields,
-  auditDoNotProgram,
   auditDayCount,
   auditLoadSanity,
   auditVocabularyCompliance,
+  AUDIT_KIND,
   auditWorkupTopSet,
   auditMetconDrills,
   blockSchemeFormatProblems,
@@ -89,35 +89,16 @@ function baselineOutput(daysPerWeek = 3): WriterOutput {
 }
 
 // ============================================================
-// Rule — do_not_program (injury safety)
+// do_not_program — the exact-name check is gone (2026-11-26)
 // ============================================================
 
-Deno.test("auditDoNotProgram: empty list → passes", () => {
-  const out = baselineOutput();
-  const r = auditDoNotProgram(out, []);
-  assert(r.passed);
-  assertEquals(r.violations.length, 0);
-});
-
-Deno.test("auditDoNotProgram: no banned movement present → passes", () => {
-  const out = baselineOutput(); // strength blocks of Back Squat
-  const r = auditDoNotProgram(out, ["Overhead Squat", "Snatch"]);
-  assert(r.passed);
-});
-
-Deno.test("auditDoNotProgram: banned movement programmed → fails with locator", () => {
+Deno.test("no hard audit compares movement names with the avoid list", () => {
   const out = baselineOutput(); // contains Back Squat on every day
-  const r = auditDoNotProgram(out, ["Back Squat"]);
-  assert(!r.passed);
-  assert(r.violations.length > 0);
-  assert(r.violations[0].includes("Back Squat"));
-  assert(r.violations[0].includes("do-not-program"));
-});
-
-Deno.test("auditDoNotProgram: match is case/whitespace-insensitive", () => {
-  const out = baselineOutput();
-  const r = auditDoNotProgram(out, ["  back squat  "]);
-  assert(!r.passed, "normalized name should still match");
+  const run = runAudits({ output: out, daysPerWeek: 3, lifts: {}, vocabulary: [], doNotProgram: ["Back Squat"] });
+  assertEquals(run.all.some((r) => r.rule === "do_not_program"), false);
+  assertEquals((AUDIT_KIND as Record<string, string>).do_not_program, undefined);
+  const src = Deno.readTextFileSync(new URL("./audits.ts", import.meta.url));
+  assert(!src.includes("export function auditDoNotProgram"));
 });
 
 // ============================================================

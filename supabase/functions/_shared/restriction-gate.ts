@@ -10,28 +10,29 @@
  * not "running"), a failed repair shipped with the residual logged, and the
  * one reviewer that reads MEANING (safety-review.ts) could only log.
  *
- * The gate puts those the right way round:
+ * The gate (as changed 2026-11-26, founder: "code should not be checking AI
+ * judgment"; "if the AI messes it up, we'll fix the AI"):
  *   1. JUDGE by meaning — on EVERY week, for EVERY athlete, an AI reads the
  *      finished output against everything the athlete has said about their
  *      body (injury box, signup answers, notes to the coach) and their avoid
- *      list, every block included, and
- *      names each conflict WITH a replacement chosen from the allowed
- *      vocabulary.
- *   2. FIX — code applies the replacements (validated: a real vocabulary
- *      movement, not itself ruled out), then the judge reads the result again.
- *   3. GUARANTEE — whatever is still flagged after the last reading, and
- *      any avoid-list name (or plain variant of one) still present, is put to
- *      the AI once more for a replacement. If that fails, or the AI cannot be
- *      reached at all, code REMOVES the movement. Removing needs no matching
- *      and cannot fail.
+ *      list, every block included, and names each conflict WITH a replacement.
+ *   2. APPLY — code puts the AI's replacement in at the position the AI gave,
+ *      under the name the AI gave. Code does not compare the name with the
+ *      avoid list, with the movement list, or with what was there before.
+ *      Then the judge reads the result again.
+ *   3. A movement the AI flagged but gave no replacement for is put to the AI
+ *      once more; if it still names none, the movement is removed. That is
+ *      still the AI's judgment being applied (it said the movement cannot
+ *      stay), never a match on a name.
  * The week then saves as normal.
  *
- * Matching two pieces of text is never what decides a swap (2026-11-23,
- * founder: "exact matching will never be practical"): the stored substitutes
- * are phrases ("Row (Concept2) or Bike Erg (low resistance)"), not catalogue
- * names. CHOOSING a replacement is always the AI's job, with those phrases as
- * guidance; code only applies the choice or removes the movement. The
- * plain-name rule is a cheap second look that hands what it spots to the AI.
+ * REMOVED 2026-11-26: the "second look" (code searching the week for avoid-list
+ * names and their stemmed variants, and removing them), the refusal of an AI
+ * replacement that was not an exact spelling from the movement list or that
+ * matched an avoid-list name, the hiding of list names from the AI, and the
+ * skipping of a finding whose echoed name differed from the row. If the AI
+ * cannot be reached, the week ships as the writer wrote it; the writer was
+ * given the same restrictions.
  */
 
 import type { MovementPrescription, WriterOutput } from "./v2-output-schema.ts";
@@ -55,7 +56,8 @@ export interface Restrictions {
   otherWords?: string[];
   /** Stored substitutes from the injury parse. */
   suggestedSubs: Array<{ instead_of: string; use: string }>;
-  /** Every movement name the writer may use. */
+  /** The movement list: spellings to use when a replacement is on it.
+   *  Guidance for the AI; code never checks a name against it. */
   vocabulary: string[];
 }
 
@@ -153,46 +155,6 @@ export function athleteWordsElsewhere(
   return out;
 }
 
-// ── Names ──────────────────────────────────────────────────────────────────
-
-const QUANTITY_TOKEN = /^(\d+(\.\d+)?(m|km|k|mi|ft|yd|cal|cals|s|sec|min)?|mile|miles|meter|meters|metre|metres|km|m)$/;
-
-/** A movement name reduced to its plain form: lower-case, no punctuation, no
- *  leading/trailing quantity ("400m run" → "run"), "-ing"/plural folded
- *  ("running" → "run", "box jumps" → "box jump"). Deliberately conservative:
- *  it never drops a describing word, so "ring row" stays distinct from "row". */
-export function plainName(name: string): string {
-  const tokens = (name ?? "").toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9. ]+/g, " ").split(/\s+/).filter(Boolean);
-  const kept = tokens.filter((t) => !QUANTITY_TOKEN.test(t)).map((t) => {
-    if (t.length > 5 && t.endsWith("ing") && !["swing", "string", "spring", "facing"].includes(t)) {
-      const stem = t.slice(0, -3);
-      const n = stem.length; // running → runn → run; pressing → press (kept)
-      return n > 2 && stem[n - 1] === stem[n - 2] && !"sl".includes(stem[n - 1]) ? stem.slice(0, -1) : stem;
-    }
-    if (t.length > 3 && t.endsWith("s") && !t.endsWith("ss") && !["press", "pass", "abs", "plus", "bus"].includes(t)) return t.slice(0, -1);
-    return t;
-  });
-  return kept.join(" ").trim();
-}
-
-function bannedPlainSet(doNotProgram: string[]): Set<string> {
-  const s = new Set<string>();
-  for (const m of doNotProgram ?? []) {
-    const exact = (m ?? "").trim().toLowerCase();
-    if (exact) s.add(exact);
-    const p = plainName(m ?? "");
-    if (p) s.add(p);
-  }
-  return s;
-}
-
-/** True when the name is on the avoid list, exactly or as a plain variant. */
-export function isRuledOutByName(name: string, doNotProgram: string[]): boolean {
-  const banned = bannedPlainSet(doNotProgram);
-  if (banned.size === 0) return false;
-  return banned.has((name ?? "").trim().toLowerCase()) || banned.has(plainName(name ?? ""));
-}
-
 // ── Walking the output ─────────────────────────────────────────────────────
 
 type Loc = { week_num: number; day_num: number; block_index: number; movement_index: number };
@@ -204,35 +166,9 @@ function blockAt(output: WriterOutput, l: { week_num: number; day_num: number; b
   return ((day?.blocks ?? [])[l.block_index] as AnyBlock | undefined) ?? null;
 }
 
-/** Every movement still on the avoid list by name or plain variant. Pure. */
-export function nameHits(output: WriterOutput, doNotProgram: string[]): Array<Loc & { movement: string }> {
-  const hits: Array<Loc & { movement: string }> = [];
-  if ((doNotProgram ?? []).length === 0) return hits;
-  const banned = bannedPlainSet(doNotProgram);
-  for (const week of output.weeks ?? []) {
-    for (const day of week.days ?? []) {
-      (day.blocks ?? []).forEach((b, bi) => {
-        ((b as AnyBlock).movements ?? []).forEach((m, mi) => {
-          const n = (m?.movement ?? "").trim();
-          if (n && (banned.has(n.toLowerCase()) || banned.has(plainName(n)))) {
-            hits.push({ week_num: week.week_num, day_num: day.day_num, block_index: bi, movement_index: mi, movement: n });
-          }
-        });
-      });
-    }
-  }
-  return hits;
-}
-
 const where = (l: Loc) => `W${l.week_num}D${l.day_num} block ${l.block_index}`;
 
 // ── Fixing ─────────────────────────────────────────────────────────────────
-
-function canonical(vocabulary: string[], name: string | null | undefined): string | null {
-  const want = (name ?? "").trim().toLowerCase();
-  if (!want) return null;
-  return vocabulary.find((v) => v.trim().toLowerCase() === want) ?? null;
-}
 
 /** Swap one movement for another, keeping the row's quantity unless the
  *  replacement brings its own. Load and 1RM anchoring never carry over to a
@@ -284,42 +220,50 @@ function removeMovement(output: WriterOutput, l: Loc): void {
 }
 
 /**
- * Apply the judge's replacements. A replacement is used only when it is a real
- * vocabulary movement that is not itself ruled out by name; anything else is
- * returned as `unresolved` for the rule-based step. Pure apart from mutating
- * `output`. Findings whose location no longer holds that movement are skipped.
+ * Apply the judge's replacements, each at the position the judge gave and
+ * under the name the judge gave. Nothing is compared with a list. A finding is
+ * `unresolved` only when the judge named no replacement for it (or named the
+ * movement that is already there, which changes nothing). A position that does
+ * not exist in the output is skipped. Mutates `output`.
  */
-export function applyFindings(output: WriterOutput, findings: Finding[], r: Restrictions): { applied: string[]; unresolved: Finding[] } {
+export function applyFindings(output: WriterOutput, findings: Finding[], _r?: Restrictions): { applied: string[]; unresolved: Finding[] } {
   const applied: string[] = [];
   const unresolved: Finding[] = [];
   for (const f of findings) {
     const block = blockAt(output, f);
     const row = block?.movements?.[f.movement_index];
-    if (!row || (row.movement ?? "").trim().toLowerCase() !== (f.movement ?? "").trim().toLowerCase()) continue;
-    const to = canonical(r.vocabulary, f.replacement?.movement);
-    if (!to || isRuledOutByName(to, r.doNotProgram) || to.toLowerCase() === row.movement.trim().toLowerCase()) {
+    if (!row) continue;
+    const to = (f.replacement?.movement ?? "").trim();
+    if (!to || to.toLowerCase() === (row.movement ?? "").trim().toLowerCase()) {
       unresolved.push(f);
       continue;
     }
+    const was = row.movement;
     block!.movements![f.movement_index] = swap(row, to, f.replacement);
-    applied.push(`${where(f)}: "${f.movement}" replaced with "${to}" — ${f.reason}`);
+    applied.push(`${where(f)}: "${was}" replaced with "${to}" — ${f.reason}`);
   }
   return { applied, unresolved };
 }
 
 /**
- * The last resort: remove each movement. No AI, no matching; cannot fail.
- * Handled last-to-first so removals do not shift the other locations.
+ * Remove each movement at its position. No AI, no matching. Handled
+ * last-to-first so removals do not shift the other positions; a position
+ * listed twice is removed once.
  */
 export function removeByRule(output: WriterOutput, locs: Array<Loc & { movement: string; reason?: string }>): string[] {
   const actions: string[] = [];
+  const seen = new Set<string>();
   const ordered = [...locs].sort((a, b) =>
     (b.week_num - a.week_num) || (b.day_num - a.day_num) || (b.block_index - a.block_index) || (b.movement_index - a.movement_index));
   for (const l of ordered) {
+    const key = `${l.week_num}-${l.day_num}-${l.block_index}-${l.movement_index}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
     const row = blockAt(output, l)?.movements?.[l.movement_index];
-    if (!row || (row.movement ?? "").trim().toLowerCase() !== l.movement.trim().toLowerCase()) continue;
+    if (!row) continue;
+    const was = row.movement;
     removeMovement(output, l);
-    actions.push(`${where(l)}: "${l.movement}" removed${l.reason ? ` — ${l.reason}` : ""}`);
+    actions.push(`${where(l)}: "${was}" removed${l.reason ? ` — ${l.reason}` : ""}`);
   }
   return actions;
 }
@@ -328,7 +272,7 @@ export function removeByRule(output: WriterOutput, locs: Array<Loc & { movement:
 
 const JUDGE_SYSTEM = `You check AI-written training against ONE athlete's physical restrictions. Nothing else is your job: not variety, not balance, not difficulty.
 
-You receive the athlete's restrictions (what they wrote under injuries, what they said elsewhere — signup answers and notes to their coach — and a list of movements never to program), the list of movements that may be used, and the written training as JSON.
+You receive the athlete's restrictions (what they wrote under injuries, what they said elsewhere — signup answers and notes to their coach — and a list of movements never to program), a list of movement names for spelling, and the written training as JSON.
 
 Pain, injury or a physical limit counts wherever the athlete mentioned it, not only under injuries. A statement about one movement tells you about the body part: "pain in shoulder on muscle-ups" means the shoulder is the problem, so heavy or high-skill overhead loading of that shoulder goes against it too. Statements that are only likes, dislikes or goals are NOT restrictions.
 
@@ -342,13 +286,13 @@ Do NOT flag:
   - Movements that are merely near a restriction but do not load the area the athlete named.
   - Anything the athlete did not ask to avoid. Their words are the ground truth; do not invent restrictions.
 
-For every flagged movement give a replacement the athlete CAN do, chosen from the allowed list, that keeps the block's purpose (an easy cardio flush stays an easy cardio flush on a different machine; a pulling accessory stays a pull). The replacement must not itself go against the restrictions. Give its quantity when the original quantity would not make sense for it (for example a time in seconds for a machine in place of a distance run).
+For every flagged movement give a replacement the athlete CAN do, that keeps the block's purpose (an easy cardio flush stays an easy cardio flush on a different machine; a pulling accessory stays a pull). The replacement must not itself go against the restrictions. Give its quantity when the original quantity would not make sense for it (for example a time in seconds for a machine in place of a distance run).
 
 Report through the report tool. Locations use the JSON's own week_num and day_num, block_index = the block's position in that day's blocks array (first is 0), movement_index = the movement's position in that block's movements array (first is 0), and movement = the name exactly as written.`;
 
 const JUDGE_TOOL = {
   name: "report_restriction_check",
-  description: "Report every movement that goes against the athlete's restrictions, each with a replacement from the allowed list.",
+  description: "Report every movement that goes against the athlete's restrictions, each with a replacement.",
   input_schema: {
     type: "object",
     properties: {
@@ -367,7 +311,7 @@ const JUDGE_TOOL = {
             replacement: {
               type: "object",
               properties: {
-                movement: { type: "string", description: "A name from the allowed list, exactly as listed." },
+                movement: { type: "string", description: "The replacement movement's name only (no notes in the name). Use the spelling from the movement names list when it is on it." },
                 sets: { type: "integer", minimum: 1 },
                 reps: { type: "integer", minimum: 1 },
                 time_seconds: { type: "integer", minimum: 1 },
@@ -425,20 +369,19 @@ export function compactForJudge(output: WriterOutput): unknown {
 }
 
 export function judgeUserMessage(output: WriterOutput, r: Restrictions, mustReplace?: Array<Loc & { movement: string }>): string {
-  const allowed = (r.vocabulary ?? []).filter((v) => !isRuledOutByName(v, r.doNotProgram));
   const subs = (r.suggestedSubs ?? []).filter((x) => x?.instead_of && x?.use).map((x) => `${x.instead_of} → ${x.use}`).join("; ");
   const must = (mustReplace ?? []).map((l) => `week ${l.week_num} day ${l.day_num} block_index ${l.block_index} movement_index ${l.movement_index} "${l.movement}"`);
   return [
     restrictionsForPrompt(r.injuriesText, r.doNotProgram, r.otherWords) || "ABSOLUTE RESTRICTIONS: the athlete has stated no injury, pain or physical limit anywhere, and has no avoid list.",
     "",
-    `ALLOWED MOVEMENTS (choose replacements only from these): ${allowed.join(", ")}`,
-    ...(subs ? ["", `SUBSTITUTES ALREADY SUGGESTED FOR THIS ATHLETE (guidance, not exact names — pick the allowed movement that best matches): ${subs}`] : []),
+    `MOVEMENT NAMES (for spelling: when your replacement is on this list, write it exactly as listed; you may name a movement that is not on it. You decide what the athlete can do — some names here may themselves go against the restrictions): ${(r.vocabulary ?? []).join(", ")}`,
+    ...(subs ? ["", `SUBSTITUTES ALREADY SUGGESTED FOR THIS ATHLETE (guidance, not exact names): ${subs}`] : []),
     "",
     "WRITTEN TRAINING (JSON):",
     JSON.stringify(compactForJudge(output)),
     "",
     must.length
-      ? `These movements are ALREADY KNOWN to go against the restrictions. Report EVERY ONE of them with a replacement from the allowed list (and anything else you find): ${must.join("; ")}`
+      ? `These movements are ALREADY KNOWN to go against the restrictions. Report EVERY ONE of them with a replacement (and anything else you find): ${must.join("; ")}`
       : "Check every movement in every block against the restrictions and report through the tool.",
   ].join("\n");
 }
@@ -492,11 +435,11 @@ export const askJudge: Judge = async (output, r, mustReplace) => {
 
 /**
  * Run the gate over a written output, mutating it in place. Always returns;
- * never throws; after it returns no movement the judge flagged in its final
- * reading, and no avoid-list name or plain variant, remains in `output`.
+ * never throws. After it returns, every movement the judge flagged has been
+ * replaced with the judge's choice, or removed when the judge named none.
  *
  * `judge` is injectable for tests. `maxReviews` bounds the AI calls: review,
- * fix, review again; whatever the last reading flags is taken out by rule.
+ * apply, review again.
  */
 export async function runRestrictionGate(
   output: WriterOutput,
@@ -506,28 +449,23 @@ export async function runRestrictionGate(
   const report: GateReport = { actions: [], reviews: 0, judgeUnavailable: false };
   const judge = opts.judge ?? askJudge;
   const maxReviews = Math.max(1, opts.maxReviews ?? 2);
-
-  const present = (l: Loc & { movement: string }) => {
-    const row = blockAt(output, l)?.movements?.[l.movement_index];
-    return !!row && (row.movement ?? "").trim().toLowerCase() === (l.movement ?? "").trim().toLowerCase();
-  };
-  // Flagged on the judge's last reading and still in the output.
+  const at = (l: Loc) => `${l.week_num}-${l.day_num}-${l.block_index}-${l.movement_index}`;
+  const exists = (l: Loc) => !!blockAt(output, l)?.movements?.[l.movement_index];
+  // Flagged on the judge's last reading with no replacement named.
   let pending: Array<Loc & { movement: string; reason?: string }> = [];
 
   try {
     // EVERY week is read, for EVERY athlete — never skipped (founder,
     // 2026-11-23). An empty injury box is not evidence of no injury.
-    {
-      for (let round = 1; round <= maxReviews; round++) {
-        const findings = await judge(output, r);
-        if (findings == null) { report.judgeUnavailable = true; break; }
-        report.reviews++;
-        if (findings.length === 0) { pending = []; break; }
-        const { applied } = applyFindings(output, findings, r);
-        report.actions.push(...applied);
-        pending = findings.filter(present); // no usable replacement offered
-        if (applied.length === 0 && pending.length === 0) break; // stale locations only
-      }
+    for (let round = 1; round <= maxReviews; round++) {
+      const findings = await judge(output, r);
+      if (findings == null) { report.judgeUnavailable = true; break; }
+      report.reviews++;
+      if (findings.length === 0) { pending = []; break; }
+      const { applied, unresolved } = applyFindings(output, findings);
+      report.actions.push(...applied);
+      pending = unresolved.filter(exists);
+      if (applied.length === 0) break; // nothing changed: reading again would say the same
     }
   } catch (e) {
     // The judge path must never stop a week from shipping.
@@ -535,39 +473,29 @@ export async function runRestrictionGate(
     console.error("[restriction-gate] judge path failed:", e instanceof Error ? e.message : String(e));
   }
 
-  // Second look: any avoid-list name, or plain variant of one, still present.
-  try {
-    for (const h of nameHits(output, r.doNotProgram)) {
-      if (!pending.some((p) => p.week_num === h.week_num && p.day_num === h.day_num && p.block_index === h.block_index && p.movement_index === h.movement_index)) {
-        pending.push({ ...h, reason: "on the avoid list" });
-      }
-    }
-  } catch (e) {
-    console.error("[restriction-gate] name look failed:", e instanceof Error ? e.message : String(e));
-  }
-
-  // The guarantee. The AI is asked once more to CHOOSE a replacement for each;
-  // whatever it does not replace is removed. Removal needs no matching.
+  // The judge said these cannot stay but named no replacement. It is asked
+  // once more to choose one; what it still does not replace is removed.
   if (pending.length > 0) {
+    let left = pending;
     try {
-      // Already unreachable this run: do not wait on it again, go to removal.
+      // Already unreachable this run: do not wait on it again.
       const chosen = report.judgeUnavailable ? null : await judge(output, r, pending);
       if (chosen == null) report.judgeUnavailable = true;
       else {
         report.reviews++;
-        const mine = chosen.filter((f) => pending.some((p) => p.week_num === f.week_num && p.day_num === f.day_num && p.block_index === f.block_index && p.movement_index === f.movement_index));
-        report.actions.push(...applyFindings(output, mine, r).applied);
+        const want = new Set(pending.map(at));
+        const { applied, unresolved } = applyFindings(output, chosen.filter((f) => want.has(at(f))));
+        report.actions.push(...applied);
+        const answered = new Set(chosen.filter((f) => want.has(at(f))).map(at));
+        const stillNone = new Set(unresolved.map(at));
+        left = pending.filter((p) => !answered.has(at(p)) || stillNone.has(at(p)));
       }
     } catch (e) {
       report.judgeUnavailable = true;
       console.error("[restriction-gate] replacement call failed:", e instanceof Error ? e.message : String(e));
     }
     try {
-      report.actions.push(...removeByRule(output, pending.filter(present)));
-      // A replacement can never be an avoid-list name (applyFindings refuses
-      // those), so this finds nothing unless the output changed underneath us.
-      const left = nameHits(output, r.doNotProgram);
-      if (left.length > 0) report.actions.push(...removeByRule(output, left.map((h) => ({ ...h, reason: "on the avoid list" }))));
+      report.actions.push(...removeByRule(output, left.filter(exists)));
     } catch (e) {
       console.error("[restriction-gate] removal failed:", e instanceof Error ? e.message : String(e));
     }
@@ -581,7 +509,7 @@ export async function runRestrictionGate(
  * Run the gate over ONE block. Returns the block as it may be offered, or
  * null when nothing of it survives (every movement was ruled out and none
  * could be replaced) — the caller then asks for a different proposal.
- * Same guarantee as the full gate; never throws.
+ * Same steps as the full gate; never throws.
  */
 export async function gateBlock<B extends { movements?: MovementPrescription[] }>(
   block: B,

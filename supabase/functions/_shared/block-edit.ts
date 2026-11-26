@@ -242,9 +242,9 @@ function hasVolumeSpecifier(m: MovementPrescription): boolean {
     scheme(m.rep_scheme) || scheme(m.cal_scheme) || scheme(m.distance_scheme);
 }
 
-/** Validate a proposed block against the athlete's hard constraints. Returns
- *  problem strings (empty = legal). Safety is one of the three forever-hard
- *  classes: a banned movement NEVER reaches the athlete, even by request.
+/** Validate a proposed block's FORMAT. Returns problem strings (empty = fine):
+ *  a valid scheme format, at least one movement, every movement named and
+ *  given work. It judges nothing about which movements were chosen.
  *
  *  Movement NAMING is free — no vocabulary gate. The generator dropped hard
  *  vocabulary enforcement in 2026-05 (it banned the legitimate accessory
@@ -255,7 +255,7 @@ function hasVolumeSpecifier(m: MovementPrescription): boolean {
  *  free-emits, and the power calculator is confident-or-skip. */
 export function validateBlockProposal(
   proposal: BlockPrescription,
-  opts: { doNotProgram: string[] },
+  _opts?: { doNotProgram?: string[] },
 ): string[] {
   const problems: string[] = [];
   problems.push(...blockSchemeFormatProblems(proposal));
@@ -264,15 +264,13 @@ export function validateBlockProposal(
     problems.push("The proposed block has no movements.");
     return problems;
   }
-  const banned = new Set(opts.doNotProgram.map((s) => s.toLowerCase().trim()));
+  // The avoid-list name check that stood here was removed 2026-11-26: it
+  // compared exact names. The restriction check reads the proposal by meaning.
   for (const m of movements) {
     const name = (m.movement ?? "").trim();
     if (!name) {
       problems.push("A movement is missing its name.");
       continue;
-    }
-    if (banned.has(name.toLowerCase())) {
-      problems.push(`"${name}" is on this athlete's do-not-program list — substitute a safe alternative that preserves the stimulus.`);
     }
     if (!hasVolumeSpecifier(m)) {
       problems.push(`"${name}" has no work specified — populate at least one of sets/reps/rep_scheme/calories/weight/time_seconds/distance, or mark it max_effort.`);

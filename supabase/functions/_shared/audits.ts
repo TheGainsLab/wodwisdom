@@ -715,37 +715,10 @@ export function auditSchemeFormat(output: WriterOutput): AuditResult {
 // Rule — no contraindicated movements (injury safety)
 // ============================================================
 
-/**
- * Every movement must NOT be on the athlete's injuries_structured.do_not_program
- * list (parsed from their free-text injuries by parse-injuries-constraints). This
- * is the DETERMINISTIC enforcement of free-text injury constraints: the writer is
- * told to honor them, this guarantees it. Block-local → surgical swaps the
- * offending movement for a safe one (it already receives do_not_program). Match
- * is exact/normalized name against the canonical do_not_program list (both sides
- * use canonical vocabulary) — no regex.
- */
-export function auditDoNotProgram(output: WriterOutput, doNotProgram: string[]): AuditResult {
-  const violations: string[] = [];
-  const banned = new Set((doNotProgram ?? []).map((m) => m.trim().toLowerCase()).filter(Boolean));
-  if (banned.size === 0) return { rule: "do_not_program", passed: true, violations };
-
-  for (const week of output.weeks ?? []) {
-    for (const day of week.days ?? []) {
-      const blocks = day.blocks ?? [];
-      for (let i = 0; i < blocks.length; i++) {
-        const b = blocks[i];
-        for (const m of b.movements ?? []) {
-          if (m.movement && banned.has(m.movement.trim().toLowerCase())) {
-            violations.push(
-              `Week ${week.week_num} Day ${day.day_num} block[${i}] (${b.block_type}): "${m.movement}" is on the athlete's do-not-program list (injury constraint). Replace it with a safe substitute that preserves the block's intent — do NOT re-emit any do-not-program movement.`,
-            );
-          }
-        }
-      }
-    }
-  }
-  return { rule: "do_not_program", passed: violations.length === 0, violations };
-}
+// auditDoNotProgram REMOVED 2026-11-26 (founder: "Remove it from individual
+// and gym classes"). It compared each movement's exact name with the avoid
+// list and sent a match for a block rewrite. The writer is told the avoid list
+// and the athlete's own words; the restriction check reads the week by meaning.
 
 // ============================================================
 // Rule 4c — metcon duration matches the labeled time-domain bucket
@@ -1131,7 +1104,6 @@ export interface AuditContext {
 
 export const ALL_AUDITS = [
   (ctx: AuditContext): AuditResult => auditBlockTypeEnum(ctx.output),
-  (ctx: AuditContext): AuditResult => auditDoNotProgram(ctx.output, ctx.doNotProgram ?? []),
   // strength_one_lift dropped 2026-05-15 — rule banned legitimate strength
   // complexes (snatch + OHS + snatch balance as one block). auditStrengthOneLift()
   // retained as a callable but no longer wired.
@@ -1179,7 +1151,6 @@ export const AUDIT_KIND: Record<string, AuditKind> = {
   max_effort_placement: "block-local",
   scheme_format_valid: "block-local",
   workup_top_set: "block-local",
-  do_not_program: "block-local",
   // Structural — whole-program issues; only writer-retry can fix
   // (metcon_presence: a MISSING block has nothing for a surgical
   // block-local call to rewrite).
