@@ -257,6 +257,9 @@ export function computeConditioningDiagnosis(inputs: ConditioningInputs): Condit
 
 // ─── Format (raw signals — no labels) ────────────────────────────────────────
 
+const RAW_CLOSING = "No labels are applied — judge each system's state, its trend, recovery, and any need to recalibrate from the numbers yourself.";
+const UNDER_ASSESSMENT_CLOSING = "The overall read of these numbers is the ENGINE ASSESSMENT above. Use the numbers to answer specific questions and to talk about sessions logged since it was written.";
+
 const METRIC_EXPLAINER =
   "rolling_avg_ratio = mean of the athlete's last up-to-5 (actual_pace ÷ target_pace) for that day_type+modality; " +
   "1.0 = exactly on their adaptive target, >1.0 beating it, <1.0 under it. recent is the raw sequence " +
@@ -266,13 +269,21 @@ const METRIC_EXPLAINER =
   "sits well above 1.0; the trend across sessions is the signal). Each session's ratio uses the baseline in force " +
   "when it was logged, so a retest moves the scale and the series steps at that date — read the trend BETWEEN " +
   "retests, and use the trial history dates to place the steps. " +
-  "No labels are applied — judge each system's state, its trend, recovery, and any need to recalibrate from the numbers yourself.";
+  RAW_CLOSING;
 
-export function formatConditioningState(inputs: ConditioningInputs): string {
+/** Header and closing line when the reader has also been given the stored
+ *  Engine assessment: the numbers are then the detail behind that read, not
+ *  something to form a different read from. */
+export const SIGNALS_HEADER_RAW = "\n\nENGINE CONDITIONING SIGNALS (raw — interpret yourself)";
+export const SIGNALS_HEADER_UNDER_ASSESSMENT = "\n\nENGINE CONDITIONING SIGNALS (the detail behind the ENGINE ASSESSMENT above — use them for specifics and for anything newer than it; do not form a different overall read from them)";
+
+export function formatConditioningState(inputs: ConditioningInputs, opts?: { underAssessment?: boolean }): string {
   const diag = computeConditioningDiagnosis(inputs);
   if (!diag.hasData) return "";
 
-  const parts: string[] = ["\n\nENGINE CONDITIONING SIGNALS (raw — interpret yourself)", METRIC_EXPLAINER];
+  const parts: string[] = opts?.underAssessment
+    ? [SIGNALS_HEADER_UNDER_ASSESSMENT, METRIC_EXPLAINER.replace(RAW_CLOSING, UNDER_ASSESSMENT_CLOSING)]
+    : [SIGNALS_HEADER_RAW, METRIC_EXPLAINER];
 
   parts.push(
     `\nDays since last completed session: ${diag.daysSinceLastSession ?? "none in the lookback window (90 days)"}`,
@@ -435,7 +446,7 @@ function primaryMachine(trials: TrialInput[], sessionMachines: string[], curves:
 export async function buildConditioningState(
   supa: SupabaseClient,
   userId: string,
-  opts?: { recentDays?: number; daysPerWeek?: number | null; curve?: "stored" | "fresh" | "fresh_unsaved"; forAssessment?: boolean },
+  opts?: { recentDays?: number; daysPerWeek?: number | null; curve?: "stored" | "fresh" | "fresh_unsaved"; forAssessment?: boolean; underAssessment?: boolean },
 ): Promise<string> {
   // recentDays bounds the days-since / adherence windows only; the analytics
   // block (below) and the session list use every completed session, as the
@@ -482,7 +493,7 @@ export async function buildConditioningState(
     timeTrials: (timeTrials as TimeTrialRow[]) ?? [],
     sessions: allSessions.filter((s) => s.date >= cutoff),
     daysPerWeek: opts?.daysPerWeek ?? null,
-  });
+  }, { underAssessment: opts?.underAssessment });
   // ONE CALCULATION (founder, 2026-11-11): the sequencer and the Coach see
   // exactly the analytics the athlete sees, computed by the same module as
   // the Analytics page (engine-analytics.ts).

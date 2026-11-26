@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { fetchAndFormatRecentHistory } from "../_shared/training-history.ts";
-import { buildConditioningState } from "../_shared/conditioning-state.ts";
+import { conditioningForCoach } from "../_shared/engine-assessment.ts";
 import { searchChunks, deduplicateChunks, formatChunksAsContext } from "../_shared/rag.ts";
 import { callClaude } from "../_shared/call-claude.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
@@ -792,7 +792,7 @@ Deno.serve(async (req) => {
       fetchAndFormatRecentHistory(supa, user.id, { days: 14, maxLines: 25 }),
       // Soft-fail: a review without conditioning context beats no review —
       // but log loudly (buildConditioningState now throws on fetch errors).
-      buildConditioningState(supa, user.id).catch((err) => {
+      conditioningForCoach(supa, user.id).catch((err) => {
         console.error(JSON.stringify({ tag: "conditioning_state_failed", at: "workout-review", error: err instanceof Error ? err.message : String(err) }));
         return "";
       }),

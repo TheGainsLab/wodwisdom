@@ -21,6 +21,7 @@ import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { callClaude } from "./call-claude.ts";
 import { MODELS } from "./model-profiles.ts";
 import { buildSequencerConditioning } from "./conditioning-state.ts";
+import { ensureEngineAssessment, renderEngineAssessment } from "./engine-assessment.ts";
 import { formatReaches } from "./engine-continuum-reaches.ts";
 import { buildOtherTrainingLoadBlock } from "./athlete-activities.ts";
 import { loadUpcomingProgrammingWeek } from "./programming-week.ts";
@@ -107,6 +108,10 @@ const SYSTEM_PROMPT =
   `  * No type more often per block than its CAP below (its share of the curated month).\n` +
   `  * Over a month, draw on the full breadth of what is ready. A type marked NEVER DONE that the athlete ` +
   `is ready for should appear within the next two blocks — that is how the catalogue opens as they earn it.\n\n` +
+  `ENGINE ASSESSMENT: when one is given at the top of the input, it is the standing read of this athlete ` +
+  `that their coach also works from. Choose days that serve its priorities, in their order, within every ` +
+  `rule above (readiness, variety, caps and envelopes still bind). Never write a "reason" that contradicts ` +
+  `it. Sessions logged since it was written are in the numbers below it: use them.\n\n` +
   `The "reason" field is READ BY THE ATHLETE, on their workout screen, as their coach explaining the day. ` +
   `Write it as one or two plain sentences addressed to them ("you"/"your") in a confident coach voice. ` +
   `Ground it in their actual training — what they've been doing well, what today builds — but NEVER use ` +
@@ -483,7 +488,14 @@ export async function runResequence(
     { reaches: (row) => formatReaches(row, conditioning.primaryCurve) },
   );
 
+  // The standing read the chat coach also works from (written now if it is
+  // missing or out of date). Without one the sequencer works as it did.
+  const ensured = await ensureEngineAssessment(supa, userId);
+  const assessmentText = ensured ? `${renderEngineAssessment(ensured.assessment)}\n\n` : "";
+  console.log(`[run-resequence] user=${userId} assessment=${ensured ? ensured.source : "none"}`);
+
   const userContent =
+    assessmentText +
     `${diagnosis}\n\n` +
     (otherLoad ? `${otherLoad}\n\n` : "") +
     (programmingWeek ? `${programmingWeek}\n` : "") +
