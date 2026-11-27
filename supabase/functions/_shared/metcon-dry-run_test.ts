@@ -1,5 +1,5 @@
 import { assert, assertEquals } from "jsr:@std/assert";
-import { pieceAsText, timeDomainTable } from "./metcon-dry-run-text.ts";
+import { movementAsText, pieceAsText, planForBlock, timeDomainTable, weekAsText } from "./metcon-dry-run-text.ts";
 
 // deno-lint-ignore no-explicit-any
 type Any = any;
@@ -46,5 +46,45 @@ Deno.test("a composed piece is shown as the member would read it, with each load
     "  15 Wall Ball (medicine ball)",
     "  15 cal Row",
     "  Note: Fast and unbroken.",
+  ].join("\n"));
+});
+
+Deno.test("the write step runs the real writer and none of what changes a week after it", () => {
+  const src = Deno.readTextFileSync(new URL("../metcon-dry-run/index.ts", import.meta.url));
+  assert(src.includes('const wk = await callWeekFill(build.payload, skeleton, week, priorWeeks, "", PACK, pieces);'));
+  assert(src.includes("renderWeekSchemesInPlace(wk);"));
+  for (const notRun of ["applySurgicalFixes", "recomputeBenchmarks", "applyProgrammaticFixes", "clampLoadSanity"]) {
+    assert(!src.includes(notRun), `the write step runs ${notRun}`);
+  }
+});
+
+Deno.test("a written week is shown block by block, with what the plan asked for beside it", () => {
+  const skel: Any = { days: [{
+    day_num: 1, day_intent: "heavy squat", primary_lift: "Back Squat", strength_scheme: "5x5 @75%", skill_focus: "Strict pull-up volume",
+    metcon_time_domain: "short",
+    block_intents: [{ block_type: "accessory", focus: "midline", purpose: "support" }, { block_type: "strength", focus: "powerlifting_strength", purpose: "develop", source_priority_rank: 1 }],
+    block_minutes: [{ block_type: "strength", minutes: 20 }],
+  }] };
+  assertEquals(planForBlock(skel.days[0], "strength"), "Back Squat, 5x5 @75% · develop powerlifting_strength (priority 1) · 20 min");
+  assertEquals(planForBlock(skel.days[0], "skills"), "Strict pull-up volume");
+  assertEquals(planForBlock(skel.days[0], "accessory"), "support midline");
+  assertEquals(planForBlock(skel.days[0], "metcon"), "short (composed before the writer)");
+  assertEquals(planForBlock(skel.days[0], "warm-up"), "");
+  assertEquals(movementAsText({ movement: "Back Squat", sets: 5, reps: 5, weight: 300, weight_unit: "lbs", target_pct_1rm: 75 }), "    Back Squat: 5 x 5 · @ 300 lbs · (75% of max)");
+  assertEquals(movementAsText({ movement: "Rowing", calories: 12, scaling_note: "easy" }), "    Rowing: 12 cal  [easy]");
+  assertEquals(movementAsText({ movement: "Plank" }), "    Plank: (no numbers)");
+  const text = weekAsText({ week_num: 1, days: [{ day_num: 1, blocks: [
+    { block_type: "strength", block_scheme: "5 x 5", movements: [{ movement: "Back Squat", sets: 5, reps: 5, weight: 300, weight_unit: "lbs" }] },
+    { block_type: "metcon", block_scheme: "AMRAP 6", stimulus_note: "Fast.", movements: [{ movement: "Burpee", rep_scheme: [10] }] },
+  ] }] }, skel);
+  assertEquals(text, [
+    "=== Week 1 Day 1 — plan: heavy squat",
+    "  [strength]   (plan: Back Squat, 5x5 @75% · develop powerlifting_strength (priority 1) · 20 min)",
+    "    5 x 5",
+    "    Back Squat: 5 x 5 · @ 300 lbs",
+    "  [metcon]   (plan: short (composed before the writer))",
+    "    AMRAP 6",
+    "    Burpee: reps 10",
+    "    Note: Fast.",
   ].join("\n"));
 });
