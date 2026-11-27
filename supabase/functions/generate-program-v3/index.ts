@@ -1451,7 +1451,14 @@ Deno.serve(async (req) => {
         }
         monthNumber = nextMonth;
       }
-      if (monthNumber < 2) {
+      // ANY month of an existing program can be rebuilt by the admin rebuild,
+      // month 1 included (founder, 2026-11-27: "you should be able to rebuild
+      // the current month no matter what month it is"). It used to be refused
+      // for month 1, so a month-1 rebuild cleared the month and then could not
+      // build it. A service call names the month; the save's month marker
+      // still stops the same month being saved twice. An athlete's own call
+      // can only ever add the next month, as before.
+      if (monthNumber < 1 || (!isServiceCall && monthNumber < 2)) {
         return jsonErr(400, "Bad Request", "Continuation month must be ≥ 2.");
       }
     } else {
