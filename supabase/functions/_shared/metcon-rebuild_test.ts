@@ -337,3 +337,26 @@ Deno.test("the twelve search-picked examples are gone", () => {
   assertEquals(exists, false);
   assert(!read("../generate-program-v3/index.ts").includes("metcon-examples"));
 });
+
+// ── Movement list clean-up (founder, 2026-11-27) ──
+
+Deno.test("no bike on the profile rules out Air Bike under its new name and its old ones", async () => {
+  const { EQUIPMENT_TO_MOVEMENTS } = await import("./equipment-movements.ts");
+  for (const name of ["Air Bike", "Bike", "Assault Bike", "Echo Bike"]) {
+    assert(EQUIPMENT_TO_MOVEMENTS.assault_bike.includes(name), `${name} is not ruled out without a bike`);
+  }
+});
+
+Deno.test("the composer is told to name a movement without its style, and not to bring out a second implement as an obstacle", () => {
+  const p = METCON_COMPOSER_SYSTEM_PROMPT;
+  assert(p.includes("Never put a style of doing a movement (kipping, butterfly) in its name"));
+  assert(p.includes("do not bring out a second implement only as an obstacle or a marker"));
+});
+
+Deno.test("the movement list migration removes Kipping Pull Up and leaves one bike, Air Bike", () => {
+  const sql = read("../../migrations/20261127200000_movement_list_pull_up_air_bike.sql");
+  assert(sql.includes("DELETE FROM public.movements WHERE canonical_name = 'kipping_pull_up';"));
+  assert(sql.includes("SET display_name = 'Air Bike'"));
+  assert(sql.includes("DELETE FROM public.movements WHERE canonical_name IN ('assault_bike', 'echo_bike');"));
+  assert(sql.includes('["Bike", "Biking", "Assault Bike", "Echo Bike"]'));
+});

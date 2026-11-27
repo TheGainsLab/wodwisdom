@@ -440,7 +440,7 @@ export default function StartWorkoutPage({ session, sourceStateProp, onExit, onD
           .order('block_order'),
         supabase
           .from('movements')
-          .select('canonical_name, display_name, work_rate, weight_degradation_rate, modality')
+          .select('canonical_name, display_name, work_rate, weight_degradation_rate, modality, aliases')
           .not('work_rate', 'is', null),
         supabase
           .from('athlete_profiles')

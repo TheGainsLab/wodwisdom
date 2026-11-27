@@ -15,6 +15,8 @@ export interface MovementWorkRate {
   work_rate: number | null;           // reps per minute at median pace
   weight_degradation_rate: number | null; // 0.7–1.0
   modality: string;                   // W, G, M
+  /** Other spellings of the same movement ("Assault Bike" for "Air Bike"). */
+  aliases?: string[] | null;
 }
 
 export interface MetconEntry {
@@ -84,11 +86,12 @@ const BARBELL_MOVEMENTS = new Set([
  * Look up work rate for a movement by matching display_name (case-insensitive).
  * Falls back to DEFAULT_WORK_RATE if no match found.
  */
-function findWorkRate(
+export function findWorkRate(
   movementName: string,
   workRates: MovementWorkRate[]
 ): MovementWorkRate | null {
   const normalized = movementName.toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (!normalized) return null;
 
   for (const wr of workRates) {
     // Match on display_name (case-insensitive, stripped)
@@ -98,6 +101,16 @@ function findWorkRate(
     // Match on canonical_name (underscores → stripped)
     const canonNorm = wr.canonical_name.replace(/_/g, '');
     if (canonNorm === normalized) return wr;
+  }
+
+  // An alternate spelling. A workout written before the movement list was
+  // cleaned up (2026-11-27) says "Assault Bike" or "Kipping Pull Up": those
+  // are now spellings of "Air Bike" and "Pull Up", and must still find their
+  // rate instead of falling back to the default.
+  for (const wr of workRates) {
+    for (const alias of wr.aliases ?? []) {
+      if (typeof alias === 'string' && alias.toLowerCase().replace(/[^a-z0-9]/g, '') === normalized) return wr;
+    }
   }
 
   return null;
