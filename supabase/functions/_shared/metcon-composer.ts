@@ -315,7 +315,7 @@ export const EMIT_METCON_MONTH_TOOL = {
                   weight: {
                     type: "number",
                     description:
-                      "DUMBBELL and KETTLEBELL movements only: the weight you chose for this athlete from their lifts, per dumbbell or kettlebell, in the athlete's units.",
+                      "DUMBBELL and KETTLEBELL movements only, in the athlete's units. Dumbbell: one of the fixed weights in the shared table, per dumbbell. Kettlebell: the weight you chose for this athlete from their lifts.",
                   },
                   machine: {
                     type: "string",

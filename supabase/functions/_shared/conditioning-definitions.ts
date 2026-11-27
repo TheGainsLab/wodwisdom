@@ -101,6 +101,12 @@ export const CYCLING_LOAD_CLASSES: Record<string, LoadClassDef> = {
 export const AIR_BIKE_NAME_RULE =
   'An air bike is always written "Air Bike", whatever brand or model it is: never a brand name, and never "Bike" alone.';
 
+/** Dumbbell weights in metcons, per dumbbell (founder, 2026-11-27). */
+export const DUMBBELL_METCON_WEIGHTS = {
+  standard: { men: "50 lb / 22.5 kg", women: "35 lb / 15 kg" },
+  strong: { men: "70 lb / 32 kg", women: "50 lb / 22.5 kg" },
+} as const;
+
 /** The medicine ball is one fixed weight per sex (founder, 2026-11-27). */
 export const MEDICINE_BALL_WEIGHTS = { men: "20 lb / 9 kg", women: "14 lb / 6 kg" } as const;
 
@@ -177,7 +183,12 @@ export const CYCLING_LOAD_BANDS_PROMPT = [
   // Founder, 2026-11-27: the composer chooses dumbbell and kettlebell weights
   // from the athlete's lifts (the fixed 35/50/70 and 20/35/50 table is gone);
   // the medicine ball is always one weight per sex.
-  "  - dumbbell / kettlebell: no band and no default. The composer chooses the weight for THIS athlete from their lifts and states it on the movement (weight, per implement); the writer uses it as given.",
+  // Dumbbells in metcons are two fixed sizes per sex (founder, 2026-11-27:
+  // "Generally it's 50 pounds for men and 35 for women... for more advanced
+  // or stronger athletes 70 for men and 50 for women. We don't need the 40").
+  // Kettlebells stay the composer's choice.
+  `  - dumbbell (metcons): ${DUMBBELL_METCON_WEIGHTS.standard.men} for men and ${DUMBBELL_METCON_WEIGHTS.standard.women} for women; for a stronger or more advanced athlete, ${DUMBBELL_METCON_WEIGHTS.strong.men} for men and ${DUMBBELL_METCON_WEIGHTS.strong.women} for women. No other dumbbell weight. The composer picks which of the two fits THIS athlete and states it on the movement (weight, per dumbbell); the writer uses it as given.`,
+  "  - kettlebell: no band and no default. The composer chooses the weight for THIS athlete from their lifts and states it on the movement (weight); the writer uses it as given.",
   `  - medicine ball: always ${MEDICINE_BALL_WEIGHTS.men} for men and ${MEDICINE_BALL_WEIGHTS.women} for women.`,
   `  Rounding: ${ROUNDING_RULE}`,
 ].join("\n");
