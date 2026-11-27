@@ -66,3 +66,15 @@ Deno.test("strength days, other entries, and entries with nothing left are not e
   assertEquals(cleanMainsiteWorkout(entry("For Time", "**Fran**\nPost time to comments.")), null);
   assert(cleanMainsiteWorkout("no header at all") === null);
 });
+
+Deno.test("the one-time fill never changes an original, stores nothing on a dry run, and is service role only", () => {
+  const fn = Deno.readTextFileSync(new URL("../clean-mainsite-examples/index.ts", import.meta.url));
+  // The library (chunks) is only read.
+  assert(fn.includes('.from("chunks").select("id, content").eq("category", "mainsite")'));
+  for (const write of ['.from("chunks").update', '.from("chunks").delete', '.from("chunks").insert', '.from("chunks").upsert']) assert(!fn.includes(write), write);
+  assertEquals(fn.split(".upsert(").length - 1, 1);
+  assert(fn.includes('.from("mainsite_examples").upsert('));
+  assert(fn.includes('searchParams.get("dry_run") !== "false"'));
+  assert(fn.indexOf("if (dryRun) {") < fn.indexOf('.from("mainsite_examples").upsert('));
+  assert(fn.includes('return json({ error: "service role only" }, 401)'));
+});
