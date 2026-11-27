@@ -7,7 +7,9 @@
 import { assert, assertEquals } from "jsr:@std/assert";
 import type { BlockPrescription } from "./v2-output-schema.ts";
 import {
+  applyBlockProposal,
   buildProposeBlockEditTool,
+  purposeAfterEdit,
   reconcileReps,
   validateBlockProposal,
 } from "./block-edit.ts";
@@ -62,4 +64,57 @@ Deno.test("the tool fences block_id to today's blocks", () => {
   assertEquals(schema.properties.block_id.enum, ["b1", "b2"]);
   assertEquals(schema.required, ["block_id", "rationale", "block"]);
   assert(schema.properties.block.properties.movements != null);
+});
+
+// ── Applied edit: the old purpose line is replaced by the coach's reason (2026-11-26) ──
+
+function fakeSupa(failColumn?: string) {
+  const updates: Array<Record<string, unknown>> = [];
+  // deno-lint-ignore no-explicit-any
+  const from = (table: string): any => ({
+    update: (row: Record<string, unknown>) => ({
+      eq: () => {
+        if (table === "program_blocks_v2") {
+          if (failColumn && failColumn in row) return Promise.resolve({ error: { message: `column "${failColumn}" does not exist` } });
+          updates.push(row);
+        }
+        return Promise.resolve({ error: null });
+      },
+    }),
+    delete: () => ({ eq: () => Promise.resolve({ error: null }) }),
+    insert: () => Promise.resolve({ error: null }),
+  });
+  // deno-lint-ignore no-explicit-any
+  return { supa: { from } as any, updates };
+}
+
+const metcon = (extra: Record<string, unknown> = {}): BlockPrescription => ({
+  block_type: "metcon", block_scheme: "AMRAP 12", scheme_format: { format: "amrap", minutes: 12 },
+  movements: [{ movement: "Burpee", rep_scheme: [10] }], ...extra,
+} as BlockPrescription);
+
+Deno.test("an applied edit replaces the old purpose line with the coach's reason for the change", async () => {
+  const { supa, updates } = fakeSupa();
+  await applyBlockProposal(supa, "b1", metcon({ stimulus_note: "  Swapped the wall balls for burpees: same 12-minute push, no ball needed.  " }));
+  assertEquals(updates[0].stimulus_note, "Swapped the wall balls for burpees: same 12-minute push, no ball needed.");
+});
+
+Deno.test("an applied edit with no reason still clears the old purpose line", async () => {
+  const { supa, updates } = fakeSupa();
+  await applyBlockProposal(supa, "b1", metcon());
+  assert("stimulus_note" in updates[0]);
+  assertEquals(updates[0].stimulus_note, null);
+  assertEquals(purposeAfterEdit(metcon({ stimulus_note: "   " })), null);
+});
+
+Deno.test("before the purpose column exists, the edit still saves", async () => {
+  const { supa, updates } = fakeSupa("stimulus_note");
+  await applyBlockProposal(supa, "b1", metcon({ stimulus_note: "Reason" }));
+  assertEquals(updates.length, 1);
+  assertEquals("stimulus_note" in updates[0], false);
+});
+
+Deno.test("the coach's reason is stored with the proposal it applies to", () => {
+  const chat = Deno.readTextFileSync(new URL("../chat/index.ts", import.meta.url));
+  assert(chat.includes('proposal: { ...input.block, stimulus_note: (input.rationale ?? "").trim() || undefined },'));
 });

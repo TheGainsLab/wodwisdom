@@ -1908,7 +1908,9 @@ Deno.serve(async (req) => {
                   block_id: blockRef.id,
                   request: question.slice(0, 2000),
                   original: owned.original,
-                  proposal: input.block,
+                  // The coach's reason rides with the proposal: on Apply it
+                  // replaces the old purpose line (block-edit.ts purposeAfterEdit).
+                  proposal: { ...input.block, stimulus_note: (input.rationale ?? "").trim() || undefined },
                   outcome: null,
                 })
                 .select("id")
