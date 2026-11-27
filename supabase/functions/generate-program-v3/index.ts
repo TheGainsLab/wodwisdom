@@ -479,6 +479,19 @@ async function stageSkeleton(
         const notesNeededIt = notes.length > 0 &&
           (drift.length === 0 || (await classifyNotesForReplan(notes)) === "replan");
         replan = { failed: true, notesNeededIt };
+        // Recorded (founder, 2026-11-26): the member gets this week from the
+        // month's old plan, not the re-plan their profile or notes asked for.
+        await logGenerationAudit(supa, {
+          user_id: job.user_id,
+          program_id: rs.continuation.programId ?? null,
+          month_number: rs.continuation.monthNumber,
+          stage: "replan_fallback",
+          violations: [
+            `week ${weekNum}: the re-plan failed, so this week was written from the month's old plan. ` +
+            `Asked for by: ${[drift.length ? `profile (${drift.join("; ")})` : "", notes.length ? `notes (${notes.join(" | ").slice(0, 300)})` : ""].filter(Boolean).join(" + ")}. ` +
+            `Error: ${(e instanceof Error ? e.message : String(e)).slice(0, 300)}`,
+          ],
+        }).catch((err) => console.warn("[generate-program-v3] replan_fallback log failed (non-fatal):", err));
       }
     }
     // The prior weeks the fill progresses from are the program AS IT STANDS
@@ -726,7 +739,9 @@ async function stageMetcons(
     warnings: audit.warnings,
     retried,
     meta: {
-      ...(retried ? { first_pass_violations: firstPassViolations } : {}),
+      // The retry ships whether or not it is better: the two counts show
+      // which (founder, 2026-11-26).
+      ...(retried ? { first_pass_violations: firstPassViolations, first_pass_count: firstPassViolations.length, after_retry_count: audit.violations.length } : {}),
       ...(repairs.length ? { repairs } : {}),
     },
   });
@@ -787,9 +802,21 @@ async function stageFillWeek(
   return { next, resumeState: { ...rs, weeks }, displayStage: next };
 }
 
+/** Every weight the 1RM clamp lowered, recorded (founder, 2026-11-26). */
+async function logLoadClamp(supa: SupabaseClient, job: ProgramJobRow, rs: ResumeState, lines: string[]): Promise<void> {
+  if (lines.length === 0) return;
+  await logGenerationAudit(supa, {
+    user_id: job.user_id,
+    program_id: rs.continuation.programId ?? rs.programId ?? null,
+    month_number: rs.continuation.monthNumber,
+    stage: "load_clamp",
+    violations: lines,
+  }).catch((e) => console.warn("[generate-program-v3] load_clamp log failed (non-fatal):", e));
+}
+
 async function stageBenchmarkAudit(
-  _supa: SupabaseClient,
-  _job: ProgramJobRow,
+  supa: SupabaseClient,
+  job: ProgramJobRow,
   rs: ResumeState,
 ): Promise<StageOutcome> {
   const payload = rs.payload!;
@@ -813,6 +840,7 @@ async function stageBenchmarkAudit(
     if (patch.patched > 0) {
       console.log(`[generate-program-v3] programmatic patches applied: ${patch.patched}`);
       for (const line of patch.log) console.log(`  - ${line}`);
+      await logLoadClamp(supa, job, rs, patch.log);
       pendingFailures = await recomputeBenchmarks(output, gender, pendingFailures, PACK, []);
       auditResult = auditOutput(output, payload, skeleton, PACK, rs.weekly ? 1 : 4);
       console.log(`[generate-program-v3] audits after patch: ${summarizeAuditRun(auditResult)}`);
@@ -907,6 +935,7 @@ async function stageSurgical(
     const patch2 = applyProgrammaticFixes(output, byKind["programmatic-fix"], payload, PACK);
     if (patch2.patched > 0) {
       for (const line of patch2.log) console.log(`  - ${line}`);
+      await logLoadClamp(supa, job, rs, patch2.log);
       pendingFailures = await recomputeBenchmarks(output, gender, pendingFailures, PACK, []);
       auditResult = auditOutput(output, payload, skeleton, PACK, rs.weekly ? 1 : 4);
       if (auditResult.passed) return { next: "safety_review", resumeState: toSafety(rs, output, []), displayStage: "safety_review" };

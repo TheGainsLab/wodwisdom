@@ -184,3 +184,11 @@ Deno.test("days per week: the default of 5 stays, and using it (or a number outs
   const gen = read("generate-program-v3/index.ts");
   assert(gen.includes('stage: "payload_default"') && gen.includes("daysPerWeekLogLine("));
 });
+
+Deno.test("the 1RM clamp, a failed re-plan and the composer's retry counts are recorded", () => {
+  const gen = read("generate-program-v3/index.ts");
+  assert(gen.includes('stage: "load_clamp"'));
+  assertEquals((gen.match(/await logLoadClamp\(supa, job, rs, patch2?\.log\);/g) ?? []).length, 2);
+  assert(gen.includes('stage: "replan_fallback"') && gen.includes("the re-plan failed, so this week was written from the month's old plan"));
+  assert(gen.includes("first_pass_count: firstPassViolations.length, after_retry_count: audit.violations.length"));
+});
