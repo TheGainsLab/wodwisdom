@@ -10,7 +10,8 @@
  * no job, no audit log, no coach state.
  *
  * Because it starts from the last build's stored inputs, a profile change
- * made since that build is not reflected.
+ * made since that build is not reflected. The movement list is the one
+ * exception: it is read fresh, as a build reads it.
  *
  * Service role only. Two steps, because the planner and the composer
  * together do not fit one request:
@@ -30,7 +31,7 @@ import { callSkeletonWriter, generateSkeletonWithAudits } from "../_shared/engin
 import { auditSkeletonMetconMix, formatSkeletonViolationsForRetry } from "../_shared/v3-skeleton-audits.ts";
 import { buildCoachStateDocumentBlock, type CoachStateContent } from "../_shared/coach-state.ts";
 import type { TrainingDesignInput } from "../_shared/training-design-input.ts";
-import type { WriterPayload } from "../_shared/build-writer-payload.ts";
+import { fetchVocabulary, type WriterPayload } from "../_shared/build-writer-payload.ts";
 import type { SkeletonOutput } from "../_shared/v3-output-schema.ts";
 import {
   type ComposedMetcon,
@@ -113,6 +114,14 @@ Deno.serve(async (req) => {
   try {
     const build = await loadLastBuild(supa, userId);
     if (!build) return json({ error: "this member has no finished build with stored inputs to run from" }, 404);
+    // The movement list is read fresh, as a build reads it: the stored build
+    // holds the list as it was on the day it ran, so a change to the list
+    // made since would not show in the dry run.
+    const listNow = await fetchVocabulary(supa);
+    if (listNow.length > 0) {
+      build.tdi = { ...build.tdi, vocabulary: listNow };
+      build.payload = { ...build.payload, vocabulary: listNow };
+    }
     const from = { job_id: build.job_id, built_at: build.built_at, month_number: build.monthNumber };
 
     if (step === "plan") {
