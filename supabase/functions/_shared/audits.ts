@@ -25,6 +25,7 @@
  *   7. Movement vocabulary compliance (display_name match)
  */
 
+import { TIME_DOMAINS } from "./conditioning-definitions.ts";
 import { liftKeyOf } from "./lift-key.ts";
 import {
   BLOCK_TYPES,
@@ -737,9 +738,8 @@ export function auditSchemeFormat(output: WriterOutput): AuditResult {
  *      tolerance range — surgical retry then adjusts volume.
  *
  * Tolerance ranges (loose at boundaries so 5-10% rounding doesn't fire):
- *   short:  ≤ 540s        (label: under 8 min; allow up to 9 min)
- *   medium: 420s – 960s   (label: 8-15 min; allow 7-16 min)
- *   long:   ≥ 840s        (label: 15+ min; allow as low as 14 min)
+ *   The definitions come from conditioning-definitions.ts TIME_DOMAINS (short
+ *   under 7, medium 7–14, long 14–22), with one minute of slack each side.
  *
  * Skips when:
  *   - No skeleton context (ingestion path)
@@ -766,10 +766,11 @@ function parseMetconFocusBucket(focus: string | null | undefined): TimeDomainBuc
 }
 
 interface BucketRange { min: number; max: number; label: string }
+const SLACK_MIN = 1;
 const BUCKET_RANGES: Record<TimeDomainBucket, BucketRange> = {
-  short:  { min: 0,    max: 540,        label: "≤ 9 min" },
-  medium: { min: 420,  max: 960,        label: "7–16 min" },
-  long:   { min: 840,  max: Infinity,   label: "≥ 14 min" },
+  short:  { min: 0, max: (TIME_DOMAINS.short.maxMinutes + SLACK_MIN) * 60, label: `under ${TIME_DOMAINS.short.maxMinutes} min` },
+  medium: { min: (TIME_DOMAINS.medium.minMinutes - SLACK_MIN) * 60, max: (TIME_DOMAINS.medium.maxMinutes + SLACK_MIN) * 60, label: `${TIME_DOMAINS.medium.minMinutes}–${TIME_DOMAINS.medium.maxMinutes} min` },
+  long:   { min: (TIME_DOMAINS.long.minMinutes - SLACK_MIN) * 60, max: (TIME_DOMAINS.long.maxMinutes + SLACK_MIN) * 60, label: `${TIME_DOMAINS.long.minMinutes}–${TIME_DOMAINS.long.maxMinutes} min` },
 };
 
 // deno-lint-ignore no-explicit-any

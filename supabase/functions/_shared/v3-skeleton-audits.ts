@@ -17,6 +17,7 @@
  * tool_use schema enforcement is imperfect — see audits.ts notes).
  */
 
+import { timeDomainForMinutes } from "./conditioning-definitions.ts";
 import { BLOCK_TYPES } from "./v2-output-schema.ts";
 import type {
   DaySkeleton,
@@ -68,7 +69,7 @@ export function auditSkeletonMetconMix(skeleton: SkeletonOutput): SkeletonAuditR
     const m = f.match(/\((\d+)(?:\s*[-–—]\s*(\d+))?\s*min/);
     if (m) {
       const upper = parseInt(m[2] ?? m[1], 10);
-      return upper <= 8 ? "short" : upper <= 15 ? "medium" : "long";
+      return timeDomainForMinutes(upper);
     }
     if (/\bshort\b/.test(f)) return "short";
     if (/\blong\b/.test(f)) return "long";

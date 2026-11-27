@@ -13,6 +13,7 @@
  * failures by `kind` and routes block-local ones here.
  */
 
+import { TIME_DOMAINS_LINE } from "./conditioning-definitions.ts";
 import type { BlockPrescription, WriterOutput } from "./v2-output-schema.ts";
 import { buildEmitBlockTool } from "./v2-output-schema.ts";
 import type { SkeletonOutput } from "./v3-output-schema.ts";
@@ -42,7 +43,7 @@ You will emit: ONE corrected block via the \`emit_block\` tool, matching the sam
 
 RULES (honor every one):
 - Stay true to the skeleton's intent. If metcon_focus says "long aerobic chipper", the rewrite is still a long aerobic chipper — just one that fixes the violations.
-- Time domain: the skeleton's metcon_focus STARTS with the time domain (short / medium / long). Keep the block in it: short = under 9 min, medium = 7-16 min, long = 14+ min. Take the time domain from that first word only; other words in the line (aerobic, sprint, power) describe the feel, not the length. No check rewrites a block for its duration.
+- Time domain: the skeleton's metcon_focus STARTS with the time domain (short / medium / long). Keep the block in it: ${TIME_DOMAINS_LINE}. Take the time domain from that first word only; other words in the line (aerobic, sprint, power) describe the feel, not the length. No check rewrites a block for its duration.
 - COMPOSED METCON: when the user message carries a COMPOSED PIECE, the block is a metcon that a month-sighted composer already designed. It is NOT yours to redesign. Keep its movements, format, scheme, duration and purpose exactly, and change ONLY what the audit violations name (a missing field, a misplaced max_effort flag, a format field that does not match the rows). If a violation can only be fixed by changing a movement, change that one movement and nothing else.
 - Honor injuries / do-not-program list.
 - All weights in the athlete's units.

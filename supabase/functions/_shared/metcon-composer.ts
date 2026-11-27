@@ -34,6 +34,7 @@
  * floor 2–3 pieces for capable athletes.
  */
 
+import { timeDomainForMinutes } from "./conditioning-definitions.ts";
 import { MODELS } from "./model-profiles.ts";
 import {
   METCON_COMPOSER_ENGINE_ADDENDUM,
@@ -207,9 +208,7 @@ export function parseSlotTimeDomain(focus: string): MetconTimeDomain {
   const m = focus.match(/\((\d+)(?:\s*[-–—]\s*(\d+))?\s*min/i);
   if (m) {
     const upper = parseInt(m[2] ?? m[1], 10);
-    if (upper <= 8) return "short";
-    if (upper <= 15) return "medium";
-    return "long";
+    return timeDomainForMinutes(upper);
   }
   if (/\bshort\b/.test(f)) return "short";
   if (/\blong\b/.test(f)) return "long";
