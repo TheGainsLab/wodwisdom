@@ -65,6 +65,7 @@ export interface SkeletonAuditContext {
  * Checks per week (weeks with 3+ metcon days):
  *   - every domain present (≥1 short, ≥1 medium, ≥1 long) — deload included
  *   - no domain over ceil(n/3)+1 slots (a priority moves at most ~one slot)
+ *   - the time domains do not fall on the same days as the week before
  */
 export function auditSkeletonMetconMix(skeleton: SkeletonOutput, fromWeek = 1): SkeletonAuditResult {
   const violations: string[] = [];
@@ -98,6 +99,25 @@ export function auditSkeletonMetconMix(skeleton: SkeletonOutput, fromWeek = 1): 
         );
       }
     }
+  }
+  // Rotation (founder, 2026-11-27): the day that carries each time domain
+  // changes from week to week, so no day is always the long day. Two weeks
+  // in a row with the same order is a miss. On a re-plan the first
+  // re-planned week is compared with the written week before it.
+  const orderOf = (wk: { days?: Array<Parameters<typeof metconTimeDomainOfDay>[0] & { block_types?: string[]; day_num: number }> }) =>
+    (wk.days ?? [])
+      .filter((d) => (d.block_types ?? []).includes("metcon"))
+      .map((d) => `D${d.day_num} ${metconTimeDomainOfDay(d) ?? "none"}`);
+  const byNum = new Map((skeleton.weeks ?? []).map((w) => [w.week_num, w]));
+  for (const wk of skeleton.weeks ?? []) {
+    if (wk.week_num < fromWeek) continue;
+    const prev = byNum.get(wk.week_num - 1);
+    if (!prev) continue;
+    const now = orderOf(wk), before = orderOf(prev);
+    if (now.length < 3 || now.join("|") !== before.join("|")) continue;
+    violations.push(
+      `Week ${wk.week_num}: the metcon time domains fall on the same days as week ${prev.week_num} (${now.join(" · ")}) — rotate them, so a day's time domain changes from week to week.`,
+    );
   }
   return { rule: "metcon_time_domain_mix", passed: violations.length === 0, violations };
 }

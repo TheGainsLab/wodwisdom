@@ -153,9 +153,28 @@ Deno.test("the time-domain mix reads the typed field, flags a metcon with none, 
   const missing: Any = { weeks: [week(1, ["short", "medium", "long", null])] };
   assert(auditSkeletonMetconMix(missing).violations.some((v) => v.includes("Day 4: the metcon has no time domain")));
   // Re-plan from week 3: weeks 1-2 are written and not counted.
-  const replanned: Any = { weeks: [week(1, ["long", "long", "long"]), week(2, ["long", "long", "long"]), week(3, ["short", "medium", "long"]), week(4, ["short", "medium", "long"])] };
+  const replanned: Any = { weeks: [week(1, ["long", "long", "long"]), week(2, ["long", "long", "long"]), week(3, ["short", "medium", "long"]), week(4, ["medium", "long", "short"])] };
   assertEquals(auditSkeletonMetconMix(replanned).passed, false);
   assertEquals(auditSkeletonMetconMix(replanned, 3).passed, true);
+});
+
+Deno.test("the time domains rotate: two weeks in a row with the same days is a miss, sent back like the mix", () => {
+  const week = (n: number, domains: string[]) => ({ week_num: n, weekly_intent: "build", days: domains.map((d, i) => day(i + 1, { metcon_time_domain: d })) });
+  const fixed: Any = { weeks: [1, 2, 3, 4].map((n) => week(n, ["medium", "long", "short", "long", "medium"])) };
+  const r = auditSkeletonMetconMix(fixed);
+  assertEquals(r.violations.length, 3);
+  assert(r.violations[0].includes("Week 2: the metcon time domains fall on the same days as week 1 (D1 medium · D2 long · D3 short · D4 long · D5 medium)"));
+  const rotated: Any = { weeks: [
+    week(1, ["medium", "long", "short", "long", "medium"]), week(2, ["long", "short", "medium", "medium", "long"]),
+    week(3, ["short", "medium", "long", "medium", "long"]), week(4, ["medium", "long", "short", "long", "medium"]),
+  ] };
+  assertEquals(auditSkeletonMetconMix(rotated).passed, true); // week 4 may match week 1: only neighbours are compared
+  // A re-plan from week 3 is compared with written week 2.
+  const replan: Any = { weeks: [week(1, ["short", "medium", "long"]), week(2, ["long", "short", "medium"]), week(3, ["long", "short", "medium"]), week(4, ["medium", "long", "short"])] };
+  assert(auditSkeletonMetconMix(replan, 3).violations.some((v) => v.startsWith("Week 3:")));
+  // Two metcon days a week: not counted.
+  assertEquals(auditSkeletonMetconMix({ weeks: [week(1, ["short", "long"]), week(2, ["short", "long"])] } as Any).passed, true);
+  assert(V3_SKELETON_SYSTEM_PROMPT.includes("ROTATE THE DAYS"));
 });
 
 Deno.test("the mix is counted on a first build and on a re-plan, and the planner reads the Theoretical Template", () => {
