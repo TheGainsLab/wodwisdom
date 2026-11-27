@@ -21,6 +21,7 @@
  *     parameterization pattern as v2's EMIT_PROGRAM_TOOL).
  */
 
+import { PLAN_SKILL_OPTIONS } from "./skills-plan.ts";
 import { BLOCK_TYPES, MONTH_PLAN_SCHEMA, type BlockType, type MonthPlan } from "./v2-output-schema.ts";
 import { FOCUS_AREAS, type FocusArea } from "./coach-state.ts";
 
@@ -93,6 +94,12 @@ export interface DaySkeleton {
    * Gym classes still write it, with the metcon's minutes.
    */
   metcon_focus?: string;
+  /**
+   * If a skills block is present: the one or two skills it trains, from the
+   * fixed list (skills-plan.ts PLAN_SKILL_OPTIONS). Individual programs,
+   * planned from 2026-11-28; older months and gym classes have none.
+   */
+  skill_names?: string[];
   /**
    * If a skills block is present: the skill or family being trained.
    * E.g., "Deficit HSPU progression", "Ring MU technique", "Skill maintenance EMOM".
@@ -167,6 +174,13 @@ function buildDaySkeletonSchema(daysPerWeek: number) {
         type: "string",
         maxLength: 300,
         description: "Leave out unless the KEY RULES ask for it (group classes state the metcon's minutes here).",
+      },
+      skill_names: {
+        type: "array",
+        minItems: 1,
+        maxItems: 2,
+        description: "Individual programs: REQUIRED on every day that has a skills block. The one or two skills the block trains.",
+        items: { type: "string", enum: [...PLAN_SKILL_OPTIONS] },
       },
       skill_focus: { type: "string", maxLength: 300 },
       block_intents: {

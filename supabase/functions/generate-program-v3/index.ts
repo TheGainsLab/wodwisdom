@@ -27,8 +27,9 @@ import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supa
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { buildWriterPayload, daysPerWeekLogLine, fetchMovementsByBlock, movementListFor, type WriterPayload } from "../_shared/build-writer-payload.ts";
 import { generateAndPersistCoachState } from "../_shared/generate-coach-state.ts";
-import { buildCoachStateDocumentBlock } from "../_shared/coach-state.ts";
 import { deriveMetconSlots, describeComposedPiece } from "../_shared/metcon-composer.ts";
+import { planCounts, plannerDocument } from "../_shared/planner-inputs.ts";
+import { stripSkillAreasFromTdi } from "../_shared/skills-plan.ts";
 import { COMPOSER_ARTICLES, loadArticleBlock, loadExampleBlock, PLANNER_ARTICLES } from "../_shared/metcon-library.ts";
 import { buildComposerInputs, composeMetconsForSlots } from "../_shared/compose-metcons.ts";
 import {
@@ -72,7 +73,6 @@ import { type BlockLocation, missingBenchmarkLines } from "../_shared/compute-bl
 // instead of inlining it. See _shared/engine/pipeline.ts.
 import {
   auditCardioPlan,
-  auditSkeletonMetconMix,
   formatSkeletonViolationsForRetry,
   stripCardioBlocks,
 } from "../_shared/v3-skeleton-audits.ts";
@@ -381,7 +381,9 @@ async function stageCoachState(
   // need it. Null (no block marks, or unreadable) = everyone gets the whole list.
   const payloadForBuild: WriterPayload = { ...payload, vocabulary_by_block: await fetchMovementsByBlock(supa) };
 
-  const trainingDesignInput = buildTrainingDesignInput(coachState, {
+  // The planner is not given the four skill areas (founder, 2026-11-28): it
+  // plans the skills block from the athlete's own skill ratings and goal.
+  const trainingDesignInput = stripSkillAreasFromTdi(buildTrainingDesignInput(coachState, {
     days_per_week: payload.training_context.days_per_week,
     // Session-budget observe phase (2026-08-31): thread the athlete's stated
     // time budget to the skeleton. Null when never stated — the skeleton then
@@ -395,7 +397,7 @@ async function stageCoachState(
     lifts: payload.lifts,
     previous_cycle: payload.previous_cycle,
     cardio_allowed: cardioAllowed,
-  });
+  }));
 
   return {
     next: "skeleton",
@@ -428,7 +430,7 @@ async function withMixCheck(
   },
 ): Promise<SkeletonOutput> {
   let skeleton = o.skeleton;
-  let mix = auditSkeletonMetconMix(skeleton, o.fromWeek);
+  let mix = planCounts(skeleton, o.fromWeek);
   let mixRetried = false;
   if (!mix.passed) {
     mixRetried = true;
@@ -442,7 +444,7 @@ async function withMixCheck(
         trainingDesignInput: o.tdi,
       });
       const retrySkeleton = o.finish ? o.finish(retryRaw) : retryRaw;
-      const retryMix = auditSkeletonMetconMix(retrySkeleton, o.fromWeek);
+      const retryMix = planCounts(retrySkeleton, o.fromWeek);
       if (hard.passed && retryMix.violations.length < mix.violations.length) {
         skeleton = retrySkeleton;
         mix = retryMix;
@@ -483,8 +485,7 @@ async function stageSkeleton(
   // The planner also reads the Theoretical Template article (founder,
   // 2026-11-27). "" when the library cannot be read: the build goes on.
   const plannerArticles = await loadArticleBlock(supa, PLANNER_ARTICLES);
-  const intentDocument = [rs.coachState ? buildCoachStateDocumentBlock(rs.coachState) : "", plannerArticles]
-    .filter(Boolean).join("\n\n");
+  const intentDocument = plannerDocument(rs.coachState ?? null, rs.payload!, plannerArticles);
 
   // WEEK JOB (PR 4): the month's skeleton already exists. Load it; if the
   // athlete's notes touch what the skeleton owns (which lifts, how much

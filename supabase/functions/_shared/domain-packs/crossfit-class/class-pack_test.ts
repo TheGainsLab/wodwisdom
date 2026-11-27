@@ -69,7 +69,11 @@ Deno.test("class recap states the template + owner split + clock; base recap unc
 
 Deno.test("class pack inherits everything else from crossfit@3", () => {
   assertEquals(CROSSFIT_CLASS_PACK.id, "crossfit_class@1");
-  assertEquals(CROSSFIT_CLASS_PACK.writer.skeletonSystemPrompt, CROSSFIT_PACK.writer.skeletonSystemPrompt);
+  // A class keeps the planner text as it was; individual programs plan skills
+  // from the athlete's own ratings (2026-11-28), which a class does not have.
+  assertEquals(CROSSFIT_CLASS_PACK.writer.skeletonSystemPrompt.includes("SKILLS BLOCK — DEVELOP vs MAINTAIN"), true);
+  assertEquals(CROSSFIT_PACK.writer.skeletonSystemPrompt.includes("THE SKILLS BLOCK — YOURS TO DECIDE"), true);
+  assertEquals(CROSSFIT_CLASS_PACK.writer.weekFillSystemPrompt, CROSSFIT_PACK.writer.weekFillSystemPrompt);
   assertEquals(CROSSFIT_CLASS_PACK.audits.runHard, CROSSFIT_PACK.audits.runHard);
   assertEquals(CROSSFIT_CLASS_PACK.recovery, CROSSFIT_PACK.recovery);
   assertEquals(CROSSFIT_CLASS_PACK.scaling, CROSSFIT_PACK.scaling);
