@@ -201,3 +201,14 @@ Deno.test("no per-round rep ranges for skills, and no code checking skill volume
   const composer = read("_shared/metcon-composer-prompt.ts");
   assert(!composer.includes("SKILL_FATIGUE_BANDS_PROMPT") && composer.includes("${SKILL_RATINGS_PROMPT}"));
 });
+
+Deno.test("the admin rebuild can rebuild any month of a program, month 1 included", () => {
+  const gen = read("generate-program-v3/index.ts");
+  assert(gen.includes("if (monthNumber < 1 || (!isServiceCall && monthNumber < 2)) {"));
+  assert(!gen.includes("      if (monthNumber < 2) {\n        return jsonErr(400"));
+  // The rebuild names the month it cleared and passes the program.
+  const rebuild = read("admin-rebuild-month/index.ts");
+  assert(rebuild.includes("body: JSON.stringify({ program_id: program.id, user_id: targetUserId, month_number: month })"));
+  const next = read("generate-next-month/index.ts");
+  assert(next.includes("...(appendToProgramId ? { program_id: appendToProgramId } : {}),") && next.includes("month_number: targetMonth,"));
+});
