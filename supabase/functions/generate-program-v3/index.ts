@@ -828,8 +828,8 @@ async function stageBenchmarkAudit(
 }
 
 async function stageSurgical(
-  _supa: SupabaseClient,
-  _job: ProgramJobRow,
+  supa: SupabaseClient,
+  job: ProgramJobRow,
   rs: ResumeState,
 ): Promise<StageOutcome> {
   const payload = rs.payload!;
@@ -864,6 +864,19 @@ async function stageSurgical(
   // last clean state.
   const sg = await applySurgicalFixes(output, byKind["block-local"], payload, skeleton, PACK, rs.composedMetcons ?? []);
   console.log(`[generate-program-v3] surgical pass ${pass}: rewritten=${sg.rewritten} failed=${sg.failed}`);
+  // Every rewrite is recorded: what the block was, what it became, and why
+  // (founder, 2026-11-26 — rewrites used to leave no record). Changes nothing.
+  if (sg.rewrites.length > 0) {
+    await logGenerationAudit(supa, {
+      user_id: job.user_id,
+      program_id: rs.continuation.programId ?? rs.programId ?? null,
+      month_number: rs.continuation.monthNumber,
+      stage: "block_rewrite",
+      violations: sg.rewrites.map((r) =>
+        `W${r.week}D${r.day} block[${r.blockIdx}] (${r.block_type}) rewritten — why: ${r.reasons.join(" / ").slice(0, 400)} | before: ${r.before} | after: ${r.after}`),
+      meta: { pass },
+    }).catch((e) => console.warn("[generate-program-v3] block_rewrite log failed (non-fatal):", e));
+  }
   if (sg.rewritten === 0) {
     // LLM call(s) failed — stall, ship with residuals.
     console.log(`[generate-program-v3] surgical stalled at pass ${pass} (LLM call(s) failed); shipping residuals`);

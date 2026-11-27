@@ -567,6 +567,36 @@ export function applyProgrammaticFixes(
   return { patched: totalPatched, log };
 }
 
+/** One block as a single readable line, for the rewrite log: its header and
+ *  each movement with its quantity. */
+export function blockLine(b: { block_type?: string; block_scheme?: string | null; movements?: Array<Record<string, unknown>> } | null | undefined): string {
+  if (!b) return "(none)";
+  const mv = (b.movements ?? []).map((m) => {
+    const q: string[] = [];
+    if (m.sets) q.push(`${m.sets}x`);
+    if (Array.isArray(m.rep_scheme) && m.rep_scheme.length) q.push(`[${(m.rep_scheme as number[]).join(",")}]`);
+    else if (m.reps) q.push(String(m.reps));
+    if (m.calories) q.push(`${m.calories} cal`);
+    if (m.distance) q.push(`${m.distance}${m.distance_unit ?? ""}`);
+    if (m.time_seconds) q.push(`${m.time_seconds}s`);
+    if (m.weight) q.push(`@${m.weight}${m.weight_unit ?? ""}`);
+    return `${m.movement}${q.length ? " " + q.join(" ") : ""}`;
+  });
+  return `${b.block_scheme ?? ""}${b.block_scheme ? ": " : ""}${mv.join("; ")}`.slice(0, 600);
+}
+
+/** What one block rewrite changed, for the log (2026-11-26: rewrites used to
+ *  leave no record). */
+export interface BlockRewrite {
+  week: number;
+  day: number;
+  blockIdx: number;
+  block_type: string;
+  reasons: string[];
+  before: string;
+  after: string;
+}
+
 /** Run one round of surgical block rewrites for the supplied block-local
  *  failures. Each unique block gets ONE LLM call. Splices results back in place. */
 export async function applySurgicalFixes(
@@ -580,9 +610,10 @@ export async function applySurgicalFixes(
    *  (2026-11-26): the rewrite used to work from the planner's one line and
    *  could return a different workout from the one the composer designed. */
   composedMetcons: ComposedMetcon[] = [],
-): Promise<{ rewritten: number; failed: number; locations: BlockLocation[] }> {
+): Promise<{ rewritten: number; failed: number; locations: BlockLocation[]; rewrites: BlockRewrite[] }> {
   const groups = groupBlockLocalFailures(blockLocalFailures);
-  if (groups.length === 0) return { rewritten: 0, failed: 0, locations: [] };
+  const rewrites: BlockRewrite[] = [];
+  if (groups.length === 0) return { rewritten: 0, failed: 0, locations: [], rewrites };
 
   let rewritten = 0;
   let failed = 0;
@@ -592,6 +623,7 @@ export async function applySurgicalFixes(
     const day = week?.days?.find((d) => d.day_num === g.day);
     const block = day?.blocks?.[g.blockIdx];
     if (!block) { failed++; continue; }
+    const before = blockLine(block as unknown as Parameters<typeof blockLine>[0]);
 
     const composed = block.block_type === "metcon"
       ? composedMetcons.find((m) => m.week_num === g.week && m.day_num === g.day) ?? null
@@ -614,12 +646,16 @@ export async function applySurgicalFixes(
     if (pack.recovery.spliceBlock(output, g.week, g.day, g.blockIdx, corrected)) {
       rewritten++;
       locations.push({ week: g.week, day: g.day, blockIdx: g.blockIdx });
+      rewrites.push({
+        week: g.week, day: g.day, blockIdx: g.blockIdx, block_type: String(corrected.block_type ?? block.block_type ?? ""),
+        reasons: g.violations, before, after: blockLine(corrected as unknown as Parameters<typeof blockLine>[0]),
+      });
       console.log(`[engine] surgical rewrote w${g.week}d${g.day}b${g.blockIdx} (${g.violations.length} violation${g.violations.length === 1 ? "" : "s"})`);
     } else {
       failed++;
     }
   }
-  return { rewritten, failed, locations };
+  return { rewritten, failed, locations, rewrites };
 }
 
 // ============================================================

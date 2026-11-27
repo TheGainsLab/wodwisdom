@@ -151,3 +151,26 @@ Deno.test("skill ratings: each rating is defined in the founder's words, and non
   assert(read("_shared/v2-system-prompt.ts").includes("${SKILL_RATINGS_PROMPT}"));
   assert(read("_shared/metcon-composer-prompt.ts").includes("${SKILL_RATINGS_PROMPT}"));
 });
+
+Deno.test("every block rewrite is recorded: before, after and why", async () => {
+  const { applySurgicalFixes, blockLine } = await import("./engine/pipeline.ts");
+  const output: Any = { month_plan: {}, weeks: [{ week_num: 1, days: [{ day_num: 3, blocks: [
+    { block_type: "metcon", block_scheme: "4 rounds", movements: [{ movement: "Row", calories: 15 }, { movement: "Echo Bike", calories: 12 }] },
+  ] }] }] };
+  const pack: Any = { recovery: {
+    surgicallyRewriteBlock: () => Promise.resolve({ block_type: "metcon", scheme_format: { format: "rft", rounds: 4 }, movements: [{ movement: "Row", calories: 15 }, { movement: "Burpee", rep_scheme: [10] }] }),
+    spliceBlock: (out: Any, _w: number, _d: number, i: number, nb: Any) => { out.weeks[0].days[0].blocks[i] = nb; return true; },
+  } };
+  const failures: Any = [{ rule: "metcon_one_monostructural", passed: false, violations: ["Week 1 Day 3 block[0] (metcon): contains 2 monostructural cardio modalities"] }];
+  const r = await applySurgicalFixes(output, failures, { basics: {}, training_context: {} } as Any, { weeks: [] } as Any, pack, []);
+  assertEquals(r.rewrites.length, 1);
+  const w = r.rewrites[0];
+  assertEquals([w.week, w.day, w.blockIdx, w.block_type], [1, 3, 0, "metcon"]);
+  assertEquals(w.before, "4 rounds: Row 15 cal; Echo Bike 12 cal");
+  assert(w.after.includes("Burpee [10]"));
+  assert(w.reasons[0].includes("2 monostructural cardio modalities"));
+  assertEquals(blockLine(null), "(none)");
+  const gen = read("generate-program-v3/index.ts");
+  const stage = gen.slice(gen.indexOf("async function stageSurgical("), gen.indexOf("async function stageSafetyReview("));
+  assert(stage.includes('stage: "block_rewrite"') && stage.includes("before: ${r.before} | after: ${r.after}"));
+});
