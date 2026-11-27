@@ -24,10 +24,19 @@
  *     → { pieces, text, violations, warnings, retried, first_pass_violations }
  *   For week 2+, pass the earlier weeks' pieces as prior_pieces: the composer
  *   is shown them as the month so far, as in a real weekly job.
+ *
+ *   POST { "user_id": "...", "step": "write", "skeleton": <from plan>,
+ *          "week": 1, "pieces": <from compose>, "prior_weeks": [] }
+ *     → { text, checks_would_flag, week_written }
+ *   The writer's week: every block of every day, with what the plan asked for
+ *   beside it. The rewriter and the finish-time estimates are not run. What
+ *   the member logged is not shown to the writer (a dry-run plan is not the
+ *   plan they trained).
  */
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getDomainPack } from "../_shared/domain-packs/registry.ts";
-import { callSkeletonWriter, generateSkeletonWithAudits } from "../_shared/engine/pipeline.ts";
+import { auditOutput, callSkeletonWriter, callWeekFill, generateSkeletonWithAudits } from "../_shared/engine/pipeline.ts";
+import { renderWeekSchemesInPlace } from "../_shared/compose-block-scheme.ts";
 import { auditSkeletonMetconMix, formatSkeletonViolationsForRetry } from "../_shared/v3-skeleton-audits.ts";
 import { buildCoachStateDocumentBlock, type CoachStateContent } from "../_shared/coach-state.ts";
 import type { TrainingDesignInput } from "../_shared/training-design-input.ts";
@@ -39,7 +48,7 @@ import {
   describeComposedPiece,
   normalizeMetconTimeDomains,
 } from "../_shared/metcon-composer.ts";
-import { pieceAsText, timeDomainTable } from "../_shared/metcon-dry-run-text.ts";
+import { pieceAsText, timeDomainTable, weekAsText } from "../_shared/metcon-dry-run-text.ts";
 import { buildComposerInputs, composeMetconsForSlots } from "../_shared/compose-metcons.ts";
 import { COMPOSER_ARTICLES, loadArticleBlock, loadExampleBlock, PLANNER_ARTICLES } from "../_shared/metcon-library.ts";
 import { loadMonthStore } from "../_shared/weekly-fill.ts";
@@ -106,8 +115,8 @@ Deno.serve(async (req) => {
   try { body = await req.json(); } catch { return json({ error: "send a JSON body" }, 400); }
   const userId = typeof body?.user_id === "string" ? body.user_id : "";
   const step = body?.step;
-  if (!userId || (step !== "plan" && step !== "compose")) {
-    return json({ error: 'send { "user_id": "...", "step": "plan" | "compose" }' }, 400);
+  if (!userId || (step !== "plan" && step !== "compose" && step !== "write")) {
+    return json({ error: 'send { "user_id": "...", "step": "plan" | "compose" | "write" }' }, 400);
   }
   const supa = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
@@ -151,6 +160,35 @@ Deno.serve(async (req) => {
         time_domains: timeDomainTable(skeleton),
         mix: { passed: mix.passed, violations: mix.violations, sent_back: mixRetried, first_pass_violations: mixRetried ? firstMix : [] },
         skeleton,
+      });
+    }
+
+    if (step === "write") {
+      // The writer, for one week, exactly as a build calls it: the plan, that
+      // week's composed metcons, and the weeks before it. The rewriter and the
+      // finish-time estimates are NOT run, so this is the writer's own work.
+      if (!body.skeleton?.weeks) return json({ error: 'write needs "skeleton": the skeleton returned by the plan step' }, 400);
+      const skeleton = normalizeMetconTimeDomains(body.skeleton as SkeletonOutput);
+      const week = Number.isInteger(body.week) ? body.week : 1;
+      const pieces: ComposedMetcon[] = (Array.isArray(body.pieces) ? body.pieces : []).filter((p: ComposedMetcon) => p.week_num === week);
+      const priorWeeks = Array.isArray(body.prior_weeks) ? body.prior_weeks : [];
+      const wk = await callWeekFill(build.payload, skeleton, week, priorWeeks, "", PACK, pieces);
+      renderWeekSchemesInPlace(wk);
+      // As a build does: the composer's purpose goes on the metcon block.
+      for (const m of pieces) {
+        const metconBlock = wk.days?.find((d) => d.day_num === m.day_num)?.blocks?.find((b) => b.block_type === "metcon");
+        if (metconBlock && m.stimulus_note?.trim()) (metconBlock as { stimulus_note?: string }).stimulus_note = m.stimulus_note.trim().slice(0, 500);
+      }
+      // What the checks after the writer would send for a rewrite. Listed, not acted on.
+      const audit = auditOutput({ month_plan: skeleton.month_plan, weeks: [wk] } as never, build.payload, skeleton, PACK, 1);
+      const skeletonWeek = (skeleton.weeks ?? []).find((w) => w.week_num === week);
+      return json({
+        dry_run: true, saved: "nothing", from, week,
+        list_by_block: build.payload.vocabulary_by_block != null,
+        composed_metcons_given: pieces.length,
+        checks_would_flag: (audit as { failures?: unknown }).failures ?? audit,
+        text: weekAsText(wk, skeletonWeek),
+        week_written: wk,
       });
     }
 
