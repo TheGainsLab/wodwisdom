@@ -37,8 +37,10 @@ import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supa
 import { getDomainPack } from "../_shared/domain-packs/registry.ts";
 import { auditOutput, callSkeletonWriter, callWeekFill, generateSkeletonWithAudits } from "../_shared/engine/pipeline.ts";
 import { renderWeekSchemesInPlace } from "../_shared/compose-block-scheme.ts";
-import { auditSkeletonMetconMix, formatSkeletonViolationsForRetry } from "../_shared/v3-skeleton-audits.ts";
-import { buildCoachStateDocumentBlock, type CoachStateContent } from "../_shared/coach-state.ts";
+import { formatSkeletonViolationsForRetry } from "../_shared/v3-skeleton-audits.ts";
+import { planCounts, plannerDocument } from "../_shared/planner-inputs.ts";
+import { stripSkillAreasFromTdi } from "../_shared/skills-plan.ts";
+import type { CoachStateContent } from "../_shared/coach-state.ts";
 import type { TrainingDesignInput } from "../_shared/training-design-input.ts";
 import { fetchMovementsByBlock, fetchVocabulary, movementListFor, type WriterPayload } from "../_shared/build-writer-payload.ts";
 import type { SkeletonOutput } from "../_shared/v3-output-schema.ts";
@@ -132,16 +134,18 @@ Deno.serve(async (req) => {
       // As a build does: the planner is shown the strength and skills part.
       build.tdi = { ...build.tdi, vocabulary: movementListFor(build.payload, ["strength", "skills"]) };
     }
+    // As a build does: the planner is not given the four skill areas. (A
+    // build stored before 2026-11-28 still holds them.)
+    build.tdi = stripSkillAreasFromTdi(build.tdi);
     const from = { job_id: build.job_id, built_at: build.built_at, month_number: build.monthNumber };
 
     if (step === "plan") {
-      const doc = [
-        build.coachState ? buildCoachStateDocumentBlock(build.coachState) : "",
-        await loadArticleBlock(supa, PLANNER_ARTICLES),
-      ].filter(Boolean).join("\n\n");
+      // As a build does: the coach state without its skill areas, the
+      // athlete's skills, and the planner's article.
+      const doc = plannerDocument(build.coachState, build.payload, await loadArticleBlock(supa, PLANNER_ARTICLES));
       let skeleton = await generateSkeletonWithAudits(build.tdi, PACK, undefined, doc);
       // The same count and single send-back a build runs (withMixCheck), without the log row.
-      let mix = auditSkeletonMetconMix(skeleton);
+      let mix = planCounts(skeleton);
       const firstMix = mix.violations;
       let mixRetried = false;
       if (!mix.passed) {
@@ -149,7 +153,7 @@ Deno.serve(async (req) => {
         try {
           const retry = await callSkeletonWriter(build.tdi, formatSkeletonViolationsForRetry([mix]), PACK, doc);
           const hard = PACK.audits.runSkeleton({ skeleton: retry, daysPerWeek: build.tdi.days_per_week, trainingDesignInput: build.tdi });
-          const retryMix = auditSkeletonMetconMix(retry);
+          const retryMix = planCounts(retry);
           if (hard.passed && retryMix.violations.length < mix.violations.length) { skeleton = retry; mix = retryMix; }
         } catch (e) {
           console.warn("[metcon-dry-run] mix send-back failed (keeping the first plan):", e);

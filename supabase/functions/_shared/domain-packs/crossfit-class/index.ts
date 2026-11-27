@@ -35,6 +35,7 @@ import {
   type SkeletonAuditRunResult,
 } from "../../v3-skeleton-audits.ts";
 import { CROSSFIT_PACK } from "../crossfit/index.ts";
+import { V3_SKELETON_SYSTEM_PROMPT_CLASS } from "../../v3-skeleton-prompt.ts";
 
 /** Default weekly focus split when the owner hasn't set one: 2 skills days on
  *  a 5-6 day week, 1 below that; the rest strength. */
@@ -138,6 +139,9 @@ export const CROSSFIT_CLASS_PACK: DomainPack = {
   version: "1",
   writer: {
     ...CROSSFIT_PACK.writer,
+    // A class has no athlete profile: it keeps the planner text as it was
+    // before individual programs began planning skills from skill ratings.
+    skeletonSystemPrompt: V3_SKELETON_SYSTEM_PROMPT_CLASS,
     skeletonRuleRecap: classSkeletonRuleRecap,
   },
   audits: {

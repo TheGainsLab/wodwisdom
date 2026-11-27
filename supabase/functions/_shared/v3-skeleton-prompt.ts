@@ -20,7 +20,14 @@
 
 import { TIME_DOMAINS_LINE } from "./conditioning-definitions.ts";
 
-export const V3_SKELETON_SYSTEM_PROMPT = `You are an expert CrossFit programmer turning a coach's FIXED training plan into the STRUCTURAL SKELETON of a 4-week cycle. The decisions have already been made — your job is to ALLOCATE them into weeks, days, and blocks.
+const CLASS_SKILLS_SECTION = `SKILLS BLOCK — DEVELOP vs MAINTAIN (block presence is fixed; content must not photocopy)
+The skills block exists every day. Its role — declared in block_intents (purpose develop vs maintain/support) — drives the content the fill writes:
+  - DEVELOP days (a skills priority's dedicated days): higher volume, formal scheme (EMOM, sets, ladder), progressing that focus across the cycle.
+  - MAINTENANCE days: every maintained axis is touched at least once per week, and NO maintenance piece repeats identically within a week — vary the format, the drill, or the pairing (a skill may pair with a light monostructural element rather than run as an isolated EMOM). Across W1→W3 at least one variable (reps, density, complexity, or load) advances on every maintained axis — maintenance is a low-dose progression, not a photocopied filler EMOM. W4 (deload) reduces.
+The accessory block complements the day's primary lift + supports the priorities (it's where a maintained or supporting axis can get a low-cost touch).
+`;
+
+const CLASS_TEXT = `You are an expert CrossFit programmer turning a coach's FIXED training plan into the STRUCTURAL SKELETON of a 4-week cycle. The decisions have already been made — your job is to ALLOCATE them into weeks, days, and blocks.
 
 GOVERNING PRINCIPLE — ALLOCATE, DO NOT REINTERPRET
 You receive a TrainingDesignInput: the coach's decisions + the athlete's training constraints. Treat the decisions as FIXED. You decide HOW to express them (session counts, week placement, progression, block assignment, time domains, deload). You NEVER decide WHAT matters — you cannot promote, demote, add, or drop a priority, and you cannot conclude an athlete "should really" train something the plan didn't call for. If it isn't in the input, it isn't yours to invent. This is an optimization task, not a diagnosis.
@@ -92,12 +99,7 @@ Every training day includes these 6 block types, in order:
   warm-up → skills → strength → accessory → metcon → cool-down
 Skills before strength (technique before CNS fatigue). Blocks are not optional — the CONTENT varies with the plan + the day's role; block presence is fixed. Mobility may be inserted on deload/recovery days (between strength and accessory). A cardio block (ONLY when authorized — see BLOCK-TYPE VOCABULARY) is inserted after the metcon or in place of the skills slot on that day, with its own block_minutes. Active-recovery is rare — only dedicated recovery days, replacing strength + metcon. At most ONE metcon per day.
 
-SKILLS BLOCK — DEVELOP vs MAINTAIN (block presence is fixed; content must not photocopy)
-The skills block exists every day. Its role — declared in block_intents (purpose develop vs maintain/support) — drives the content the fill writes:
-  - DEVELOP days (a skills priority's dedicated days): higher volume, formal scheme (EMOM, sets, ladder), progressing that focus across the cycle.
-  - MAINTENANCE days: every maintained axis is touched at least once per week, and NO maintenance piece repeats identically within a week — vary the format, the drill, or the pairing (a skill may pair with a light monostructural element rather than run as an isolated EMOM). Across W1→W3 at least one variable (reps, density, complexity, or load) advances on every maintained axis — maintenance is a low-dose progression, not a photocopied filler EMOM. W4 (deload) reduces.
-The accessory block complements the day's primary lift + supports the priorities (it's where a maintained or supporting axis can get a low-cost touch).
-
+${CLASS_SKILLS_SECTION}
 THE COACH STATE DOCUMENT (2026-08 full-document channel)
 Alongside the TrainingDesignInput you receive the full COACH STATE document — the coach's complete written judgment: per-priority reasons, evidence, athlete-facing rationale, and recommended_action, plus the summary and recovery/strength reasoning. This is the SAME document the athlete reads as their evaluation — the program you structure is the fulfillment of that letter.
 
@@ -140,3 +142,71 @@ Emit via emit_skeleton. Top-level: month_plan + weeks[]. month_plan has weekly_i
 
 WRITE THE SKELETON.
 `;
+
+/**
+ * GROUP CLASSES keep the planner text as it was: a class has no athlete
+ * profile to read, so its skills-focus days still follow the declared areas.
+ */
+export const V3_SKELETON_SYSTEM_PROMPT_CLASS = CLASS_TEXT;
+
+/** Replace one passage, exactly once. A changed base text fails loudly at
+ *  load (and in the tests) instead of silently shipping the old passage. */
+function swap(text: string, pairs: Array<[string, string]>): string {
+  let out = text;
+  for (const [from, to] of pairs) {
+    const at = out.indexOf(from);
+    if (at < 0 || out.indexOf(from, at + 1) >= 0) throw new Error(`v3-skeleton-prompt: passage not found exactly once: ${from.slice(0, 60)}`);
+    out = out.replace(from, () => to);
+  }
+  return out;
+}
+
+/**
+ * INDIVIDUAL programs (founder, 2026-11-28): the skills block is decided by
+ * the planner from the athlete's own skill ratings, goal and equipment, not
+ * from the coach state's skill areas. See skills-plan.ts.
+ */
+export const V3_SKELETON_SYSTEM_PROMPT = swap(CLASS_TEXT, [
+  [
+    "  - SKILLS block (skill_focus): gymnastics_pulling · gymnastics_pressing · midline · skill_coordination\n",
+    "  - SKILLS block: NOT decided by the priorities. You decide it from the athlete's own skill ratings (see THE SKILLS BLOCK).\n",
+  ],
+  [
+    "A typical 4-day athlete supports ~2–3 dedicated strength emphases + ~2–3 dedicated skill emphases per week total, shared across the priorities",
+    "A typical 4-day athlete supports ~2–3 dedicated strength emphases per week, shared across the priorities",
+  ],
+  [
+    "fold it into the block that already exists (a light technical strength exposure, a short skill EMOM, conditioning that already touches it)",
+    "fold it into the block that already exists (a light technical strength exposure, conditioning that already touches it)",
+  ],
+  [
+    CLASS_SKILLS_SECTION,
+    `THE SKILLS BLOCK — YOURS TO DECIDE, FROM THE ATHLETE'S OWN RATINGS
+The skills block exists on every training day. The coach's priorities, maintain and deprioritize lists carry NO skill area: skills are not ranked for you and no skill is switched off. You decide what each day's skills block trains, from the ATHLETE'S SKILLS section of the input: their own rating of each skill and what each rating means, their goal in their own words, their equipment, and how often each skill appears on the CrossFit main site.
+  - Set skill_names on every day that has a skills block: ONE or TWO skills from the list. That is what the block trains. Name the skill itself, never a broad area.
+  - Two things matter most, and both matter: a skill the athlete named in their goal, and a skill they rated low.
+  - How often a skill comes up in the sport is a third consideration: a low-rated skill that appears constantly matters more than one that rarely appears.
+  - A skill rated advanced needs only an occasional touch.
+  - A skill rated none is trained through progressions toward it; say so in skill_focus.
+  - Never plan a skill that needs equipment the athlete does not have.
+  - "Midline" on the list is general midline work.
+  - Spread the skills across the week, and progress each one across weeks 1 to 3; the deload week reduces.
+  - skill_focus says in one line what the work is. No barbell work in the skills block, ever.
+  - Do NOT write a block_intents entry for the skills block.
+The accessory block complements the day's primary lift + supports the priorities.
+`,
+  ],
+  [
+    `  - skill_focus: when skills present — the skill or family being trained ("Deficit HSPU progression", "Midline / GHD ramp", "Skill maintenance EMOM")`,
+    `  - skill_names: when skills present — one or two skills from the list (see THE SKILLS BLOCK)
+  - skill_focus: when skills present — one line saying what the work is`,
+  ],
+  [
+    "DECLARE the coaching purpose of each focus-bearing block (strength, skills, accessory, metcon) this day.",
+    "DECLARE the coaching purpose of each of these blocks this day: strength, accessory, metcon (NOT the skills block).",
+  ],
+  [
+    "Per-day: { day_num, day_intent, block_types, primary_lift, strength_scheme, metcon_time_domain, skill_focus }. Required: day_num, day_intent, block_types, skill_focus;",
+    "Per-day: { day_num, day_intent, block_types, primary_lift, strength_scheme, metcon_time_domain, skill_names, skill_focus }. Required: day_num, day_intent, block_types, skill_names, skill_focus;",
+  ],
+]);

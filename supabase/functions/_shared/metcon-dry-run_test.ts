@@ -10,7 +10,7 @@ Deno.test("the dry run saves nothing: it has no write to any table and no log ro
     assert(!src.includes(write), `the dry run calls ${write}`);
   }
   // It runs the same code a build runs.
-  for (const shared of ["generateSkeletonWithAudits(", "auditSkeletonMetconMix(", "composeMetconsForSlots(", "buildComposerInputs(", "loadExampleBlock(supa)", "loadArticleBlock(supa, COMPOSER_ARTICLES)"]) {
+  for (const shared of ["generateSkeletonWithAudits(", "planCounts(", "plannerDocument(", "stripSkillAreasFromTdi(", "composeMetconsForSlots(", "buildComposerInputs(", "loadExampleBlock(supa)", "loadArticleBlock(supa, COMPOSER_ARTICLES)"]) {
     assert(src.includes(shared), `the dry run does not use ${shared}`);
   }
   // The movement list is read as it is today, not as the stored build had it.

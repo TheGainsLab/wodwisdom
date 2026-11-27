@@ -68,6 +68,8 @@ export interface MetconSlot {
     primary_lift?: string;
     strength_scheme?: string;
     skill_focus?: string;
+    /** The skills the day's skills block trains (planner's skill_names). */
+    skill_names?: string[];
     /** Focus areas the day's accessory block carries (e.g. ["midline"]). */
     accessory_focuses?: string[];
   };
@@ -170,6 +172,7 @@ interface SkeletonLikeDay {
   primary_lift?: string;
   strength_scheme?: string;
   skill_focus?: string;
+  skill_names?: string[];
   block_intents?: Array<{ block_type: string; focus: string }>;
   block_minutes?: Array<{ block_type: string; minutes: number }>;
 }
@@ -250,6 +253,7 @@ export function deriveMetconSlots(skeleton: SkeletonLike): MetconSlot[] {
           primary_lift: day.primary_lift,
           strength_scheme: day.strength_scheme,
           skill_focus: day.skill_focus,
+          ...(Array.isArray(day.skill_names) && day.skill_names.length ? { skill_names: day.skill_names } : {}),
           accessory_focuses: accessory,
         },
       });

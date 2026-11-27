@@ -111,6 +111,7 @@ function buildBlockIntent(
       strength_scheme?: string;
       metcon_focus?: string;
       skill_focus?: string;
+      skill_names?: string[];
       block_intents?: Array<{
         block_type: string;
         focus: string;
@@ -136,6 +137,9 @@ function buildBlockIntent(
     if (daySkel.metcon_focus) base.focus = daySkel.metcon_focus;
   } else if (blockType === "skills") {
     if (daySkel.skill_focus) base.focus = daySkel.skill_focus;
+    // The skills the block trains, as named by the planner: kept on the block
+    // so a progression drill sits in a block tagged with its skill.
+    if (Array.isArray(daySkel.skill_names) && daySkel.skill_names.length) base.skills = daySkel.skill_names;
   }
   // DECLARED coaching intent (Step 3): the FocusArea + purpose this block serves.
   // Distinct from `focus` above (a movement descriptor) — coaching_focus is the
@@ -372,6 +376,7 @@ export async function saveProgramV3(
         strength_scheme?: string;
         metcon_focus?: string;
         skill_focus?: string;
+        skill_names?: string[];
         block_intents?: Array<{ block_type: string; focus: string; purpose: string; source_priority_rank?: number }>;
         block_minutes?: Array<{ block_type: string; minutes: number }>;
       }
