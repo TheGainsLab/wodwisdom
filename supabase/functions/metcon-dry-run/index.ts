@@ -17,7 +17,9 @@
  * together do not fit one request:
  *
  *   POST { "user_id": "...", "step": "plan" }
- *     → { skeleton, time_domains, mix }      the planner's month + the mix count
+ *     → { skeleton, time_domains, hard_passed, hard_failures, counts }
+ *   ONE planner call. To send a plan back the way a build does, call again
+ *   with "retry_failures": the hard_failures, or [counts], from the reply.
  *
  *   POST { "user_id": "...", "step": "compose", "skeleton": <from plan>,
  *          "week": 1, "prior_pieces": [] }
@@ -35,7 +37,7 @@
  */
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getDomainPack } from "../_shared/domain-packs/registry.ts";
-import { auditOutput, callSkeletonWriter, callWeekFill, generateSkeletonWithAudits } from "../_shared/engine/pipeline.ts";
+import { auditOutput, callSkeletonWriter, callWeekFill } from "../_shared/engine/pipeline.ts";
 import { renderWeekSchemesInPlace } from "../_shared/compose-block-scheme.ts";
 import { formatSkeletonViolationsForRetry } from "../_shared/v3-skeleton-audits.ts";
 import { planCounts, plannerDocument } from "../_shared/planner-inputs.ts";
@@ -143,26 +145,30 @@ Deno.serve(async (req) => {
       // As a build does: the coach state without its skill areas, the
       // athlete's skills, and the planner's article.
       const doc = plannerDocument(build.coachState, build.payload, await loadArticleBlock(supa, PLANNER_ARTICLES));
-      let skeleton = await generateSkeletonWithAudits(build.tdi, PACK, undefined, doc);
-      // The same count and single send-back a build runs (withMixCheck), without the log row.
-      let mix = planCounts(skeleton);
-      const firstMix = mix.violations;
-      let mixRetried = false;
-      if (!mix.passed) {
-        mixRetried = true;
-        try {
-          const retry = await callSkeletonWriter(build.tdi, formatSkeletonViolationsForRetry([mix]), PACK, doc);
-          const hard = PACK.audits.runSkeleton({ skeleton: retry, daysPerWeek: build.tdi.days_per_week, trainingDesignInput: build.tdi });
-          const retryMix = planCounts(retry);
-          if (hard.passed && retryMix.violations.length < mix.violations.length) { skeleton = retry; mix = retryMix; }
-        } catch (e) {
-          console.warn("[metcon-dry-run] mix send-back failed (keeping the first plan):", e);
-        }
-      }
+      // ONE planner call per request. A build makes the first call and, on a
+      // miss, sends the plan back; both do not fit in a single web request
+      // here (Supabase ends a request after 150 seconds). So this step
+      // returns the plan with everything the checks found, and the caller
+      // sends it back by calling again with "retry_failures" set to the
+      // "hard_failures" (or the "counts") it was given.
+      const retryFailures = Array.isArray(body.retry_failures) ? body.retry_failures : [];
+      const skeleton = await callSkeletonWriter(
+        build.tdi,
+        retryFailures.length ? formatSkeletonViolationsForRetry(retryFailures) : "",
+        PACK,
+        doc,
+      );
+      // The hard plan checks (a build retries on these, up to 3 planner calls).
+      const hard = PACK.audits.runSkeleton({ skeleton, daysPerWeek: build.tdi.days_per_week, trainingDesignInput: build.tdi });
+      // The counts (a build sends these back once, then accepts).
+      const counts = planCounts(skeleton);
       return json({
         dry_run: true, saved: "nothing", from,
+        sent_back_with: retryFailures.length,
         time_domains: timeDomainTable(skeleton),
-        mix: { passed: mix.passed, violations: mix.violations, sent_back: mixRetried, first_pass_violations: mixRetried ? firstMix : [] },
+        hard_passed: hard.passed,
+        hard_failures: hard.passed ? [] : hard.failures,
+        counts,
         skeleton,
       });
     }

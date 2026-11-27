@@ -10,7 +10,7 @@ Deno.test("the dry run saves nothing: it has no write to any table and no log ro
     assert(!src.includes(write), `the dry run calls ${write}`);
   }
   // It runs the same code a build runs.
-  for (const shared of ["generateSkeletonWithAudits(", "planCounts(", "plannerDocument(", "stripSkillAreasFromTdi(", "composeMetconsForSlots(", "buildComposerInputs(", "loadExampleBlock(supa)", "loadArticleBlock(supa, COMPOSER_ARTICLES)"]) {
+  for (const shared of ["callSkeletonWriter(", "PACK.audits.runSkeleton(", "planCounts(", "plannerDocument(", "stripSkillAreasFromTdi(", "composeMetconsForSlots(", "buildComposerInputs(", "loadExampleBlock(supa)", "loadArticleBlock(supa, COMPOSER_ARTICLES)"]) {
     assert(src.includes(shared), `the dry run does not use ${shared}`);
   }
   // The movement list is read as it is today, not as the stored build had it.
@@ -87,4 +87,13 @@ Deno.test("a written week is shown block by block, with what the plan asked for 
     "    Burpee: reps 10",
     "    Note: Fast.",
   ].join("\n"));
+});
+
+Deno.test("the plan step makes one planner call per request, so it fits the 150-second request limit", () => {
+  const src = Deno.readTextFileSync(new URL("../metcon-dry-run/index.ts", import.meta.url));
+  assert(!src.includes("generateSkeletonWithAudits("));
+  const plan = src.slice(src.indexOf('if (step === "plan")'), src.indexOf('if (step === "write")'));
+  assertEquals((plan.match(/callSkeletonWriter\(/g) ?? []).length, 1);
+  assert(plan.includes("hard_failures: hard.passed ? [] : hard.failures,"));
+  assert(plan.includes("retryFailures.length ? formatSkeletonViolationsForRetry(retryFailures)"));
 });
