@@ -25,7 +25,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
-import { buildWriterPayload, daysPerWeekLogLine, type WriterPayload } from "../_shared/build-writer-payload.ts";
+import { buildWriterPayload, daysPerWeekLogLine, fetchMovementsByBlock, movementListFor, type WriterPayload } from "../_shared/build-writer-payload.ts";
 import { generateAndPersistCoachState } from "../_shared/generate-coach-state.ts";
 import { buildCoachStateDocumentBlock } from "../_shared/coach-state.ts";
 import { deriveMetconSlots, describeComposedPiece } from "../_shared/metcon-composer.ts";
@@ -376,6 +376,11 @@ async function stageCoachState(
     cardioAllowed = false;
   }
 
+  // The movement list by training block, for the planner, composer, writer
+  // and rewriter. Added here, after the coach state: the evaluation does not
+  // need it. Null (no block marks, or unreadable) = everyone gets the whole list.
+  const payloadForBuild: WriterPayload = { ...payload, vocabulary_by_block: await fetchMovementsByBlock(supa) };
+
   const trainingDesignInput = buildTrainingDesignInput(coachState, {
     days_per_week: payload.training_context.days_per_week,
     // Session-budget observe phase (2026-08-31): thread the athlete's stated
@@ -384,7 +389,9 @@ async function stageCoachState(
     session_length_minutes: payload.training_context.session_length_minutes ?? null,
     equipment: payload.equipment,
     do_not_program: payload.training_context.injuries_structured?.do_not_program ?? [],
-    vocabulary: payload.vocabulary,
+    // The planner names a movement only for the main lift and the skill
+    // focus, so it is shown the strength and skills part of the list.
+    vocabulary: movementListFor(payloadForBuild, ["strength", "skills"]),
     lifts: payload.lifts,
     previous_cycle: payload.previous_cycle,
     cardio_allowed: cardioAllowed,
@@ -392,7 +399,7 @@ async function stageCoachState(
 
   return {
     next: "skeleton",
-    resumeState: { ...rs, coachState, trainingDesignInput },
+    resumeState: { ...rs, payload: payloadForBuild, coachState, trainingDesignInput },
     displayStage: "coach_state_done",
   };
 }

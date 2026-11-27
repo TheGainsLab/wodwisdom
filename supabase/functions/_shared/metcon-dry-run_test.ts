@@ -15,7 +15,7 @@ Deno.test("the dry run saves nothing: it has no write to any table and no log ro
   }
   // The movement list is read as it is today, not as the stored build had it.
   assert(src.includes("const listNow = await fetchVocabulary(supa);"));
-  assert(src.includes("build.tdi = { ...build.tdi, vocabulary: listNow };"));
+  assert(src.includes("vocabulary_by_block: await fetchMovementsByBlock(supa)"));
   assert(src.includes('if (!isServiceRole(req.headers.get("Authorization"))) return json({ error: "service role only" }, 401);'));
 });
 

@@ -326,6 +326,9 @@ export async function callWeekFill(
     `- Emit EXACTLY week ${weekNum}: week_num=${weekNum} with ${daysPerWeek} days (day_num 1..${daysPerWeek}).`,
     `- All weights in ${units}.`,
     "- Honor THIS WEEK's skeleton: each day's block_types, primary_lift, strength_scheme, metcon time domain, skill_focus are already decided. Fill in movement-level prescriptions only.",
+    ...(payload.vocabulary_by_block
+      ? ["- MOVEMENT LIST BY BLOCK: the payload's vocabulary_by_block gives, for each block type (warm-up, skills, strength, accessory, metcon), the movements we use in that block and how each is spelled. Use it for the block you are writing. It is a guide: you may use a movement that is not on it when it is the right choice."]
+      : []),
     "- Prescribed barbell weight ≤ athlete's 1RM for that lift, unless the block's notes mark it a 1RM attempt.",
     "- At most one metcon block per day.",
     "- Every movement in strength / accessory / metcon / skills blocks must populate at least one of {sets, reps, weight, time_seconds, distance} > 0.",
@@ -388,8 +391,13 @@ export async function callWeekFill(
     training_evaluation: _te,
     athlete_model: _am,
     competition: _comp,
-    ...fillPayload
+    ...fillPayloadAll
   } = payload;
+  // When the movement list is marked by block, the writer is shown it by
+  // block and not as one flat list (the flat list offered every movement for
+  // every block: a goblet squat in a metcon).
+  const { vocabulary: _flatList, ...fillPayloadByBlock } = fillPayloadAll;
+  const fillPayload = payload.vocabulary_by_block ? fillPayloadByBlock : fillPayloadAll;
   const payloadBlock = `ATHLETE PAYLOAD (JSON):\n${JSON.stringify(fillPayload, null, 2)}`;
   const baseMessage = [thisWeekBlock, composedBlock, priorBlock, arcBlock, payloadBlock, ruleRecap]
     .filter(Boolean).join("\n\n");

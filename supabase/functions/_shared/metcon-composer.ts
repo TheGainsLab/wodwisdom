@@ -413,7 +413,7 @@ export function buildComposerUserMessage(inputs: MetconComposerInputs): string {
   }
   // Guidance, not a fence (founder, 2026-11-26): the composer names movements
   // itself and uses these spellings when a movement is on the list.
-  parts.push(`MOVEMENT LIST (your guide to names: use these spellings when a movement is on it; you may use a movement that is not):\n${inputs.vocabulary.join(" · ")}`);
+  parts.push(`MOVEMENT LIST (the movements we use in metcons, and how each is spelled. Your guide: use these spellings when a movement is on it; you may use a movement that is not):\n${inputs.vocabulary.join(" · ")}`);
   parts.push(
     `LAST MONTH'S METCONS (do not serve any of these again):\n` +
       (inputs.previous_cycle_metcons.length
