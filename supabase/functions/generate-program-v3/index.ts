@@ -28,10 +28,9 @@ import { getCorsHeaders } from "../_shared/cors.ts";
 import { buildWriterPayload, daysPerWeekLogLine, type WriterPayload } from "../_shared/build-writer-payload.ts";
 import { generateAndPersistCoachState } from "../_shared/generate-coach-state.ts";
 import { buildCoachStateDocumentBlock } from "../_shared/coach-state.ts";
-import { deriveMetconSlots, describeComposedPiece, type MetconComposerInputs } from "../_shared/metcon-composer.ts";
-import { athleteWordsElsewhere } from "../_shared/athlete-file-text.ts";
+import { deriveMetconSlots, describeComposedPiece } from "../_shared/metcon-composer.ts";
 import { COMPOSER_ARTICLES, loadArticleBlock, loadExampleBlock, PLANNER_ARTICLES } from "../_shared/metcon-library.ts";
-import { composeMetconsForSlots } from "../_shared/compose-metcons.ts";
+import { buildComposerInputs, composeMetconsForSlots } from "../_shared/compose-metcons.ts";
 import {
   builtFromForWeekSave,
   builtFromOf,
@@ -698,30 +697,7 @@ async function stageMetcons(
       console.warn("[generate-program-v3] last month's metcons could not be read (continuing without):", e instanceof Error ? e.message : String(e));
     }
   }
-  const inputs: MetconComposerInputs = {
-    slots,
-    goal_text: payload.training_context.goal_text ?? null,
-    basics: {
-      age: payload.basics.age ?? null,
-      sex: payload.basics.gender ?? null,
-      bodyweight: payload.basics.bodyweight ?? null,
-    },
-    units: payload.basics.units === "kg" ? "kg" : "lbs",
-    lifts: tdi.lifts,
-    skills: payload.skills,
-    conditioning_benchmarks: payload.conditioning,
-    equipment: tdi.equipment,
-    injuries_text: payload.training_context.injuries_constraints_text ?? null,
-    do_not_program: tdi.do_not_program,
-    athlete_words: athleteWordsElsewhere(payload.athlete_model?.self_report, []),
-    vocabulary: tdi.vocabulary,
-    previous_cycle_metcons: previousCycleMetcons,
-    examples,
-    articles,
-    // The athlete's completed Engine sessions, or null. Rebuilt on every
-    // generation, so the composer sees their current Engine month.
-    engine_training: payload.engine_training ?? null,
-  };
+  const inputsSansSlots = buildComposerInputs(payload, tdi, { examples, articles, previousCycleMetcons });
   const auditOpts = {
     slots,
     engineActive: payload.engine_training != null,
@@ -734,10 +710,9 @@ async function stageMetcons(
   const slotsToCompose = rs.weekly ? slots.filter((sl) => sl.week_num === targetWeek) : slots;
   const priorPieces = rs.weeklyFill ? ((rs.composedMetcons ?? []).filter((m) => m.week_num < targetWeek)) : [];
   const priorSlots = rs.weeklyFill ? slots.filter((sl) => sl.week_num < targetWeek) : [];
-  const { slots: _unusedSlots, ...inputsSansSlots } = inputs;
   const { slots: _unusedAuditSlots, ...auditOptsSansSlots } = auditOpts;
   const composed = await composeMetconsForSlots({
-    inputs: { ...inputsSansSlots, coach_notes: payload.training_context.coach_notes ?? [] },
+    inputs: inputsSansSlots,
     slots: slotsToCompose,
     priorSlots,
     priorPieces,

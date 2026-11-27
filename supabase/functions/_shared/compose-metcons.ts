@@ -18,6 +18,47 @@ import {
   stripStructuralRestRows,
 } from "./metcon-variety-audits.ts";
 
+import type { WriterPayload } from "./build-writer-payload.ts";
+import type { TrainingDesignInput } from "./training-design-input.ts";
+import { athleteWordsElsewhere } from "./athlete-file-text.ts";
+
+/**
+ * Everything the composer is given about the athlete, from the build's
+ * payload and plan inputs. ONE builder, used by the real build and by the
+ * dry run (metcon-dry-run), so the dry run shows the composer exactly what a
+ * build would. Slots and notes are added by the caller.
+ */
+export function buildComposerInputs(
+  payload: WriterPayload,
+  tdi: TrainingDesignInput,
+  library: { examples: string; articles: string; previousCycleMetcons: string[] },
+): Omit<MetconComposerInputs, "slots"> {
+  return {
+    goal_text: payload.training_context.goal_text ?? null,
+    basics: {
+      age: payload.basics.age ?? null,
+      sex: payload.basics.gender ?? null,
+      bodyweight: payload.basics.bodyweight ?? null,
+    },
+    units: payload.basics.units === "kg" ? "kg" : "lbs",
+    lifts: tdi.lifts,
+    skills: payload.skills,
+    conditioning_benchmarks: payload.conditioning,
+    equipment: tdi.equipment,
+    injuries_text: payload.training_context.injuries_constraints_text ?? null,
+    do_not_program: tdi.do_not_program,
+    athlete_words: athleteWordsElsewhere(payload.athlete_model?.self_report, []),
+    coach_notes: payload.training_context.coach_notes ?? [],
+    vocabulary: tdi.vocabulary,
+    previous_cycle_metcons: library.previousCycleMetcons,
+    examples: library.examples,
+    articles: library.articles,
+    // The athlete's completed Engine sessions, or null. Rebuilt on every
+    // generation, so the composer sees their current Engine month.
+    engine_training: payload.engine_training ?? null,
+  };
+}
+
 export type AuditOpts = Omit<Parameters<typeof auditMetconVariety>[1], "slots">;
 
 export interface ComposeResult {

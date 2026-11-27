@@ -228,12 +228,15 @@ Deno.test("the composer is not given the coach state, priorities, recovery stanc
   ]) assert(!msg.includes(gone), `the composer is still told "${gone}"`);
   const gen = read("../generate-program-v3/index.ts");
   const stage = gen.slice(gen.indexOf("async function stageMetcons("), gen.indexOf("async function stageFillWeek("));
+  const builder = read("./compose-metcons.ts");
   for (const gone of ["coachState", "metcon_guidance", "recovery_stance", "priorities", "tdi.maintain", "buildStratifiedMetconExamples"]) {
     assert(!stage.includes(gone), `the metcons stage still reads ${gone}`);
+    assert(!builder.includes(gone), `the composer's inputs still read ${gone}`);
   }
   assert(stage.includes("loadExampleBlock(supa)"));
   assert(stage.includes("loadArticleBlock(supa, COMPOSER_ARTICLES)"));
-  assert(stage.includes("goal_text: payload.training_context.goal_text"));
+  assert(stage.includes("buildComposerInputs(payload, tdi, { examples, articles, previousCycleMetcons })"));
+  assert(builder.includes("goal_text: payload.training_context.goal_text"));
   assert(stage.includes("rs.continuation.monthNumber - 1"));
 });
 
