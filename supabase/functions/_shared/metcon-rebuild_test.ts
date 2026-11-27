@@ -337,3 +337,45 @@ Deno.test("the twelve search-picked examples are gone", () => {
   assertEquals(exists, false);
   assert(!read("../generate-program-v3/index.ts").includes("metcon-examples"));
 });
+
+// ── Movement list clean-up (founder, 2026-11-27) ──
+
+Deno.test("no bike on the profile rules out Air Bike under its new name and its old ones", async () => {
+  const { EQUIPMENT_TO_MOVEMENTS } = await import("./equipment-movements.ts");
+  for (const name of ["Air Bike", "Bike", "Assault Bike", "Echo Bike"]) {
+    assert(EQUIPMENT_TO_MOVEMENTS.assault_bike.includes(name), `${name} is not ruled out without a bike`);
+  }
+});
+
+Deno.test("the composer is told not to bring out a second implement as an obstacle", () => {
+  const p = METCON_COMPOSER_SYSTEM_PROMPT;
+  assert(p.includes("do not bring out a second implement only as an obstacle or a marker"));
+});
+
+Deno.test("the movement list migration removes Kipping Pull Up and leaves one bike, Air Bike", () => {
+  const sql = read("../../migrations/20261127200000_movement_list_pull_up_air_bike.sql");
+  assert(sql.includes("DELETE FROM public.movements WHERE canonical_name = 'kipping_pull_up';"));
+  assert(sql.includes("SET display_name = 'Air Bike'"));
+  assert(sql.includes("DELETE FROM public.movements WHERE canonical_name IN ('assault_bike', 'echo_bike');"));
+  assert(sql.includes('["Bike", "Biking", "Assault Bike", "Echo Bike"]'));
+});
+
+Deno.test("every AI that writes a programmed movement is told an air bike is always written Air Bike", async () => {
+  const { AIR_BIKE_NAME_RULE } = await import("./conditioning-definitions.ts");
+  const { SURGICAL_SYSTEM_PROMPT } = await import("./surgical-block-fix.ts");
+  assert(AIR_BIKE_NAME_RULE.includes('always written "Air Bike"'));
+  for (const [who, text] of [
+    ["composer", METCON_COMPOSER_SYSTEM_PROMPT],
+    ["writer", V2_GENERATE_PROGRAM_SYSTEM_PROMPT],
+    ["rewriter", SURGICAL_SYSTEM_PROMPT],
+  ] as const) assert(text.includes(AIR_BIKE_NAME_RULE), `the ${who} is not told`);
+  assert(read("../chat/index.ts").includes("`- ${AIR_BIKE_NAME_RULE}\\n`"));
+  const { EQUIPMENT_LABELS } = await import("./equipment-labels.ts");
+  assertEquals(EQUIPMENT_LABELS.assault_bike, "Air Bike (Echo / Assault / other)");
+});
+
+Deno.test("the migration renames the old bike names on programs already written, by exact name only", () => {
+  const sql = read("../../migrations/20261127200000_movement_list_pull_up_air_bike.sql");
+  assert(sql.includes("UPDATE public.program_movements_v2\nSET movement = 'Air Bike'\nWHERE movement IN ('Bike', 'Assault Bike', 'Echo Bike');"));
+  assert(!/program_movements_v2[\s\S]*(ilike|LIKE)/i.test(sql.slice(sql.indexOf("-- 3."))));
+});

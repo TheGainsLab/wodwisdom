@@ -4,6 +4,7 @@ import { buildCoachNotesBlock, buildProposeCoachNoteTool, COACH_NOTE_PROMPT, loa
 import { noteReadBy } from "../_shared/note-readers.ts";
 import { nextMonthLine } from "../_shared/next-month-text.ts";
 import { renderCoachStateForChat, type CoachState } from "../_shared/coach-state.ts";
+import { AIR_BIKE_NAME_RULE } from "../_shared/conditioning-definitions.ts";
 import { cleanScreenTargets, screenTargetsBlock, screenTargetsKey } from "../_shared/engine-screen-targets.ts";
 import {
   type BlockEditContext,
@@ -1480,6 +1481,7 @@ Deno.serve(async (req) => {
         "- The do_not_program list is ABSOLUTE: never propose a movement on it even when asked by name. Explain, offer the closest safe alternative, and note they can update their profile if the constraint no longer applies.\n" +
         "- equipment_not_available comes from the profile's checklist and can be out of date. If the athlete says they HAVE something on it (or chooses to do a movement that needs it), take their word and propose the edit. If they say they DON'T have something today's block uses, make the swap for today and tell them their profile still lists it, so later days will use it too; if they no longer have it at all, offer to update their profile for them (propose_profile_update, equipment_dont_have) in your next message.\n" +
         "- Requests about the weeks ahead are not edits to today, but they ARE something you act on: a lasting change to days per week, session length or goal is a propose_profile_update, and a wish for the coming weeks is a propose_coach_note. Either one re-plans the weeks of this month that are not written yet. Never tell them it must wait for the next cycle.\n" +
+        `- ${AIR_BIKE_NAME_RULE}\n` +
         "- If the athlete keeps reversing recent changes, pause and help them decide what they actually want instead of proposing again.\n" +
         "- After a card is shown, conclude in one or two sentences; never restate the block's contents in text."
       : "";

@@ -37,7 +37,7 @@ Deno.test("the block carries every setting the coach could not see: session leng
   assert(b.includes("- Units: kg"));
   assert(b.includes("- Height: 180 cm · Bodyweight: 82 kg"));
   assert(b.includes("- Equipment they have unticked (don't have): Rower, Climbing Rope"));
-  assert(b.includes("- Equipment they have: Assault/Echo Bike, Ski Erg"));
+  assert(b.includes("- Equipment they have: Air Bike (Echo / Assault / other), Ski Erg"));
   assert(b.includes('Anything else we should know? "I love long chippers. Hate burpees."'));
   assert(b.includes("preferences, loved: long chippers; preferences, disliked: burpees; history, training age: 6 years; goals, competes: no"));
 });

@@ -21,7 +21,9 @@
 export const EQUIPMENT_TO_MOVEMENTS: Record<string, string[]> = {
   // Cardio machines — these block their dedicated movements.
   rower: ["Row", "Calorie Row", "1k Row", "2k Row", "5k Row"],
-  assault_bike: ["Assault Bike", "Echo Bike", "Bike Calories", "Bike Erg"],
+  // "Air Bike" is the movement list's one name for every air bike (2026-11-27);
+  // the older names stay so a workout written before still counts.
+  assault_bike: ["Air Bike", "Bike", "Assault Bike", "Echo Bike", "Bike Calories", "Bike Erg"],
   ski_erg: ["Ski Erg", "Ski Calories"],
   treadmill: [],
   jump_rope: ["Double-Unders", "Single-Unders", "Crossovers", "Jump Rope"],

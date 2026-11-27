@@ -24,7 +24,7 @@ const EQUIPMENT_LABELS: Record<string, string> = {
   dumbbells: 'Dumbbells',
   kettlebells: 'Kettlebells',
   rower: 'Rower',
-  assault_bike: 'Assault/Echo Bike',
+  assault_bike: 'Air Bike (Echo / Assault / other)',
   ski_erg: 'Ski Erg',
   treadmill: 'Treadmill',
   pull_up_bar: 'Pull-up Bar',
