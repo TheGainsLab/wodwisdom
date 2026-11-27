@@ -13,7 +13,7 @@
 -- Service role only: row level security is on and there are no policies.
 
 CREATE TABLE IF NOT EXISTS public.mainsite_examples (
-  chunk_id     uuid PRIMARY KEY REFERENCES public.chunks(id) ON DELETE CASCADE,
+  chunk_id     text PRIMARY KEY REFERENCES public.chunks(id) ON DELETE CASCADE,
   workout_date date,
   kind         text NOT NULL,
   name         text,
