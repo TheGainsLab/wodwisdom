@@ -326,62 +326,6 @@ Deno.test("rule 10: barbell movement without typed load band is a violation", ()
   assert(r.violations.some((v) => v.includes("no typed load_class/load_band")));
 });
 
-Deno.test("rule 11: skill volume above tier band without justification is a violation; in-band passes; justification exempts; unmapped skills are skipped", () => {
-  const skills = { double_unders: "beginner" }; // band 15-30/round
-  const over = goodMonth();
-  const du = over[11].movements.find((mv) => mv.movement === "Double Under")!;
-  du.prescription = "50";
-  const r = auditMetconVariety({ metcons: over }, { skills });
-  assert(r.violations.some((v) => v.includes("exceeds the band for the athlete's beginner rating")));
-
-  const inBand = goodMonth();
-  inBand[11].movements.find((mv) => mv.movement === "Double Under")!.prescription = "25";
-  const ok = auditMetconVariety({ metcons: inBand }, { skills });
-  assertEquals(ok.violations.filter((v) => v.includes("exceeds the")), []);
-
-  const justified = goodMonth();
-  justified[11].movements.find((mv) => mv.movement === "Double Under")!.prescription = "50";
-  justified[11].stimulus_note = "Deliberate double-under density push — big unbroken sets are the stimulus.";
-  const j = auditMetconVariety({ metcons: justified }, { skills });
-  assertEquals(j.violations.filter((v) => v.includes("exceeds the")), []);
-
-  // Toes To Bar prescribes 10 in the fixture but toes_to_bar has no entry in
-  // this skills map — absence is neutral, so no violation for it.
-  assertEquals(r.violations.filter((v) => v.includes("Toes To Bar")), []);
-});
-
-Deno.test("rule 11 resolves DISPLAY-NAME skills keys (the production payload shape)", () => {
-  // The writer payload keys skills by display name, not snake_case — the
-  // production shape that silently no-opped before the normalized lookup.
-  const displaySkills = { "Double-Unders": "beginner", "HSPU": "intermediate" };
-  const over = goodMonth();
-  over[11].movements.find((mv) => mv.movement === "Double Under")!.prescription = "50";
-  const r = auditMetconVariety({ metcons: over }, { skills: displaySkills });
-  assert(r.violations.some((v) => v.includes("exceeds the band for the athlete's beginner rating")));
-});
-
-Deno.test("rule 11: a skill rated none (can't do it yet) is never the movement itself; beginner may be in a metcon in small sets", () => {
-  const m = goodMonth();
-  m[7].movements.push({ movement: "Ring Muscle Up", prescription: "2" });
-  const none = auditMetconVariety({ metcons: m }, { skills: { muscle_ups: "none" } });
-  assert(none.violations.some((v) => v.includes("rated this skill none (can't do it yet)")));
-  const beginner = auditMetconVariety({ metcons: m }, { skills: { muscle_ups: "beginner" } });
-  assertEquals(beginner.violations.filter((v) => v.includes("Ring Muscle Up")), []);
-});
-
-Deno.test("rule 11: each skill uses only its own rating — skills never affect each other", () => {
-  const m = goodMonth();
-  m[7].movements.push({ movement: "Ring Muscle Up", prescription: "2" });
-  // Bar muscle-ups rated none says nothing about ring muscle-ups.
-  const r = auditMetconVariety({ metcons: m }, { skills: { bar_muscle_ups: "none", strict_ring_muscle_ups: "none" } });
-  assertEquals(r.violations.filter((v) => v.includes("Ring Muscle Up")), []);
-  // "HSPU" sits inside "Strict HSPU", and they are two skills.
-  const h = goodMonth();
-  h[7].movements.push({ movement: "Strict HSPU", prescription: "2" });
-  const r2 = auditMetconVariety({ metcons: h }, { skills: { "HSPU": "none" } });
-  assertEquals(r2.violations.filter((v) => v.includes("Strict HSPU")), []);
-});
-
 Deno.test("rule 12: a development axis missing from a non-deload week is a violation; deload weeks exempt", () => {
   const m = goodMonth();
   const slots: MetconSlot[] = m.map((p) => ({

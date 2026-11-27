@@ -20,10 +20,8 @@ import type {
   MetconSlot,
 } from "./metcon-composer.ts";
 import {
-  athleteTierFor,
   bandRange,
   loadClassForMovement,
-  skillFatigueDefForMovement,
 } from "./conditioning-definitions.ts";
 
 export interface MetconVarietyAuditResult {
@@ -110,17 +108,6 @@ function movementExpressesAxis(movement: string, axis: string): boolean {
   return (AXIS_MOVEMENT_KEYWORDS[axis] ?? []).some((kw) => n.includes(kw));
 }
 
-/** Best-effort per-round rep parse from a prescription string: the largest
- *  dash/slash-separated leading integer ("15" → 15, "21-15-9" → 21). Null when
- *  the prescription is calorie/distance/time-denominated or non-numeric. */
-function parsePerRoundReps(prescription: string): number | null {
-  const p = prescription.trim().toLowerCase();
-  if (/\b(cal|cals|calories|m|meter|meters|km|ft|yd|sec|s|min)\b/.test(p)) return null;
-  const m = p.match(/^(\d+(?:\s*[-\/]\s*\d+)*)/);
-  if (!m) return null;
-  const nums = m[1].split(/[-\/]/).map((x) => parseInt(x.trim(), 10)).filter((x) => Number.isFinite(x));
-  return nums.length ? Math.max(...nums) : null;
-}
 
 /**
  * Strip structural "Rest" rows the composer sometimes emits when making
@@ -462,38 +449,11 @@ export function auditMetconVariety(
     }
   }
 
-  // 11. Skill volume within the athlete's tier band. Per-round reps only (round
-  //     counts live in prose block_scheme and aren't reliably parseable).
-  //     Above-band is allowed WITH a written justification — proxied as the
-  //     stimulus_note mentioning the movement (deterministic audits can't judge
-  //     justification quality; the proxy forces the composer to write one).
-  if (opts.skills) {
-    for (const m of pieces) {
-      for (const mv of m.movements ?? []) {
-        const def = skillFatigueDefForMovement(mv?.movement ?? "");
-        if (!def) continue;
-        const tier = athleteTierFor(def, opts.skills);
-        if (tier == null) continue; // not rated — no check
-        if (tier === "none") {
-          // Rated none = can't do it yet: progressions only (founder, 2026-11-26).
-          violations.push(
-            `${at(m)}: "${mv.movement}" — the athlete rated this skill none (can't do it yet). Never the movement itself: use a progression toward it, or a different movement.`,
-          );
-          continue;
-        }
-        const band = def.perRound[tier];
-        const reps = parsePerRoundReps(mv.prescription);
-        if (reps != null && reps > band[1]) {
-          const justified = norm(m.stimulus_note ?? "").includes(norm(mv.movement).split(" ")[0]);
-          if (!justified) {
-            violations.push(
-              `${at(m)}: "${mv.movement}" at ${reps}/round exceeds the band for the athlete's ${tier} rating of this skill (${band[0]}-${band[1]}) with no justification in stimulus_note — bring it in band or justify it.`,
-            );
-          }
-        }
-      }
-    }
-  }
+  // 11. Skill volume — REMOVED 2026-11-26 (founder). It held per-round rep
+  //     ranges per skill and rating ("v0 placeholders", never calibrated),
+  //     read reps out of the composer's text and sent the month back when a
+  //     skill was over its range. The composer now sets volume from the
+  //     athlete's rating of each skill, defined in the founder's words.
 
   // 12. Development-axis expression — each development axis appears in at least
   //     one piece per non-deload week (deload weeks detected from slot

@@ -1,5 +1,3 @@
-import { SKILL_DISPLAY_NAMES } from "./tier-status.ts";
-
 /**
  * conditioning-definitions.ts
  *
@@ -14,8 +12,8 @@ import { SKILL_DISPLAY_NAMES } from "./tier-status.ts";
  *   2. Cycling load bands — what light/moderate/heavy mean as a fraction of
  *      THIS athlete's 1RM in the parent lift, per movement class, with the
  *      parent-lift proxy chain for missing 1RMs and DB/KB defaults by load band.
- *   3. Skill volume bands under fatigue — per-round rep ranges and caps by
- *      the athlete's self-reported tier.
+ *   3. Skill ratings — what each of the athlete's own ratings means (the
+ *      per-round rep ranges that used to sit here were removed 2026-11-26).
  *
  * Band numbers are v0 placeholders (founder-calibrated after the first
  * shadow run) — the RULE STRUCTURE is what's frozen, not the numbers.
@@ -116,7 +114,7 @@ export function bandRange(cls: string, band: LoadBand): [number, number] | null 
 }
 
 // ============================================================
-// 3. Skill volume bands under fatigue (per-round reps by tier)
+// 3. Skill ratings — what the athlete's own rating of each skill means
 // ============================================================
 
 export type SkillTier = "beginner" | "intermediate" | "advanced";
@@ -135,76 +133,6 @@ export const SKILL_RATING_MEANINGS: Record<SkillRating, string> = {
   intermediate: "can do it comfortably in workouts",
   advanced: "big unbroken sets even under fatigue",
 };
-
-export interface SkillFatigueDef {
-  /** The ONE profile skill this band belongs to. Its rating is the only one read. */
-  skillKey: string;
-  /** Normalized keywords the movement matches by. */
-  match: string[];
-  /** Per-round rep band by rating. "none" is never under fatigue: progressions only. */
-  perRound: Record<SkillTier, [number, number]>;
-}
-
-// One band per rated skill (2026-11-26). They used to be grouped by family, and
-// one skill's rating set another's volume (the toes-to-bar rating governed
-// pull-ups; an HSPU rating governed wall walks). Beginner is allowed in metcons
-// in small sets (founder, 2026-11-26); the beginner muscle-up and HSPU bands
-// were "not under fatigue" before.
-const PULL: Record<SkillTier, [number, number]> = { beginner: [3, 6], intermediate: [6, 12], advanced: [10, 20] };
-const MU: Record<SkillTier, [number, number]> = { beginner: [1, 2], intermediate: [2, 5], advanced: [5, 10] };
-const HSPU: Record<SkillTier, [number, number]> = { beginner: [1, 3], intermediate: [3, 8], advanced: [8, 15] };
-const ROPE: Record<SkillTier, [number, number]> = { beginner: [1, 1], intermediate: [1, 2], advanced: [2, 3] };
-
-export const SKILL_FATIGUE_BANDS: Record<string, SkillFatigueDef> = {
-  toes_to_bar: { skillKey: "toes_to_bar", match: ["toes to bar"], perRound: PULL },
-  chest_to_bar_pull_ups: { skillKey: "chest_to_bar_pull_ups", match: ["chest to bar"], perRound: PULL },
-  kipping_pull_ups: { skillKey: "kipping_pull_ups", match: ["kipping pull up", "pull up"], perRound: PULL },
-  strict_pull_ups: { skillKey: "strict_pull_ups", match: ["strict pull up"], perRound: PULL },
-  butterfly_pull_ups: { skillKey: "butterfly_pull_ups", match: ["butterfly pull up"], perRound: PULL },
-  bar_muscle_ups: { skillKey: "bar_muscle_ups", match: ["bar muscle up"], perRound: MU },
-  muscle_ups: { skillKey: "muscle_ups", match: ["ring muscle up", "muscle up"], perRound: MU },
-  strict_ring_muscle_ups: { skillKey: "strict_ring_muscle_ups", match: ["strict ring muscle up", "strict muscle up"], perRound: MU },
-  hspu: { skillKey: "hspu", match: ["handstand push up", "hspu"], perRound: HSPU },
-  strict_hspu: { skillKey: "strict_hspu", match: ["strict handstand push up", "strict hspu"], perRound: HSPU },
-  deficit_hspu: { skillKey: "deficit_hspu", match: ["deficit handstand push up", "deficit hspu"], perRound: HSPU },
-  wall_facing_hspu: { skillKey: "wall_facing_hspu", match: ["wall facing handstand push up", "wall facing hspu"], perRound: HSPU },
-  double_unders: { skillKey: "double_unders", match: ["double under"], perRound: { beginner: [15, 30], intermediate: [30, 50], advanced: [50, 100] } },
-  rope_climbs: { skillKey: "rope_climbs", match: ["rope climb"], perRound: ROPE },
-  legless_rope_climbs: { skillKey: "legless_rope_climbs", match: ["legless rope climb"], perRound: ROPE },
-};
-
-/** Find the skill-fatigue definition a movement falls under (longest keyword
- *  match wins). Null when the movement isn't a banded skill. */
-export function skillFatigueDefForMovement(movement: string): SkillFatigueDef | null {
-  const n = normalize(movement);
-  let best: { def: SkillFatigueDef; len: number } | null = null;
-  for (const def of Object.values(SKILL_FATIGUE_BANDS)) {
-    for (const kw of def.match) {
-      if (n.includes(kw) && (!best || kw.length > best.len)) best = { def, len: kw.length };
-    }
-  }
-  return best?.def ?? null;
-}
-
-/**
- * The athlete's own rating of THIS skill, or null when they gave none.
- * Only the def's own skill is read, never another (2026-11-26). The skills map
- * may be keyed by profile key or by display name; both are matched exactly
- * (normalized), never by one name sitting inside another — "hspu" sits inside
- * "strict hspu", and those are two skills. "none" stays "none": it means the
- * athlete can't do it yet (it used to be read as beginner).
- */
-export function athleteTierFor(
-  def: SkillFatigueDef,
-  skills: Record<string, string | null>,
-): SkillRating | null {
-  const want = new Set([normalize(def.skillKey), normalize(SKILL_DISPLAY_NAMES[def.skillKey] ?? def.skillKey)]);
-  for (const [k, v] of Object.entries(skills)) {
-    if (!want.has(normalize(k))) continue;
-    if (v === "none" || v === "beginner" || v === "intermediate" || v === "advanced") return v;
-  }
-  return null;
-}
 
 /** The four ratings and what they mean for programming, for the composer and
  *  the writer. Rules only: no example athlete, no movement named. */
@@ -241,13 +169,3 @@ export const CYCLING_LOAD_BANDS_PROMPT = [
   `  Rounding: ${ROUNDING_RULE}`,
 ].join("\n");
 
-/** The skill volume table rendered for prompts. */
-export const SKILL_FATIGUE_BANDS_PROMPT = [
-  "SKILL VOLUME BANDS UNDER FATIGUE (per-round reps by the athlete's rating of THAT skill — each skill uses only its own rating; volume inside the band is presumptively defensible, above it needs a written justification in the piece's stimulus_note):",
-  ...Object.entries(SKILL_FATIGUE_BANDS).map(([key, def]) => {
-    const tiers = (Object.entries(def.perRound) as Array<[SkillTier, [number, number]]>)
-      .map(([t, r]) => `${t} ${r[0]}-${r[1]}`)
-      .join(" · ") + " · none: never the movement itself, progressions only";
-    return `  - ${key.replace(/_/g, " ")}: ${tiers}`;
-  }),
-].join("\n");

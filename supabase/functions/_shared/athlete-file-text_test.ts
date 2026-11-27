@@ -192,3 +192,12 @@ Deno.test("the 1RM clamp, a failed re-plan and the composer's retry counts are r
   assert(gen.includes('stage: "replan_fallback"') && gen.includes("the re-plan failed, so this week was written from the month's old plan"));
   assert(gen.includes("first_pass_count: firstPassViolations.length, after_retry_count: audit.violations.length"));
 });
+
+Deno.test("no per-round rep ranges for skills, and no code checking skill volume (removed 2026-11-26)", () => {
+  const defs = read("_shared/conditioning-definitions.ts");
+  for (const gone of ["SKILL_FATIGUE_BANDS", "perRound", "skillFatigueDefForMovement", "athleteTierFor"]) assert(!defs.includes(gone), `${gone} is back`);
+  const audit = read("_shared/metcon-variety-audits.ts");
+  for (const gone of ["parsePerRoundReps", "skillFatigueDefForMovement", "exceeds the band"]) assert(!audit.includes(gone), `${gone} is back`);
+  const composer = read("_shared/metcon-composer-prompt.ts");
+  assert(!composer.includes("SKILL_FATIGUE_BANDS_PROMPT") && composer.includes("${SKILL_RATINGS_PROMPT}"));
+});

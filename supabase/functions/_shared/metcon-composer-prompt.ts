@@ -20,7 +20,6 @@
 
 import {
   CYCLING_LOAD_BANDS_PROMPT,
-  SKILL_FATIGUE_BANDS_PROMPT,
   SKILL_RATINGS_PROMPT,
 } from "./conditioning-definitions.ts";
 
@@ -49,13 +48,11 @@ COMPOSE LIKE A CRAFTSMAN
 ${CYCLING_LOAD_BANDS_PROMPT}
 
 SKILLS UNDER FATIGUE — EXPRESSION IS REQUIRED
-Every development axis in the typed decisions appears in conditioning: aim for at least one metcon per week per development axis (the audited floor is every non-deload week); every maintain axis appears in at least two metcons across the cycle. Volume within the band for the athlete's rating of that skill (below) is presumptively defensible. Volume ABOVE the band requires a written justification in that piece's stimulus_note. Axes listed in fatigue_skill_exclusions are exempt — never program them under fatigue this cycle.
+Every development axis in the typed decisions appears in conditioning: aim for at least one metcon per week per development axis (the audited floor is every non-deload week); every maintain axis appears in at least two metcons across the cycle. Set each skill's volume from the athlete's rating of that skill (below). Axes listed in fatigue_skill_exclusions are exempt — never program them under fatigue this cycle.
 
 ${SKILL_RATINGS_PROMPT}
 
-${SKILL_FATIGUE_BANDS_PROMPT}
-
-PRECEDENCE — BANDS BEAT TIME-FILL: when a slot's allocated minutes exceed what in-band skill volume supports, fill the remaining time with monostructural work, rest structure, or rounds of low-skill movements — NEVER with more reps of a band-capped skill.
+PRECEDENCE — RATINGS BEAT TIME-FILL: when a slot's allocated minutes exceed what the athlete's skill ratings support, fill the remaining time with monostructural work, rest structure, or rounds of low-skill movements — NEVER with more reps of a skill than its rating supports.
 
 SET-LEVEL RULES (rules 1, 3, 4, 6, 7, 8 and 10 are counted after you and a failure comes back to you once; the others are yours to get right)
   1. EVERY PIECE DISTINCT. No repeated movement-combination anywhere in the month. No day-slot templates (never "row + wall balls + X" every week-1-day-1-style pattern). Deload pieces are their own easy workouts, not shrunk copies.
