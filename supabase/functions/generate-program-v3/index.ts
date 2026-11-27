@@ -25,7 +25,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
-import { buildWriterPayload, type WriterPayload } from "../_shared/build-writer-payload.ts";
+import { buildWriterPayload, daysPerWeekLogLine, type WriterPayload } from "../_shared/build-writer-payload.ts";
 import { generateAndPersistCoachState } from "../_shared/generate-coach-state.ts";
 import { buildCoachStateDocumentBlock } from "../_shared/coach-state.ts";
 import { deriveMetconSlots, type MetconComposerInputs } from "../_shared/metcon-composer.ts";
@@ -249,7 +249,20 @@ async function stagePayloadBuilding(
   // WEEKLY MODE opt-in (2026-11-13): week 1 filled, weeks 2-4 as outline,
   // the weekly cron fills the rest. Per-athlete while it rolls out.
   const { data: weeklyRow } = await supa
-    .from("athlete_profiles").select("programming_weekly").eq("user_id", userId).maybeSingle();
+    .from("athlete_profiles").select("programming_weekly, days_per_week").eq("user_id", userId).maybeSingle();
+  // Days per week: the default of 5 stays, but a build that used it, or a
+  // number outside 2 to 6, is recorded (founder, 2026-11-26).
+  const daysNote = daysPerWeekLogLine((weeklyRow as { days_per_week?: number | null } | null)?.days_per_week ?? null);
+  if (daysNote) {
+    console.warn(`[generate-program-v3] ${daysNote}`);
+    await logGenerationAudit(supa, {
+      user_id: userId,
+      program_id: rs.continuation.programId ?? null,
+      month_number: rs.continuation.monthNumber,
+      stage: "payload_default",
+      warnings: [daysNote],
+    }).catch((e) => console.warn("[generate-program-v3] payload_default log failed (non-fatal):", e));
+  }
   const weekly = rs.weeklyFill != null || weeklyRow?.programming_weekly === true;
   if (weekly) console.log(`[generate-program-v3] weekly mode for ${userId}`);
 

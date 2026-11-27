@@ -174,3 +174,13 @@ Deno.test("every block rewrite is recorded: before, after and why", async () => 
   const stage = gen.slice(gen.indexOf("async function stageSurgical("), gen.indexOf("async function stageSafetyReview("));
   assert(stage.includes('stage: "block_rewrite"') && stage.includes("before: ${r.before} | after: ${r.after}"));
 });
+
+Deno.test("days per week: the default of 5 stays, and using it (or a number outside 2 to 6) is logged", async () => {
+  const { clampDaysPerWeek, daysPerWeekLogLine } = await import("./build-writer-payload.ts");
+  assertEquals(clampDaysPerWeek(null), 5);
+  assertEquals(daysPerWeekLogLine(null), "days_per_week: none saved on the profile; built with the default of 5 days.");
+  assertEquals(daysPerWeekLogLine(8), "days_per_week: profile says 8; built with 6 days (the range is 2 to 6).");
+  assertEquals(daysPerWeekLogLine(4), null);
+  const gen = read("generate-program-v3/index.ts");
+  assert(gen.includes('stage: "payload_default"') && gen.includes("daysPerWeekLogLine("));
+});
