@@ -42,8 +42,8 @@ You will receive:
 You will emit: ONE corrected block via the \`emit_block\` tool, matching the same BlockPrescription schema the writer uses.
 
 RULES (honor every one):
-- Stay true to the skeleton's intent. If metcon_focus says "long aerobic chipper", the rewrite is still a long aerobic chipper — just one that fixes the violations.
-- Time domain: the skeleton's metcon_focus STARTS with the time domain (short / medium / long). Keep the block in it: ${TIME_DOMAINS_LINE}. Take the time domain from that first word only; other words in the line (aerobic, sprint, power) describe the feel, not the length. No check rewrites a block for its duration.
+- Stay true to the skeleton's intent: the rewrite is the same kind of block, with the violations fixed.
+- Time domain: the skeleton gives a metcon's time domain (short / medium / long) in metcon_time_domain; on a month planned before that field, it is the first word of metcon_focus. Keep the block in it: ${TIME_DOMAINS_LINE}. No check rewrites a block for its duration.
 - COMPOSED METCON: when the user message carries a COMPOSED PIECE, the block is a metcon that a month-sighted composer already designed. It is NOT yours to redesign. Keep its movements, format, scheme, duration and purpose exactly, and change ONLY what the audit violations name (a missing field, a misplaced max_effort flag, a format field that does not match the rows). If a violation can only be fixed by changing a movement, change that one movement and nothing else.
 - Honor injuries / do-not-program list.
 - All weights in the athlete's units.
@@ -63,7 +63,7 @@ Output ONLY the corrected block. Do NOT explain, do NOT apologize, do NOT emit a
 
 /** Pick the slice of the skeleton that matters for this day. */
 function findSkeletonDay(skeleton: SkeletonOutput, weekNum: number, dayNum: number):
-  | { day_intent?: string; primary_lift?: string; strength_scheme?: string; metcon_focus?: string; skill_focus?: string }
+  | { day_intent?: string; primary_lift?: string; strength_scheme?: string; metcon_time_domain?: string; metcon_focus?: string; skill_focus?: string }
   | null {
   for (const week of skeleton.weeks ?? []) {
     if (week.week_num !== weekNum) continue;

@@ -258,12 +258,9 @@ export interface CoachStateContent {
   recovery_posture: CoachStateRecoveryPosture;
   strength_emphasis: CoachStateStrengthEmphasis;
 
-  /** v1.7 — the coach's conditioning INTENT for the cycle: what the metcons
-   *  must accomplish, pace/duration/rest character per conditioning priority,
-   *  dose cautions (age, injury, recovery), preference notes. NEVER a movement
-   *  list or a workout — composition is the metcon composer's job downstream.
-   *  Terminates at the composer (not the skeleton). */
-  metcon_guidance: string;
+  /** No longer written (founder, 2026-11-27): the coach state has no
+   *  conditioning paragraph. Present only on states stored before that; nothing reads it. */
+  metcon_guidance?: string;
 
   /** v1.7 — athlete-facing review of the PREVIOUS cycle, grounded in real
    *  logged numbers from payload.previous_cycle. Present ONLY when a previous
@@ -271,18 +268,10 @@ export interface CoachStateContent {
    *  training_evaluations, replacing the separate training-analysis call. */
   month_in_review?: string | null;
 
-  /** v1.16 — TRUE only when the coach deliberately de-emphasizes loading under
-   *  fatigue this cycle (injury, explicit coach instruction, movement rated
-   *  none). Read by the composer's barbell target: absent/false, normal barbell
-   *  presence is assumed. Goal words ("engine", "aerobic") NEVER set this —
-   *  they shift time domains, not modality. Makes the 2026-08-11 letter-owns-
-   *  taste precedent auditable without parsing prose. */
+  /** No longer written or read (2026-11-27). On older stored states only. */
   loading_deemphasis?: boolean;
 
-  /** v1.16 — skill axes deliberately kept OUT of conditioning under fatigue
-   *  this cycle. The
-   *  under-fatigue expression requirement skips these axes; the letter's prose
-   *  explains why. Empty/absent = no exclusions. */
+  /** No longer written or read (2026-11-27). On older stored states only. */
   fatigue_skill_exclusions?: FocusArea[];
 
   /** v1.17 (Part D) — typed authorization for DEDICATED cardio blocks (plain
@@ -490,31 +479,12 @@ export const EMIT_COACH_STATE_TOOL = {
         required: ["value", "confidence", "reasons"],
         additionalProperties: false,
       },
-      metcon_guidance: {
-        type: "string",
-        minLength: 100,
-        maxLength: 1200,
-        description:
-          "The coach's conditioning INTENT for the cycle: what the metcons must accomplish, the pace/duration/rest character each conditioning priority calls for, dose cautions (age, injury, recovery budget), and preference notes worth honoring. NEVER name specific movements or write workouts — composition happens downstream.",
-      },
       month_in_review: {
         type: "string",
         minLength: 200,
         maxLength: 2500,
         description:
           "Athlete-facing review of the PREVIOUS training cycle — emit ONLY when the payload has a non-null previous_cycle. Second person, concrete: cite the real logged numbers (top lifts, hit rates, session counts, metcon coverage), name what moved and what held, connect it forward to this cycle's plan. Sparse logging is NEUTRAL — never scold or infer decline from absence. Omit this field entirely for a first cycle.",
-      },
-      loading_deemphasis: {
-        type: "boolean",
-        description:
-          "TRUE only when you are DELIBERATELY de-emphasizing loaded work under fatigue this cycle — an injury the athlete stated, or an explicit coaching reason. When true, metcon_guidance must contain one explicit sentence stating the de-emphasis and its reason. A conditioning/engine/aerobic GOAL is NOT de-emphasis — it shifts time domains and dose, never modality. Omit (or false) in every other case: downstream assumes normal barbell and skill presence in conditioning.",
-      },
-      fatigue_skill_exclusions: {
-        type: "array",
-        maxItems: 4,
-        description:
-          "Skill axes to keep OUT of conditioning under fatigue this cycle Only for deliberate, stated reasons (an injury the athlete stated, or a coaching instruction) — never because the athlete is merely developing the skill. Omit when there are none.",
-        items: { type: "string", enum: [...FOCUS_AREAS] },
       },
       dedicated_cardio: {
         type: "object",
@@ -537,7 +507,6 @@ export const EMIT_COACH_STATE_TOOL = {
       "deprioritize",
       "recovery_posture",
       "strength_emphasis",
-      "metcon_guidance",
     ],
     additionalProperties: false,
   },
@@ -585,7 +554,11 @@ export function coachStateDiff(
  *  TrainingDesignInput remain the locked plan; this is the letter that
  *  explains it — the same content the athlete reads as their evaluation. */
 export function buildCoachStateDocumentBlock(coachState: CoachStateContent): string {
-  return `COACH STATE DOCUMENT (JSON — the coach's full written judgment; the TrainingDesignInput above remains the locked plan):\n${JSON.stringify(coachState, null, 2)}`;
+  // The coach state no longer writes a conditioning paragraph (founder,
+  // 2026-11-27). States stored before that still hold one, with its two
+  // switches: they are left out so nothing downstream reads them.
+  const { metcon_guidance: _g, loading_deemphasis: _l, fatigue_skill_exclusions: _f, ...doc } = coachState;
+  return `COACH STATE DOCUMENT (JSON — the coach's full written judgment; the TrainingDesignInput above remains the locked plan):\n${JSON.stringify(doc, null, 2)}`;
 }
 
 /** Compact letter render for the AI Coach chat (Pair 6, 2026-08-11): the chat
@@ -629,9 +602,6 @@ export function renderCoachStateForChat(
     lines.push(`Deliberately set aside this cycle: ${cs.deprioritize.map((d) => d.focus).join(", ")}`);
   }
   lines.push(`Recovery stance: ${cs.recovery_posture.stance} · Strength emphasis: ${cs.strength_emphasis.value}`);
-  if (cs.metcon_guidance?.trim()) {
-    lines.push(`Conditioning intent: ${cs.metcon_guidance.trim()}`);
-  }
   const closing = opts.closing ?? "adjustment-rules";
   if (closing === "adjustment-rules") {
     lines.push(

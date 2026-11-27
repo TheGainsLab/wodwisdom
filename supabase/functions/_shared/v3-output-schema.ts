@@ -80,9 +80,17 @@ export interface DaySkeleton {
    */
   strength_scheme?: string;
   /**
-   * If a metcon block is present: the conditioning focus.
-   * E.g., "short power couplet (5-8 min)", "long aerobic chipper (20-25 min)",
-   * "competition simulation (15 min ascending C&J ladder)".
+   * If a metcon block is present: its time domain. The planner's ONE decision
+   * about the metcon (founder, 2026-11-27): it sets how long the piece is, and
+   * the composer writes it. No pace word, no focus label, no minutes.
+   */
+  metcon_time_domain?: "short" | "medium" | "long";
+  /**
+   * A text line about the metcon. Individual programs: no longer written by
+   * the planner; code sets it to the time domain so the screens and checks
+   * that read it keep working (normalizeMetconTimeDomains). Months planned
+   * before 2026-11-27 hold the old line ("medium · build, sustained · …").
+   * Gym classes still write it, with the metcon's minutes.
    */
   metcon_focus?: string;
   /**
@@ -150,7 +158,16 @@ function buildDaySkeletonSchema(daysPerWeek: number) {
       },
       primary_lift: { type: "string", maxLength: 80 },
       strength_scheme: { type: "string", maxLength: 300 },
-      metcon_focus: { type: "string", maxLength: 300 },
+      metcon_time_domain: {
+        type: "string",
+        enum: ["short", "medium", "long"],
+        description: "REQUIRED on every day that has a metcon block: the metcon's time domain. This is your one decision about the metcon.",
+      },
+      metcon_focus: {
+        type: "string",
+        maxLength: 300,
+        description: "Leave out unless the KEY RULES ask for it (group classes state the metcon's minutes here).",
+      },
       skill_focus: { type: "string", maxLength: 300 },
       block_intents: {
         type: "array",
@@ -171,7 +188,7 @@ function buildDaySkeletonSchema(daysPerWeek: number) {
       block_minutes: {
         type: "array",
         description:
-          "Time allocation for this day: one {block_type, minutes} entry per entry in block_types, distributing the athlete's session budget in service of the priorities. Emit when a SESSION TIME BUDGET is stated in the rules.",
+          "Time allocation for this day: one {block_type, minutes} entry per entry in block_types except the metcon (its length is its time domain), distributing the athlete's session budget in service of the priorities. Emit when a SESSION TIME BUDGET is stated in the rules.",
         items: {
           type: "object",
           properties: {
@@ -215,7 +232,7 @@ export function buildEmitSkeletonTool(daysPerWeek: number) {
   return {
     name: "emit_skeleton",
     description:
-      "Emit the structural skeleton for this athlete's 4-week training cycle. The skeleton declares the 4-week month plan plus, for each training day, which block types exist + the primary lift / metcon focus / skill focus when applicable, AND block_intents — the declared coaching purpose (focus + develop/maintain/support) of each focus-bearing block. Do NOT emit movement-level data (sets, reps, weight) — those are filled by subsequent per-week calls. Keep the skeleton tight and structural; this is the decision layer that constrains the per-week fills.",
+      "Emit the structural skeleton for this athlete's 4-week training cycle. The skeleton declares the 4-week month plan plus, for each training day, which block types exist + the primary lift / metcon time domain / skill focus when applicable, AND block_intents — the declared coaching purpose (focus + develop/maintain/support) of each focus-bearing block. Do NOT emit movement-level data (sets, reps, weight) — those are filled by subsequent per-week calls. Keep the skeleton tight and structural; this is the decision layer that constrains the per-week fills.",
     input_schema: {
       type: "object",
       properties: {

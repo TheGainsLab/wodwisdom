@@ -95,12 +95,8 @@ export const CYCLING_LOAD_CLASSES: Record<string, LoadClassDef> = {
   },
 };
 
-/** DB/KB defaults by load band (lbs; DB per hand / KB) when no benchmark exists.
- *  The fill may override upward when the athlete's data supports it. */
-export const IMPLEMENT_TIER_DEFAULTS = {
-  dumbbell: { beginner: 35, intermediate: 50, advanced: 70 },
-  kettlebell: { beginner: 20, intermediate: 35, advanced: 50 },
-} as const;
+/** The medicine ball is one fixed weight per sex (founder, 2026-11-27). */
+export const MEDICINE_BALL_WEIGHTS = { men: "20 lb / 9 kg", women: "14 lb / 6 kg" } as const;
 
 const normalize = (s: string) => s.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
@@ -172,9 +168,11 @@ export const CYCLING_LOAD_BANDS_PROMPT = [
       .join(" · ");
     return `  - ${cls} (parent 1RM: ${def.parents.join(" else ")}): ${bands}`;
   }),
-  // By the piece's load band, not by an athlete "tier": the athlete has no
-  // overall tier (2026-11-26). Light / moderate / heavy take the three values.
-  `  - dumbbell / kettlebell (no barbell parent), by load band: light ${IMPLEMENT_TIER_DEFAULTS.dumbbell.beginner} · moderate ${IMPLEMENT_TIER_DEFAULTS.dumbbell.intermediate} · heavy ${IMPLEMENT_TIER_DEFAULTS.dumbbell.advanced} lb per dumbbell; light ${IMPLEMENT_TIER_DEFAULTS.kettlebell.beginner} · moderate ${IMPLEMENT_TIER_DEFAULTS.kettlebell.intermediate} · heavy ${IMPLEMENT_TIER_DEFAULTS.kettlebell.advanced} lb kettlebell (convert for kg), overridable when the athlete's data supports more.`,
+  // Founder, 2026-11-27: the composer chooses dumbbell and kettlebell weights
+  // from the athlete's lifts (the fixed 35/50/70 and 20/35/50 table is gone);
+  // the medicine ball is always one weight per sex.
+  "  - dumbbell / kettlebell: no band and no default. The composer chooses the weight for THIS athlete from their lifts and states it on the movement (weight, per implement); the writer uses it as given.",
+  `  - medicine ball: always ${MEDICINE_BALL_WEIGHTS.men} for men and ${MEDICINE_BALL_WEIGHTS.women} for women.`,
   `  Rounding: ${ROUNDING_RULE}`,
 ].join("\n");
 

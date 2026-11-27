@@ -192,7 +192,7 @@ async function callCoachStateChecked(payload: WriterPayload, retryViolations = "
     console.warn(`[generate-coach-state] ${e.message} — retrying once`);
     const note = e.problems.length
       ? `YOUR PREVIOUS REPLY WAS REJECTED — required fields were missing or malformed: ${e.problems.join("; ")}. Emit the complete emit_coach_state input with every required list present.`
-      : "YOUR PREVIOUS REPLY WAS CUT OFF before the tool input completed. Emit the complete emit_coach_state input; keep the summary, metcon_guidance and month_in_review within their stated lengths.";
+      : "YOUR PREVIOUS REPLY WAS CUT OFF before the tool input completed. Emit the complete emit_coach_state input; keep the summary and month_in_review within their stated lengths.";
     return await callCoachState(payload, retryViolations ? `${note}\n\n${retryViolations}` : note);
   }
 }
