@@ -953,8 +953,8 @@ export async function buildWriterPayload(
 
   // 5. RAG — RETIRED from generation (2026-08-11). The v1 reference block was
   // built here for three months with no v3 consumer (skeleton/fill never read
-  // payload.rag). Example anchoring now lives in the metcon composer's
-  // stratified retrieval (metcon-examples.ts). Field kept for type compat.
+  // payload.rag). The composer is shown real main site metcons and articles
+  // from metcon-library.ts. Field kept for type compat.
   const rag = "";
 
   // 6. Hydrate the remaining JSONB blobs.

@@ -17,7 +17,7 @@
  * tool_use schema enforcement is imperfect — see audits.ts notes).
  */
 
-import { timeDomainForMinutes } from "./conditioning-definitions.ts";
+import { metconTimeDomainOfDay } from "./metcon-composer.ts";
 import { BLOCK_TYPES } from "./v2-output-schema.ts";
 import type {
   DaySkeleton,
@@ -58,27 +58,27 @@ export interface SkeletonAuditContext {
  * (stageSkeleton) runs it separately — one retry, then accept-and-log — the
  * same tier as the composer's variety fence.
  *
+ * Reads the planner's typed metcon_time_domain (a month planned before the
+ * field existed is read from its text line). Runs on a first build AND on a
+ * re-plan (fromWeek = the first re-planned week; founder, 2026-11-27).
+ *
  * Checks per week (weeks with 3+ metcon days):
  *   - every domain present (≥1 short, ≥1 medium, ≥1 long) — deload included
  *   - no domain over ceil(n/3)+1 slots (a priority moves at most ~one slot)
  */
-export function auditSkeletonMetconMix(skeleton: SkeletonOutput): SkeletonAuditResult {
+export function auditSkeletonMetconMix(skeleton: SkeletonOutput, fromWeek = 1): SkeletonAuditResult {
   const violations: string[] = [];
-  const parseDomain = (focus: string): "short" | "medium" | "long" => {
-    const f = (focus ?? "").toLowerCase();
-    const m = f.match(/\((\d+)(?:\s*[-–—]\s*(\d+))?\s*min/);
-    if (m) {
-      const upper = parseInt(m[2] ?? m[1], 10);
-      return timeDomainForMinutes(upper);
-    }
-    if (/\bshort\b/.test(f)) return "short";
-    if (/\blong\b/.test(f)) return "long";
-    return "medium";
-  };
   for (const wk of skeleton.weeks ?? []) {
-    const domains = (wk.days ?? [])
-      .filter((d) => (d.block_types ?? []).includes("metcon") && d.metcon_focus)
-      .map((d) => parseDomain(d.metcon_focus!));
+    // A re-plan keeps the weeks already written: only the re-planned ones count.
+    if (wk.week_num < fromWeek) continue;
+    const metconDays = (wk.days ?? []).filter((d) => (d.block_types ?? []).includes("metcon"));
+    // The planner's one metcon decision: a day without it is a miss.
+    for (const d of metconDays) {
+      if (metconTimeDomainOfDay(d) == null) {
+        violations.push(`Week ${wk.week_num} Day ${d.day_num}: the metcon has no time domain — set metcon_time_domain (short, medium or long).`);
+      }
+    }
+    const domains = metconDays.map((d) => metconTimeDomainOfDay(d)).filter((d): d is "short" | "medium" | "long" => d != null);
     const n = domains.length;
     if (n < 3) continue;
     const count = { short: 0, medium: 0, long: 0 };

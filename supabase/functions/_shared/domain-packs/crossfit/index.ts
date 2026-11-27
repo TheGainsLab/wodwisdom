@@ -52,7 +52,7 @@ export const CROSSFIT_PACK: DomainPack = {
       // time, per the priorities); nothing enforces, retries, or rescales it.
       ...(tdi.session_length_minutes && tdi.session_length_minutes > 0
         ? [
-          `- SESSION TIME BUDGET: this athlete trains ~${tdi.session_length_minutes} minutes per session. For EVERY day, emit block_minutes — one {block_type, minutes} entry per entry in block_types — distributing the budget in service of the priorities. Each day's minutes should total near the budget (the deload week may run lighter). YOU decide where the time goes; the fill will size each block to your allocation.`,
+          `- SESSION TIME BUDGET: this athlete trains ~${tdi.session_length_minutes} minutes per session. For EVERY day, emit block_minutes — one {block_type, minutes} entry per entry in block_types EXCEPT the metcon — distributing the budget in service of the priorities. The metcon gets no minutes: its length is its time domain, so leave room for it and do not stretch it to fill the session (spare session time is simply not used). YOU decide where the rest of the time goes; the fill will size each block to your allocation.`,
         ]
         : []),
       // Part D (2026-08-31): dedicated cardio — offered ONLY when the coach
@@ -67,10 +67,11 @@ export const CROSSFIT_PACK: DomainPack = {
           "- NO dedicated cardio blocks this cycle — never emit the cardio block type. Aerobic work lives in the metcon time domains.",
         ]),
       "- Every training day includes skills + strength + accessory + metcon block types. The skills block is on every training day, without exception.",
+      "- Every day with a metcon block sets metcon_time_domain (short, medium or long). That is your only decision about the metcon.",
       "- Emit STRUCTURE ONLY — no sets / reps / weight. Name a movement only in primary_lift and skill_focus; everything else is filled in subsequent per-week calls.",
       "- primary_lift uses canonical display names (Back Squat, Deadlift, Snatch, Clean and Jerk, etc.) or a complex description.",
       "- ALLOCATE the given priorities/maintain/deprioritize — never invent, promote, or drop one. Every priority must appear in the structure; no block built around a deprioritized focus.",
-      "- Honor do_not_program when picking primary_lift / metcon_focus / skill_focus.",
+      "- Honor do_not_program when picking primary_lift / skill_focus.",
     ].join("\n"),
   },
   audits: {

@@ -1,37 +1,29 @@
 /**
- * metcon-composer.ts
+ * metcon-composer.ts — the call that writes the metcons.
  *
- * The MONTH-SIGHTED metcon composition call (2026-08). Metcon quality was
- * capped by architecture: composition happened inside four per-week fill calls
- * steering by one-sentence relays, so no author ever saw the whole month —
- * variety across the set was unenforceable by construction, and both writer
- * models converged to a safe attractor (row + wall ball, machines-only, cloned
- * weeks). Every good block in the pipeline (strength, skills) already has a
- * month-sighted author; this call extends that principle to conditioning.
+ * REBUILT 2026-11-27 (founder's decisions, after the metcons had drifted to
+ * long, many-movement pieces). What the composer is given, and nothing else:
  *
- * One call per month. Inputs (the COMPLETE contract — scattered requirements
- * are how payload.rag got silently dropped for three months):
- *   - every metcon slot in the month (time domain + intensity + focus, from
- *     the skeleton — the part the skeleton is actually competent at)
- *   - each slot's day context (primary lift / skill focus / accessory intents)
- *     for interference management
- *   - the letter's conditioning judgment (CoachState.metcon_guidance, v1.7 —
- *     terminates HERE, not at the skeleton)
- *   - athlete data: vocabulary, equipment, do_not_program, skills tier,
- *     1RMs, pacing benchmarks, age/recovery context
- *   - previous cycle's metcons (never re-serve)
- *   - stratified example workouts (metcon-examples.ts — frozen queries)
+ *   - each slot: week and day, its TIME DOMAIN (the planner's one decision),
+ *     the week's role, and the rest of that day (main lift, skill focus,
+ *     accessory focus) so the metcon does not fight it
+ *   - the athlete's own profile as they entered it: goal in their words,
+ *     lifts, skills, conditioning numbers, equipment, what they said about
+ *     injuries, the avoid list, notes to the coach, age / sex / bodyweight /
+ *     units, and their Engine training when they have it
+ *   - 100 real main site metcons drawn at random, as examples of what a
+ *     well-written workout looks like (metcon-library.ts)
+ *   - three CrossFit Journal articles (metcon-library.ts)
+ *   - the metcons already written this month, and last month's
+ *   - the movement list, as a guide to spelling
  *
- * Output: one distinct workout per slot. The deterministic set-level fence is
- * metcon-variety-audits.ts (one retry). The fill DOES NOT compose metcons —
- * it places the composed pieces with exact loads.
+ * What it is NO LONGER given: the coach state's conditioning paragraph, the
+ * ranked priorities, the maintain / set-aside lists, the recovery stance, a
+ * pace word, a focus label, or minutes from the planner. Those were steering
+ * the metcons ("longer sustained efforts") and are gone.
  *
- * FROZEN SPEC (2026-08-11 rulings): every piece distinct — no repeated
- * movement-combination, no day-slot template, no test-piece repeats (athletes
- * test on their own; evaluation leans on the bigger data set). Monostructural:
- * 1 fine, 2 max, always reasoned. Named WODs allowed but infrequent. No
- * movement in more than ~1/3 of pieces; ≥3 formats, none over half; barbell
- * floor 2–3 pieces for capable athletes.
+ * Output: one workout per slot. metcon-variety-audits.ts counts the few
+ * things code counts (one send-back). The writer transcribes the pieces.
  */
 
 import { timeDomainForMinutes } from "./conditioning-definitions.ts";
@@ -42,6 +34,7 @@ import {
   TWO_DAY_COMPOSER_ADDENDUM,
 } from "./metcon-composer-prompt.ts";
 import type { EngineTrainingPayload } from "./build-writer-payload.ts";
+import { restrictionsForPrompt } from "./athlete-file-text.ts";
 
 // ============================================================
 // Types
@@ -63,23 +56,14 @@ export const METCON_FORMATS = [
 ] as const;
 export type MetconFormat = typeof METCON_FORMATS[number];
 
-/** One conditioning slot from the skeleton — the skeleton's ENTIRE metcon
- *  contribution (time domain + intensity + focus), plus the day's other
- *  blocks as required interference context. */
+/** One metcon slot. From the planner: the time domain and the week's role.
+ *  The rest is that day's other work, so the metcon does not fight it. */
 export interface MetconSlot {
   week_num: number;
   day_num: number;
   time_domain: MetconTimeDomain;
-  /** Week/intensity character, e.g. "build — sustained threshold", "deload — easy". */
-  intensity: string;
-  /** Conditioning focus (adaptation, never a movement menu): aerobic_capacity |
-   *  anaerobic_capacity | mixed_modal_conditioning. */
-  focus: string;
-  /** The skeleton's exact time allocation for this metcon block (block_minutes,
-   *  session-budget phase). Null when the athlete never stated a budget. When
-   *  present, the piece's stated_duration_minutes must land near it — a large
-   *  allocation is a deliberate design decision, not a suggestion. */
-  allocated_minutes?: number | null;
+  /** The week's role, from the planner's weekly_intent ("build", "deload"). */
+  week_role: string;
   day_context: {
     primary_lift?: string;
     strength_scheme?: string;
@@ -89,20 +73,26 @@ export interface MetconSlot {
   };
 }
 
+export const METCON_MACHINES = ["row", "bike", "ski", "run", "swim"] as const;
+export type MetconMachine = typeof METCON_MACHINES[number];
+
 export interface ComposedMetconMovement {
-  /** Display name from the athlete's vocabulary. */
+  /** The movement's name only. */
   movement: string;
-  /** Human prescription for this movement within the piece — reps ("15"),
-   *  calories ("12 cal"), distance ("400m"). Exact weights are the fill's job. */
+  /** Reps ("15"), calories ("12 cal"), distance ("400m"). */
   prescription: string;
-  /** TYPED load (athlete-match package): the movement class from the shared
-   *  cycling-load table (conditioning-definitions.ts) — REQUIRED on every
-   *  loaded movement (barbell / DB / KB / ball); omit for bodyweight,
-   *  gymnastics, and monostructural work. The fill computes the exact weight
-   *  from the athlete's parent-lift 1RM; the audit checks presence. Adjectives
-   *  in prose without these fields are a defect. */
+  /** BARBELL movements: the class from the shared cycling-load table, with
+   *  load_band. The writer works out the weight from the athlete's 1RM.
+   *  Also "dumbbell" / "kettlebell" / "medicine_ball" to name the implement. */
   load_class?: string | null;
+  /** Barbell only. */
   load_band?: "light" | "moderate" | "heavy" | null;
+  /** DUMBBELL and KETTLEBELL: the weight the composer chose for this athlete,
+   *  per implement, in the athlete's units. The writer uses it as given. */
+  weight?: number | null;
+  /** Set by the composer when the movement is done on a machine, or is a run
+   *  or swim. The one-machine count reads THIS, never the movement's name. */
+  machine?: MetconMachine | null;
 }
 
 export interface ComposedMetcon {
@@ -128,55 +118,42 @@ export interface MetconComposerOutput {
   metcons: ComposedMetcon[];
 }
 
-/** Everything the composer call needs — the complete contract, one object. */
+/** Everything the composer is given: the complete list, one object. */
 export interface MetconComposerInputs {
   slots: MetconSlot[];
-  /** CoachState.metcon_guidance (v1.7). Empty string when unavailable. */
-  metcon_guidance: string;
+  /** The athlete's goal, in their own words. Null when they gave none. */
+  goal_text: string | null;
+  basics: { age: number | null; sex: string | null; bodyweight: number | null };
+  /** The unit the lifts and bodyweight are in. */
+  units?: "lbs" | "kg";
+  /** 1RMs by lift; null when not entered. */
+  lifts: Record<string, number | null>;
+  /** The athlete's own rating of each skill; null when not rated. */
+  skills: Record<string, string | null>;
+  /** Mile, 5k, row and bike numbers; null when not entered. */
+  conditioning_benchmarks: Record<string, string | number | null>;
+  equipment: Record<string, boolean>;
+  /** What the athlete wrote under injuries, as written. */
+  injuries_text: string | null;
+  /** The avoid list. */
+  do_not_program: string[];
+  /** What the athlete said elsewhere that can carry a physical limit
+   *  (athleteWordsElsewhere), in their words. */
+  athlete_words?: string[];
+  /** The athlete's notes for their coach, in their words. */
+  coach_notes?: string[];
+  /** Last month's metcons, one line each. */
+  previous_cycle_metcons: string[];
+  /** The metcons already written this month, one line each. */
+  already_composed_this_month?: string[];
   /** The movement list: spellings to use. Guidance, not a fence. */
   vocabulary: string[];
-  equipment: Record<string, boolean>;
-  do_not_program: string[];
-  /** Skill tiers by key (e.g. { muscle_ups: "advanced" }) — null values fine. */
-  skills: Record<string, string | null>;
-  /** 1RMs by canonical key — null when unknown. */
-  lifts: Record<string, number | null>;
-  /** The unit the 1RMs are in. Was labelled "lbs" for everyone, so a kilo
-   *  athlete's 100 kg was read as 100 lb when sizing loads (2026-11-23). */
-  units?: "lbs" | "kg";
-  /** Conditioning benchmarks (mile time, 2k row, bike cals...) — null fine. */
-  conditioning_benchmarks: Record<string, string | number | null>;
-  /** Age / recovery context line, e.g. "masters 52, conservative stance". */
-  athlete_context: string;
-  /** Last cycle's metcons as one-line summaries — never re-serve these. */
-  previous_cycle_metcons: string[];
-  /** WEEKLY MODE (2026-11-13): the pieces already composed EARLIER THIS
-   *  MONTH, one line each — this call composes one more week that must stay
-   *  distinct from them (the variety audit checks the month as a whole). */
-  already_composed_this_month?: string[];
-  /** WEEKLY MODE: the athlete's notes for their coach, in their words —
-   *  honour them in the pieces for this week ("longer metcons", "more
-   *  rowing"), within the slots' time domains. */
-  coach_notes?: string[];
-  /** Stratified example block from metcon-examples.ts. Empty string = none. */
+  /** 100 real main site metcons (metcon-library.ts). "" = none loaded. */
   examples: string;
-  /** TYPED coaching decisions (athlete-match package) — the authoritative
-   *  channel for axis roles. The prose metcon_guidance informs character and
-   *  flavor ONLY; where the two appear to conflict, these fields win.
-   *  development_axes = the plan's ranked development focuses (strength +
-   *  gymnastics axes; conditioning axes express as time domains, not here). */
-  development_axes: string[];
-  maintain_axes: string[];
-  /** CoachState.loading_deemphasis (typed) — true ONLY when the letter
-   *  explicitly de-emphasizes loading under fatigue. Gates the barbell target. */
-  loading_deemphasis: boolean;
-  /** Skill axes the letter keeps OUT of conditioning under fatigue. */
-  fatigue_skill_exclusions: string[];
-  /** Engine-awareness (2026-10): payload.engine_training — completed-
-   *  session Engine evidence, or null for everyone without it. Non-null
-   *  adds the ENGINE WEEK CONTEXT section to the user message and the
-   *  ENGINE addendum to the system prompt; null is byte-identical to the
-   *  pre-Engine composer call. */
+  /** The reference articles (metcon-library.ts). "" = none loaded. */
+  articles: string;
+  /** The athlete's completed Engine sessions, or null for everyone without
+   *  Engine. Non-null adds the Engine section and the Engine add-on. */
   engine_training: EngineTrainingPayload | null;
 }
 
@@ -188,6 +165,7 @@ export interface MetconComposerInputs {
 interface SkeletonLikeDay {
   day_num: number;
   block_types?: string[];
+  metcon_time_domain?: MetconTimeDomain;
   metcon_focus?: string;
   primary_lift?: string;
   strength_scheme?: string;
@@ -199,10 +177,10 @@ interface SkeletonLike {
   weeks?: Array<{ week_num: number; weekly_intent?: string; days?: SkeletonLikeDay[] }>;
 }
 
-/** Parse the slot's time domain from a metcon_focus line. Handles BOTH the
- *  demoted slot format ("medium · build, sustained · aerobic_capacity") and
- *  legacy prose ("long aerobic chipper (18-22 min)") so old skeletons stay
- *  composable in the harness. */
+/** The time domain in an old metcon_focus line. Months planned before
+ *  2026-11-27 have no typed field: their line reads "medium · build,
+ *  sustained · aerobic_capacity" or, older still, "long aerobic chipper
+ *  (18-22 min)". Gym classes write minutes here too. */
 export function parseSlotTimeDomain(focus: string): MetconTimeDomain {
   const f = focus.toLowerCase();
   const m = focus.match(/\((\d+)(?:\s*[-–—]\s*(\d+))?\s*min/i);
@@ -215,26 +193,59 @@ export function parseSlotTimeDomain(focus: string): MetconTimeDomain {
   return "medium";
 }
 
-/** Derive the month's conditioning slots from a skeleton — one slot per day
- *  that declares a metcon block. Days without one (active recovery) are
- *  correctly skipped. */
+const isDomain = (v: unknown): v is MetconTimeDomain => v === "short" || v === "medium" || v === "long";
+
+/** A metcon day's time domain: the planner's typed field; for a month planned
+ *  before the field existed, read from its text line. Null when the day says
+ *  neither. THE one reader: every check and screen goes through it. */
+export function metconTimeDomainOfDay(
+  day: { metcon_time_domain?: unknown; metcon_focus?: string | null } | null | undefined,
+): MetconTimeDomain | null {
+  if (!day) return null;
+  if (isDomain(day.metcon_time_domain)) return day.metcon_time_domain;
+  const focus = (day.metcon_focus ?? "").trim();
+  return focus ? parseSlotTimeDomain(focus) : null;
+}
+
+/** Run on every plan as it arrives from the planner. Sets the typed field on
+ *  each metcon day that has one to read, and writes the text line from it when
+ *  the planner left the line out (individual programs do), so the screens and
+ *  checks that read the line keep working. Changes nothing the planner
+ *  decided. Mutates and returns the plan. */
+export function normalizeMetconTimeDomains<T extends SkeletonLike>(skeleton: T): T {
+  for (const wk of skeleton?.weeks ?? []) {
+    for (const day of wk.days ?? []) {
+      if (!(day.block_types ?? []).includes("metcon")) continue;
+      const td = metconTimeDomainOfDay(day);
+      if (!td) continue;
+      day.metcon_time_domain = td;
+      if (!(day.metcon_focus ?? "").trim()) day.metcon_focus = td;
+    }
+  }
+  return skeleton;
+}
+
+/** The week's role, from the planner's weekly_intent. */
+export function weekRoleOf(weeklyIntent: string | null | undefined): string {
+  return (weeklyIntent ?? "").trim() || "build";
+}
+
+/** The month's metcon slots from the plan: one per day that has a metcon
+ *  block. What the planner tells the composer is the time domain and the
+ *  week's role, plus the rest of that day so the metcon does not fight it. */
 export function deriveMetconSlots(skeleton: SkeletonLike): MetconSlot[] {
   const slots: MetconSlot[] = [];
   for (const wk of skeleton.weeks ?? []) {
     for (const day of wk.days ?? []) {
       if (!(day.block_types ?? []).includes("metcon")) continue;
-      const metconIntent = (day.block_intents ?? []).find((b) => b.block_type === "metcon");
       const accessory = (day.block_intents ?? [])
         .filter((b) => b.block_type === "accessory")
         .map((b) => b.focus);
-      const allocated = (day.block_minutes ?? []).find((b) => b.block_type === "metcon")?.minutes ?? null;
       slots.push({
         week_num: wk.week_num,
         day_num: day.day_num,
-        time_domain: parseSlotTimeDomain(day.metcon_focus ?? ""),
-        intensity: `${wk.weekly_intent ?? ""} · ${day.metcon_focus ?? ""}`.trim(),
-        focus: metconIntent?.focus ?? "aerobic_capacity",
-        allocated_minutes: allocated,
+        time_domain: metconTimeDomainOfDay(day) ?? "medium",
+        week_role: weekRoleOf(wk.weekly_intent),
         day_context: {
           primary_lift: day.primary_lift,
           strength_scheme: day.strength_scheme,
@@ -254,9 +265,8 @@ export function deriveMetconSlots(skeleton: SkeletonLike): MetconSlot[] {
 export const EMIT_METCON_MONTH_TOOL = {
   name: "emit_metcon_month",
   description:
-    "Emit the complete month of conditioning: exactly one composed metcon per slot, " +
-    "every piece a distinct workout, honoring each slot's time domain / intensity / focus " +
-    "and the set-level variety rules in the system prompt.",
+    "Emit exactly one composed metcon per slot, each inside its slot's time domain, " +
+    "following the rules in the system prompt.",
   input_schema: {
     type: "object",
     properties: {
@@ -270,7 +280,7 @@ export const EMIT_METCON_MONTH_TOOL = {
             day_num: { type: "integer", minimum: 1, maximum: 7 },
             format: { type: "string", enum: [...METCON_FORMATS] },
             block_scheme: { type: "string", minLength: 4, maxLength: 200 },
-            stated_duration_minutes: { type: "integer", minimum: 3, maximum: 40 },
+            stated_duration_minutes: { type: "integer", minimum: 1, maximum: 22 },
             movements: {
               type: "array",
               minItems: 1,
@@ -283,7 +293,7 @@ export const EMIT_METCON_MONTH_TOOL = {
                   load_class: {
                     type: "string",
                     description:
-                      "REQUIRED for every loaded movement (barbell/DB/KB/ball): the movement class from the shared cycling-load table. Omit for bodyweight, gymnastics, and machine work.",
+                      "The implement. A barbell movement: its class from the shared cycling-load table, with load_band. A dumbbell or kettlebell movement: \"dumbbell\" or \"kettlebell\", with weight. A medicine ball movement: \"medicine_ball\" (its weight is fixed). Omit for bodyweight, gymnastics, and machine work.",
                     enum: [
                       "deadlift",
                       "clean",
@@ -299,8 +309,19 @@ export const EMIT_METCON_MONTH_TOOL = {
                   load_band: {
                     type: "string",
                     description:
-                      "REQUIRED alongside load_class: the band from the shared table. The fill computes the exact weight from the athlete's parent-lift 1RM — an adjective in prose without this field is a defect.",
+                      "BARBELL movements only, alongside load_class: the band from the shared table. The writer works out the exact weight from the athlete's 1RM.",
                     enum: ["light", "moderate", "heavy"],
+                  },
+                  weight: {
+                    type: "number",
+                    description:
+                      "DUMBBELL and KETTLEBELL movements only: the weight you chose for this athlete from their lifts, per dumbbell or kettlebell, in the athlete's units.",
+                  },
+                  machine: {
+                    type: "string",
+                    description:
+                      "Set on every movement done on a machine, and on a run or a swim. Omit on every other movement.",
+                    enum: [...METCON_MACHINES],
                   },
                 },
                 required: ["movement", "prescription"],
@@ -333,26 +354,44 @@ export const EMIT_METCON_MONTH_TOOL = {
 // User-message assembly + the call
 // ============================================================
 
+/** One composed piece on one line, as the composer is shown the month so far
+ *  and last month: where it sat, its header, and its movements as written. */
+export function describeComposedPiece(m: ComposedMetcon): string {
+  const moves = (m.movements ?? [])
+    .map((x) => `${(x.prescription ?? "").trim()} ${(x.movement ?? "").trim()}`.trim())
+    .filter(Boolean)
+    .join(", ");
+  return `W${m.week_num}D${m.day_num} · ${(m.block_scheme ?? "").trim() || m.format} (${m.stated_duration_minutes} min): ${moves}`;
+}
+
 export function buildComposerUserMessage(inputs: MetconComposerInputs): string {
+  const unit = inputs.units === "kg" ? "kg" : "lbs";
   const parts: string[] = [];
+  // Reference material first, then the athlete, then the work to do.
+  if (inputs.articles.trim()) parts.push(inputs.articles.trim());
+  if (inputs.examples.trim()) parts.push(inputs.examples.trim());
+
   parts.push(
-    `CONDITIONING SLOTS (${inputs.slots.length} — compose exactly one distinct metcon per slot):\n` +
-      JSON.stringify(inputs.slots, null, 2),
+    `THE ATHLETE'S GOAL, in their own words: ${
+      (inputs.goal_text ?? "").trim() ? `"${(inputs.goal_text ?? "").trim()}"` : "(none given)"
+    }`,
   );
   parts.push(
-    [
-      `TYPED COACHING DECISIONS (AUTHORITATIVE — these govern axis roles, loading, and modality; the guidance paragraph below informs character and flavor only; where they appear to conflict, these fields win):`,
-      `  development axes (each must be EXPRESSED under fatigue — see the system prompt): ${inputs.development_axes.length ? inputs.development_axes.join(", ") : "(none)"}`,
-      `  maintain axes: ${inputs.maintain_axes.length ? inputs.maintain_axes.join(", ") : "(none)"}`,
-      `  loading_deemphasis: ${inputs.loading_deemphasis} ${inputs.loading_deemphasis ? "(the letter explicitly de-emphasizes loading under fatigue — the barbell target relaxes)" : "(normal barbell + skill presence assumed)"}`,
-      `  fatigue_skill_exclusions: ${inputs.fatigue_skill_exclusions.length ? inputs.fatigue_skill_exclusions.join(", ") : "(none)"}`,
-    ].join("\n"),
+    `THE ATHLETE: age ${inputs.basics.age ?? "not given"} · sex ${inputs.basics.sex ?? "not given"} · ` +
+      `bodyweight ${inputs.basics.bodyweight != null ? `${inputs.basics.bodyweight} ${unit}` : "not given"} · units ${unit}`,
   );
-  parts.push(
-    `COACH'S CONDITIONING GUIDANCE (the letter's judgment — honor its intent):\n` +
-      (inputs.metcon_guidance.trim() || "(none provided — compose from the slots and athlete data)"),
-  );
-  parts.push(`ATHLETE CONTEXT: ${inputs.athlete_context || "(none)"}`);
+  const restrictions = restrictionsForPrompt(inputs.injuries_text, inputs.do_not_program, inputs.athlete_words ?? []);
+  parts.push(restrictions || "INJURIES AND AVOID LIST: the athlete has stated none.");
+  if ((inputs.coach_notes ?? []).length > 0) {
+    parts.push(
+      `THE ATHLETE'S NOTES FOR THEIR COACH (what they asked for, in their words; honour them inside each slot's time domain, never over an injury):\n` +
+        (inputs.coach_notes ?? []).map((n) => `  - "${n}"`).join("\n"),
+    );
+  }
+  parts.push(`1RM LIFTS (${unit}; null = not entered). Give every weight in ${unit}:\n${JSON.stringify(inputs.lifts)}`);
+  parts.push(`SKILL RATINGS (the athlete's own rating of each skill; null = not rated):\n${JSON.stringify(inputs.skills)}`);
+  parts.push(`CONDITIONING NUMBERS (null = not entered):\n${JSON.stringify(inputs.conditioning_benchmarks)}`);
+  parts.push(`EQUIPMENT (true = they have it):\n${JSON.stringify(inputs.equipment)}`);
   if (inputs.engine_training) {
     const et = inputs.engine_training;
     const z = (m: Record<string, number>) =>
@@ -372,35 +411,25 @@ export function buildComposerUserMessage(inputs: MetconComposerInputs): string {
       ].join("\n"),
     );
   }
-  parts.push(`EQUIPMENT (true = available):\n${JSON.stringify(inputs.equipment)}`);
-  parts.push(`DO NOT PROGRAM (hard bans):\n${JSON.stringify(inputs.do_not_program)}`);
-  parts.push(`SKILL TIERS:\n${JSON.stringify(inputs.skills)}`);
-  parts.push(`1RM LIFTS (${inputs.units === "kg" ? "kg" : "lbs"}; null = unknown). Give every load in ${inputs.units === "kg" ? "kg" : "lbs"}:\n${JSON.stringify(inputs.lifts)}`);
-  parts.push(`CONDITIONING BENCHMARKS:\n${JSON.stringify(inputs.conditioning_benchmarks)}`);
-  parts.push(
-    `PREVIOUS CYCLE'S METCONS (NEVER re-serve any of these):\n` +
-      (inputs.previous_cycle_metcons.length
-        ? inputs.previous_cycle_metcons.map((m) => `  - ${m}`).join("\n")
-        : "  (first cycle — none)"),
-  );
-  if ((inputs.already_composed_this_month ?? []).length > 0) {
-    parts.push(
-      `ALREADY COMPOSED THIS MONTH (earlier weeks, written and some already trained — you are composing the NEXT week; ` +
-        `every new piece must be a DISTINCT workout from these; vary movements and shapes across the month):\n` +
-        (inputs.already_composed_this_month ?? []).map((m) => `  - ${m}`).join("\n"),
-    );
-  }
-  if ((inputs.coach_notes ?? []).length > 0) {
-    parts.push(
-      `ATHLETE'S NOTES FOR THEIR COACH (what they asked for, in their words — honour them in this week's pieces within ` +
-        `each slot's time domain; never over an injury):\n` +
-        (inputs.coach_notes ?? []).map((n) => `  - "${n}"`).join("\n"),
-    );
-  }
-  if (inputs.examples.trim()) parts.push(inputs.examples.trim());
   // Guidance, not a fence (founder, 2026-11-26): the composer names movements
   // itself and uses these spellings when a movement is on the list.
   parts.push(`MOVEMENT LIST (your guide to names: use these spellings when a movement is on it; you may use a movement that is not):\n${inputs.vocabulary.join(" · ")}`);
+  parts.push(
+    `LAST MONTH'S METCONS (do not serve any of these again):\n` +
+      (inputs.previous_cycle_metcons.length
+        ? inputs.previous_cycle_metcons.map((m) => `  - ${m}`).join("\n")
+        : "  (none: this is the first month)"),
+  );
+  parts.push(
+    `THIS MONTH SO FAR (already written; the rules for the month count these together with what you write now):\n` +
+      ((inputs.already_composed_this_month ?? []).length
+        ? (inputs.already_composed_this_month ?? []).map((m) => `  - ${m}`).join("\n")
+        : "  (nothing yet)"),
+  );
+  parts.push(
+    `SLOTS TO WRITE NOW (${inputs.slots.length}; exactly one metcon per slot):\n` +
+      JSON.stringify(inputs.slots, null, 2),
+  );
   return parts.join("\n\n");
 }
 
@@ -410,18 +439,13 @@ interface ClaudeResponse {
   usage?: { input_tokens?: number; output_tokens?: number };
 }
 
-// The composer emits one metcon per slot — a 24-slot (6-day) month can run
-// 10k+ tokens, several minutes of Fable generation. The stage makes at most
-// TWO calls (initial + one variety retry — the only multiplier), so per the
-// house rule keep calls × timeout under the ~400s edge wall-clock
-// (2 × 195s = 390s). A timeout here THROWS, and metcons is a writer stage
-// (no retry on throw → job fails) — the deadline must outlast the biggest
-// legal month, not the average one. Sized 2026-08-12 after 130s proved thin.
+// The stage makes at most TWO calls (the first and one send-back), so calls ×
+// timeout stays under the ~400s edge limit (2 × 195s). A timeout here throws
+// and the job fails, so the deadline must outlast the biggest month.
 const COMPOSER_TIMEOUT_MS = 195_000;
 
-/** One composer call. `model` defaults to the fill's model (Sonnet) pending the
- *  side-by-side; retryViolations prepends a failed variety audit for the single
- *  retry. */
+/** One composer call. retryViolations puts a failed count at the top of the
+ *  message for the single send-back. */
 export async function callMetconComposer(
   inputs: MetconComposerInputs,
   opts: { model?: string; apiKey?: string; retryViolations?: string } = {},
@@ -453,10 +477,8 @@ export async function callMetconComposer(
       // 24-slot month with margin. Unused headroom costs nothing.
       max_tokens: 16000,
       stream: false,
-      // Scoped addenda, composable: ENGINE rides only with completed-
-      // session Engine evidence; TWO-DAY rides only on 2-slot weeks (a
-      // 2-day Engine athlete gets both). Months matching neither get the
-      // byte-identical base prompt.
+      // Add-ons: Engine only with completed Engine sessions; two-day only
+      // on 2-slot weeks.
       system: METCON_COMPOSER_SYSTEM_PROMPT +
         (inputs.engine_training ? METCON_COMPOSER_ENGINE_ADDENDUM : "") +
         (slotsPerWeekMax <= 2 ? TWO_DAY_COMPOSER_ADDENDUM : ""),

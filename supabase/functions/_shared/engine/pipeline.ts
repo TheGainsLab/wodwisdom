@@ -30,6 +30,7 @@ import type { ComposedMetcon } from "../metcon-composer.ts";
 import { MODELS } from "../model-profiles.ts";
 import { COUNTS_TOWARD_INSTRUCTION } from "../counts-toward.ts";
 import { athleteFileForWriter, athleteWordsElsewhere, restrictionsForPrompt } from "../athlete-file-text.ts";
+import { normalizeMetconTimeDomains } from "../metcon-composer.ts";
 import { DISPLAY_TO_LIFT_KEY } from "../lift-key.ts";
 
 /** Failure list shape from a hard-audit run (type-only; erased at runtime). */
@@ -190,6 +191,8 @@ function repairSkeletonEmission(skeleton: SkeletonOutput): SkeletonOutput {
       console.warn(`[engine skeleton] month_plan is a string of unparseable JSON — structural audit will retry`);
     }
   }
+  // The metcon's typed time domain, and the text line the screens read.
+  normalizeMetconTimeDomains(s);
   return s as SkeletonOutput;
 }
 
@@ -322,7 +325,7 @@ export async function callWeekFill(
     "=== KEY RULES (re-check before emit) ===",
     `- Emit EXACTLY week ${weekNum}: week_num=${weekNum} with ${daysPerWeek} days (day_num 1..${daysPerWeek}).`,
     `- All weights in ${units}.`,
-    "- Honor THIS WEEK's skeleton: each day's block_types, primary_lift, strength_scheme, metcon_focus, skill_focus are already decided. Fill in movement-level prescriptions only.",
+    "- Honor THIS WEEK's skeleton: each day's block_types, primary_lift, strength_scheme, metcon time domain, skill_focus are already decided. Fill in movement-level prescriptions only.",
     "- Prescribed barbell weight ≤ athlete's 1RM for that lift, unless the block's notes mark it a 1RM attempt.",
     "- At most one metcon block per day.",
     "- Every movement in strength / accessory / metcon / skills blocks must populate at least one of {sets, reps, weight, time_seconds, distance} > 0.",
@@ -353,7 +356,7 @@ export async function callWeekFill(
     // emitted one. Guidance only — nothing checks or enforces it.
     ...((payload.training_context.session_length_minutes ?? 0) > 0
       ? [
-        "- The skeleton's block_minutes (when present on a day) is that day's time allocation and part of each block's PURPOSE: size the work — interval lengths, set counts, secondary movements, rest — so the block genuinely occupies about its allotted minutes. A large allocation is deliberate: a 28-minute strength slot carries more than a lone 5x5 (add working sets or a secondary movement); working sets plus realistic rest should approach the allocation.",
+        "- The skeleton's block_minutes (when present on a day) is that day's time allocation and part of each block's PURPOSE: size the work — interval lengths, set counts, secondary movements, rest — so the block genuinely occupies about its allotted minutes. A large allocation is deliberate: a 28-minute strength slot carries more than a lone 5x5 (add working sets or a secondary movement); working sets plus realistic rest should approach the allocation. The metcon has no allotted minutes: it is transcribed as composed, inside its time domain.",
         "- PRECEDENCE: skill volume caps beat time-fill. When a block's minutes exceed what tier-appropriate skill volume supports, fill the remainder with monostructural work, rest structure, or low-skill movements — never more reps of a capped skill.",
       ]
       : []),

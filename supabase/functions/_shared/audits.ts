@@ -795,8 +795,9 @@ export function auditMetconDuration(
     for (const day of safeDays(week)) {
       const blocks = safeBlocks(day);
       const skDay = findSkeletonDay(skeleton, week.week_num, day.day_num);
-      const focus = skDay?.metcon_focus as string | undefined;
-      const bucket = parseMetconFocusBucket(focus);
+      // The planner's typed time domain; an older month is read from its line.
+      const focus = (skDay?.metcon_time_domain ?? skDay?.metcon_focus) as string | undefined;
+      const bucket = (skDay?.metcon_time_domain as TimeDomainBucket | undefined) ?? parseMetconFocusBucket(focus);
       if (!bucket) continue;
       const range = BUCKET_RANGES[bucket];
       for (let i = 0; i < blocks.length; i++) {

@@ -1,18 +1,16 @@
 /**
- * compose-metcons — compose the conditioning pieces for a set of slots (a
- * month, or ONE WEEK in weekly mode), with the variety audit, one retry,
- * boundary repairs and the drop-illegal fallback. Extracted from
- * generate-program-v3's metcons stage (2026-11-13, weekly Programming PR 3)
- * so the weekly cron composes each week the same way.
+ * compose-metcons — write the metcons for a set of slots (week 1 on a first
+ * build, one later week from the weekly job), count what code counts, and
+ * send a miss back once. What comes back ships: nothing here deletes or
+ * rewrites a piece.
  *
- * Weekly mode: `priorPieces` are the month's earlier weeks; they are shown to
- * the composer as ALREADY COMPOSED and included in the audit's view of the
- * month, so distinctness is a running check against what is written. Only
- * the NEW pieces are returned.
+ * `priorPieces` are the month's earlier weeks. The composer is shown them as
+ * THIS MONTH SO FAR and the counts run over the month so far as a whole.
+ * Only the NEW pieces are returned.
  */
 
 import { MODELS } from "./model-profiles.ts";
-import { callMetconComposer, type ComposedMetcon, type MetconComposerInputs, type MetconSlot } from "./metcon-composer.ts";
+import { callMetconComposer, describeComposedPiece, type ComposedMetcon, type MetconComposerInputs, type MetconSlot } from "./metcon-composer.ts";
 import {
   auditMetconVariety,
   formatMetconVarietyViolationsForRetry,
@@ -31,23 +29,12 @@ export interface ComposeResult {
   repairs: string[];
 }
 
-/** One line per piece, for the composer's ALREADY COMPOSED list. */
-export function summarizeComposedPiece(m: ComposedMetcon): string {
-  const moves = (m.movements ?? []).map((x) => x.movement).filter(Boolean).join(", ");
-  const td = (m as unknown as { time_domain?: string }).time_domain ?? "";
-  return `W${m.week_num}D${m.day_num} ${m.format ?? ""} ${td}: ${moves}`.replace(/\s+/g, " ").trim();
-}
-
 export async function composeMetconsForSlots(opts: {
   inputs: Omit<MetconComposerInputs, "slots">;
   slots: MetconSlot[];
   priorSlots?: MetconSlot[];
   priorPieces?: ComposedMetcon[];
   auditOpts: AuditOpts;
-  /** No longer read (2026-11-26); accepted so callers need not change. */
-  vocabulary?: string[];
-  doNotProgram?: string[];
-  equipment?: Record<string, boolean>;
   logPrefix?: string;
 }): Promise<ComposeResult> {
   const tag = opts.logPrefix ?? "[compose-metcons]";
@@ -56,7 +43,7 @@ export async function composeMetconsForSlots(opts: {
   const inputs: MetconComposerInputs = {
     ...opts.inputs,
     slots: opts.slots,
-    ...(prior.length ? { already_composed_this_month: prior.map(summarizeComposedPiece) } : {}),
+    ...(prior.length ? { already_composed_this_month: prior.map(describeComposedPiece) } : {}),
   };
   const auditOpts = { ...opts.auditOpts, slots: [...priorSlots, ...opts.slots] };
   const newKeys = new Set(opts.slots.map((s) => `${s.week_num}-${s.day_num}`));
@@ -80,7 +67,7 @@ export async function composeMetconsForSlots(opts: {
   if (!audit.passed) {
     retried = true;
     firstPassViolations = audit.violations;
-    console.warn(`${tag} metcon variety violations (retrying once): ${audit.violations.join(" | ")}`);
+    console.warn(`${tag} metcon count misses (sending back once): ${audit.violations.join(" | ")}`);
     const retry = await composeRepaired(formatMetconVarietyViolationsForRetry(audit.violations));
     output = retry.output;
     repairs = [...repairs, ...retry.repairs];
@@ -90,9 +77,9 @@ export async function composeMetconsForSlots(opts: {
       // (2026-11-26): pieces used to be dropped here when a movement's name
       // was on the avoid list, off the movement list, or contained a machine
       // word the athlete had unticked. What is left after the retry ships.
-      if (!audit.passed) console.warn(`${tag} metcon variety violations persist (accepting): ${audit.violations.join(" | ")}`);
+      if (!audit.passed) console.warn(`${tag} metcon count misses remain (accepting): ${audit.violations.join(" | ")}`);
     }
   }
-  if (audit.warnings.length) console.log(`${tag} metcon variety warnings: ${audit.warnings.join(" | ")}`);
+  if (audit.warnings.length) console.log(`${tag} metcon warnings: ${audit.warnings.join(" | ")}`);
   return { pieces: onlyNew(output.metcons), violations: audit.violations, warnings: audit.warnings, retried, firstPassViolations, repairs };
 }

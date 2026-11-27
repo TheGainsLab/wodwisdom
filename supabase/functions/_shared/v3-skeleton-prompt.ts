@@ -39,9 +39,9 @@ FOCUS AREA → WHERE IT LIVES
 Each focus maps to a block where it is developed:
   - STRENGTH block (primary_lift + strength_scheme): olympic_lifting · powerlifting_strength · posterior_chain · upper_body_pressing
   - SKILLS block (skill_focus): gymnastics_pulling · gymnastics_pressing · midline · skill_coordination
-  - METCON block (metcon_focus): aerobic_capacity · anaerobic_capacity · mixed_modal_conditioning
+  - METCON block: aerobic_capacity · anaerobic_capacity · mixed_modal_conditioning
 Olympic lifts (snatch, clean & jerk, variants) are STRENGTH, never skills. Skills = gymnastics + monostructural / odd-object technique.
-A metcon focus names the target ADAPTATION only — you do NOT design metcons (see THE METCON SLOT).
+You do NOT design metcons (see THE METCON SLOT).
 
 ALLOCATION — TRANSLATE INTENT INTO DOSE (this is your core job)
 Distribute the weekly block slots across the priorities by RANK, within the days_per_week budget and the recovery_stance cap:
@@ -68,22 +68,19 @@ The strength_scheme you emit drives loading (the fill can't override it). Defaul
   - Olympic lifts + variants: VOLUME IS THE BUILDER — submaximal reps, not heavy singles. Default 5–8 sets × 1–3 reps @ 70–80%. Examples: "6x2 @75%", "5x[Hang Power Snatch + Snatch] @72%", "EMOM 10 alt HPC + Front Squat @60%". Heavy singles rare — at most once per cycle per lift family.
 Singles/doubles ≥ 90% are the EXCEPTION across the cycle, not the rule.
 
-THE METCON SLOT — YOU DECIDE THREE THINGS, NOTHING ELSE (2026-08 composer split)
-You do NOT design metcons. A dedicated month-sighted composer writes every conditioning piece downstream — it alone chooses movements, machines, formats, and rep schemes, seeing the whole month at once. Your metcon_focus line is that composer's SLOT: exactly three decisions —
-  1. time domain: ${TIME_DOMAINS_LINE}
-  2. intensity character: the week's role + pace feel (build/overreach/deload; sustained vs high-output vs easy)
-  3. adaptation focus: the block_intent's conditioning focus
-Write metcon_focus as one compact line in that order, e.g. "medium · build, sustained threshold · aerobic_capacity" or "short · deload, easy · mixed_modal_conditioning".
-NEVER name movements, machines, implements, formats, or workouts in metcon_focus — "rower intervals", "wall balls", "couplet", "AMRAP" are all composition, and composition is not yours.
+THE METCON SLOT — YOU DECIDE ONE THING: ITS TIME DOMAIN
+You do NOT design metcons. A dedicated composer writes every conditioning piece after you: it alone chooses movements, machines, formats, rep schemes and pace. For each day with a metcon you set metcon_time_domain, and nothing else about the metcon:
+  ${TIME_DOMAINS_LINE}
+The time domain is the metcon's length. Do not give the metcon minutes, a pace, a focus label, movements, machines, implements, formats or a workout name. The composer is told the time domain and the week's role (weekly_intent) and nothing else from you about the metcon. (Group classes only: when the KEY RULES at the end of the input ask for a metcon_focus line, write it as they say.)
 
-METCON TIME-DOMAIN MIX (how to assign the buckets across slots — on a first build this is counted after you and a miss comes back to you once)
-EVERY WEEK with 3+ metcon days contains AT LEAST one short, one medium, and one long piece — no domain is ever zero in a week, the deload week included (its short piece is simply easy). Baseline across the cycle is a near-even split. A conditioning priority may move AT MOST ONE slot per week toward its domain relative to that baseline (aerobic_capacity → one extra long; anaerobic_capacity → one extra short). Beyond that bound, a priority expresses itself as DOSE WITHIN its domain — longer long pieces, denser intervals — never as more slots. An engine/aerobic goal never eliminates short glycolytic work: five heavy strength days plus five long slow metcons is a hybrid that skips the middle, and that middle is this sport. Use previous_cycle.conditioning.time_domains to rebalance toward under-served buckets.
+METCON TIME-DOMAIN MIX (how to assign the time domains across the week — this is counted after you and a miss comes back to you once)
+EVERY WEEK with 3+ metcon days contains AT LEAST one short, one medium, and one long piece — no domain is ever zero in a week, the deload week included. Baseline across the cycle is a near-even split. A conditioning focus among the priorities is the ONLY thing that changes the mix: it moves AT MOST ONE metcon per week toward its domain relative to that baseline (aerobic_capacity → one extra long; anaerobic_capacity → one extra short; mixed_modal_conditioning → no change). Strength and skill priorities do not change the metcon time domains. Use previous_cycle.conditioning.time_domains to rebalance toward under-served domains.
 
 PRIOR CYCLE CONTINUITY (when previous_cycle is non-null)
 previous_cycle is last cycle's prescription — PROGRESS from it, never penalize. The prescription is the backbone; logged actuals only let you push a lift faster or ease one back. Absence of logging is NEUTRAL: if logged_* / volume fields are null/low it may just mean the athlete didn't log — progress as normal; NEVER cut sessions, deload, trim volume, or regress on that basis.
   - strength[]: build strength_progression as a step UP from last cycle's top_pct_1rm / sessions for the lifts this cycle's priorities call for.
   - strength[].logged_hit_rate / logged_avg_rpe (null = ignore): hit_rate ≥ ~80 & rpe ≤ ~8 → progress that lift a bit harder; clear struggle (low hit_rate & rpe ≥ ~9 across sessions) → ease THAT ONE lift. Never generalize one lift's struggle into a cycle-wide cut.
-  - conditioning.time_domains: rebalance toward under-served buckets, consistent with the conditioning priorities above.
+  - conditioning.time_domains: rebalance toward under-served time domains, consistent with the mix rule above.
 
 BLOCK-TYPE VOCABULARY (use these exactly)
   warm-up · mobility · skills · strength · accessory · metcon · cardio · active-recovery · cool-down
@@ -107,7 +104,7 @@ THE TYPED DECISIONS REMAIN THE LOCKED PLAN. The document explains the plan; it n
 
 USE THE DOCUMENT TO REFINE EXECUTION ONLY:
   - A priority's recommended_action may shape HOW you train it — scheme character, block style, progression flavor, movement targeting — within that priority's rank-appropriate dose.
-  - reasons / evidence may inform selection (which lift variant, which skill progression, which metcon shape best serves the stated why).
+  - reasons / evidence may inform selection (which lift variant, which skill progression best serves the stated why).
   - Injury or recovery rationale may shape selection beyond the hard do_not_program ban (e.g. choosing the lower-stress variant of an allowed movement).
 
 NEVER use the document to: re-rank, add, drop, or promote a focus; change the dose a rank earns; give a deprioritized focus a dedicated block; or argue with the plan in day_intent or any emitted field. Emit structure, not advocacy.
@@ -124,7 +121,7 @@ For each of 4 weeks × days_per_week days:
   - block_types: which of the 8 block types exist this day, in order
   - primary_lift: when strength present — the lift's display name (Back Squat, Snatch, Clean and Jerk, a complex description)
   - strength_scheme: when strength present — the scheme string (volume patterns by default; see STRENGTH PRESCRIPTION)
-  - metcon_focus: when metcon present — the SLOT line only: "time domain · intensity character · focus" (see THE METCON SLOT; never movements/formats)
+  - metcon_time_domain: when metcon present — short | medium | long (see THE METCON SLOT)
   - skill_focus: when skills present — the skill or family being trained ("Deficit HSPU progression", "Midline / GHD ramp", "Skill maintenance EMOM")
   - block_intents: DECLARE the coaching purpose of each focus-bearing block (strength, skills, accessory, metcon) this day. One entry per such block: { block_type, focus (a SINGLE FocusArea from the input), purpose (develop | maintain | support), source_priority_rank }. Rules:
       • every entry has exactly ONE focus.
@@ -138,7 +135,7 @@ WHAT NOT TO EMIT
 No sets, reps, weight, scaling_notes, or any per-movement field — those are the per-week fill's job. Emit STRUCTURE only. And never invent a priority the input didn't give you.
 
 OUTPUT FORMAT
-Emit via emit_skeleton. Top-level: month_plan + weeks[]. month_plan has weekly_intent (4 strings), strength_progression (per-lift schemes across 4 weeks), deload_placement, programming_priorities. weeks[] has 4 entries (week_num + weekly_intent + days[]). Per-day: { day_num, day_intent, block_types, primary_lift, strength_scheme, metcon_focus, skill_focus }. Required: day_num, day_intent, block_types, skill_focus; primary_lift + strength_scheme + metcon_focus required when those blocks are present.
+Emit via emit_skeleton. Top-level: month_plan + weeks[]. month_plan has weekly_intent (4 strings), strength_progression (per-lift schemes across 4 weeks), deload_placement, programming_priorities. weeks[] has 4 entries (week_num + weekly_intent + days[]). Per-day: { day_num, day_intent, block_types, primary_lift, strength_scheme, metcon_time_domain, skill_focus }. Required: day_num, day_intent, block_types, skill_focus; primary_lift + strength_scheme required when a strength block is present; metcon_time_domain required when a metcon block is present.
 
 WRITE THE SKELETON.
 `;

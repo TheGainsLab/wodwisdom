@@ -34,16 +34,17 @@ Deno.test("the month is passed through from the week being written", async () =>
 });
 
 const COMPOSER_BASE: Any = {
-  slots: [], metcon_guidance: "", vocabulary: [], equipment: {}, do_not_program: [], skills: {},
-  lifts: { back_squat: 120 }, conditioning_benchmarks: {}, athlete_context: "", previous_cycle_metcons: [],
-  development_axes: [], maintain_axes: [], loading_deemphasis: false, fatigue_skill_exclusions: [],
-  examples: "", engine_training: null,
+  slots: [], goal_text: null, basics: { age: null, sex: null, bodyweight: 80 }, vocabulary: [], equipment: {},
+  injuries_text: null, do_not_program: [], skills: {},
+  lifts: { back_squat: 120 }, conditioning_benchmarks: {}, previous_cycle_metcons: [],
+  examples: "", articles: "", engine_training: null,
 };
 
 Deno.test("conditioning is sized in the athlete's own unit: a kilo athlete's lifts are labelled kg", () => {
   const kg = buildComposerUserMessage({ ...COMPOSER_BASE, units: "kg" });
   assertEquals(kg.includes("1RM LIFTS (kg;"), true);
-  assertEquals(kg.includes("Give every load in kg"), true);
+  assertEquals(kg.includes("Give every weight in kg"), true);
+  assertEquals(kg.includes("bodyweight 80 kg"), true);
   const lbs = buildComposerUserMessage({ ...COMPOSER_BASE, units: "lbs" });
   assertEquals(lbs.includes("1RM LIFTS (lbs;"), true);
   assertEquals(buildComposerUserMessage(COMPOSER_BASE).includes("1RM LIFTS (lbs;"), true); // unset stays lbs

@@ -41,9 +41,11 @@ Deno.test("the repair step has a pass ceiling, checked before each pass", async 
 Deno.test("a re-planned month has cardio removed for an Engine member before it is stored", async () => {
   const gen = await Deno.readTextFile(new URL("../generate-program-v3/index.ts", import.meta.url));
   const replan = gen.slice(gen.indexOf("const fresh = await generateSkeletonWithAudits(tdi, PACK, undefined, replanDoc);"));
-  const strip = replan.indexOf("stripCardioBlocks(fresh)");
+  // Applied to every plan the planner returns for the re-plan (the first and the mix send-back).
+  const strip = replan.indexOf("stripCardioBlocks(plan)");
   assertEquals(strip > 0 && strip < replan.indexOf('.update({ skeleton, replanned_at'), true);
   assertMatch(replan.slice(0, strip), /tdi\.cardio_allowed === false/);
+  assertMatch(replan, /withMixCheck\(supa, job, rs, \{ skeleton: finish\(fresh\), tdi, doc: replanDoc, fromWeek: weekNum, finish \}\)/);
 });
 
 Deno.test("every job tells the check how many weeks to expect", async () => {

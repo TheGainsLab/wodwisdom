@@ -79,8 +79,9 @@ Deno.test("a metcon being rewritten is shown its composed piece and told to chan
   assert(!buildSurgicalUserMessage(PAYLOAD, null, 1, 1, 0, BLOCK, ["x"]).includes("COMPOSED PIECE"));
   assert(SURGICAL_SYSTEM_PROMPT.includes("It is NOT yours to redesign."));
   assert(SURGICAL_SYSTEM_PROMPT.includes("change ONLY what the audit violations name"));
-  // The rewriter no longer reads the time domain from words like "aerobic", and is not told a duration check rewrites.
-  assert(SURGICAL_SYSTEM_PROMPT.includes("Take the time domain from that first word only"));
+  // The rewriter takes the time domain from the planner's field, and is not told a duration check rewrites.
+  assert(SURGICAL_SYSTEM_PROMPT.includes("metcon_time_domain"));
+  assert(!SURGICAL_SYSTEM_PROMPT.includes("long aerobic chipper"));
   assert(!SURGICAL_SYSTEM_PROMPT.includes("The audit will reject rewrites whose computed duration"));
 });
 

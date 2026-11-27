@@ -28,9 +28,9 @@ import { getCorsHeaders } from "../_shared/cors.ts";
 import { buildWriterPayload, daysPerWeekLogLine, type WriterPayload } from "../_shared/build-writer-payload.ts";
 import { generateAndPersistCoachState } from "../_shared/generate-coach-state.ts";
 import { buildCoachStateDocumentBlock } from "../_shared/coach-state.ts";
-import { deriveMetconSlots, type MetconComposerInputs } from "../_shared/metcon-composer.ts";
-import { isBarbellMetconMovement } from "../_shared/metcon-variety-audits.ts";
-import { buildStratifiedMetconExamples } from "../_shared/metcon-examples.ts";
+import { deriveMetconSlots, describeComposedPiece, type MetconComposerInputs } from "../_shared/metcon-composer.ts";
+import { athleteWordsElsewhere } from "../_shared/athlete-file-text.ts";
+import { COMPOSER_ARTICLES, loadArticleBlock, loadExampleBlock, PLANNER_ARTICLES } from "../_shared/metcon-library.ts";
 import { composeMetconsForSlots } from "../_shared/compose-metcons.ts";
 import {
   builtFromForWeekSave,
@@ -398,6 +398,72 @@ async function stageCoachState(
   };
 }
 
+/**
+ * The planner's metcon time-domain mix, counted after it (every week with 3+
+ * metcon days has a short, a medium and a long; no domain far over its
+ * share). A miss goes back to the planner ONCE; the second plan is used only
+ * if it still passes the hard plan checks and misses less. Never fails a
+ * job. Logged as skeleton_mix.
+ *
+ * Runs on a first build and on a re-plan (founder, 2026-11-27; a re-plan
+ * used to skip it). On a re-plan only the re-planned weeks are counted, and
+ * `finish` puts the written weeks back on whatever the planner returns.
+ */
+async function withMixCheck(
+  supa: SupabaseClient,
+  job: ProgramJobRow,
+  rs: ResumeState,
+  o: {
+    skeleton: SkeletonOutput;
+    tdi: NonNullable<ResumeState["trainingDesignInput"]>;
+    doc: string;
+    fromWeek: number;
+    finish?: (fresh: SkeletonOutput) => SkeletonOutput;
+  },
+): Promise<SkeletonOutput> {
+  let skeleton = o.skeleton;
+  let mix = auditSkeletonMetconMix(skeleton, o.fromWeek);
+  let mixRetried = false;
+  if (!mix.passed) {
+    mixRetried = true;
+    console.warn(`[generate-program-v3] skeleton mix violations (retrying once): ${mix.violations.join(" | ")}`);
+    try {
+      const retryRaw = await callSkeletonWriter(o.tdi, formatSkeletonViolationsForRetry([mix]), PACK, o.doc);
+      // The retry must still pass the HARD plan checks; otherwise keep the first.
+      const hard = PACK.audits.runSkeleton({
+        skeleton: retryRaw,
+        daysPerWeek: o.tdi.days_per_week,
+        trainingDesignInput: o.tdi,
+      });
+      const retrySkeleton = o.finish ? o.finish(retryRaw) : retryRaw;
+      const retryMix = auditSkeletonMetconMix(retrySkeleton, o.fromWeek);
+      if (hard.passed && retryMix.violations.length < mix.violations.length) {
+        skeleton = retrySkeleton;
+        mix = retryMix;
+        console.log(`[generate-program-v3] skeleton mix retry adopted (${mix.violations.length} residual)`);
+      } else {
+        console.warn(
+          `[generate-program-v3] skeleton mix retry rejected (hard=${hard.passed}, violations ${retryMix.violations.length} vs ${mix.violations.length}) — keeping first skeleton`,
+        );
+      }
+    } catch (e) {
+      console.warn("[generate-program-v3] skeleton mix retry call failed (accepting first skeleton):", e);
+    }
+  }
+  if (mixRetried || mix.violations.length > 0) {
+    await logGenerationAudit(supa, {
+      user_id: job.user_id,
+      program_id: rs.continuation.programId ?? null,
+      month_number: rs.continuation.monthNumber,
+      stage: "skeleton_mix",
+      violations: mix.violations,
+      retried: mixRetried,
+      ...(o.fromWeek > 1 ? { meta: { replan_from_week: o.fromWeek } } : {}),
+    }).catch((e) => console.warn("[generate-program-v3] skeleton_mix log failed (non-fatal):", e));
+  }
+  return skeleton;
+}
+
 async function stageSkeleton(
   supa: SupabaseClient,
   job: ProgramJobRow,
@@ -408,7 +474,11 @@ async function stageSkeleton(
   // letter the athlete reads. The typed decisions bind; the document refines
   // execution; the audit loop enforces the boundary.
   const tdi = rs.trainingDesignInput!;
-  const intentDocument = rs.coachState ? buildCoachStateDocumentBlock(rs.coachState) : "";
+  // The planner also reads the Theoretical Template article (founder,
+  // 2026-11-27). "" when the library cannot be read: the build goes on.
+  const plannerArticles = await loadArticleBlock(supa, PLANNER_ARTICLES);
+  const intentDocument = [rs.coachState ? buildCoachStateDocumentBlock(rs.coachState) : "", plannerArticles]
+    .filter(Boolean).join("\n\n");
 
   // WEEK JOB (PR 4): the month's skeleton already exists. Load it; if the
   // athlete's notes touch what the skeleton owns (which lifts, how much
@@ -446,22 +516,25 @@ async function stageSkeleton(
         `\nCURRENT SKELETON:\n${JSON.stringify(store.skeleton)}`;
       try {
         const fresh = await generateSkeletonWithAudits(tdi, PACK, undefined, replanDoc);
-        // An Engine-entitled athlete never receives a cardio block. This used
-        // to be applied on a first build only, so a re-planned month could
-        // carry one (2026-11-24). Same rule, same place in the order: on the
-        // plan, before anything is written from it.
-        if (tdi.cardio_allowed === false) {
-          const strippedOnReplan = stripCardioBlocks(fresh);
-          if (strippedOnReplan.length) console.log(`[generate-program-v3] week ${weekNum}: re-plan cardio removed from ${strippedOnReplan.join(", ")} (athlete holds an Engine entitlement)`);
-        }
-        // Keep written weeks from the stored skeleton whatever the writer did.
-        skeleton = {
-          ...fresh,
-          weeks: [
-            ...store.skeleton.weeks.filter((w) => w.week_num < weekNum),
-            ...fresh.weeks.filter((w) => w.week_num >= weekNum),
-          ].sort((a, b) => a.week_num - b.week_num),
+        // Applied to every plan the planner returns for this re-plan:
+        //  - an Engine-entitled athlete never receives a cardio block (this
+        //    used to be applied on a first build only; 2026-11-24);
+        //  - written weeks are kept from the stored plan whatever came back.
+        const finish = (plan: SkeletonOutput): SkeletonOutput => {
+          if (tdi.cardio_allowed === false) {
+            const strippedOnReplan = stripCardioBlocks(plan);
+            if (strippedOnReplan.length) console.log(`[generate-program-v3] week ${weekNum}: re-plan cardio removed from ${strippedOnReplan.join(", ")} (athlete holds an Engine entitlement)`);
+          }
+          return {
+            ...plan,
+            weeks: [
+              ...store.skeleton.weeks.filter((w) => w.week_num < weekNum),
+              ...plan.weeks.filter((w) => w.week_num >= weekNum),
+            ].sort((a, b) => a.week_num - b.week_num),
+          };
         };
+        // The time-domain mix is counted on the re-planned weeks too.
+        skeleton = await withMixCheck(supa, job, rs, { skeleton: finish(fresh), tdi, doc: replanDoc, fromWeek: weekNum, finish });
         replanned = true;
         console.log(`[generate-program-v3] week ${weekNum}: skeleton RE-PLANNED on ${drift.length ? `profile (${drift.join("; ")})` : ""}${drift.length && notes.length ? " + " : ""}${notes.length ? `notes (${notes.join(" | ")})` : ""}`);
         await supa.from("program_month_skeletons")
@@ -511,52 +584,8 @@ async function stageSkeleton(
   let skeleton = await generateSkeletonWithAudits(tdi, PACK, undefined, intentDocument);
   console.log("[generate-program-v3] skeleton passed audits");
 
-  // Metcon time-domain mix (athlete-match package) — quality rule, not a
-  // contract: ONE retry with the violations, then accept-and-log (the same
-  // tier as the composer's variety fence; a mix miss must never fail the job).
-  let mix = auditSkeletonMetconMix(skeleton);
-  let mixRetried = false;
-  if (!mix.passed) {
-    mixRetried = true;
-    console.warn(`[generate-program-v3] skeleton mix violations (retrying once): ${mix.violations.join(" | ")}`);
-    try {
-      const retrySkeleton = await callSkeletonWriter(
-        tdi,
-        formatSkeletonViolationsForRetry([mix]),
-        PACK,
-        intentDocument,
-      );
-      // The retry must still satisfy the HARD skeleton audits — otherwise keep
-      // the first (hard-audit-passing) skeleton and ship its mix as-is.
-      const hard = PACK.audits.runSkeleton({
-        skeleton: retrySkeleton,
-        daysPerWeek: tdi.days_per_week,
-        trainingDesignInput: tdi,
-      });
-      const retryMix = auditSkeletonMetconMix(retrySkeleton);
-      if (hard.passed && retryMix.violations.length < mix.violations.length) {
-        skeleton = retrySkeleton;
-        mix = retryMix;
-        console.log(`[generate-program-v3] skeleton mix retry adopted (${mix.violations.length} residual)`);
-      } else {
-        console.warn(
-          `[generate-program-v3] skeleton mix retry rejected (hard=${hard.passed}, violations ${retryMix.violations.length} vs ${mix.violations.length}) — keeping first skeleton`,
-        );
-      }
-    } catch (e) {
-      console.warn("[generate-program-v3] skeleton mix retry call failed (accepting first skeleton):", e);
-    }
-  }
-  if (mixRetried || mix.violations.length > 0) {
-    await logGenerationAudit(supa, {
-      user_id: job.user_id,
-      program_id: rs.continuation.programId ?? null,
-      month_number: rs.continuation.monthNumber,
-      stage: "skeleton_mix",
-      violations: mix.violations,
-      retried: mixRetried,
-    }).catch((e) => console.warn("[generate-program-v3] skeleton_mix log failed (non-fatal):", e));
-  }
+  // Metcon time-domain mix: one send-back, then accept and log.
+  skeleton = await withMixCheck(supa, job, rs, { skeleton, tdi, doc: intentDocument, fromWeek: 1 });
 
   // Part D — dedicated cardio. Two layers, per doctrine:
   //   1. ENTITLEMENT (code, hard): Engine-entitled athletes never receive a
@@ -634,13 +663,14 @@ async function stageSkeleton(
 }
 
 /**
- * metcons stage (2026-08 composer split) — ONE month-sighted Fable call that
- * composes every conditioning piece from the skeleton's slots, the letter's
- * metcon_guidance, the athlete's full legal vocabulary, and stratified example
- * workouts. The set-level variety audit fences it (one retry); persistent
- * violations are accepted-with-log (programs must ship; the audit trail is the
- * fix signal). No composed piece is deleted, and no movement name is checked
- * against the avoid list, the movement list or equipment (2026-11-26).
+ * metcons stage — the composer writes the metcons (rebuilt 2026-11-27).
+ *
+ * It is given each slot's time domain and the week's role from the plan, the
+ * athlete's own profile, 100 real main site metcons, three articles, this
+ * month's metcons so far and last month's. It is NOT given the coach state's
+ * conditioning paragraph, priorities, or recovery stance. A few counts run
+ * after it (one send-back); what comes back ships. No composed piece is
+ * deleted and no movement name is checked.
  */
 async function stageMetcons(
   supa: SupabaseClient,
@@ -652,55 +682,48 @@ async function stageMetcons(
   const tdi = rs.trainingDesignInput!;
 
   const slots = deriveMetconSlots(skeleton);
-  const examples = await buildStratifiedMetconExamples(supa);
-  // Typed axis roles (athlete-match package): the composer's AUTHORITATIVE
-  // channel for what must be expressed under fatigue. Conditioning axes are
-  // excluded — they express as time domains via the slots, not as movements.
-  const CONDITIONING_AXES = new Set(["aerobic_capacity", "anaerobic_capacity", "mixed_modal_conditioning"]);
-  const developmentAxes = tdi.priorities
-    .map((p) => p.focus as string)
-    .filter((f) => !CONDITIONING_AXES.has(f));
-  const maintainAxes = (tdi.maintain as string[]).filter((f) => !CONDITIONING_AXES.has(f));
-  const loadingDeemphasis = rs.coachState?.loading_deemphasis === true;
-  const fatigueSkillExclusions = rs.coachState?.fatigue_skill_exclusions ?? [];
+  const [examples, articles] = await Promise.all([
+    loadExampleBlock(supa),
+    loadArticleBlock(supa, COMPOSER_ARTICLES),
+  ]);
+  // Last month's metcons, so none is served again. Read from where each
+  // month's composed pieces are stored; "" lines when there is no last month
+  // or it cannot be read.
+  let previousCycleMetcons: string[] = [];
+  if (rs.continuation.programId && rs.continuation.monthNumber > 1) {
+    try {
+      const last = await loadMonthStore(supa, rs.continuation.programId, rs.continuation.monthNumber - 1);
+      previousCycleMetcons = (last?.composed_metcons ?? []).map(describeComposedPiece);
+    } catch (e) {
+      console.warn("[generate-program-v3] last month's metcons could not be read (continuing without):", e instanceof Error ? e.message : String(e));
+    }
+  }
   const inputs: MetconComposerInputs = {
     slots,
-    metcon_guidance: rs.coachState?.metcon_guidance ?? "",
-    development_axes: developmentAxes,
-    maintain_axes: maintainAxes,
-    loading_deemphasis: loadingDeemphasis,
-    fatigue_skill_exclusions: fatigueSkillExclusions,
-    vocabulary: tdi.vocabulary,
-    equipment: tdi.equipment,
-    do_not_program: tdi.do_not_program,
-    skills: payload.skills,
-    lifts: tdi.lifts,
+    goal_text: payload.training_context.goal_text ?? null,
+    basics: {
+      age: payload.basics.age ?? null,
+      sex: payload.basics.gender ?? null,
+      bodyweight: payload.basics.bodyweight ?? null,
+    },
     units: payload.basics.units === "kg" ? "kg" : "lbs",
+    lifts: tdi.lifts,
+    skills: payload.skills,
     conditioning_benchmarks: payload.conditioning,
-    athlete_context: [
-      payload.basics.age ? `age ${payload.basics.age}` : "",
-      `${tdi.days_per_week} days/week`,
-      `recovery stance ${tdi.recovery_stance}`,
-    ].filter(Boolean).join(", "),
-    previous_cycle_metcons: [], // per-month metcon detail needs the scoped RPC (parked)
+    equipment: tdi.equipment,
+    injuries_text: payload.training_context.injuries_constraints_text ?? null,
+    do_not_program: tdi.do_not_program,
+    athlete_words: athleteWordsElsewhere(payload.athlete_model?.self_report, []),
+    vocabulary: tdi.vocabulary,
+    previous_cycle_metcons: previousCycleMetcons,
     examples,
-    // Engine-awareness: evidence block or null (build-writer-payload gates
-    // it). Unlike coach-state, this is rebuilt UNCACHED on every generation,
-    // so the composer always sees the athlete's current Engine month.
+    articles,
+    // The athlete's completed Engine sessions, or null. Rebuilt on every
+    // generation, so the composer sees their current Engine month.
     engine_training: payload.engine_training ?? null,
   };
-  const bannedSet = new Set(tdi.do_not_program.map((s) => s.toLowerCase()));
   const auditOpts = {
     slots,
-    barbellCapable: (tdi.equipment.barbell ?? false) &&
-      tdi.vocabulary.some((v) => isBarbellMetconMovement(v) && !bannedSet.has(v.toLowerCase())),
-    vocabulary: tdi.vocabulary,
-    doNotProgram: tdi.do_not_program,
-    equipment: tdi.equipment,
-    developmentAxes,
-    skills: payload.skills as Record<string, string | null>,
-    loadingDeemphasis,
-    fatigueSkillExclusions,
     engineActive: payload.engine_training != null,
   };
 
@@ -719,13 +742,18 @@ async function stageMetcons(
     priorSlots,
     priorPieces,
     auditOpts: auditOptsSansSlots,
-    vocabulary: tdi.vocabulary,
-    doNotProgram: tdi.do_not_program,
-    equipment: tdi.equipment,
     logPrefix: "[generate-program-v3]",
   });
   const output = { metcons: [...priorPieces, ...composed.pieces] };
-  const audit = { violations: composed.violations, warnings: composed.warnings };
+  const audit = {
+    violations: composed.violations,
+    // A build the library did not reach is recorded, so it can be found.
+    warnings: [
+      ...composed.warnings,
+      ...(examples === "" ? ["The example workouts could not be loaded: the composer wrote without them."] : []),
+      ...(articles === "" ? ["The reference articles could not be loaded: the composer wrote without them."] : []),
+    ],
+  };
   const retried = composed.retried;
   const firstPassViolations = composed.firstPassViolations;
   const repairs = composed.repairs;
@@ -743,6 +771,7 @@ async function stageMetcons(
       // which (founder, 2026-11-26).
       ...(retried ? { first_pass_violations: firstPassViolations, first_pass_count: firstPassViolations.length, after_retry_count: audit.violations.length } : {}),
       ...(repairs.length ? { repairs } : {}),
+      last_month_pieces: previousCycleMetcons.length,
     },
   });
   console.log(`[generate-program-v3] composed ${output.metcons.length} metcons for ${slots.length} slots`);

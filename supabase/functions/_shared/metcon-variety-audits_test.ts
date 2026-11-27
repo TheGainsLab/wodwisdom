@@ -1,25 +1,24 @@
 /**
  * metcon-variety-audits_test.ts
  *
- * Tests for the set-level metcon fence — each rule exercised with the failure
- * mode that motivated it (the 2026-08 findings: wall ball in 12/16 pieces,
- * zero barbell for capable athletes, cloned day-slot templates, machine-only
- * months).
+ * What code counts about the composed metcons (rebuilt 2026-11-27): slot
+ * coverage, formats, monostructural-only pieces, named benchmarks, one
+ * machine per round-based piece, and a defined band on a barbell class.
+ * Every count reads a field the composer set, never a movement's name.
  */
 
 import { assert, assertEquals } from "jsr:@std/assert";
-import type { ComposedMetcon, MetconSlot } from "./metcon-composer.ts";
+import type { ComposedMetcon, ComposedMetconMovement, MetconSlot } from "./metcon-composer.ts";
 import {
   auditMetconVariety,
-  isBarbellMetconMovement,
-  movementSignature,
+  formatMetconVarietyViolationsForRetry,
   repairComposerEmission,
   stripStructuralRestRows,
 } from "./metcon-variety-audits.ts";
-import { loadClassForMovement } from "./conditioning-definitions.ts";
 
 let dayCounter = 0;
-function piece(movements: string[], overrides: Partial<ComposedMetcon> = {}): ComposedMetcon {
+type Row = string | ComposedMetconMovement;
+function piece(movements: Row[], overrides: Partial<ComposedMetcon> = {}): ComposedMetcon {
   const idx = dayCounter++;
   return {
     week_num: Math.floor(idx / 3) % 4 + 1,
@@ -27,162 +26,138 @@ function piece(movements: string[], overrides: Partial<ComposedMetcon> = {}): Co
     format: "amrap",
     block_scheme: "AMRAP 12",
     stated_duration_minutes: 12,
-    // Barbell movements carry typed loads (rule 10) so the base fixture stays legal.
-    movements: movements.map((m) =>
-      isBarbellMetconMovement(m)
-        ? { movement: m, prescription: "10", load_class: loadClassForMovement(m), load_band: "moderate" as const }
-        : { movement: m, prescription: "10" }
-    ),
-    stimulus_note: "Sustained repeatable pace across all rounds.",
+    movements: movements.map((m) => (typeof m === "string" ? { movement: m, prescription: "10" } : m)),
+    stimulus_note: "Steady across all rounds.",
     monostructural: false,
     ...overrides,
   };
 }
+const row = (machine: ComposedMetconMovement["machine"], movement: string): ComposedMetconMovement => ({ movement, prescription: "12 cal", machine });
+const bar = (movement: string, load_class: string, load_band: ComposedMetconMovement["load_band"] = "moderate"): ComposedMetconMovement =>
+  ({ movement, prescription: "10", load_class, load_band });
 
-/** A legal, varied 12-piece month (3-day athlete): distinct combos, spread
- *  movements, 4 formats, 2 barbell pieces, 1 reasoned mono piece. */
+/** A 12-piece month that meets every count. */
 function goodMonth(): ComposedMetcon[] {
   dayCounter = 0;
   return [
-    piece(["Row", "Wall Ball", "Burpee"], { format: "rft" }),
+    piece([row("row", "Row"), "Wall Ball", "Burpee"], { format: "rft" }),
     piece(["Dumbbell Snatch", "Box Jump Over"], { format: "amrap" }),
-    piece(["Thruster", "Pull Up"], { format: "rep_scheme", block_scheme: "21-15-9 for time" }),
-    piece(["Run", "Kettlebell Swing"], { format: "intervals" }),
-    piece(["Bike", "Wall Walk", "Sit Up"], { format: "amrap" }),
-    piece(["Deadlift", "Bar Facing Burpee"], { format: "rft" }),
-    piece(["Row"], {
-      format: "intervals",
-      monostructural: true,
-      stimulus_note: "Deliberate monostructural VO2 session — repeatable 500m pace.",
-    }),
+    piece([bar("Thruster", "thruster"), "Pull Up"], { format: "rep_scheme", block_scheme: "21-15-9 for time" }),
+    piece([row("run", "Run"), "Kettlebell Swing"], { format: "intervals" }),
+    piece([row("bike", "Bike"), "Wall Walk", "Sit Up"], { format: "amrap" }),
+    piece([bar("Deadlift", "deadlift"), "Bar Facing Burpee"], { format: "rft" }),
+    piece([row("row", "Row")], { format: "intervals", monostructural: true }),
     piece(["Burpee Box Jump Over", "Goblet Squat"], { format: "amrap" }),
-    piece(["Run", "Push Up", "Walking Lunge"], { format: "chipper" }),
+    piece([row("run", "Run"), "Push Up", "Walking Lunge"], { format: "chipper" }),
     piece(["Kettlebell Swing", "Toes To Bar"], { format: "emom" }),
-    piece(["Wall Ball", "Shuttle Run", "Bike"], { format: "amrap" }),
+    piece(["Wall Ball", "Shuttle Run", row("bike", "Bike")], { format: "amrap" }),
     piece(["Dumbbell Thruster", "Double Under"], { format: "rft" }),
   ];
 }
+const slotsFor = (m: ComposedMetcon[]): MetconSlot[] =>
+  m.map((p) => ({ week_num: p.week_num, day_num: p.day_num, time_domain: "medium", week_role: "build", day_context: {} }));
 
-Deno.test("a varied, legal month passes", () => {
-  const r = auditMetconVariety({ metcons: goodMonth() }, { barbellCapable: true });
+Deno.test("a month that meets every count passes", () => {
+  const r = auditMetconVariety({ metcons: goodMonth() });
   assertEquals(r.violations, []);
   assertEquals(r.passed, true);
 });
 
-Deno.test("repeated movement combination is flagged (cloned day-slot template)", () => {
-  const m = goodMonth();
-  m[8] = piece(["Wall Ball", "Row", "Burpee"]); // same combo as piece 1, reordered
+Deno.test("fewer than 3 formats and one format over half are counted", () => {
+  const m = goodMonth().map((p) => ({ ...p, format: "amrap" as const }));
   const r = auditMetconVariety({ metcons: m });
-  assertEquals(r.passed, false);
-  assert(r.violations.some((v) => v.includes("repeats the movement combination")));
+  assert(r.violations.some((v) => v.includes("distinct format")));
+  assert(r.violations.some((v) => v.includes("no format may exceed half")));
 });
 
-Deno.test("movement over the 1/3 frequency cap is flagged (wall-ball saturation)", () => {
+Deno.test("monostructural-only pieces are counted from the composer's own flag: 2 allowed, 0 for an Engine athlete", () => {
   const m = goodMonth();
-  for (let i = 0; i < 6; i++) m[i].movements.push({ movement: "Wall Ball", prescription: "12" });
-  const r = auditMetconVariety({ metcons: m });
-  assertEquals(r.passed, false);
-  assert(r.violations.some((v) => v.includes('"wall ball"') && v.includes("cap")));
+  m[3] = { ...m[3], monostructural: true };
+  assertEquals(auditMetconVariety({ metcons: m }).passed, true); // two is the budget
+  m[4] = { ...m[4], monostructural: true };
+  assert(auditMetconVariety({ metcons: m }).violations.some((v) => v.includes("budget is 2")));
+  // An Engine athlete: none. Machines inside mixed pieces are untouched.
+  const engine = auditMetconVariety({ metcons: goodMonth() }, { engineActive: true });
+  assertEquals(engine.violations.length, 1);
+  assert(engine.violations[0].includes("trains Engine"));
+  const mixedOnly = goodMonth().map((p) => ({ ...p, monostructural: false }));
+  assertEquals(auditMetconVariety({ metcons: mixedOnly }, { engineActive: true }).passed, true);
 });
 
-Deno.test("fewer than 3 formats / one format over half are flagged", () => {
-  const m = goodMonth().map((p) => ({ ...p, format: "rft" as const }));
-  const r = auditMetconVariety({ metcons: m });
-  assertEquals(r.passed, false);
-  assert(r.violations.some((v) => v.includes("at least 3")));
-  assert(r.violations.some((v) => v.includes("exceed half")));
-});
-
-Deno.test("barbell floor is WARNING tier (letter may overrule it); incapable athletes exempt", () => {
-  // Demoted 2026-08-11: Nick's letter (no Olympic lifting, engine-first,
-  // loading de-emphasized) legitimately argued against the floor — the
-  // composer followed the coach and the old hard rule called it a defect.
-  const m = goodMonth().map((p) => ({
-    ...p,
-    movements: p.movements.filter((mv) => !isBarbellMetconMovement(mv.movement)),
-  })).filter((p) => p.movements.length > 0);
-  const flagged = auditMetconVariety({ metcons: m }, { barbellCapable: true });
-  assertEquals(flagged.violations.filter((v) => v.includes("barbell")), []);
-  assert(flagged.warnings.some((w) => w.includes("barbell-capable")));
-  const exempt = auditMetconVariety({ metcons: m }, { barbellCapable: false });
-  assertEquals(exempt.warnings.filter((w) => w.includes("barbell")), []);
-});
-
-Deno.test("three monostructural pieces exceed the budget of 2", () => {
+Deno.test("more than 2 named pieces are counted", () => {
   const m = goodMonth();
-  m[3] = piece(["Bike"], { monostructural: true });
-  m[8] = piece(["Run"], { monostructural: true });
-  const r = auditMetconVariety({ metcons: m });
-  assertEquals(r.passed, false);
-  assert(r.violations.some((v) => v.includes("budget is 2")));
+  for (const i of [0, 1, 2]) m[i] = { ...m[i], format: "named" };
+  assert(auditMetconVariety({ metcons: m }).violations.some((v) => v.includes("named benchmark")));
 });
 
-Deno.test("engineActive drops the mono budget to 0; mixed pieces with machines stay legal", () => {
-  // goodMonth carries exactly ONE deliberate mono piece — legal normally,
-  // a violation once Engine evidence is active.
+Deno.test("one machine per round-based piece is counted from the machine field; a chipper may touch two", () => {
   const m = goodMonth();
-  const normal = auditMetconVariety({ metcons: m });
-  assertEquals(normal.violations.filter((v) => v.includes("mono budget is 0")), []);
-  const engine = auditMetconVariety({ metcons: m }, { engineActive: true });
-  assert(engine.violations.some((v) => v.includes("mono budget is 0")));
-  // A month with machines only INSIDE mixed pieces is untouched by the flag.
-  const mixedOnly = m.map((p) =>
-    p.movements.length > 0 && p.movements.every((mv) => ["Row", "Bike", "Run", "Ski Erg"].includes(mv.movement))
-      ? piece(["Wall Ball", "Row"], { week_num: p.week_num, day_num: p.day_num, format: p.format })
-      : p
-  );
-  const engineMixed = auditMetconVariety({ metcons: mixedOnly }, { engineActive: true });
-  assertEquals(engineMixed.violations.filter((v) => v.includes("mono budget is 0")), []);
+  m[1] = piece([row("row", "Row"), row("bike", "Bike"), "Burpee"], { week_num: m[1].week_num, day_num: m[1].day_num, format: "amrap" });
+  assert(auditMetconVariety({ metcons: m }).violations.some((v) => v.includes("2 machines (row, bike)")));
+  const chipper = goodMonth();
+  chipper[8] = piece([row("row", "Row"), row("run", "Run"), "Burpee"], { week_num: chipper[8].week_num, day_num: chipper[8].day_num, format: "chipper" });
+  assertEquals(auditMetconVariety({ metcons: chipper }).passed, true);
 });
 
-Deno.test("dumbbell/kettlebell implements never count as barbell", () => {
-  assertEquals(isBarbellMetconMovement("Thruster"), true);
-  assertEquals(isBarbellMetconMovement("Dumbbell Thruster"), false);
-  assertEquals(isBarbellMetconMovement("Kettlebell Swing"), false);
-  assertEquals(isBarbellMetconMovement("Power Clean"), true);
-});
-
-Deno.test("shuttle run is a floor movement: doesn't count mono, doesn't trip one-machine", () => {
+Deno.test("no count reads a movement's name: machine words in a name with no machine field are not machines", () => {
+  dayCounter = 0;
+  // "Row" and "Bike" by name only (no machine field), and a name that merely contains a machine word.
   const m = goodMonth();
-  const r = auditMetconVariety({ metcons: m });
-  // piece 11 pairs Wall Ball + Shuttle Run + Bike — one machine only.
-  assertEquals(r.violations.filter((v) => v.includes("modalities")), []);
-  const twoMachines = [...m.slice(0, 11), piece(["Row", "Bike"], { format: "intervals" })];
-  const r2 = auditMetconVariety({ metcons: twoMachines });
-  assert(r2.violations.some((v) => v.includes("one machine per round-based piece")));
+  m[1] = piece(["Row", "Bike", "Medicine Ball Throw"], { week_num: m[1].week_num, day_num: m[1].day_num });
+  assertEquals(auditMetconVariety({ metcons: m }).passed, true);
+  // A piece of machine-named rows is not "monostructural-only" unless the composer flagged it.
+  const three = goodMonth();
+  three[0] = piece(["Row"], { week_num: three[0].week_num, day_num: three[0].day_num, format: "rft" });
+  three[1] = piece(["Run"], { week_num: three[1].week_num, day_num: three[1].day_num });
+  assertEquals(auditMetconVariety({ metcons: three }).passed, true);
 });
 
-Deno.test("chipper may touch two machines; no machine is read out of a name to check equipment", () => {
-  const m = goodMonth();
-  m[8] = piece(["Run", "Single Under", "Row"], { format: "chipper", block_scheme: "For time (cap 22)" });
-  const equipped = auditMetconVariety({ metcons: m }, {
-    equipment: { rower: true, assault_bike: true, ski_erg: false },
-  });
-  assertEquals(equipped.violations.filter((v) => v.includes("modalities")), []);
-  assertEquals(equipped.passed, true);
-
-  // Same chipper for an athlete with no rower: no longer a finding here (2026-11-26).
-  // The composer is told the equipment; the fit check reads the written week.
-  const unequipped = auditMetconVariety({ metcons: m }, { equipment: { rower: false } });
-  assertEquals(unequipped.violations.filter((v) => v.includes("requires")), []);
+Deno.test("what is no longer counted: repeats, a movement in most pieces, no barbell at all", () => {
+  dayCounter = 0;
+  const formats = ["amrap", "rft", "emom", "intervals"] as const;
+  const same = Array.from({ length: 12 }, (_, i) => piece(["Wall Ball", "Burpee"], { format: formats[i % 4] }));
+  const r = auditMetconVariety({ metcons: same });
+  assertEquals(r.violations, []);
+  assertEquals(r.warnings, []);
 });
 
-Deno.test("previous-cycle signatures are never re-served", () => {
+Deno.test("a barbell load class needs a band that class defines; dumbbell, kettlebell and medicine ball need none", () => {
   const m = goodMonth();
-  const prev = [movementSignature(m[2])];
-  const r = auditMetconVariety({ metcons: m }, { previousCycleSignatures: prev });
-  assertEquals(r.passed, false);
-  assert(r.violations.some((v) => v.includes("re-serves")));
+  m[2] = piece([{ movement: "Thruster", prescription: "10", load_class: "thruster" }, "Pull Up"], { week_num: m[2].week_num, day_num: m[2].day_num, format: "rep_scheme" });
+  assert(auditMetconVariety({ metcons: m }).violations.some((v) => v.includes('load_class "thruster" and no load_band')));
+  const heavy = goodMonth();
+  heavy[5] = piece([bar("Back Squat", "back_squat", "heavy")], { week_num: heavy[5].week_num, day_num: heavy[5].day_num, format: "rft" });
+  assert(auditMetconVariety({ metcons: heavy }).violations.some((v) => v.includes("does not define")));
+  const implement = goodMonth();
+  implement[1] = piece([
+    { movement: "Dumbbell Snatch", prescription: "10", load_class: "dumbbell", weight: 22.5 },
+    { movement: "Kettlebell Swing", prescription: "15", load_class: "kettlebell", weight: 24 },
+    { movement: "Wall Ball", prescription: "20", load_class: "medicine_ball" },
+  ], { week_num: implement[1].week_num, day_num: implement[1].day_num });
+  assertEquals(auditMetconVariety({ metcons: implement }).passed, true);
 });
 
-Deno.test("more than 2 named pieces are flagged", () => {
+Deno.test("slot coverage: missing, doubled, and orphan slots are counted; a length outside the time domain is logged only", () => {
   const m = goodMonth();
-  m[1].format = "named";
-  m[4].format = "named";
-  m[9].format = "named";
-  const r = auditMetconVariety({ metcons: m });
-  assertEquals(r.passed, false);
-  assert(r.violations.some((v) => v.includes("named")));
+  const slots = slotsFor(m);
+  assertEquals(auditMetconVariety({ metcons: m }, { slots }).passed, true);
+
+  const broken = m.slice(1); // drop W1D1
+  broken.push({ ...m[1], week_num: 4, day_num: 7 }); // orphan slot
+  const r = auditMetconVariety({ metcons: broken }, { slots });
+  assert(r.violations.some((v) => v.includes("no composed metcon")));
+  assert(r.violations.some((v) => v.includes("doesn't exist")));
+
+  const slow = m.map((p, i) => (i === 0 ? { ...p, stated_duration_minutes: 20 } : p));
+  const warned = auditMetconVariety({ metcons: slow }, { slots });
+  assertEquals(warned.passed, true);
+  assert(warned.warnings.some((w) => w.includes('"medium"')));
+});
+
+Deno.test("the send-back says pieces already written this month cannot be changed", () => {
+  const msg = formatMetconVarietyViolationsForRetry(["Format \"amrap\" carries 4/5 pieces"]);
+  assert(msg.includes("Pieces already written this month cannot be changed."));
+  assert(msg.includes('Format "amrap" carries 4/5 pieces'));
 });
 
 Deno.test("structural Rest rows are stripped before legality can see them (2026-08-31 hard-fail)", () => {
@@ -272,22 +247,10 @@ Deno.test("no-throw guarantee: repair → strip → audit runs the full gauntlet
     week_num: 1,
     day_num: d,
     time_domain: "medium",
-    intensity: "build",
-    focus: "aerobic_capacity",
+    week_role: "build",
     day_context: {},
-    allocated_minutes: 20,
   }));
-  const r = auditMetconVariety(output, {
-    slots,
-    barbellCapable: true,
-    vocabulary: ["Burpee"],
-    doNotProgram: [],
-    equipment: {},
-    developmentAxes: ["gymnastics_pulling", "olympic_lifting"],
-    skills: { "Double-Unders": "beginner" },
-    loadingDeemphasis: false,
-    fatigueSkillExclusions: [],
-  });
+  const r = auditMetconVariety(output, { slots, engineActive: true });
   // W1D1 was dropped by repair → slot coverage flags it. No exceptions anywhere.
   assert(r.violations.some((v) => v.includes("no composed metcon")));
 });
@@ -297,108 +260,3 @@ Deno.test("strip: tolerates pieces with missing movements (post-repair this can'
   assertEquals(stripStructuralRestRows(weird), 0);
 });
 
-// ── No name checks on composed metcons (2026-11-26) ──
-
-Deno.test("a composed movement's name is not checked against the avoid list, the movement list or equipment", () => {
-  const m = goodMonth();
-  m[0].movements = [{ movement: "Ring Row", prescription: "10" }, { movement: "Medicine Ball Throw", prescription: "12" }, { movement: "Row", prescription: "15 cal" }];
-  const audit = auditMetconVariety({ metcons: m }, {
-    vocabulary: ["Burpee"],            // Ring Row and the throw are not on it
-    doNotProgram: ["Ring Row"],        // and Ring Row is on the avoid list
-    equipment: { rower: false },       // and the rower is unticked ("Throw" also contains "row")
-  });
-  for (const gone of ["do-not-program", "allowed vocabulary", "doesn't have"]) {
-    assertEquals(audit.violations.filter((v) => v.includes(gone)), [], gone);
-  }
-  const src = Deno.readTextFileSync(new URL("./metcon-variety-audits.ts", import.meta.url));
-  assert(!src.includes("export function dropIllegalComposedPieces"));
-  const compose = Deno.readTextFileSync(new URL("./compose-metcons.ts", import.meta.url));
-  for (const gone of ["dropIllegalComposedPieces", "trimComposedMovementAnnotations", "movement-name-repair"]) assert(!compose.includes(gone), gone);
-});
-
-// ── Athlete-match rules (2026-08-31) ──
-
-Deno.test("rule 10: barbell movement without typed load band is a violation", () => {
-  const m = goodMonth();
-  m[2].movements = [{ movement: "Thruster", prescription: "10" }, { movement: "Pull Up", prescription: "10" }];
-  const r = auditMetconVariety({ metcons: m });
-  assertEquals(r.passed, false);
-  assert(r.violations.some((v) => v.includes("no typed load_class/load_band")));
-});
-
-Deno.test("rule 12: a development axis missing from a non-deload week is a violation; deload weeks exempt", () => {
-  const m = goodMonth();
-  const slots: MetconSlot[] = m.map((p) => ({
-    week_num: p.week_num,
-    day_num: p.day_num,
-    time_domain: "medium",
-    intensity: p.week_num === 4 ? "deload — easy" : "build",
-    focus: "aerobic_capacity",
-    day_context: {},
-  }));
-  // gymnastics_pressing appears in W2 (Wall Walk) but not W1/W3.
-  const r = auditMetconVariety({ metcons: m }, { slots, developmentAxes: ["gymnastics_pressing"], skills: {} });
-  assert(r.violations.some((v) => v.includes('Week 1: development axis "gymnastics_pressing"')));
-  assert(!r.violations.some((v) => v.includes("Week 4:")));
-});
-
-Deno.test("rule 13: fit floor flags a month that ignores the athlete's tracks", () => {
-  dayCounter = 0;
-  const generic = Array.from({ length: 12 }, (_, i) =>
-    piece([["Run", "Sit Up"], ["Row", "Lunge"], ["Bike", "Air Squat"], ["Run", "Burpee"]][i % 4], {
-      format: (["amrap", "rft", "intervals"] as const)[i % 3],
-      week_num: Math.floor(i / 3) + 1,
-      day_num: (i % 3) + 1,
-    }));
-  // Distinctness will also flag repeats; check the fit violation specifically.
-  const r = auditMetconVariety({ metcons: generic }, { developmentAxes: ["olympic_lifting", "gymnastics_pulling"] });
-  assert(r.violations.some((v) => v.includes("floor 60%")));
-});
-
-Deno.test("barbell target reads the typed loading_deemphasis flag", () => {
-  const m = goodMonth(); // 2 barbell pieces in 12 → below the 4-6 target
-  const flagged = auditMetconVariety({ metcons: m }, { barbellCapable: true });
-  assert(flagged.warnings.some((w) => w.includes("loading_deemphasis NOT set")));
-  const exempt = auditMetconVariety({ metcons: m }, { barbellCapable: true, loadingDeemphasis: true });
-  assertEquals(exempt.warnings.filter((w) => w.includes("barbell")), []);
-});
-
-Deno.test("allocated_minutes drives the duration warning when present", () => {
-  const m = goodMonth();
-  const slots: MetconSlot[] = m.map((p) => ({
-    week_num: p.week_num,
-    day_num: p.day_num,
-    time_domain: "long",
-    intensity: "build",
-    focus: "aerobic_capacity",
-    day_context: {},
-    allocated_minutes: 24,
-  }));
-  // Every piece states 12 min against a 24-min allocation → warned.
-  const r = auditMetconVariety({ metcons: m }, { slots });
-  assert(r.warnings.some((w) => w.includes("vs allocated 24 min")));
-});
-
-Deno.test("slot coverage: missing, doubled, and orphan slots are flagged; off-bucket duration warns", () => {
-  const m = goodMonth();
-  const slots: MetconSlot[] = m.map((p) => ({
-    week_num: p.week_num,
-    day_num: p.day_num,
-    time_domain: "medium",
-    intensity: "build",
-    focus: "aerobic_capacity",
-    day_context: {},
-  }));
-  const clean = auditMetconVariety({ metcons: m }, { slots });
-  assertEquals(clean.passed, true);
-
-  const broken = m.slice(1); // drop W1D1
-  broken.push({ ...m[1], week_num: 4, day_num: 7 }); // orphan slot
-  const r = auditMetconVariety({ metcons: broken }, { slots });
-  assert(r.violations.some((v) => v.includes("no composed metcon")));
-  assert(r.violations.some((v) => v.includes("doesn't exist")));
-
-  const slow = m.map((p, i) => (i === 0 ? { ...p, stated_duration_minutes: 25 } : p));
-  const warned = auditMetconVariety({ metcons: slow }, { slots });
-  assert(warned.warnings.some((w) => w.includes('"medium"')));
-});
