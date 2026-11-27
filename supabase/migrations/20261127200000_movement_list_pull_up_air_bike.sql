@@ -28,3 +28,11 @@ SET display_name = 'Air Bike',
 WHERE canonical_name = 'bike';
 
 DELETE FROM public.movements WHERE canonical_name IN ('assault_bike', 'echo_bike');
+
+-- 3. Programs already written for members: the three old bike names become
+--    "Air Bike" (founder, 2026-11-27). Exact names only; "Easy Bike" (warm-up
+--    and cool-down) and "Bike Erg" (a different machine) are left as they are.
+--    Only the movement name changes on these lines.
+UPDATE public.program_movements_v2
+SET movement = 'Air Bike'
+WHERE movement IN ('Bike', 'Assault Bike', 'Echo Bike');

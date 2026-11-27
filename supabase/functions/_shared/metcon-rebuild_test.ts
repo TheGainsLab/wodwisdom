@@ -374,3 +374,9 @@ Deno.test("every AI that writes a programmed movement is told an air bike is alw
   const { EQUIPMENT_LABELS } = await import("./equipment-labels.ts");
   assertEquals(EQUIPMENT_LABELS.assault_bike, "Air Bike (Echo / Assault / other)");
 });
+
+Deno.test("the migration renames the old bike names on programs already written, by exact name only", () => {
+  const sql = read("../../migrations/20261127200000_movement_list_pull_up_air_bike.sql");
+  assert(sql.includes("UPDATE public.program_movements_v2\nSET movement = 'Air Bike'\nWHERE movement IN ('Bike', 'Assault Bike', 'Echo Bike');"));
+  assert(!/program_movements_v2[\s\S]*(ilike|LIKE)/i.test(sql.slice(sql.indexOf("-- 3."))));
+});
