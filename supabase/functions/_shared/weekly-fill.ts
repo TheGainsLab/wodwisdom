@@ -91,13 +91,11 @@ export async function loadMonthStore(supa: SupabaseClient, programId: string, mo
 export const REPLAN_SYSTEM =
   "You read an athlete's notes to their coach and answer ONE word. Answer 'replan' if ANY note asks to change the " +
   "STRUCTURE of the month: which lifts " +
-  "are trained (e.g. snatch/clean & jerk instead of presses), how much lifting or gymnastics or conditioning there is " +
-  "overall, which kind of training is emphasised, or the metcon focus " +
-  "(e.g. 'more long metcons', 'less conditioning', 'more Olympic lifting', 'more gymnastics days'). Answer 'fill' if " +
+  "are trained, how much lifting or gymnastics or conditioning there is " +
+  "overall, which kind of training is emphasised, or the metcon focus. Answer 'fill' if " +
   "every note is about what goes INSIDE the existing days: loads (heavier/easier), a specific movement to include " +
-  "or avoid for a week, equipment for a week (hotel gym), a tired week, a travel week, one metcon longer or shorter. " +
-  "A note that only asks to train fewer or more days a week (e.g. '3 days from now on', 'drop to 4 days', 'add a " +
-  "day') is 'fill': the number of training days is set in the athlete's profile, not by a note, and a re-plan " +
+  "or avoid for a week, equipment available for a week, how they feel this week, one metcon longer or shorter. " +
+  "A note that only asks to train fewer or more days a week is 'fill': the number of training days is set in the athlete's profile, not by a note, and a re-plan " +
   "cannot change it. " +
   "Reply with exactly one word: replan or fill.";
 

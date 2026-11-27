@@ -416,7 +416,7 @@ export function formatSkeletonViolationsForRetry(failures: SkeletonAuditResult[]
   if (failures.length === 0) return "";
   const lines: string[] = [];
   lines.push(
-    "Your previous skeleton failed structural audits. Fix these violations in your regenerated skeleton. Do NOT explain — just emit a corrected skeleton via the emit_skeleton tool.",
+    "Your previous skeleton failed the checks below. Fix these violations in your regenerated skeleton. Do NOT explain — just emit a corrected skeleton via the emit_skeleton tool.",
   );
   lines.push("");
   for (const failure of failures) {

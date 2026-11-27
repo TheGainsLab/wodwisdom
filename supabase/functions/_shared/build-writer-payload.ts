@@ -384,7 +384,7 @@ async function fetchSignatureProfile(
 // Helpers — coercion / hydration
 // ============================================================
 
-function clampDaysPerWeek(n: number | null | undefined): 2 | 3 | 4 | 5 | 6 {
+export function clampDaysPerWeek(n: number | null | undefined): 2 | 3 | 4 | 5 | 6 {
   if (n == null || !Number.isFinite(n)) return 5;
   const r = Math.round(n);
   // Floor 2 (2026-10-05): honor the athlete's 2 instead of silently
@@ -392,6 +392,16 @@ function clampDaysPerWeek(n: number | null | undefined): 2 | 3 | 4 | 5 | 6 {
   if (r <= 2) return 2;
   if (r >= 6) return 6;
   return r as 2 | 3 | 4 | 5 | 6;
+}
+
+/** A line for the generation log when the days used are not the days the
+ *  athlete saved (founder, 2026-11-26: keep the default of 5, but log it).
+ *  null when they match. */
+export function daysPerWeekLogLine(saved: number | null | undefined): string | null {
+  const used = clampDaysPerWeek(saved);
+  if (saved == null || !Number.isFinite(saved)) return `days_per_week: none saved on the profile; built with the default of ${used} days.`;
+  if (saved !== used) return `days_per_week: profile says ${saved}; built with ${used} days (the range is 2 to 6).`;
+  return null;
 }
 
 // Exported so the cohort roster builder resolves member 1RMs by the EXACT same rule

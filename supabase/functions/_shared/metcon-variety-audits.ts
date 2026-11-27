@@ -20,10 +20,8 @@ import type {
   MetconSlot,
 } from "./metcon-composer.ts";
 import {
-  athleteTierFor,
   bandRange,
   loadClassForMovement,
-  skillFatigueDefForMovement,
 } from "./conditioning-definitions.ts";
 
 export interface MetconVarietyAuditResult {
@@ -110,17 +108,6 @@ function movementExpressesAxis(movement: string, axis: string): boolean {
   return (AXIS_MOVEMENT_KEYWORDS[axis] ?? []).some((kw) => n.includes(kw));
 }
 
-/** Best-effort per-round rep parse from a prescription string: the largest
- *  dash/slash-separated leading integer ("15" → 15, "21-15-9" → 21). Null when
- *  the prescription is calorie/distance/time-denominated or non-numeric. */
-function parsePerRoundReps(prescription: string): number | null {
-  const p = prescription.trim().toLowerCase();
-  if (/\b(cal|cals|calories|m|meter|meters|km|ft|yd|sec|s|min)\b/.test(p)) return null;
-  const m = p.match(/^(\d+(?:\s*[-\/]\s*\d+)*)/);
-  if (!m) return null;
-  const nums = m[1].split(/[-\/]/).map((x) => parseInt(x.trim(), 10)).filter((x) => Number.isFinite(x));
-  return nums.length ? Math.max(...nums) : null;
-}
 
 /**
  * Strip structural "Rest" rows the composer sometimes emits when making
@@ -142,56 +129,6 @@ export function stripStructuralRestRows(output: MetconComposerOutput): number {
     m.movements = kept;
   }
   return stripped;
-}
-
-/**
- * Drop composed pieces that remain ILLEGAL after the retry — the subtraction
- * that ends content-fatal generations (2026-09-01 founder ruling: "code is
- * the problem"; three paid runs died over a movement name). Mirrors rule 9's
- * legality checks exactly (banned / out-of-vocabulary / missing equipment).
- * A dropped piece's slot is rebuilt by the fill's own metcon fallback, so the
- * athlete still receives a complete day; the log carries the exact movement
- * so a good-but-missing movement gets added to the library. Mutates
- * output.metcons; returns human-readable drop lines.
- */
-export function dropIllegalComposedPieces(
-  output: MetconComposerOutput,
-  opts: {
-    vocabulary?: string[];
-    doNotProgram?: string[];
-    equipment?: Record<string, boolean>;
-  },
-): string[] {
-  const vocab = opts.vocabulary?.length ? new Set(opts.vocabulary.map(norm)) : null;
-  const bans = opts.doNotProgram?.length ? new Set(opts.doNotProgram.map(norm)) : null;
-  const dropped: string[] = [];
-  output.metcons = (output.metcons ?? []).filter((m) => {
-    for (const mv of m.movements ?? []) {
-      const x = norm(mv?.movement ?? "");
-      if (bans?.has(x)) {
-        dropped.push(`W${m.week_num}D${m.day_num} dropped: "${mv.movement}" is on the do-not-program list`);
-        return false;
-      }
-      if (vocab && !vocab.has(x)) {
-        dropped.push(`W${m.week_num}D${m.day_num} dropped: "${mv.movement}" not in vocabulary (add to movements table if legitimate)`);
-        return false;
-      }
-      if (opts.equipment && isMonoMovement(x)) {
-        for (const k of MONO_KEYWORDS) {
-          if (x.includes(k)) {
-            const eq = MACHINE_EQUIPMENT[k];
-            if (eq && !opts.equipment[eq]) {
-              dropped.push(`W${m.week_num}D${m.day_num} dropped: "${mv.movement}" requires ${eq} the athlete doesn't have`);
-              return false;
-            }
-            break;
-          }
-        }
-      }
-    }
-    return true;
-  });
-  return dropped;
 }
 
 /**
@@ -292,11 +229,11 @@ export function auditMetconVariety(
     barbellCapable?: boolean;
     /** Normalized signatures of last cycle's pieces (never re-serve). */
     previousCycleSignatures?: string[];
-    /** Allowed movement display names — every composed movement must be one. */
+    /** No longer read (2026-11-26): names are not checked against a list. */
     vocabulary?: string[];
-    /** Hard bans — a banned movement anywhere is a violation. */
+    /** No longer read (2026-11-26). */
     doNotProgram?: string[];
-    /** Equipment map — machine movements require the owning equipment. */
+    /** No longer read (2026-11-26). */
     equipment?: Record<string, boolean>;
     /** Typed development axes (strength/gymnastics; conditioning axes excluded)
      *  — drives the weekly-expression and fit rules. */
@@ -486,36 +423,11 @@ export function auditMetconVariety(
     }
   }
 
-  // 9. Legality — every movement must be in the vocabulary, never banned, and
-  //    machine movements require the owning equipment. Belt-and-braces with the
-  //    prompt inputs: a banned or invented movement must never survive to the
-  //    fill (found 2026-08-11: a composed month used Ski Erg unchecked).
-  const vocab = opts.vocabulary?.length ? new Set(opts.vocabulary.map(norm)) : null;
-  const bans = opts.doNotProgram?.length ? new Set(opts.doNotProgram.map(norm)) : null;
-  for (const m of pieces) {
-    for (const mv of m.movements) {
-      const x = norm(mv.movement);
-      if (bans?.has(x)) {
-        violations.push(`${at(m)}: "${mv.movement}" is on this athlete's do-not-program list.`);
-        continue;
-      }
-      if (vocab && !vocab.has(x)) {
-        violations.push(`${at(m)}: "${mv.movement}" is not in this athlete's allowed vocabulary.`);
-        continue;
-      }
-      if (opts.equipment && isMonoMovement(x)) {
-        for (const k of MONO_KEYWORDS) {
-          if (x.includes(k)) {
-            const eq = MACHINE_EQUIPMENT[k];
-            if (eq && !opts.equipment[eq]) {
-              violations.push(`${at(m)}: "${mv.movement}" requires ${eq} the athlete doesn't have.`);
-            }
-            break;
-          }
-        }
-      }
-    }
-  }
+  // 9. Legality — REMOVED 2026-11-26 (founder: "code should not be checking AI
+  //    judgment"). Code no longer compares a composed movement's name with the
+  //    avoid list or the movement list, and no longer reads a machine out of a
+  //    name ("throw" contains "row") to check it against equipment. The
+  //    composer is told all three. Nothing changes the week after it is written.
 
   // ── Athlete-match rules (2026-08-31) — the objective's deterministic floor ──
 
@@ -537,37 +449,11 @@ export function auditMetconVariety(
     }
   }
 
-  // 11. Skill volume within the athlete's tier band. Per-round reps only (round
-  //     counts live in prose block_scheme and aren't reliably parseable).
-  //     Above-band is allowed WITH a written justification — proxied as the
-  //     stimulus_note mentioning the movement (deterministic audits can't judge
-  //     justification quality; the proxy forces the composer to write one).
-  if (opts.skills) {
-    for (const m of pieces) {
-      for (const mv of m.movements ?? []) {
-        const def = skillFatigueDefForMovement(mv?.movement ?? "");
-        if (!def) continue;
-        const tier = athleteTierFor(def, opts.skills);
-        if (tier == null) continue; // absence is neutral — no tier, no check
-        const band = def.perRound[tier];
-        if (band == null) {
-          violations.push(
-            `${at(m)}: "${mv.movement}" under fatigue for a ${tier}-tier athlete — this skill is not programmed under fatigue at that tier.`,
-          );
-          continue;
-        }
-        const reps = parsePerRoundReps(mv.prescription);
-        if (reps != null && reps > band[1]) {
-          const justified = norm(m.stimulus_note ?? "").includes(norm(mv.movement).split(" ")[0]);
-          if (!justified) {
-            violations.push(
-              `${at(m)}: "${mv.movement}" at ${reps}/round exceeds the ${tier} band (${band[0]}-${band[1]}) with no justification in stimulus_note — bring it in band or justify it.`,
-            );
-          }
-        }
-      }
-    }
-  }
+  // 11. Skill volume — REMOVED 2026-11-26 (founder). It held per-round rep
+  //     ranges per skill and rating ("v0 placeholders", never calibrated),
+  //     read reps out of the composer's text and sent the month back when a
+  //     skill was over its range. The composer now sets volume from the
+  //     athlete's rating of each skill, defined in the founder's words.
 
   // 12. Development-axis expression — each development axis appears in at least
   //     one piece per non-deload week (deload weeks detected from slot

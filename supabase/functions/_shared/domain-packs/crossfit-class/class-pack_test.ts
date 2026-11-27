@@ -60,9 +60,9 @@ Deno.test("class recap states the template + owner split + clock; base recap unc
   assert(recap.includes("4 strength-focus days and 2 skills-focus days"), "owner split stated");
   assert(recap.includes("cool-down is NOT counted"), "clock rule");
 
-  // The base pack recap is byte-identical to the pre-seam pipeline string.
+  // The base (member) recap: the skills block is on every training day (founder, 2026-11-26).
   const base = CROSSFIT_PACK.writer.skeletonRuleRecap(5, tdi);
-  assert(base.includes("Every training day includes strength + accessory + metcon block types. Skills 2–4 days per week."));
+  assert(base.includes("Every training day includes skills + strength + accessory + metcon block types. The skills block is on every training day, without exception."));
   assert(base.includes("- Output exactly 4 weeks × 5 days. day_num is 1..5."));
   assert(!base.includes("GROUP CLASS"));
 });

@@ -11,7 +11,6 @@ import { assert, assertEquals } from "jsr:@std/assert";
 import type { ComposedMetcon, MetconSlot } from "./metcon-composer.ts";
 import {
   auditMetconVariety,
-  dropIllegalComposedPieces,
   isBarbellMetconMovement,
   movementSignature,
   repairComposerEmission,
@@ -153,7 +152,7 @@ Deno.test("shuttle run is a floor movement: doesn't count mono, doesn't trip one
   assert(r2.violations.some((v) => v.includes("one machine per round-based piece")));
 });
 
-Deno.test("chipper may touch two machines; equipment ownership still enforced", () => {
+Deno.test("chipper may touch two machines; no machine is read out of a name to check equipment", () => {
   const m = goodMonth();
   m[8] = piece(["Run", "Single Under", "Row"], { format: "chipper", block_scheme: "For time (cap 22)" });
   const equipped = auditMetconVariety({ metcons: m }, {
@@ -162,27 +161,10 @@ Deno.test("chipper may touch two machines; equipment ownership still enforced", 
   assertEquals(equipped.violations.filter((v) => v.includes("modalities")), []);
   assertEquals(equipped.passed, true);
 
-  // Same chipper for an athlete with no rower → equipment violation.
+  // Same chipper for an athlete with no rower: no longer a finding here (2026-11-26).
+  // The composer is told the equipment; the fit check reads the written week.
   const unequipped = auditMetconVariety({ metcons: m }, { equipment: { rower: false } });
-  assert(unequipped.violations.some((v) => v.includes("requires rower")));
-});
-
-Deno.test("banned and out-of-vocabulary movements are violations", () => {
-  const m = goodMonth();
-  const r = auditMetconVariety({ metcons: m }, {
-    vocabulary: ["Row", "Wall Ball", "Burpee", "Run", "Kettlebell Swing", "Bike", "Sit Up",
-      "Thruster", "Pull Up", "Deadlift", "Bar Facing Burpee", "Box Jump Over", "Dumbbell Snatch",
-      "Wall Walk", "Burpee Box Jump Over", "Goblet Squat", "Push Up", "Walking Lunge",
-      "Toes To Bar", "Shuttle Run", "Dumbbell Thruster", "Double Under"],
-    doNotProgram: ["Toes To Bar"],
-  });
-  assertEquals(r.passed, false);
-  assert(r.violations.some((v) => v.includes("do-not-program")));
-
-  const invented = goodMonth();
-  invented[0].movements.push({ movement: "Ski Erg", prescription: "10 cal" });
-  const r2 = auditMetconVariety({ metcons: invented }, { vocabulary: ["Row", "Wall Ball", "Burpee"] });
-  assert(r2.violations.some((v) => v.includes("not in this athlete's allowed vocabulary")));
+  assertEquals(unequipped.violations.filter((v) => v.includes("requires")), []);
 });
 
 Deno.test("previous-cycle signatures are never re-served", () => {
@@ -315,47 +297,23 @@ Deno.test("strip: tolerates pieces with missing movements (post-repair this can'
   assertEquals(stripStructuralRestRows(weird), 0);
 });
 
-// ── Drop-instead-of-throw (2026-09-01 founder ruling): content never kills ──
+// ── No name checks on composed metcons (2026-11-26) ──
 
-Deno.test("dropIllegalComposedPieces: banned, unknown, and no-equipment pieces drop; legal pieces survive", () => {
+Deno.test("a composed movement's name is not checked against the avoid list, the movement list or equipment", () => {
   const m = goodMonth();
-  const before = m.length;
-  const output = { metcons: m };
-  const dropped = dropIllegalComposedPieces(output, {
-    vocabulary: ["Row", "Wall Ball", "Burpee", "Run", "Kettlebell Swing", "Bike", "Sit Up",
-      "Thruster", "Pull Up", "Deadlift", "Bar Facing Burpee", "Box Jump Over", "Dumbbell Snatch",
-      "Wall Walk", "Burpee Box Jump Over", "Goblet Squat", "Push Up", "Walking Lunge",
-      "Toes To Bar", "Shuttle Run", "Dumbbell Thruster", "Double Under"],
-    doNotProgram: ["Toes To Bar"], // piece 10 (KB Swing + T2B) → banned drop
-    equipment: { rower: true, assault_bike: true },
+  m[0].movements = [{ movement: "Ring Row", prescription: "10" }, { movement: "Medicine Ball Throw", prescription: "12" }, { movement: "Row", prescription: "15 cal" }];
+  const audit = auditMetconVariety({ metcons: m }, {
+    vocabulary: ["Burpee"],            // Ring Row and the throw are not on it
+    doNotProgram: ["Ring Row"],        // and Ring Row is on the avoid list
+    equipment: { rower: false },       // and the rower is unticked ("Throw" also contains "row")
   });
-  assert(dropped.some((d) => d.includes("do-not-program")));
-  assertEquals(output.metcons.length, before - 1);
-  // The surviving month audits WITHOUT legality violations.
-  const audit = auditMetconVariety(output, {
-    vocabulary: ["Row", "Wall Ball", "Burpee", "Run", "Kettlebell Swing", "Bike", "Sit Up",
-      "Thruster", "Pull Up", "Deadlift", "Bar Facing Burpee", "Box Jump Over", "Dumbbell Snatch",
-      "Wall Walk", "Burpee Box Jump Over", "Goblet Squat", "Push Up", "Walking Lunge",
-      "Toes To Bar", "Shuttle Run", "Dumbbell Thruster", "Double Under"],
-    doNotProgram: ["Toes To Bar"],
-  });
-  assertEquals(audit.violations.filter((v) => v.includes("do-not-program")), []);
-});
-
-Deno.test("dropIllegalComposedPieces: unknown-movement piece drops with add-to-library hint (the Ring Row case)", () => {
-  const m = goodMonth();
-  m[0].movements = [{ movement: "Ring Row", prescription: "10" }, { movement: "Burpee", prescription: "5" }];
-  const output = { metcons: m };
-  const dropped = dropIllegalComposedPieces(output, { vocabulary: ["Burpee", "Row"] , doNotProgram: [], equipment: {} });
-  assert(dropped.some((d) => d.includes('"Ring Row"') && d.includes("movements table")));
-});
-
-Deno.test("dropIllegalComposedPieces: clean month drops nothing", () => {
-  const m = goodMonth();
-  const output = { metcons: m };
-  const dropped = dropIllegalComposedPieces(output, { doNotProgram: [], equipment: { rower: true, assault_bike: true } });
-  assertEquals(dropped, []);
-  assertEquals(output.metcons.length, 12);
+  for (const gone of ["do-not-program", "allowed vocabulary", "doesn't have"]) {
+    assertEquals(audit.violations.filter((v) => v.includes(gone)), [], gone);
+  }
+  const src = Deno.readTextFileSync(new URL("./metcon-variety-audits.ts", import.meta.url));
+  assert(!src.includes("export function dropIllegalComposedPieces"));
+  const compose = Deno.readTextFileSync(new URL("./compose-metcons.ts", import.meta.url));
+  for (const gone of ["dropIllegalComposedPieces", "trimComposedMovementAnnotations", "movement-name-repair"]) assert(!compose.includes(gone), gone);
 });
 
 // ── Athlete-match rules (2026-08-31) ──
@@ -366,47 +324,6 @@ Deno.test("rule 10: barbell movement without typed load band is a violation", ()
   const r = auditMetconVariety({ metcons: m });
   assertEquals(r.passed, false);
   assert(r.violations.some((v) => v.includes("no typed load_class/load_band")));
-});
-
-Deno.test("rule 11: skill volume above tier band without justification is a violation; in-band passes; justification exempts; unmapped skills are skipped", () => {
-  const skills = { double_unders: "beginner" }; // band 15-30/round
-  const over = goodMonth();
-  const du = over[11].movements.find((mv) => mv.movement === "Double Under")!;
-  du.prescription = "50";
-  const r = auditMetconVariety({ metcons: over }, { skills });
-  assert(r.violations.some((v) => v.includes("exceeds the beginner band")));
-
-  const inBand = goodMonth();
-  inBand[11].movements.find((mv) => mv.movement === "Double Under")!.prescription = "25";
-  const ok = auditMetconVariety({ metcons: inBand }, { skills });
-  assertEquals(ok.violations.filter((v) => v.includes("exceeds the")), []);
-
-  const justified = goodMonth();
-  justified[11].movements.find((mv) => mv.movement === "Double Under")!.prescription = "50";
-  justified[11].stimulus_note = "Deliberate double-under density push — big unbroken sets are the stimulus.";
-  const j = auditMetconVariety({ metcons: justified }, { skills });
-  assertEquals(j.violations.filter((v) => v.includes("exceeds the")), []);
-
-  // Toes To Bar prescribes 10 in the fixture but toes_to_bar has no entry in
-  // this skills map — absence is neutral, so no violation for it.
-  assertEquals(r.violations.filter((v) => v.includes("Toes To Bar")), []);
-});
-
-Deno.test("rule 11 resolves DISPLAY-NAME skills keys (the production payload shape)", () => {
-  // The writer payload keys skills by display name, not snake_case — the
-  // production shape that silently no-opped before the normalized lookup.
-  const displaySkills = { "Double-Unders": "beginner", "HSPU (kipping)": "intermediate" };
-  const over = goodMonth();
-  over[11].movements.find((mv) => mv.movement === "Double Under")!.prescription = "50";
-  const r = auditMetconVariety({ metcons: over }, { skills: displaySkills });
-  assert(r.violations.some((v) => v.includes("exceeds the beginner band")));
-});
-
-Deno.test("rule 11: a not-under-fatigue tier skill is a violation regardless of reps", () => {
-  const m = goodMonth();
-  m[7].movements.push({ movement: "Ring Muscle Up", prescription: "2" });
-  const r = auditMetconVariety({ metcons: m }, { skills: { muscle_ups: "none" } });
-  assert(r.violations.some((v) => v.includes("not programmed under fatigue")));
 });
 
 Deno.test("rule 12: a development axis missing from a non-deload week is a violation; deload weeks exempt", () => {

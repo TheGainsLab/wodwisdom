@@ -29,8 +29,8 @@ import type { DomainPack } from "../domain-packs/types.ts";
 import type { ComposedMetcon } from "../metcon-composer.ts";
 import { MODELS } from "../model-profiles.ts";
 import { COUNTS_TOWARD_INSTRUCTION } from "../counts-toward.ts";
-import { athleteWordsElsewhere, restrictionsForPrompt } from "../restriction-gate.ts";
-import { fitProfileFromPayload, fitRulesForWriter } from "../fit-gate.ts";
+import { athleteFileForWriter, athleteWordsElsewhere, restrictionsForPrompt } from "../athlete-file-text.ts";
+import { DISPLAY_TO_LIFT_KEY } from "../lift-key.ts";
 
 /** Failure list shape from a hard-audit run (type-only; erased at runtime). */
 type AuditFailures = ReturnType<typeof runAudits>["failures"];
@@ -323,13 +323,19 @@ export async function callWeekFill(
     `- Emit EXACTLY week ${weekNum}: week_num=${weekNum} with ${daysPerWeek} days (day_num 1..${daysPerWeek}).`,
     `- All weights in ${units}.`,
     "- Honor THIS WEEK's skeleton: each day's block_types, primary_lift, strength_scheme, metcon_focus, skill_focus are already decided. Fill in movement-level prescriptions only.",
-    "- Prescribed barbell weight ≤ athlete's 1RM for that lift, unless block_scheme/notes mention a 1RM attempt.",
-    "- At most one metcon block per day. Every metcon block must declare a block_scheme.",
+    "- Prescribed barbell weight ≤ athlete's 1RM for that lift, unless the block's notes mark it a 1RM attempt.",
+    "- At most one metcon block per day.",
     "- Every movement in strength / accessory / metcon / skills blocks must populate at least one of {sets, reps, weight, time_seconds, distance} > 0.",
     // The athlete's restrictions, in their own words, stated as an absolute
     // (2026-11-23): the old one-line "substitute or scale" let an easy run
     // into the cool-downs of an athlete who wrote "runner's knee".
-    fitRulesForWriter(fitProfileFromPayload(payload, skeleton, []), weekNum),
+    athleteFileForWriter({
+      lifts: payload.lifts,
+      liftNames: DISPLAY_TO_LIFT_KEY,
+      conditioning: payload.conditioning as Record<string, unknown> | null,
+      equipment: payload.equipment as Record<string, boolean> | null,
+      sessionMinutes: payload.training_context.session_length_minutes ?? null,
+    }),
     restrictionsForPrompt(
       payload.training_context.injuries_constraints_text,
       payload.training_context.injuries_structured?.do_not_program,
@@ -352,7 +358,7 @@ export async function callWeekFill(
       ]
       : []),
     hasComposed
-      ? "- Metcons for days listed in COMPOSED METCONS are PRE-COMPOSED: emit each EXACTLY — same movements, same scheme, same format, same duration. Your job on those is exact loads from the athlete's 1RMs, calories/distances from their pacing, and the typed per-movement fields. NEVER redesign, swap, add, or drop a composed movement. If a metcon day is NOT in the list (its piece was removed), compose that day's metcon YOURSELF from the skeleton's metcon_focus and the athlete's allowed movements — distinct from the composed pieces, expected time inside the focus window."
+      ? "- Metcons for days listed in COMPOSED METCONS are PRE-COMPOSED: emit each EXACTLY — same movements, same scheme, same format, same duration. Your job on those is exact loads from the athlete's 1RMs, calories/distances from their pacing, and the typed per-movement fields. NEVER redesign, swap, add, or drop a composed movement. If a metcon day is NOT in the list (its piece was removed), compose that day's metcon YOURSELF from the skeleton's metcon_focus and the athlete's data — distinct from the composed pieces, expected time inside the focus window."
       : "- The metcon's EXPECTED completion time must land inside the skeleton's stated metcon_focus window; a time cap may sit above it as a ceiling, never below.",
     priorWeeks.length > 0
       ? `- PROGRESS from the prior weeks below per the month_plan's arc (add load/volume, advance schemes) — do NOT copy them verbatim. ` +
@@ -561,6 +567,36 @@ export function applyProgrammaticFixes(
   return { patched: totalPatched, log };
 }
 
+/** One block as a single readable line, for the rewrite log: its header and
+ *  each movement with its quantity. */
+export function blockLine(b: { block_type?: string; block_scheme?: string | null; movements?: Array<Record<string, unknown>> } | null | undefined): string {
+  if (!b) return "(none)";
+  const mv = (b.movements ?? []).map((m) => {
+    const q: string[] = [];
+    if (m.sets) q.push(`${m.sets}x`);
+    if (Array.isArray(m.rep_scheme) && m.rep_scheme.length) q.push(`[${(m.rep_scheme as number[]).join(",")}]`);
+    else if (m.reps) q.push(String(m.reps));
+    if (m.calories) q.push(`${m.calories} cal`);
+    if (m.distance) q.push(`${m.distance}${m.distance_unit ?? ""}`);
+    if (m.time_seconds) q.push(`${m.time_seconds}s`);
+    if (m.weight) q.push(`@${m.weight}${m.weight_unit ?? ""}`);
+    return `${m.movement}${q.length ? " " + q.join(" ") : ""}`;
+  });
+  return `${b.block_scheme ?? ""}${b.block_scheme ? ": " : ""}${mv.join("; ")}`.slice(0, 600);
+}
+
+/** What one block rewrite changed, for the log (2026-11-26: rewrites used to
+ *  leave no record). */
+export interface BlockRewrite {
+  week: number;
+  day: number;
+  blockIdx: number;
+  block_type: string;
+  reasons: string[];
+  before: string;
+  after: string;
+}
+
 /** Run one round of surgical block rewrites for the supplied block-local
  *  failures. Each unique block gets ONE LLM call. Splices results back in place. */
 export async function applySurgicalFixes(
@@ -574,9 +610,10 @@ export async function applySurgicalFixes(
    *  (2026-11-26): the rewrite used to work from the planner's one line and
    *  could return a different workout from the one the composer designed. */
   composedMetcons: ComposedMetcon[] = [],
-): Promise<{ rewritten: number; failed: number; locations: BlockLocation[] }> {
+): Promise<{ rewritten: number; failed: number; locations: BlockLocation[]; rewrites: BlockRewrite[] }> {
   const groups = groupBlockLocalFailures(blockLocalFailures);
-  if (groups.length === 0) return { rewritten: 0, failed: 0, locations: [] };
+  const rewrites: BlockRewrite[] = [];
+  if (groups.length === 0) return { rewritten: 0, failed: 0, locations: [], rewrites };
 
   let rewritten = 0;
   let failed = 0;
@@ -586,6 +623,7 @@ export async function applySurgicalFixes(
     const day = week?.days?.find((d) => d.day_num === g.day);
     const block = day?.blocks?.[g.blockIdx];
     if (!block) { failed++; continue; }
+    const before = blockLine(block as unknown as Parameters<typeof blockLine>[0]);
 
     const composed = block.block_type === "metcon"
       ? composedMetcons.find((m) => m.week_num === g.week && m.day_num === g.day) ?? null
@@ -608,12 +646,16 @@ export async function applySurgicalFixes(
     if (pack.recovery.spliceBlock(output, g.week, g.day, g.blockIdx, corrected)) {
       rewritten++;
       locations.push({ week: g.week, day: g.day, blockIdx: g.blockIdx });
+      rewrites.push({
+        week: g.week, day: g.day, blockIdx: g.blockIdx, block_type: String(corrected.block_type ?? block.block_type ?? ""),
+        reasons: g.violations, before, after: blockLine(corrected as unknown as Parameters<typeof blockLine>[0]),
+      });
       console.log(`[engine] surgical rewrote w${g.week}d${g.day}b${g.blockIdx} (${g.violations.length} violation${g.violations.length === 1 ? "" : "s"})`);
     } else {
       failed++;
     }
   }
-  return { rewritten, failed, locations };
+  return { rewritten, failed, locations, rewrites };
 }
 
 // ============================================================

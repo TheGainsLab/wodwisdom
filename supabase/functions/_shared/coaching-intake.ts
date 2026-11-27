@@ -75,7 +75,7 @@ export const COACHING_INTAKE_SYSTEM_PROMPT =
   "- self_assessment: THEIR OPINION of their strengths/weaknesses. weak_time_domain ∈ short|medium|long and weak_bucket ∈ strength|gymnastics|conditioning ONLY if they clearly indicate one; else null.\n" +
   "- history.training_age: how long they've trained consistently, in their words (e.g. '3 years', 'on and off since 2015'). Keep the other history fields as short verbatim-ish summaries.\n" +
   "- goals.competes: true/false ONLY if clear; else null. goals.events: named events/dates they're aiming for.\n" +
-  "- constraints.injuries: each distinct injury/limitation as its own string, in their words (e.g. 'left shoulder pain on overhead'). schedule_equipment_notes: any schedule/equipment/life limits.\n" +
+  "- constraints.injuries: each distinct injury/limitation as its own string, in their words. schedule_equipment_notes: any schedule/equipment/life limits.\n" +
   "- freeform_notes: anything meaningful that doesn't fit the other fields (from the 'anything else' answer or asides).\n" +
   "- Preserve the athlete's voice — short, faithful phrasings, not paraphrases that change meaning.";
 

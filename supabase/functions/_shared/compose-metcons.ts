@@ -15,12 +15,10 @@ import { MODELS } from "./model-profiles.ts";
 import { callMetconComposer, type ComposedMetcon, type MetconComposerInputs, type MetconSlot } from "./metcon-composer.ts";
 import {
   auditMetconVariety,
-  dropIllegalComposedPieces,
   formatMetconVarietyViolationsForRetry,
   repairComposerEmission,
   stripStructuralRestRows,
 } from "./metcon-variety-audits.ts";
-import { trimComposedMovementAnnotations } from "./movement-name-repair.ts";
 
 export type AuditOpts = Omit<Parameters<typeof auditMetconVariety>[1], "slots">;
 
@@ -46,9 +44,10 @@ export async function composeMetconsForSlots(opts: {
   priorSlots?: MetconSlot[];
   priorPieces?: ComposedMetcon[];
   auditOpts: AuditOpts;
-  vocabulary: string[];
-  doNotProgram: string[];
-  equipment: Record<string, boolean>;
+  /** No longer read (2026-11-26); accepted so callers need not change. */
+  vocabulary?: string[];
+  doNotProgram?: string[];
+  equipment?: Record<string, boolean>;
   logPrefix?: string;
 }): Promise<ComposeResult> {
   const tag = opts.logPrefix ?? "[compose-metcons]";
@@ -69,11 +68,9 @@ export async function composeMetconsForSlots(opts: {
     if (repairs.length) console.warn(`${tag} composer emission repaired: ${repairs.join(" | ")}`);
     const strippedRest = stripStructuralRestRows(output);
     if (strippedRest > 0) console.log(`${tag} stripped ${strippedRest} structural Rest row(s)`);
-    const nameRepairs = trimComposedMovementAnnotations(output.metcons, opts.vocabulary);
-    if (nameRepairs.length) console.warn(`${tag} movement names repaired: ${nameRepairs.join(" | ")}`);
     // The month as the audit sees it: what was written before + what was just composed.
     output.metcons = [...prior, ...onlyNew(output.metcons)];
-    return { output, repairs: [...repairs, ...nameRepairs] };
+    return { output, repairs };
   };
 
   let { output, repairs } = await composeRepaired();
@@ -89,14 +86,10 @@ export async function composeMetconsForSlots(opts: {
     repairs = [...repairs, ...retry.repairs];
     audit = auditMetconVariety(output, auditOpts);
     if (!audit.passed) {
-      // Founder ruling 2026-09-01: nothing content-shaped fails a job. A piece
-      // still illegal after the retry is dropped; the fill rebuilds its slot.
-      const dropped = dropIllegalComposedPieces(output, { vocabulary: opts.vocabulary, doNotProgram: opts.doNotProgram, equipment: opts.equipment });
-      if (dropped.length) {
-        console.warn(`${tag} illegal composed pieces dropped (fill will rebuild their slots): ${dropped.join(" | ")}`);
-        repairs = [...repairs, ...dropped];
-        audit = auditMetconVariety(output, auditOpts);
-      }
+      // Nothing content-shaped fails a job, and no composed piece is deleted
+      // (2026-11-26): pieces used to be dropped here when a movement's name
+      // was on the avoid list, off the movement list, or contained a machine
+      // word the athlete had unticked. What is left after the retry ships.
       if (!audit.passed) console.warn(`${tag} metcon variety violations persist (accepting): ${audit.violations.join(" | ")}`);
     }
   }

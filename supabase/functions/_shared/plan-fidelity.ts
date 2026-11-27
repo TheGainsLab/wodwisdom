@@ -23,11 +23,7 @@
  * decided; no code compares the names.
  *
  * WHERE IT RUNS: with the hard audits, in the benchmark_audit and surgical
- * stages of generate-program-v3 — BEFORE the fit gate and the restriction
- * gate. Those gates remove on purpose (the fit gate may drop the accessory
- * block for a session under 45 minutes). This check never sees their output,
- * so it can neither flag nor undo a deliberate removal. Do not call it after
- * the gates.
+ * stages of generate-program-v3. Nothing changes the week after those stages.
  */
 
 import type { AuditResult } from "./audits.ts";

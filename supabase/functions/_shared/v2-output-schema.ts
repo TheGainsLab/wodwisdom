@@ -288,7 +288,7 @@ function buildMovementSchema(units: "lbs" | "kg") {
   return {
     type: "object",
     properties: {
-      movement: { type: "string", description: "Display name from the vocabulary list provided in the user message." },
+      movement: { type: "string", description: "The movement's name only, nothing appended. Use the spelling from the movement list when the movement is on it; the list is a guide, never a limit." },
       sets: { type: "integer", minimum: 1, maximum: 30, description: "Strength/accessory: the sets count. Calorie/distance movement in a multi-round metcon: the ROUNDS count (per-round scalar × sets = total work)." },
       reps: { type: "integer", minimum: 1, maximum: 500, description: "DO NOT compute manually. Code derives this from sum(rep_scheme) at save time." },
       rep_scheme: {
@@ -493,7 +493,7 @@ export function buildEmitBlockTool(units: "lbs" | "kg", sessionLengthMinutes: nu
   return {
     name: "emit_block",
     description:
-      "Emit ONE corrected block to replace a block that failed an audit. Use the same schema as blocks in the writer's full program output — block_type from the canonical enum, optional block_label / block_scheme / time_cap_seconds / block_notes, and movements[] with display_name strings from the vocabulary.",
+      "Emit ONE corrected block to replace a block that failed an audit. Use the same schema as blocks in the writer's full program output — block_type from the canonical enum, optional block_label / block_scheme / time_cap_seconds / block_notes, and movements[] with movement names (use the spelling from the movement list when a movement is on it; the list is a guide, never a limit).",
     input_schema: buildBlockSchema(units, sessionLengthMinutes),
   };
 }
@@ -509,7 +509,7 @@ export function buildEmitWeekTool(daysPerWeek: number, units: "lbs" | "kg", sess
   return {
     name: "emit_week",
     description:
-      "Emit ONE week of the structured program: week_num plus days[] (one entry per training day, day_num 1..N), each day with blocks[] from the canonical block_type enum and movements[] using display_name strings from the vocabulary. Fill ONLY the requested week, honoring that week's skeleton structure.",
+      "Emit ONE week of the structured program: week_num plus days[] (one entry per training day, day_num 1..N), each day with blocks[] from the canonical block_type enum and movements[] using movement names (use the spelling from the movement list when a movement is on it; the list is a guide, never a limit). Fill ONLY the requested week, honoring that week's skeleton structure.",
     input_schema: buildWeekSchema(daysPerWeek, units, sessionLengthMinutes),
   };
 }
@@ -518,7 +518,7 @@ export function buildEmitProgramTool(daysPerWeek: number, units: "lbs" | "kg", s
   return {
     name: "emit_program",
     description:
-      "Emit the structured 4-week training program for this athlete. Begin with the month_plan outline (4-week arc, strength progression, deload placement). Then weeks[] with one entry per week (week_num 1..4), each containing days[] (one entry per training day, day_num 1..N). Each day has blocks[] using the canonical block_type enum. Each block has movements[] using display_name strings from the vocabulary provided in the user message.",
+      "Emit the structured 4-week training program for this athlete. Begin with the month_plan outline (4-week arc, strength progression, deload placement). Then weeks[] with one entry per week (week_num 1..4), each containing days[] (one entry per training day, day_num 1..N). Each day has blocks[] using the canonical block_type enum. Each block has movements[] using movement names (use the spelling from the movement list when a movement is on it; the list is a guide, never a limit).",
     input_schema: {
       type: "object",
       properties: {

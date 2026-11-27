@@ -184,6 +184,8 @@ Deno.test("the re-plan question no longer lists the day count as structure, and 
   const structure = REPLAN_SYSTEM.slice(0, REPLAN_SYSTEM.indexOf("Answer 'fill'"));
   assertEquals(/how many days|days a week|drop to \d days|\d days from now on/i.test(structure), false);
   assertEquals(REPLAN_SYSTEM.includes("fewer or more days a week"), true);
-  assertEquals(/fewer or more days a week \(e\.g\.[^)]*\) is 'fill'/.test(REPLAN_SYSTEM), true);
+  assertEquals(REPLAN_SYSTEM.includes("fewer or more days a week is 'fill'"), true);
+  // No example notes in the question (founder, 2026-11-26).
+  assertEquals(/e\.g\.|hotel|travel/i.test(REPLAN_SYSTEM), false);
   assertEquals(REPLAN_SYSTEM.includes("set in the athlete's profile, not by a note"), true);
 });

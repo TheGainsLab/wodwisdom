@@ -242,9 +242,9 @@ function hasVolumeSpecifier(m: MovementPrescription): boolean {
     scheme(m.rep_scheme) || scheme(m.cal_scheme) || scheme(m.distance_scheme);
 }
 
-/** Validate a proposed block against the athlete's hard constraints. Returns
- *  problem strings (empty = legal). Safety is one of the three forever-hard
- *  classes: a banned movement NEVER reaches the athlete, even by request.
+/** Validate a proposed block's FORMAT. Returns problem strings (empty = fine):
+ *  a valid scheme format, at least one movement, every movement named and
+ *  given work. It judges nothing about which movements were chosen.
  *
  *  Movement NAMING is free — no vocabulary gate. The generator dropped hard
  *  vocabulary enforcement in 2026-05 (it banned the legitimate accessory
@@ -255,7 +255,7 @@ function hasVolumeSpecifier(m: MovementPrescription): boolean {
  *  free-emits, and the power calculator is confident-or-skip. */
 export function validateBlockProposal(
   proposal: BlockPrescription,
-  opts: { doNotProgram: string[] },
+  _opts?: { doNotProgram?: string[] },
 ): string[] {
   const problems: string[] = [];
   problems.push(...blockSchemeFormatProblems(proposal));
@@ -264,15 +264,13 @@ export function validateBlockProposal(
     problems.push("The proposed block has no movements.");
     return problems;
   }
-  const banned = new Set(opts.doNotProgram.map((s) => s.toLowerCase().trim()));
+  // The avoid-list name check that stood here was removed 2026-11-26: it
+  // compared exact names. The coach is told the athlete's restrictions.
   for (const m of movements) {
     const name = (m.movement ?? "").trim();
     if (!name) {
       problems.push("A movement is missing its name.");
       continue;
-    }
-    if (banned.has(name.toLowerCase())) {
-      problems.push(`"${name}" is on this athlete's do-not-program list — substitute a safe alternative that preserves the stimulus.`);
     }
     if (!hasVolumeSpecifier(m)) {
       problems.push(`"${name}" has no work specified — populate at least one of sets/reps/rep_scheme/calories/weight/time_seconds/distance, or mark it max_effort.`);
@@ -321,12 +319,21 @@ function reconcileScheme(
   return { total: cleaned.reduce((a, b) => a + b, 0), scheme: cleaned };
 }
 
+/** The purpose line an applied edit leaves on the block: the coach's reason
+ *  for the change, stored with the proposal (founder, 2026-11-26: "edit
+ *  should clear the old line and replace with the reason for the change").
+ *  null when the proposal carries no reason — the old line is still cleared. */
+export function purposeAfterEdit(proposal: BlockPrescription): string | null {
+  const why = ((proposal as { stimulus_note?: unknown }).stimulus_note);
+  return typeof why === "string" && why.trim() !== "" ? why.trim().slice(0, 500) : null;
+}
+
 export async function applyBlockProposal(
   supa: SupabaseClient,
   blockId: string,
   proposal: BlockPrescription,
 ): Promise<void> {
-  const { error: bErr } = await supa.from("program_blocks_v2").update({
+  const blockUpdate: Record<string, unknown> = {
     block_type: proposal.block_type,
     block_label: proposal.block_label ?? null,
     block_scheme: composeBlockScheme(proposal.scheme_format, proposal.movements ?? [], proposal.time_cap_seconds) ?? proposal.block_scheme ?? null,
@@ -337,7 +344,16 @@ export async function applyBlockProposal(
     // Truthfulness: the old prediction describes a workout that no longer
     // exists. Null immediately; refreshMetconBenchmark refills best-effort.
     expected_benchmark: null,
-  }).eq("id", blockId);
+    // The old purpose line described the old workout: replaced by the coach's
+    // reason for the change (it used to stay on the edited block).
+    stimulus_note: purposeAfterEdit(proposal),
+  };
+  let { error: bErr } = await supa.from("program_blocks_v2").update(blockUpdate).eq("id", blockId);
+  // Deploy-order safety: before the stimulus_note column exists, save without it.
+  if (bErr && /stimulus_note/.test(bErr.message ?? "")) {
+    const { stimulus_note: _drop, ...rest } = blockUpdate;
+    ({ error: bErr } = await supa.from("program_blocks_v2").update(rest).eq("id", blockId));
+  }
   if (bErr) throw new Error(`block update failed: ${bErr.message}`);
 
   const { error: dErr } = await supa.from("program_movements_v2").delete().eq("block_id", blockId);

@@ -280,15 +280,15 @@ export interface CoachStateContent {
   loading_deemphasis?: boolean;
 
   /** v1.16 — skill axes deliberately kept OUT of conditioning under fatigue
-   *  this cycle (e.g. gymnastics_pressing during a shoulder rehab). The
+   *  this cycle. The
    *  under-fatigue expression requirement skips these axes; the letter's prose
    *  explains why. Empty/absent = no exclusions. */
   fatigue_skill_exclusions?: FocusArea[];
 
   /** v1.17 (Part D) — typed authorization for DEDICATED cardio blocks (plain
    *  monostructural aerobic work as its own block). Set ONLY when the athlete's
-   *  goal is explicitly modality-specific (a named race, "run twice a week",
-   *  "improve my 5k row") — never from generic engine/conditioning language
+   *  goal is explicitly modality-specific (a named race or event, a stated
+   *  frequency for one modality, a target on one machine) — never from generic engine/conditioning language
    *  (that shapes metcon time domains instead). Absent = zero cardio blocks.
    *  source_priority_rank links the dose to the plan: rank 1 may approach the
    *  ceilings (3/week); lower ranks earn 1–2 short blocks. */
@@ -507,19 +507,19 @@ export const EMIT_COACH_STATE_TOOL = {
       loading_deemphasis: {
         type: "boolean",
         description:
-          "TRUE only when you are DELIBERATELY de-emphasizing loaded work under fatigue this cycle — an injury, an explicit coaching reason, or the athlete's movements rating none. When true, metcon_guidance must contain one explicit sentence stating the de-emphasis and its reason. A conditioning/engine/aerobic GOAL is NOT de-emphasis — it shifts time domains and dose, never modality. Omit (or false) in every other case: downstream assumes normal barbell and skill presence in conditioning.",
+          "TRUE only when you are DELIBERATELY de-emphasizing loaded work under fatigue this cycle — an injury the athlete stated, or an explicit coaching reason. When true, metcon_guidance must contain one explicit sentence stating the de-emphasis and its reason. A conditioning/engine/aerobic GOAL is NOT de-emphasis — it shifts time domains and dose, never modality. Omit (or false) in every other case: downstream assumes normal barbell and skill presence in conditioning.",
       },
       fatigue_skill_exclusions: {
         type: "array",
         maxItems: 4,
         description:
-          "Skill axes to keep OUT of conditioning under fatigue this cycle (e.g. gymnastics_pressing during shoulder rehab). Only for deliberate, stated reasons — never because the athlete is merely developing the skill. Omit when there are none.",
+          "Skill axes to keep OUT of conditioning under fatigue this cycle Only for deliberate, stated reasons (an injury the athlete stated, or a coaching instruction) — never because the athlete is merely developing the skill. Omit when there are none.",
         items: { type: "string", enum: [...FOCUS_AREAS] },
       },
       dedicated_cardio: {
         type: "object",
         description:
-          "Authorization for DEDICATED cardio blocks (standalone monostructural aerobic work). Emit ONLY when the athlete's goal is EXPLICITLY modality-specific — a named race (HYROX, a 10k), a stated frequency ('run twice a week'), or a machine-specific target ('improve my 5k row'). Generic engine/conditioning/aerobic goal language NEVER qualifies — that shapes metcon time domains, not program structure. Omit in every other case: without this field the program contains zero cardio blocks. source_priority_rank = the rank of the priority this serves; dose scales with it (rank 1 may approach 3 blocks/week; lower ranks earn 1-2 short blocks). reason cites the athlete's own goal words.",
+          "Authorization for DEDICATED cardio blocks (standalone monostructural aerobic work). Emit ONLY when the athlete's goal is EXPLICITLY modality-specific — a named race or event, a stated frequency for one modality, or a target on one machine or modality. Generic engine/conditioning/aerobic goal language NEVER qualifies — that shapes metcon time domains, not program structure. Omit in every other case: without this field the program contains zero cardio blocks. source_priority_rank = the rank of the priority this serves; dose scales with it (rank 1 may approach 3 blocks/week; lower ranks earn 1-2 short blocks). reason cites the athlete's own goal words.",
         properties: {
           modality: { type: "string", enum: ["run", "row", "bike", "ski", "swim", "mixed"] },
           source_priority_rank: { type: "integer", minimum: 1, maximum: 5 },

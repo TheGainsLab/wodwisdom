@@ -25,12 +25,11 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
-import { buildWriterPayload, type WriterPayload } from "../_shared/build-writer-payload.ts";
+import { buildWriterPayload, daysPerWeekLogLine, type WriterPayload } from "../_shared/build-writer-payload.ts";
 import { generateAndPersistCoachState } from "../_shared/generate-coach-state.ts";
 import { buildCoachStateDocumentBlock } from "../_shared/coach-state.ts";
 import { deriveMetconSlots, type MetconComposerInputs } from "../_shared/metcon-composer.ts";
 import { isBarbellMetconMovement } from "../_shared/metcon-variety-audits.ts";
-import { trimWriterMovementAnnotations } from "../_shared/movement-name-repair.ts";
 import { buildStratifiedMetconExamples } from "../_shared/metcon-examples.ts";
 import { composeMetconsForSlots } from "../_shared/compose-metcons.ts";
 import {
@@ -66,8 +65,6 @@ import {
   classifyFailuresByKind,
 } from "../_shared/audit-runner.ts";
 import { stripInternalMarkers, enforceNoLabelOnCoachedBlocks } from "../_shared/programmatic-fixes.ts";
-import { athleteWordsElsewhere, runRestrictionGate } from "../_shared/restriction-gate.ts";
-import { fitProfileFromPayload, runFitGate } from "../_shared/fit-gate.ts";
 import { saveProgramV3 } from "../_shared/save-program-v3.ts";
 import { refreshAvoidListForBuild } from "../_shared/injury-refresh.ts";
 import { type BlockLocation, missingBenchmarkLines } from "../_shared/compute-block-benchmark.ts";
@@ -186,11 +183,7 @@ const PACK = getDomainPack("crossfit@3");
  * A missing block type is logged as a residual. (The main-lift name check was
  * removed 2026-11-26: see plan-fidelity.ts.)
  *
- * This is called ONLY from the benchmark_audit and surgical stages, which run
- * BEFORE safety_review. The fit gate and the restriction gate there remove on
- * purpose (an accessory block for a session under 45 minutes, a movement
- * dropped or swapped); nothing audits their output, so this check cannot flag
- * or undo what they did. Keep it that way: never call this after the gates.
+ * This is called ONLY from the benchmark_audit and surgical stages.
  */
 /** The most repair passes a job may take before it ships with what remains. */
 export const MAX_SURGICAL_PASSES = 6;
@@ -232,7 +225,7 @@ async function stagePayloadBuilding(
   // confirmation guard below is the actual gate.
   // Three tries (2026-11-24: it was one, and a single failed call left the
   // build on the old list). Still non-fatal: after three failures the old
-  // list is kept and the weekly restriction check reads the note itself.
+  // list is kept; the writer is also given the athlete's own words.
   await refreshAvoidListForBuild(userId, "generate-program-v3.refresh", { url: SUPABASE_URL, serviceKey: SUPABASE_SERVICE_KEY });
 
   // Guard (handoff 1.3): block generation past a non-empty-but-unconfirmed injury
@@ -256,7 +249,20 @@ async function stagePayloadBuilding(
   // WEEKLY MODE opt-in (2026-11-13): week 1 filled, weeks 2-4 as outline,
   // the weekly cron fills the rest. Per-athlete while it rolls out.
   const { data: weeklyRow } = await supa
-    .from("athlete_profiles").select("programming_weekly").eq("user_id", userId).maybeSingle();
+    .from("athlete_profiles").select("programming_weekly, days_per_week").eq("user_id", userId).maybeSingle();
+  // Days per week: the default of 5 stays, but a build that used it, or a
+  // number outside 2 to 6, is recorded (founder, 2026-11-26).
+  const daysNote = daysPerWeekLogLine((weeklyRow as { days_per_week?: number | null } | null)?.days_per_week ?? null);
+  if (daysNote) {
+    console.warn(`[generate-program-v3] ${daysNote}`);
+    await logGenerationAudit(supa, {
+      user_id: userId,
+      program_id: rs.continuation.programId ?? null,
+      month_number: rs.continuation.monthNumber,
+      stage: "payload_default",
+      warnings: [daysNote],
+    }).catch((e) => console.warn("[generate-program-v3] payload_default log failed (non-fatal):", e));
+  }
   const weekly = rs.weeklyFill != null || weeklyRow?.programming_weekly === true;
   if (weekly) console.log(`[generate-program-v3] weekly mode for ${userId}`);
 
@@ -473,6 +479,19 @@ async function stageSkeleton(
         const notesNeededIt = notes.length > 0 &&
           (drift.length === 0 || (await classifyNotesForReplan(notes)) === "replan");
         replan = { failed: true, notesNeededIt };
+        // Recorded (founder, 2026-11-26): the member gets this week from the
+        // month's old plan, not the re-plan their profile or notes asked for.
+        await logGenerationAudit(supa, {
+          user_id: job.user_id,
+          program_id: rs.continuation.programId ?? null,
+          month_number: rs.continuation.monthNumber,
+          stage: "replan_fallback",
+          violations: [
+            `week ${weekNum}: the re-plan failed, so this week was written from the month's old plan. ` +
+            `Asked for by: ${[drift.length ? `profile (${drift.join("; ")})` : "", notes.length ? `notes (${notes.join(" | ").slice(0, 300)})` : ""].filter(Boolean).join(" + ")}. ` +
+            `Error: ${(e instanceof Error ? e.message : String(e)).slice(0, 300)}`,
+          ],
+        }).catch((err) => console.warn("[generate-program-v3] replan_fallback log failed (non-fatal):", err));
       }
     }
     // The prior weeks the fill progresses from are the program AS IT STANDS
@@ -620,8 +639,8 @@ async function stageSkeleton(
  * metcon_guidance, the athlete's full legal vocabulary, and stratified example
  * workouts. The set-level variety audit fences it (one retry); persistent
  * violations are accepted-with-log (programs must ship; the audit trail is the
- * fix signal), EXCEPT legality violations (bans/vocabulary/equipment) which are
- * hard failures — a banned movement must never reach the fill.
+ * fix signal). No composed piece is deleted, and no movement name is checked
+ * against the avoid list, the movement list or equipment (2026-11-26).
  */
 async function stageMetcons(
   supa: SupabaseClient,
@@ -720,7 +739,9 @@ async function stageMetcons(
     warnings: audit.warnings,
     retried,
     meta: {
-      ...(retried ? { first_pass_violations: firstPassViolations } : {}),
+      // The retry ships whether or not it is better: the two counts show
+      // which (founder, 2026-11-26).
+      ...(retried ? { first_pass_violations: firstPassViolations, first_pass_count: firstPassViolations.length, after_retry_count: audit.violations.length } : {}),
       ...(repairs.length ? { repairs } : {}),
     },
   });
@@ -754,29 +775,9 @@ async function stageFillWeek(
   // Render every header from scheme_format + rows BEFORE audits/benchmarks —
   // downstream stages read block_scheme text and must see the final strings.
   renderWeekSchemesInPlace(wk);
-  // Annotation-in-name repair, fill side (all block types): annotated names
-  // evade the exact-match do_not_program ban ("Deadlift (light)" vs banned
-  // "Deadlift") and drop out of benchmark/tracking matching. Trim to the
-  // legal name, keep the label in scaling_note, log. Runs BEFORE the audits
-  // so the ban check sees canonical names.
-  try {
-    const nameRepairs = trimWriterMovementAnnotations(
-      { weeks: [wk] } as Parameters<typeof trimWriterMovementAnnotations>[0],
-      payload.vocabulary,
-    );
-    if (nameRepairs.length) {
-      for (const r of nameRepairs) console.warn(`[generate-program-v3] fill movement name repaired: ${r}`);
-      await logGenerationAudit(supa, {
-        user_id: job.user_id,
-        program_id: rs.continuation.programId ?? null,
-        month_number: rs.continuation.monthNumber,
-        stage: "soft_audit",
-        warnings: nameRepairs.map((r) => `movement_name_trim: ${r}`),
-      });
-    }
-  } catch (e) {
-    console.warn("[generate-program-v3] fill name repair failed (non-fatal):", e);
-  }
+  // Movement names are left exactly as the writer wrote them (2026-11-26):
+  // the repair that trimmed a name back to a movement-list prefix is gone.
+  // The writer is told never to append notes to a name.
   // Persist each composed piece's stimulus into its metcon block's notes
   // (deterministic — never trust transcription for it). The note is the
   // workout's PURPOSE; it reaches storage, the athlete's UI, and the AI Coach
@@ -801,9 +802,21 @@ async function stageFillWeek(
   return { next, resumeState: { ...rs, weeks }, displayStage: next };
 }
 
+/** Every weight the 1RM clamp lowered, recorded (founder, 2026-11-26). */
+async function logLoadClamp(supa: SupabaseClient, job: ProgramJobRow, rs: ResumeState, lines: string[]): Promise<void> {
+  if (lines.length === 0) return;
+  await logGenerationAudit(supa, {
+    user_id: job.user_id,
+    program_id: rs.continuation.programId ?? rs.programId ?? null,
+    month_number: rs.continuation.monthNumber,
+    stage: "load_clamp",
+    violations: lines,
+  }).catch((e) => console.warn("[generate-program-v3] load_clamp log failed (non-fatal):", e));
+}
+
 async function stageBenchmarkAudit(
-  _supa: SupabaseClient,
-  _job: ProgramJobRow,
+  supa: SupabaseClient,
+  job: ProgramJobRow,
   rs: ResumeState,
 ): Promise<StageOutcome> {
   const payload = rs.payload!;
@@ -827,6 +840,7 @@ async function stageBenchmarkAudit(
     if (patch.patched > 0) {
       console.log(`[generate-program-v3] programmatic patches applied: ${patch.patched}`);
       for (const line of patch.log) console.log(`  - ${line}`);
+      await logLoadClamp(supa, job, rs, patch.log);
       pendingFailures = await recomputeBenchmarks(output, gender, pendingFailures, PACK, []);
       auditResult = auditOutput(output, payload, skeleton, PACK, rs.weekly ? 1 : 4);
       console.log(`[generate-program-v3] audits after patch: ${summarizeAuditRun(auditResult)}`);
@@ -855,8 +869,8 @@ async function stageBenchmarkAudit(
 }
 
 async function stageSurgical(
-  _supa: SupabaseClient,
-  _job: ProgramJobRow,
+  supa: SupabaseClient,
+  job: ProgramJobRow,
   rs: ResumeState,
 ): Promise<StageOutcome> {
   const payload = rs.payload!;
@@ -891,6 +905,19 @@ async function stageSurgical(
   // last clean state.
   const sg = await applySurgicalFixes(output, byKind["block-local"], payload, skeleton, PACK, rs.composedMetcons ?? []);
   console.log(`[generate-program-v3] surgical pass ${pass}: rewritten=${sg.rewritten} failed=${sg.failed}`);
+  // Every rewrite is recorded: what the block was, what it became, and why
+  // (founder, 2026-11-26 — rewrites used to leave no record). Changes nothing.
+  if (sg.rewrites.length > 0) {
+    await logGenerationAudit(supa, {
+      user_id: job.user_id,
+      program_id: rs.continuation.programId ?? rs.programId ?? null,
+      month_number: rs.continuation.monthNumber,
+      stage: "block_rewrite",
+      violations: sg.rewrites.map((r) =>
+        `W${r.week}D${r.day} block[${r.blockIdx}] (${r.block_type}) rewritten — why: ${r.reasons.join(" / ").slice(0, 400)} | before: ${r.before} | after: ${r.after}`),
+      meta: { pass },
+    }).catch((e) => console.warn("[generate-program-v3] block_rewrite log failed (non-fatal):", e));
+  }
   if (sg.rewritten === 0) {
     // LLM call(s) failed — stall, ship with residuals.
     console.log(`[generate-program-v3] surgical stalled at pass ${pass} (LLM call(s) failed); shipping residuals`);
@@ -908,6 +935,7 @@ async function stageSurgical(
     const patch2 = applyProgrammaticFixes(output, byKind["programmatic-fix"], payload, PACK);
     if (patch2.patched > 0) {
       for (const line of patch2.log) console.log(`  - ${line}`);
+      await logLoadClamp(supa, job, rs, patch2.log);
       pendingFailures = await recomputeBenchmarks(output, gender, pendingFailures, PACK, []);
       auditResult = auditOutput(output, payload, skeleton, PACK, rs.weekly ? 1 : 4);
       if (auditResult.passed) return { next: "safety_review", resumeState: toSafety(rs, output, []), displayStage: "safety_review" };
@@ -944,79 +972,22 @@ async function stageSurgical(
 }
 
 async function stageSafetyReview(
-  supa: SupabaseClient,
-  job: ProgramJobRow,
+  _supa: SupabaseClient,
+  _job: ProgramJobRow,
   rs: ResumeState,
 ): Promise<StageOutcome> {
-  // THE RESTRICTION GATE (2026-11-23) — no longer advisory, never skipped. The
-  // written output is read against everything the athlete has said about
-  // their body (injury box, signup answers, notes) and their avoid list; anything
-  // that goes against them is replaced, and whatever could not be replaced is
-  // taken out by rule. It always returns and the week always goes on to save:
-  // nothing is withheld and nobody is alerted. See _shared/restriction-gate.ts.
-  const payload = rs.payload!;
-  const output = rs.output!;
-  const injuries = payload.training_context.injuries_structured;
-
-  // THE FIT GATE first (2026-11-23): loads against the athlete's maxes and
-  // level, no number where there is no max, nothing needing equipment they
-  // have unticked, the session inside their time, skills at their level. It
-  // can only lower, shorten or swap. The restriction gate runs AFTER it and
-  // has the last word, so nothing the fit gate swaps in can go against an
-  // injury. See _shared/fit-gate.ts.
-  const fit = await runFitGate(output, fitProfileFromPayload(payload, rs.skeleton ?? null, injuries?.do_not_program ?? []));
-  if (fit.actions.length > 0) {
-    console.warn(`[generate-program-v3] fit gate made ${fit.actions.length} change(s):`);
-    for (const a of fit.actions) console.warn(`  - ${a}`);
-  }
-  await logGenerationAudit(supa, {
-    user_id: job.user_id,
-    program_id: rs.continuation?.programId ?? null,
-    month_number: rs.continuation?.monthNumber ?? null,
-    stage: "fit_gate",
-    violations: fit.actions,
-    warnings: fit.judgeUnavailable ? ["judge unavailable; arithmetic rules only (equipment, time and skill not enforced this week)"] : [],
-    retried: fit.reviews > 1,
-    meta: { reviews: fit.reviews },
-  }).catch((e) => console.warn("[generate-program-v3] fit_gate log failed (non-fatal):", e));
-
-  const gate = await runRestrictionGate(output, {
-    injuriesText: payload.training_context.injuries_constraints_text ?? null,
-    doNotProgram: injuries?.do_not_program ?? [],
-    otherWords: athleteWordsElsewhere(payload.athlete_model?.self_report, payload.training_context.coach_notes),
-    suggestedSubs: injuries?.suggested_subs ?? [],
-    vocabulary: payload.vocabulary ?? [],
-  });
-
-  if (gate.actions.length > 0 || fit.actions.length > 0) {
-    // Headers are rendered from the movement rows; re-render so a swapped or
-    // removed movement does not linger in a block's header.
-    for (const wk of output.weeks ?? []) renderWeekSchemesInPlace(wk);
-    console.warn(`[generate-program-v3] restriction gate changed ${gate.actions.length} movement(s):`);
-    for (const a of gate.actions) console.warn(`  - ${a}`);
-  }
-  if (gate.judgeUnavailable) console.warn("[generate-program-v3] restriction gate: judge unavailable; rule step applied");
-  await logGenerationAudit(supa, {
-    user_id: job.user_id,
-    program_id: rs.continuation?.programId ?? null,
-    month_number: rs.continuation?.monthNumber ?? null,
-    stage: "restriction_gate",
-    violations: gate.actions,
-    warnings: gate.judgeUnavailable ? ["judge unavailable; rule step only"] : [],
-    retried: gate.reviews > 1,
-    meta: { reviews: gate.reviews },
-  }).catch((e) => console.warn("[generate-program-v3] restriction_gate log failed (non-fatal):", e));
-
+  // NOTHING CHANGES THE WRITTEN WEEK HERE (founder, 2026-11-26). This stage
+  // held two AI checks built on 2026-11-23 — the restriction gate and the fit
+  // gate — that read the finished week and swapped, trimmed or removed
+  // movements. Both are removed (see _shared/athlete-file-text.ts for why).
+  // The week goes to the save exactly as the writer and the earlier stages
+  // left it. The stage itself stays so the job's stage order is unchanged.
   return {
     next: "saving",
     resumeState: {
       ...rs,
-      output,
-      safety: {
-        safe: true,
-        reasoning: gate.actions.length ? `Restriction gate changed ${gate.actions.length} movement(s).` : "Restriction gate: nothing to change.",
-        errored: gate.judgeUnavailable,
-      },
+      output: rs.output!,
+      safety: { safe: true, reasoning: "No post-write checks run.", errored: false },
     },
     displayStage: "saving",
   };

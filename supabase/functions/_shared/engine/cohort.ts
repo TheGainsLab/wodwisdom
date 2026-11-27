@@ -24,7 +24,7 @@ import type { AthleteInput, ScaledMovement, ScalingResult } from "./contract.ts"
  * the Engine core stays movement-agnostic. Basis matching is EXACT (the pack's
  * display-name → lift-key map): an unmapped movement gets no basis and no
  * resolved_weight, never a substring-guessed wrong lift that could overload a
- * member. do_not_program matching mirrors the v3 auditDoNotProgram rule exactly
+ * member. do_not_program matching here is whole-name equality
  * (canonical name, trim + lowercase, whole-string equality).
  */
 export function computeCohortScaling(
