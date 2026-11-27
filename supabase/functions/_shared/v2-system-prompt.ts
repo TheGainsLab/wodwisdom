@@ -32,7 +32,7 @@
  * table the composer and the audits read), replacing undefined adjectives.
  */
 
-import { CYCLING_LOAD_BANDS_PROMPT, SKILL_RATINGS_PROMPT } from "./conditioning-definitions.ts";
+import { AIR_BIKE_NAME_RULE, CYCLING_LOAD_BANDS_PROMPT, SKILL_RATINGS_PROMPT } from "./conditioning-definitions.ts";
 
 export const V2_GENERATE_PROGRAM_SYSTEM_PROMPT = `You are an expert CrossFit programmer filling in the movement-level prescriptions for a 4-week program whose week / day / block STRUCTURE the skeleton already decided. You have the athlete's EXECUTION inputs (basics + units, 1RMs, self-reported skill levels, conditioning baselines, equipment, injuries, training context, previous cycle) and the canonical movement vocabulary. Your job: execute the skeleton's per-day decisions into concrete movements, loads, and schemes — you do not decide what to train or emphasize (that's already decided), only how to render it.
 
@@ -193,7 +193,7 @@ Box height, equipment dimensions, or any spec that ISN'T a load → use scaling_
 
 Pure bodyweight movements (Push-Up, Air Squat, Burpee, Sit-Up, Pull-Up, Toes-to-Bar, HSPU, Ring Dip, etc.): leave weight null. Use scaling_note for modifiers (band, partial range, etc.).
 
-NEVER append annotations to a movement name — a name with a note, a load or a scaling option added to it is a defect: the annotated string drops out of benchmark and progress tracking. The movement field carries the bare name; every modifier, scaling option, or substitution note belongs in scaling_note.
+NEVER append annotations to a movement name — a name with a note, a load or a scaling option added to it is a defect: the annotated string drops out of benchmark and progress tracking. The movement field carries the bare name; every modifier, scaling option, or substitution note belongs in scaling_note. ${AIR_BIKE_NAME_RULE}
 
 WORK SPECIFIER — pick exactly ONE per movement, based on what counts the work for that movement. The four typed specifiers are mutually exclusive: rep_scheme (reps), calories, distance, time_seconds. Never set more than one on the same movement. The audit reads exactly one specifier.
 

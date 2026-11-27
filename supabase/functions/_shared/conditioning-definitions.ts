@@ -95,6 +95,12 @@ export const CYCLING_LOAD_CLASSES: Record<string, LoadClassDef> = {
   },
 };
 
+/** One name for every air bike in programmed work (founder, 2026-11-27:
+ *  "our users should always see Air Bike"). Told to the composer, the writer,
+ *  the rewriter and the chat coach's edit tool. */
+export const AIR_BIKE_NAME_RULE =
+  'An air bike is always written "Air Bike", whatever brand or model it is: never a brand name, and never "Bike" alone.';
+
 /** The medicine ball is one fixed weight per sex (founder, 2026-11-27). */
 export const MEDICINE_BALL_WEIGHTS = { men: "20 lb / 9 kg", women: "14 lb / 6 kg" } as const;
 

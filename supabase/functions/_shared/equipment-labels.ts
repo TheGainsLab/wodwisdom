@@ -11,7 +11,7 @@
 export const EQUIPMENT_LABELS: Record<string, string> = {
   // Cardio
   rower: "Rower",
-  assault_bike: "Assault/Echo Bike",
+  assault_bike: "Air Bike (Echo / Assault / other)",
   ski_erg: "Ski Erg",
   treadmill: "Treadmill",
   jump_rope: "Jump Rope",

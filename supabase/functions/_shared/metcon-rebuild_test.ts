@@ -360,3 +360,17 @@ Deno.test("the movement list migration removes Kipping Pull Up and leaves one bi
   assert(sql.includes("DELETE FROM public.movements WHERE canonical_name IN ('assault_bike', 'echo_bike');"));
   assert(sql.includes('["Bike", "Biking", "Assault Bike", "Echo Bike"]'));
 });
+
+Deno.test("every AI that writes a programmed movement is told an air bike is always written Air Bike", async () => {
+  const { AIR_BIKE_NAME_RULE } = await import("./conditioning-definitions.ts");
+  const { SURGICAL_SYSTEM_PROMPT } = await import("./surgical-block-fix.ts");
+  assert(AIR_BIKE_NAME_RULE.includes('always written "Air Bike"'));
+  for (const [who, text] of [
+    ["composer", METCON_COMPOSER_SYSTEM_PROMPT],
+    ["writer", V2_GENERATE_PROGRAM_SYSTEM_PROMPT],
+    ["rewriter", SURGICAL_SYSTEM_PROMPT],
+  ] as const) assert(text.includes(AIR_BIKE_NAME_RULE), `the ${who} is not told`);
+  assert(read("../chat/index.ts").includes("`- ${AIR_BIKE_NAME_RULE}\\n`"));
+  const { EQUIPMENT_LABELS } = await import("./equipment-labels.ts");
+  assertEquals(EQUIPMENT_LABELS.assault_bike, "Air Bike (Echo / Assault / other)");
+});

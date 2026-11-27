@@ -302,7 +302,7 @@ const EQUIPMENT_GROUPS = [
     title: 'Cardio',
     items: [
       { key: 'rower', label: 'Rower' },
-      { key: 'assault_bike', label: 'Assault/Echo Bike' },
+      { key: 'assault_bike', label: 'Air Bike (Echo / Assault / other)' },
       { key: 'ski_erg', label: 'Ski Erg' },
       { key: 'treadmill', label: 'Treadmill' },
       { key: 'jump_rope', label: 'Jump Rope' },
