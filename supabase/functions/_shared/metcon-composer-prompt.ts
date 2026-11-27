@@ -20,6 +20,7 @@
 
 import {
   CYCLING_LOAD_BANDS_PROMPT,
+  TIME_DOMAINS_LINE,
   SKILL_RATINGS_PROMPT,
 } from "./conditioning-definitions.ts";
 
@@ -32,7 +33,7 @@ TYPED DECISIONS OVER PROSE
 The user message carries TYPED COACHING DECISIONS (development/maintain axes, loading_deemphasis, fatigue_skill_exclusions). Typed fields GOVERN axis roles, loading, and modality; the prose guidance paragraph informs character and flavor only. Where they appear to conflict, the typed fields win.
 
 WHAT EACH SLOT GIVES YOU
-Each slot carries the programming plan's decisions — time domain (short: under 8 min · medium: 8–15 · long: 15+), intensity character (build week vs deload, pace feel), the adaptation focus (aerobic_capacity / anaerobic_capacity / mixed_modal_conditioning), and, when the athlete stated a session budget, allocated_minutes (the exact time this piece owns) — plus that day's other blocks (primary lift, skill focus, accessory focuses). HONOR ALL of them per slot. The focus names the ADAPTATION, never a movement menu: aerobic work is mixed movements at sustained repeatable pace, not a machine session — and never a modality restriction.
+Each slot carries the programming plan's decisions — time domain (${TIME_DOMAINS_LINE}), intensity character (build week vs deload, pace feel), the adaptation focus (aerobic_capacity / anaerobic_capacity / mixed_modal_conditioning), and, when the athlete stated a session budget, allocated_minutes (the exact time this piece owns) — plus that day's other blocks (primary lift, skill focus, accessory focuses). HONOR ALL of them per slot. The focus names the ADAPTATION, never a movement menu: aerobic work is mixed movements at sustained repeatable pace, not a machine session — and never a modality restriction.
 
 DURATION IS ARITHMETIC, NOT VIBE
 stated_duration_minutes is the piece's expected clock and must land inside the slot's time-domain bucket. When the slot carries allocated_minutes, the piece must genuinely occupy about that many minutes (within ~20%) — a 24-minute allocation is a deliberate design decision that means a ~24-minute piece (or intervals totaling it), never a stock 12-minute AMRAP. For interval/EMOM formats DO THE ARITHMETIC before choosing the format: total clock = work + rests, and it must equal your stated duration (2 × (1:00 on / 2:00 off) is a 6-minute piece — never park it in a 15-minute slot). A rotating-station EMOM's minute count MUST be a multiple of its station count — every station gets the same number of rounds. Pick the nearest multiple inside the allocation tolerance (3 stations in a ~14-minute slot → EMOM 12 or EMOM 15, NEVER EMOM 14 with a "rotate back" patch). Rest is STRUCTURE, not a movement: describe it in block_scheme ("4 rounds: 3:00 on / 1:30 off") and NEVER emit "Rest" as a movement row — movement rows are work only.

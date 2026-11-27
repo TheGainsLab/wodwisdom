@@ -20,17 +20,26 @@
  */
 
 // ============================================================
-// 1. Time domains — matches the existing audit buckets (metcon-variety-audits
-//    TIME_BUCKETS and the skeleton prompt). Kept at 8–15 deliberately: the
-//    2026-08-31 review considered 8–16 and rejected it (no functional gain,
-//    three files to touch).
+// 1. Time domains — THE definition (founder, 2026-11-27): short under 7
+//    minutes, medium 7 to 14, long 14 to 22 and never over 22. Every prompt
+//    and check in the generator reads these numbers from here.
 // ============================================================
 
 export const TIME_DOMAINS = {
-  short: { maxMinutes: 8, label: "short: under 8 min" },
-  medium: { minMinutes: 8, maxMinutes: 15, label: "medium: 8-15 min" },
-  long: { minMinutes: 15, label: "long: over 15 min (cap ~25)" },
+  short: { maxMinutes: 7, label: "short: under 7 min" },
+  medium: { minMinutes: 7, maxMinutes: 14, label: "medium: 7-14 min" },
+  long: { minMinutes: 14, maxMinutes: 22, label: "long: 14-22 min, never over 22" },
 } as const;
+
+/** The three definitions as one line, for prompts. */
+export const TIME_DOMAINS_LINE = `${TIME_DOMAINS.short.label} · ${TIME_DOMAINS.medium.label} · ${TIME_DOMAINS.long.label}`;
+
+/** Which domain a number of minutes falls in (a boundary belongs to the longer one). */
+export function timeDomainForMinutes(minutes: number): "short" | "medium" | "long" {
+  if (minutes < TIME_DOMAINS.short.maxMinutes) return "short";
+  if (minutes < TIME_DOMAINS.medium.maxMinutes) return "medium";
+  return "long";
+}
 
 // ============================================================
 // 2. Cycling load bands (% of the athlete's 1RM in the parent lift)

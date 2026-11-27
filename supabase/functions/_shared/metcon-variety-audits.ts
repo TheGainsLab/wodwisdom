@@ -22,6 +22,7 @@ import type {
 import {
   bandRange,
   loadClassForMovement,
+  TIME_DOMAINS,
 } from "./conditioning-definitions.ts";
 
 export interface MetconVarietyAuditResult {
@@ -200,10 +201,11 @@ export function movementSignature(m: ComposedMetcon): string {
 
 const at = (m: ComposedMetcon) => `W${m.week_num}D${m.day_num}`;
 
+// From the one definition (conditioning-definitions.ts TIME_DOMAINS).
 const TIME_BUCKETS: Record<string, (min: number) => boolean> = {
-  short: (min) => min <= 8,
-  medium: (min) => min >= 8 && min <= 15,
-  long: (min) => min >= 14,
+  short: (min) => min <= TIME_DOMAINS.short.maxMinutes,
+  medium: (min) => min >= TIME_DOMAINS.medium.minMinutes && min <= TIME_DOMAINS.medium.maxMinutes,
+  long: (min) => min >= TIME_DOMAINS.long.minMinutes && min <= TIME_DOMAINS.long.maxMinutes,
 };
 
 /**

@@ -212,3 +212,18 @@ Deno.test("the admin rebuild can rebuild any month of a program, month 1 include
   const next = read("generate-next-month/index.ts");
   assert(next.includes("...(appendToProgramId ? { program_id: appendToProgramId } : {}),") && next.includes("month_number: targetMonth,"));
 });
+
+Deno.test("time domains: short under 7, medium 7-14, long 14-22 and never over 22 — one definition, used everywhere", async () => {
+  const { TIME_DOMAINS, TIME_DOMAINS_LINE, timeDomainForMinutes } = await import("./conditioning-definitions.ts");
+  assertEquals([TIME_DOMAINS.short.maxMinutes, TIME_DOMAINS.medium.minMinutes, TIME_DOMAINS.medium.maxMinutes, TIME_DOMAINS.long.minMinutes, TIME_DOMAINS.long.maxMinutes], [7, 7, 14, 14, 22]);
+  assertEquals(TIME_DOMAINS_LINE, "short: under 7 min · medium: 7-14 min · long: 14-22 min, never over 22");
+  assertEquals([6, 7, 13, 14, 22].map(timeDomainForMinutes), ["short", "medium", "medium", "long", "long"]);
+  const { V3_SKELETON_SYSTEM_PROMPT } = await import("./v3-skeleton-prompt.ts");
+  const { METCON_COMPOSER_SYSTEM_PROMPT } = await import("./metcon-composer-prompt.ts");
+  const { SURGICAL_SYSTEM_PROMPT } = await import("./surgical-block-fix.ts");
+  for (const p of [V3_SKELETON_SYSTEM_PROMPT, METCON_COMPOSER_SYSTEM_PROMPT, SURGICAL_SYSTEM_PROMPT]) assert(p.includes(TIME_DOMAINS_LINE));
+  for (const f of ["_shared/v3-skeleton-prompt.ts", "_shared/metcon-composer-prompt.ts", "_shared/surgical-block-fix.ts"]) {
+    const src = read(f);
+    for (const old of ["under 8 min", "8–15)", "15+", "cap ~25", "under 9 min", "7-16 min"]) assert(!src.includes(old), `${old} in ${f}`);
+  }
+});
