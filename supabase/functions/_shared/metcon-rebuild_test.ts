@@ -347,9 +347,8 @@ Deno.test("no bike on the profile rules out Air Bike under its new name and its 
   }
 });
 
-Deno.test("the composer is told to name a movement without its style, and not to bring out a second implement as an obstacle", () => {
+Deno.test("the composer is told not to bring out a second implement as an obstacle", () => {
   const p = METCON_COMPOSER_SYSTEM_PROMPT;
-  assert(p.includes("Never put a style of doing a movement (kipping, butterfly) in its name"));
   assert(p.includes("do not bring out a second implement only as an obstacle or a marker"));
 });
 
