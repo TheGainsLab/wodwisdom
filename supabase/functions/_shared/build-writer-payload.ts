@@ -288,8 +288,16 @@ export interface WriterPayload {
    *  adherence + skip rate + per-skill volume. NULL for first-time athletes
    *  or anyone without a completed log against any prior program. */
   previous_cycle: PreviousCycleSummary | null;
-  /** display_name strings — the writer's allowed-movement set. */
+  /** display_name strings — the whole movement list. */
   vocabulary: string[];
+  /** The same list by training block (movements.blocks): which movements are
+   *  offered for a warm-up, skills, strength, accessory or metcon block. Each
+   *  AI is shown the part for the block it writes. A guide, never a check.
+   *  Null when the list has no block marks (or could not be read): every
+   *  reader then falls back to the whole list. NOT set by buildWriterPayload
+   *  (the payload also goes to the evaluation and the chat coach, which do not
+   *  need it): the program build adds it after the coach state is read. */
+  vocabulary_by_block?: MovementsByBlock | null;
   /** Latest COMPLETE profile evaluation narrative (profile_evaluations.analysis).
    *  The coach's synthesized fitness judgment. Read on EVERY generation (month 1
    *  and continuation) — the profile/eval can change between cycles. NULL when the
@@ -587,6 +595,61 @@ async function fetchLoggedCompetitionResults(
 
 // Retail path: soft-fails to [] on error (audit rule #7 then rejects any movement
 // string — a self-limiting degradation). The cohort cron passes { onError: "signal" }
+/** The blocks a movement can be marked for (movements.blocks). */
+export const MOVEMENT_BLOCKS = ["warm-up", "skills", "strength", "accessory", "metcon"] as const;
+export type MovementBlock = typeof MOVEMENT_BLOCKS[number];
+export type MovementsByBlock = Record<MovementBlock, string[]>;
+
+/** Pure: rows of the movement list grouped by the blocks each is marked for.
+ *  Null when no row carries a mark, so readers fall back to the whole list. */
+export function groupMovementsByBlock(
+  rows: Array<{ display_name?: unknown; blocks?: unknown }>,
+): MovementsByBlock | null {
+  const out = Object.fromEntries(MOVEMENT_BLOCKS.map((b) => [b, [] as string[]])) as MovementsByBlock;
+  let marked = 0;
+  for (const r of rows) {
+    const name = typeof r.display_name === "string" ? r.display_name.trim() : "";
+    if (!name || !Array.isArray(r.blocks)) continue;
+    for (const b of r.blocks) {
+      if ((MOVEMENT_BLOCKS as readonly string[]).includes(b as string) && !out[b as MovementBlock].includes(name)) {
+        out[b as MovementBlock].push(name);
+        marked++;
+      }
+    }
+  }
+  if (marked === 0) return null;
+  for (const b of MOVEMENT_BLOCKS) out[b].sort((x, y) => x.localeCompare(y));
+  return out;
+}
+
+/** The movement list by block. Null on any failure (including a database that
+ *  does not have the blocks column yet): the build goes on with the whole list. */
+export async function fetchMovementsByBlock(supa: SupabaseClient): Promise<MovementsByBlock | null> {
+  try {
+    const { data, error } = await supa.from("movements").select("display_name, blocks");
+    if (error) {
+      console.warn("[build-writer-payload] movement list by block not read (using the whole list):", error.message);
+      return null;
+    }
+    return groupMovementsByBlock((data ?? []) as Array<{ display_name?: unknown; blocks?: unknown }>);
+  } catch (e) {
+    console.warn("[build-writer-payload] movement list by block not read (using the whole list):", e instanceof Error ? e.message : String(e));
+    return null;
+  }
+}
+
+/** The movement names an AI writing `blocks` is shown: those blocks' part of
+ *  the list, or the whole list when there are no block marks. */
+export function movementListFor(
+  payload: { vocabulary: string[]; vocabulary_by_block?: MovementsByBlock | null },
+  blocks: MovementBlock[],
+): string[] {
+  const by = payload.vocabulary_by_block;
+  if (!by) return payload.vocabulary;
+  const names = [...new Set(blocks.flatMap((b) => by[b] ?? []))].sort((x, y) => x.localeCompare(y));
+  return names.length > 0 ? names : payload.vocabulary;
+}
+
 // so it can ABORT before a paid LLM run instead of generating against an empty vocab
 // (which would burn the surgical recovery passes). Both share this one query + coercion.
 export async function fetchVocabulary(supa: SupabaseClient): Promise<string[]>;

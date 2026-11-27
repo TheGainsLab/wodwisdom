@@ -276,10 +276,11 @@ Deno.test("the composer's rules: which are counted, which are its own, and what 
   assertEquals(mv.weight.type, "number");
 });
 
-Deno.test("loads: the medicine ball is one weight per sex, and the composer chooses dumbbell and kettlebell weights", () => {
+Deno.test("loads: the medicine ball is one weight per sex, dumbbells are two fixed sizes per sex, and the composer chooses kettlebell weights", () => {
   for (const text of [METCON_COMPOSER_SYSTEM_PROMPT, V2_GENERATE_PROGRAM_SYSTEM_PROMPT]) {
     assert(text.includes("medicine ball: always 20 lb / 9 kg for men and 14 lb / 6 kg for women."));
-    assert(text.includes("dumbbell / kettlebell: no band and no default. The composer chooses the weight for THIS athlete from their lifts"));
+    assert(text.includes("dumbbell (metcons): 50 lb / 22.5 kg for men and 35 lb / 15 kg for women; for a stronger or more advanced athlete, 70 lb / 32 kg for men and 50 lb / 22.5 kg for women. No other dumbbell weight."));
+    assert(text.includes("kettlebell: no band and no default. The composer chooses the weight for THIS athlete from their lifts"));
   }
   // The fixed table is gone.
   assert(!/light 35 · moderate 50 · heavy 70/.test(CYCLING_LOAD_BANDS_PROMPT));

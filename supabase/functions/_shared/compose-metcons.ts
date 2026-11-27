@@ -18,7 +18,7 @@ import {
   stripStructuralRestRows,
 } from "./metcon-variety-audits.ts";
 
-import type { WriterPayload } from "./build-writer-payload.ts";
+import { movementListFor, type WriterPayload } from "./build-writer-payload.ts";
 import type { TrainingDesignInput } from "./training-design-input.ts";
 import { athleteWordsElsewhere } from "./athlete-file-text.ts";
 
@@ -49,7 +49,8 @@ export function buildComposerInputs(
     do_not_program: tdi.do_not_program,
     athlete_words: athleteWordsElsewhere(payload.athlete_model?.self_report, []),
     coach_notes: payload.training_context.coach_notes ?? [],
-    vocabulary: tdi.vocabulary,
+    // The metcon part of the movement list (the whole list when it has no block marks).
+    vocabulary: movementListFor(payload, ["metcon"]),
     previous_cycle_metcons: library.previousCycleMetcons,
     examples: library.examples,
     articles: library.articles,

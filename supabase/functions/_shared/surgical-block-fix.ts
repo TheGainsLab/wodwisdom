@@ -17,7 +17,7 @@ import { TIME_DOMAINS_LINE, AIR_BIKE_NAME_RULE } from "./conditioning-definition
 import type { BlockPrescription, WriterOutput } from "./v2-output-schema.ts";
 import { buildEmitBlockTool } from "./v2-output-schema.ts";
 import type { SkeletonOutput } from "./v3-output-schema.ts";
-import type { WriterPayload } from "./build-writer-payload.ts";
+import { MOVEMENT_BLOCKS, type MovementBlock, movementListFor, type WriterPayload } from "./build-writer-payload.ts";
 import type { ComposedMetcon } from "./metcon-composer.ts";
 import { MODELS } from "./model-profiles.ts";
 
@@ -89,7 +89,10 @@ export function buildSurgicalUserMessage(
     units: payload.basics.units ?? "lbs",
     lifts: payload.lifts,
     do_not_program: payload.training_context.injuries_structured?.do_not_program ?? [],
-    vocabulary: payload.vocabulary,
+    // The part of the movement list for the block being rewritten.
+    vocabulary: (MOVEMENT_BLOCKS as readonly string[]).includes(originalBlock.block_type)
+      ? movementListFor(payload, [originalBlock.block_type as MovementBlock])
+      : payload.vocabulary,
   };
 
   const violationBlock = violations.length > 0

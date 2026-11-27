@@ -31,7 +31,7 @@ import { callSkeletonWriter, generateSkeletonWithAudits } from "../_shared/engin
 import { auditSkeletonMetconMix, formatSkeletonViolationsForRetry } from "../_shared/v3-skeleton-audits.ts";
 import { buildCoachStateDocumentBlock, type CoachStateContent } from "../_shared/coach-state.ts";
 import type { TrainingDesignInput } from "../_shared/training-design-input.ts";
-import { fetchVocabulary, type WriterPayload } from "../_shared/build-writer-payload.ts";
+import { fetchMovementsByBlock, fetchVocabulary, movementListFor, type WriterPayload } from "../_shared/build-writer-payload.ts";
 import type { SkeletonOutput } from "../_shared/v3-output-schema.ts";
 import {
   type ComposedMetcon,
@@ -119,8 +119,9 @@ Deno.serve(async (req) => {
     // made since would not show in the dry run.
     const listNow = await fetchVocabulary(supa);
     if (listNow.length > 0) {
-      build.tdi = { ...build.tdi, vocabulary: listNow };
-      build.payload = { ...build.payload, vocabulary: listNow };
+      build.payload = { ...build.payload, vocabulary: listNow, vocabulary_by_block: await fetchMovementsByBlock(supa) };
+      // As a build does: the planner is shown the strength and skills part.
+      build.tdi = { ...build.tdi, vocabulary: movementListFor(build.payload, ["strength", "skills"]) };
     }
     const from = { job_id: build.job_id, built_at: build.built_at, month_number: build.monthNumber };
 
