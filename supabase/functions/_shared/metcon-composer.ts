@@ -173,6 +173,7 @@ interface SkeletonLikeDay {
   strength_scheme?: string;
   skill_focus?: string;
   skill_names?: string[];
+  accessory_focus?: string;
   block_intents?: Array<{ block_type: string; focus: string }>;
   block_minutes?: Array<{ block_type: string; minutes: number }>;
 }
@@ -241,9 +242,11 @@ export function deriveMetconSlots(skeleton: SkeletonLike): MetconSlot[] {
   for (const wk of skeleton.weeks ?? []) {
     for (const day of wk.days ?? []) {
       if (!(day.block_types ?? []).includes("metcon")) continue;
-      const accessory = (day.block_intents ?? [])
-        .filter((b) => b.block_type === "accessory")
-        .map((b) => b.focus);
+      // What the accessory block supports: the planner's line, or (a month
+      // planned before it existed) the block's old focus-area tag.
+      const accessory = (day.accessory_focus ?? "").trim()
+        ? [(day.accessory_focus ?? "").trim()]
+        : (day.block_intents ?? []).filter((b) => b.block_type === "accessory").map((b) => b.focus);
       slots.push({
         week_num: wk.week_num,
         day_num: day.day_num,

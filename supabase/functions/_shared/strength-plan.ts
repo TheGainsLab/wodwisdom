@@ -93,11 +93,13 @@ export function buildLiftsBrief(p: {
   basics?: { age?: number | null; gender?: string | null; bodyweight?: number | null; units?: string | null } | null;
   injuriesText?: string | null;
   coachNotes?: string[] | null;
+  /** First line. Defaults to the planner's heading. */
+  heading?: string;
 }): string {
   const unit = p.basics?.units === "kg" ? "kg" : "lbs";
   const b = p.basics ?? {};
   const lines: string[] = [
-    "ATHLETE'S LIFTS (for THE STRENGTH BLOCK: everything you are given about this athlete's lifting)",
+    p.heading ?? "ATHLETE'S LIFTS (for THE STRENGTH BLOCK: everything you are given about this athlete's lifting)",
     `Their goal, in their own words: ${(p.goalText ?? "").trim() ? `"${(p.goalText ?? "").trim()}"` : "(none given)"}`,
     `Age ${b.age ?? "not given"} · sex ${b.gender ?? "not given"} · bodyweight ${b.bodyweight != null ? `${b.bodyweight} ${unit}` : "not given"}`,
   ];

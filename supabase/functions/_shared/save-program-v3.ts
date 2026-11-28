@@ -112,6 +112,7 @@ function buildBlockIntent(
       metcon_focus?: string;
       skill_focus?: string;
       skill_names?: string[];
+      accessory_focus?: string;
       block_intents?: Array<{
         block_type: string;
         focus: string;
@@ -140,6 +141,9 @@ function buildBlockIntent(
     // The skills the block trains, as named by the planner: kept on the block
     // so a progression drill sits in a block tagged with its skill.
     if (Array.isArray(daySkel.skill_names) && daySkel.skill_names.length) base.skills = daySkel.skill_names;
+  } else if (blockType === "accessory") {
+    // What the accessory block supports, as named by the planner.
+    if (daySkel.accessory_focus) base.focus = daySkel.accessory_focus;
   }
   // DECLARED coaching intent (Step 3): the FocusArea + purpose this block serves.
   // Distinct from `focus` above (a movement descriptor) — coaching_focus is the
@@ -377,6 +381,7 @@ export async function saveProgramV3(
         metcon_focus?: string;
         skill_focus?: string;
         skill_names?: string[];
+        accessory_focus?: string;
         block_intents?: Array<{ block_type: string; focus: string; purpose: string; source_priority_rank?: number }>;
         block_minutes?: Array<{ block_type: string; minutes: number }>;
       }
