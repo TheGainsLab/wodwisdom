@@ -149,3 +149,28 @@ Deno.test("a plan with no strength or skills entry in block_intents passes the a
   // Against the old lists the same plan would be sent back for not developing pressing.
   assert(checkAllocationInvariants(TDI, plan).violations.some((v) => v.includes("upper_body_pressing")));
 });
+
+Deno.test("a plan that leaves the strength and skills blocks out of block_intents passes EVERY hard plan check (it used to be rejected on all three attempts)", () => {
+  const day = (n: number, extra: Any = {}) => ({
+    day_num: n, day_intent: "day intent text", block_types: ["warm-up", "skills", "strength", "accessory", "metcon", "cool-down"],
+    primary_lift: ["Snatch", "Bench Press", "Back Squat", "Clean and Jerk", "Deadlift"][n - 1], strength_scheme: "5x2 @75%",
+    skill_names: ["Muscle-Ups"], skill_focus: "transition drills", metcon_time_domain: ["short", "medium", "long", "medium", "long"][n - 1],
+    block_intents: [
+      { block_type: "accessory", focus: "posterior_chain", purpose: "support" },
+      { block_type: "metcon", focus: "aerobic_capacity", purpose: n === 1 ? "develop" : "support", ...(n === 1 ? { source_priority_rank: 2 } : {}) },
+    ],
+    ...extra,
+  });
+  const plan = (days: Any[]): Any => ({
+    month_plan: { weekly_intent: ["build", "build", "build", "deload"], strength_progression: "Snatch: 5x2 @75% → 5x2 @78% → 5x1 @82% → deload", deload_placement: "Week 4", programming_priorities: "x" },
+    weeks: [1, 2, 3, 4].map((w) => ({ week_num: w, weekly_intent: w === 4 ? "deload" : "build", days })),
+  });
+  const tdi = tdiForPlanner({ ...TDI, maintain: ["olympic_lifting", "midline"] });
+  const good = CROSSFIT_PACK.audits.runSkeleton({ skeleton: plan([1, 2, 3, 4, 5].map((n) => day(n))), daysPerWeek: 5, trainingDesignInput: tdi });
+  assertEquals(good.failures.map((f: Any) => [f.rule, f.violations[0]]), []);
+  // A skills block that names no skill, and has no tag either, is still caught.
+  const bad = CROSSFIT_PACK.audits.runSkeleton({ skeleton: plan([1, 2, 3, 4, 5].map((n) => day(n, n === 3 ? { skill_names: [] } : {}))), daysPerWeek: 5, trainingDesignInput: tdi });
+  const m8 = bad.failures.find((f: Any) => f.rule === "machine_row_m8");
+  assert(m8 && m8.violations.every((v: string) => v.includes('declares "skills" but nothing says what it is for')));
+  assertEquals(m8!.violations.length, 4);
+});
