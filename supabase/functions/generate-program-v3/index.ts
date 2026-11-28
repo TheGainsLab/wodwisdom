@@ -28,8 +28,7 @@ import { getCorsHeaders } from "../_shared/cors.ts";
 import { buildWriterPayload, daysPerWeekLogLine, fetchMovementsByBlock, movementListFor, type WriterPayload } from "../_shared/build-writer-payload.ts";
 import { generateAndPersistCoachState } from "../_shared/generate-coach-state.ts";
 import { deriveMetconSlots, describeComposedPiece } from "../_shared/metcon-composer.ts";
-import { planCounts, plannerDocument } from "../_shared/planner-inputs.ts";
-import { stripSkillAreasFromTdi } from "../_shared/skills-plan.ts";
+import { planCounts, plannerDocument, tdiForPlanner } from "../_shared/planner-inputs.ts";
 import { COMPOSER_ARTICLES, loadArticleBlock, loadExampleBlock, PLANNER_ARTICLES } from "../_shared/metcon-library.ts";
 import { buildComposerInputs, composeMetconsForSlots } from "../_shared/compose-metcons.ts";
 import {
@@ -381,9 +380,10 @@ async function stageCoachState(
   // need it. Null (no block marks, or unreadable) = everyone gets the whole list.
   const payloadForBuild: WriterPayload = { ...payload, vocabulary_by_block: await fetchMovementsByBlock(supa) };
 
-  // The planner is not given the four skill areas (founder, 2026-11-28): it
-  // plans the skills block from the athlete's own skill ratings and goal.
-  const trainingDesignInput = stripSkillAreasFromTdi(buildTrainingDesignInput(coachState, {
+  // The planner is not given a skill area, a strength area or the strength
+  // emphasis (founder, 2026-11-28): it plans the skills and strength blocks
+  // from the athlete's own ratings, lifts and goal.
+  const trainingDesignInput = tdiForPlanner(buildTrainingDesignInput(coachState, {
     days_per_week: payload.training_context.days_per_week,
     // Session-budget observe phase (2026-08-31): thread the athlete's stated
     // time budget to the skeleton. Null when never stated — the skeleton then

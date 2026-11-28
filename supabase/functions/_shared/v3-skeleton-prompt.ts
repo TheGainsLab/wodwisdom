@@ -20,6 +20,14 @@
 
 import { TIME_DOMAINS_LINE } from "./conditioning-definitions.ts";
 
+const CLASS_STRENGTH_SECTION = `STRENGTH EMPHASIS — how to bias the strength block
+  - technical → favor Olympic lifting + positional/complex work, submaximal (skill expression of strength).
+  - absolute_strength → favor foundational barbell strength (back squat, deadlift, bench, strict press) at the heavier end of the volume range.
+  - balanced → a mix of both across the week.
+Pick each strength day's primary_lift to serve the strength-type priorities under this emphasis (e.g. powerlifting_strength + absolute_strength → back squat / deadlift / bench as primary lifts; olympic_lifting + technical → snatch / clean & jerk complexes).
+
+`;
+
 const CLASS_SKILLS_SECTION = `SKILLS BLOCK — DEVELOP vs MAINTAIN (block presence is fixed; content must not photocopy)
 The skills block exists every day. Its role — declared in block_intents (purpose develop vs maintain/support) — drives the content the fill writes:
   - DEVELOP days (a skills priority's dedicated days): higher volume, formal scheme (EMOM, sets, ladder), progressing that focus across the cycle.
@@ -58,13 +66,7 @@ Distribute the weekly block slots across the priorities by RANK, within the days
   - DO_NOT_PROGRAM: never appears, anywhere.
 Every priority must be visibly represented in the 4-week structure. A deprioritized focus must have no block built around it.
 
-STRENGTH EMPHASIS — how to bias the strength block
-  - technical → favor Olympic lifting + positional/complex work, submaximal (skill expression of strength).
-  - absolute_strength → favor foundational barbell strength (back squat, deadlift, bench, strict press) at the heavier end of the volume range.
-  - balanced → a mix of both across the week.
-Pick each strength day's primary_lift to serve the strength-type priorities under this emphasis (e.g. powerlifting_strength + absolute_strength → back squat / deadlift / bench as primary lifts; olympic_lifting + technical → snatch / clean & jerk complexes).
-
-RECOVERY STANCE — shape the arc
+${CLASS_STRENGTH_SECTION}RECOVERY STANCE — shape the arc
   - conservative → lower weekly volume, an earlier / longer deload, fewer high-CNS days. (Masters athletes and post-competition athletes usually land here.)
   - standard → a normal build with a reduced-volume week.
   - aggressive → more total work, deload later / shorter.
@@ -162,9 +164,10 @@ function swap(text: string, pairs: Array<[string, string]>): string {
 }
 
 /**
- * INDIVIDUAL programs (founder, 2026-11-28): the skills block is decided by
- * the planner from the athlete's own skill ratings, goal and equipment, not
- * from the coach state's skill areas. See skills-plan.ts.
+ * INDIVIDUAL programs (founder, 2026-11-28): the skills block and the
+ * strength block are decided by the planner from the athlete's own skill
+ * ratings, lifts, goal and equipment, not from the coach state's ranking.
+ * See skills-plan.ts and strength-plan.ts.
  */
 export const V3_SKELETON_SYSTEM_PROMPT = swap(CLASS_TEXT, [
   [
@@ -172,12 +175,57 @@ export const V3_SKELETON_SYSTEM_PROMPT = swap(CLASS_TEXT, [
     "  - SKILLS block: NOT decided by the priorities. You decide it from the athlete's own skill ratings (see THE SKILLS BLOCK).\n",
   ],
   [
-    "A typical 4-day athlete supports ~2–3 dedicated strength emphases + ~2–3 dedicated skill emphases per week total, shared across the priorities",
-    "A typical 4-day athlete supports ~2–3 dedicated strength emphases per week, shared across the priorities",
+    " A typical 4-day athlete supports ~2–3 dedicated strength emphases + ~2–3 dedicated skill emphases per week total, shared across the priorities — do not spread so thin that nothing adapts.",
+    "",
+  ],
+  [
+    "You are an expert CrossFit programmer turning a coach's FIXED training plan into the STRUCTURAL SKELETON of a 4-week cycle. The decisions have already been made — your job is to ALLOCATE them into weeks, days, and blocks.",
+    "You are an expert CrossFit programmer building the STRUCTURAL SKELETON of a 4-week cycle for one athlete. Some decisions are made for you (the conditioning priorities, the recovery stance): those you ALLOCATE. The strength block and the skills block are yours to decide, from the athlete's own information.",
+  ],
+  [
+    "This is an optimization task, not a diagnosis.\n",
+    "This is an optimization task, not a diagnosis.\nTHE LISTS COVER CONDITIONING ONLY. priorities, maintain and deprioritize carry no strength area and no skill area. Which lifts and which skills to train is NOT decided for you and is not a priority to allocate: see THE STRENGTH BLOCK and THE SKILLS BLOCK.\n",
+  ],
+  [
+    "  - strength_emphasis: technical | balanced | absolute_strength — biases the strength block.\n",
+    "",
+  ],
+  [
+    "  - STRENGTH block (primary_lift + strength_scheme): olympic_lifting · powerlifting_strength · posterior_chain · upper_body_pressing\n",
+    "  - STRENGTH block: NOT decided by the priorities. You decide it from the athlete's own lifts and goal (see THE STRENGTH BLOCK).\n",
+  ],
+  [
+    CLASS_STRENGTH_SECTION,
+    `THE STRENGTH BLOCK — YOURS TO DECIDE, FROM THE ATHLETE'S OWN LIFTS
+The strength block exists on every training day. The priorities, maintain and deprioritize lists carry NO strength area and there is no strength emphasis setting: lifts are not ranked for you and no lift family is switched off. You decide which lift each day trains, from the ATHLETE'S LIFTS section of the input: their goal in their own words, every max they entered, where each lift stands against its reference bar, their age, sex and bodyweight, what they said about injuries, and last cycle's lifting (previous_cycle) when there is one.
+  - Two things matter most, and both matter: a lift or a kind of lifting the athlete named in their goal, and a lift that is a real weakness for them.
+  - The reference bars are ADVANCED standards. Being under one is common. Read the comparisons as facts to weigh, not as a ranking to follow.
+  - A lift at or over its bar is a strength. Keep training it; never drop a lift because it is strong.
+  - No lift family is left out of a month: squatting, pulling from the floor, pressing and the Olympic lifts each get strength days, unless the athlete's own words, their restrictions or their equipment rule one out.
+  - Each lift you train progresses across weeks 1 to 3; the deload week reduces.
+  - Do NOT write a block_intents entry for the strength block.
+
+`,
+  ],
+  [
+    "MAINTAIN PRIMARIES: when the priorities call for fewer dedicated strength days than days_per_week, the spare strength slots MAY carry a maintain focus as primary_lift — but only at submaximal touch intensity (technical doubles, moderate loads). Intensity, not placement, is what separates a touch from development.\n\n",
+    "",
+  ],
+  [
+    "typed priorities / maintain / deprioritize / recovery_stance / strength_emphasis, THE TYPED DECISIONS WIN",
+    "typed priorities / maintain / deprioritize / recovery_stance, THE TYPED DECISIONS WIN",
+  ],
+  [
+    "  - reasons / evidence may inform selection (which lift variant, which skill progression best serves the stated why).\n",
+    "",
+  ],
+  [
+    "for the lifts this cycle's priorities call for.",
+    "for the lifts you train this cycle.",
   ],
   [
     "fold it into the block that already exists (a light technical strength exposure, a short skill EMOM, conditioning that already touches it)",
-    "fold it into the block that already exists (a light technical strength exposure, conditioning that already touches it)",
+    "fold it into the block that already exists (conditioning that already touches it)",
   ],
   [
     CLASS_SKILLS_SECTION,
@@ -203,7 +251,7 @@ The accessory block complements the day's primary lift + supports the priorities
   ],
   [
     "DECLARE the coaching purpose of each focus-bearing block (strength, skills, accessory, metcon) this day.",
-    "DECLARE the coaching purpose of each of these blocks this day: strength, accessory, metcon (NOT the skills block).",
+    "DECLARE the coaching purpose of each of these blocks this day: accessory, metcon (NOT the strength block and NOT the skills block).",
   ],
   [
     "Per-day: { day_num, day_intent, block_types, primary_lift, strength_scheme, metcon_time_domain, skill_focus }. Required: day_num, day_intent, block_types, skill_focus;",

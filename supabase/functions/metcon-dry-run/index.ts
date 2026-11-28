@@ -40,8 +40,7 @@ import { getDomainPack } from "../_shared/domain-packs/registry.ts";
 import { auditOutput, callSkeletonWriter, callWeekFill } from "../_shared/engine/pipeline.ts";
 import { renderWeekSchemesInPlace } from "../_shared/compose-block-scheme.ts";
 import { formatSkeletonViolationsForRetry } from "../_shared/v3-skeleton-audits.ts";
-import { planCounts, plannerDocument } from "../_shared/planner-inputs.ts";
-import { stripSkillAreasFromTdi } from "../_shared/skills-plan.ts";
+import { planCounts, plannerDocument, tdiForPlanner } from "../_shared/planner-inputs.ts";
 import type { CoachStateContent } from "../_shared/coach-state.ts";
 import type { TrainingDesignInput } from "../_shared/training-design-input.ts";
 import { fetchMovementsByBlock, fetchVocabulary, movementListFor, type WriterPayload } from "../_shared/build-writer-payload.ts";
@@ -136,9 +135,9 @@ Deno.serve(async (req) => {
       // As a build does: the planner is shown the strength and skills part.
       build.tdi = { ...build.tdi, vocabulary: movementListFor(build.payload, ["strength", "skills"]) };
     }
-    // As a build does: the planner is not given the four skill areas. (A
-    // build stored before 2026-11-28 still holds them.)
-    build.tdi = stripSkillAreasFromTdi(build.tdi);
+    // As a build does: the planner is not given a skill area, a strength area
+    // or the strength emphasis. (A build stored before 2026-11-28 holds them.)
+    build.tdi = tdiForPlanner(build.tdi);
     const from = { job_id: build.job_id, built_at: build.built_at, month_number: build.monthNumber };
 
     if (step === "plan") {
