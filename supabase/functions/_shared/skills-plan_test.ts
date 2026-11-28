@@ -149,7 +149,7 @@ Deno.test("a skills day that names no skill, too many, or one off the list goes 
   assert(counts.violations.some((v) => v.includes("names no skill")));
   const gen = read("../generate-program-v3/index.ts");
   assert(gen.includes("let mix = planCounts(skeleton, o.fromWeek);"));
-  assert(gen.includes("stripSkillAreasFromTdi(buildTrainingDesignInput(coachState, {"));
+  assert(gen.includes("tdiForPlanner(buildTrainingDesignInput(coachState, {"));
   assert(gen.includes("const intentDocument = plannerDocument(rs.coachState ?? null, rs.payload!, plannerArticles);"));
 });
 

@@ -8,17 +8,35 @@ import { buildCoachStateDocumentBlock, type CoachStateContent } from "./coach-st
 import type { WriterPayload } from "./build-writer-payload.ts";
 import type { SkeletonOutput } from "./v3-output-schema.ts";
 import { auditSkeletonMetconMix, type SkeletonAuditResult } from "./v3-skeleton-audits.ts";
-import { auditSkeletonSkillNames, buildSkillsBrief, coachStateForPlanner } from "./skills-plan.ts";
+import { auditSkeletonSkillNames, buildSkillsBrief, coachStateForPlanner, stripSkillAreasFromTdi } from "./skills-plan.ts";
+import { buildLiftsBrief, coachStateWithoutStrength, stripStrengthFromTdi } from "./strength-plan.ts";
+import type { TrainingDesignInput } from "./training-design-input.ts";
 
-/** The coach state (without its skill areas), the athlete's skills, and the
- *  planner's article. Any part that is empty is left out. */
+/** The plan inputs as the planner gets them: no skill area, no strength area
+ *  and no strength emphasis. What is left of the coach's lists is conditioning. */
+export function tdiForPlanner(tdi: TrainingDesignInput): TrainingDesignInput {
+  return stripStrengthFromTdi(stripSkillAreasFromTdi(tdi));
+}
+
+/** The coach state (without its skill and strength areas), the athlete's
+ *  lifts, the athlete's skills, and the planner's article. Any part that is
+ *  empty is left out. */
 export function plannerDocument(
   coachState: CoachStateContent | null,
-  payload: Pick<WriterPayload, "skills" | "equipment" | "training_context">,
+  payload: Pick<WriterPayload, "skills" | "equipment" | "training_context" | "lifts" | "basics" | "athlete_model">,
   articles: string,
 ): string {
   return [
-    coachState ? buildCoachStateDocumentBlock(coachStateForPlanner(coachState)) : "",
+    coachState ? buildCoachStateDocumentBlock(coachStateWithoutStrength(coachStateForPlanner(coachState))) : "",
+    buildLiftsBrief({
+      lifts: payload.lifts,
+      // deno-lint-ignore no-explicit-any
+      normative: (payload.athlete_model as any)?.normative ?? null,
+      goalText: payload.training_context?.goal_text ?? null,
+      basics: payload.basics,
+      injuriesText: payload.training_context?.injuries_constraints_text ?? null,
+      coachNotes: payload.training_context?.coach_notes ?? [],
+    }),
     buildSkillsBrief({
       skills: payload.skills as Record<string, string | null>,
       goalText: payload.training_context?.goal_text ?? null,
