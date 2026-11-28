@@ -208,6 +208,10 @@ The strength block exists on every training day. The priorities, maintain and de
 `,
   ],
   [
+    "      • purpose \"support\" for accessory/complementary work serving a priority or the day's primary lift — set source_priority_rank ONLY when it directly supports one specific priority, otherwise omit.\n",
+    "      • purpose \"support\" for a metcon that serves no listed conditioning focus — omit source_priority_rank.\n",
+  ],
+  [
     "MAINTAIN PRIMARIES: when the priorities call for fewer dedicated strength days than days_per_week, the spare strength slots MAY carry a maintain focus as primary_lift — but only at submaximal touch intensity (technical doubles, moderate loads). Intensity, not placement, is what separates a touch from development.\n\n",
     "",
   ],
@@ -241,17 +245,23 @@ The skills block exists on every training day. The coach's priorities, maintain 
   - Spread the skills across the week, and progress each one across weeks 1 to 3; the deload week reduces.
   - skill_focus says in one line what the work is. No barbell work in the skills block, ever.
   - Do NOT write a block_intents entry for the skills block.
-The accessory block complements the day's primary lift + supports the priorities.
+
+THE ACCESSORY BLOCK — IT SUPPORTS THE STRENGTH WORK
+The accessory block exists on every training day. Its one job is to support the lifts you are building: the muscles and positions behind a lift. Set accessory_focus on every day that has an accessory block: one line naming the lift it supports and what it works to support it.
+  - It supports that day's lift, or another lift you are building this cycle: your choice, from the ATHLETE'S LIFTS section. Where a lift is a real weakness for this athlete, accessory is where its weak link gets extra work.
+  - Gymnastics skill work belongs in the skills block, not here. Midline work is allowed in both.
+  - Do NOT write a block_intents entry for the accessory block.
 `,
   ],
   [
     `  - skill_focus: when skills present — the skill or family being trained ("Deficit HSPU progression", "Midline / GHD ramp", "Skill maintenance EMOM")`,
     `  - skill_names: when skills present — one or two skills from the list (see THE SKILLS BLOCK)
-  - skill_focus: when skills present — one line saying what the work is`,
+  - skill_focus: when skills present — one line saying what the work is
+  - accessory_focus: when accessory present — the lift it supports and what it works (see THE ACCESSORY BLOCK)`,
   ],
   [
     "DECLARE the coaching purpose of each focus-bearing block (strength, skills, accessory, metcon) this day.",
-    "DECLARE the coaching purpose of each of these blocks this day: accessory, metcon (NOT the strength block and NOT the skills block).",
+    "DECLARE the coaching purpose of the METCON block this day (NOT the strength, skills or accessory block: those are yours and carry their own fields).",
   ],
   [
     "Per-day: { day_num, day_intent, block_types, primary_lift, strength_scheme, metcon_time_domain, skill_focus }. Required: day_num, day_intent, block_types, skill_focus;",

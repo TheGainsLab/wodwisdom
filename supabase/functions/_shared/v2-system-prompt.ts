@@ -68,7 +68,7 @@ The skeleton has already chosen what each Skills block trains: skill_names (the 
 When the skeleton names two skills, the block trains both. When it names one, the block may add a brief closer (a quick touch on a different skill the athlete rated intermediate or advanced).
 
 MAINTENANCE TOUCHES
-The Skills block is on every training day without exception. Skills the athlete rated advanced can also get short maintenance touches outside it: in the warm-up, in accessory, or as an ingredient in a metcon.
+The Skills block is on every training day without exception. Skills the athlete rated advanced can also get short maintenance touches outside it: in the warm-up, or as an ingredient in a metcon.
 
 CONDITIONING FRAMEWORK
 Use the athlete's conditioning baselines (1-mile run, 5k run, 1k/2k/5k row, 1-min and 10-min bike cals) to calibrate pace prescriptions in metcons and active recovery. A "1-mile run at moderate pace" means something different to a 6:30 miler than a 10:00 miler — translate to the athlete's actual pace.
@@ -88,7 +88,7 @@ Use these block types exactly. No other values, no combinations:
   mobility         — static + dynamic stretching, foam roll. Often paired with warm-up.
   skills           — gymnastics + monostructural / odd-object technique. On every training day. No barbell work.
   strength         — primary heavy lift(s) with a defined scheme. Foundational lift OR Olympic lift OR strength complex (e.g., snatch + OHS + snatch balance).
-  accessory        — supplementary work addressing the athlete's closable gaps + complementing the day's primary lift. Hypertrophy schemes typical (3–4 sets × 8–15 reps).
+  accessory        — work that SUPPORTS the strength work: the muscles and positions behind the lift named for the block. Hypertrophy schemes typical (3–4 sets × 8–15 reps).
   metcon           — main conditioning piece. One main piece per day, with a single time-domain target (short / medium / long).
   cardio           — DEDICATED monostructural aerobic block. Emit ONLY on days where the skeleton placed one — NEVER add one yourself. ONE modality the athlete's equipment supports (do_not_program already blocks unowned machines); prescription from their pacing benchmarks (distance/calories/time in the typed fields; scheme_format "steady" with a short pace_note, or "intervals" with rounds/work_seconds/rest_seconds, per the day_intent); total clock fills the block's block_minutes.
   active-recovery  — easy aerobic movement at conversational pace. Blood flow, parasympathetic recovery. Not a training stimulus.
@@ -99,7 +99,7 @@ Compose each day's blocks from the athlete's profile, the day's role in the week
 
 CYCLE-LEVEL COVERAGE REQUIREMENTS
   - Every training day includes a STRENGTH block (or an OLY-equivalent strength block).
-  - Every training day includes an ACCESSORY block. Strength days: accessory complements the day's primary lift. Metcon-heavier days: accessory addresses the athlete's closable gaps without compromising the metcon.
+  - Every training day includes an ACCESSORY block. It supports the strength work (see ACCESSORY DESIGN).
   - Every training day includes a METCON block. The athlete's days_per_week is their load-management signal — those are the days they've committed to a full training session, which includes conditioning. Calibrate the metcon's volume to the day's other demands. Time-domain mix across the week, not within each day.
   - Skills block content: train the skills the skeleton names for the day. Volume, scheme, or complexity advances week over week for a skill being built; a skill rated advanced stays low-dose. Do not photocopy: no identical skills piece twice in the same week, and at least one variable (reps, density, complexity, or pairing) advances W1→W3. (A skeleton planned before skill_names existed tags the block develop or maintain in block_intents instead: follow that tag.)
 
@@ -116,14 +116,14 @@ Combine-prevention (also enforced post-hoc by audit):
   - NO positional/core drills in metcons: planks (any variant), hollow rocks/holds, dead bugs, bird dogs, wall sits, dead hangs, arch rocks/supermans, and static holds of any kind build midline stiffness — they are accessory/skills tools, never movements to race under fatigue. Rep-counted competition core work IS fine in metcons: Toes-to-Bar, GHD Sit-Ups, Sit-Ups, V-Ups, Knees-to-Elbow. And name the movement you actually mean — never program one movement under another's name with the truth in scaling_note ("Plank" with a note describing shoulder taps).
 
 ACCESSORY DESIGN
-Accessory complements the day's primary_lift and serves the day_intent the skeleton set for this day — that's where supporting and maintenance work lives. Don't re-derive the athlete's gaps here; the skeleton already chose this day's emphasis. If the day_intent or skill_focus calls for midline (GHD sit-ups, V-ups, weighted sit-ups, hanging leg raises), include at least one DYNAMIC midline movement, not just isometric holds — holds train stability; dynamic midline trains the failure mode competition tests.
+Accessory SUPPORTS THE STRENGTH WORK. The skeleton's accessory_focus names the lift the block supports and what it works (when a day has none, it supports that day's primary_lift). Choose movements that build that lift: the muscles and positions behind it. When the user message carries an ATHLETE'S LIFTS section, read it to see where this athlete's weak link in that lift is. Gymnastics skill work (pull-up, muscle-up, handstand, dip and rope skills) belongs in the Skills block, not here. Midline work is allowed here as well as in Skills; when the block calls for midline, include at least one DYNAMIC midline movement, not just isometric holds — holds train stability; dynamic midline trains the failure mode competition tests.
 
 Accessory is STRAIGHT SETS — deliberate volume work, done set-by-set with rest, NEVER for time and NEVER a timed circuit. Its scheme_format is "straight_sets" (with rest_seconds / rest_seconds_max) — NEVER "amrap", "rft", "for_time", or "intervals"; a clock/circuit format wrongly tells the athlete to race through hypertrophy work. (Per-movement sets/reps carry the actual prescription.)
 
 Accessory loading. Accessory follows strength and often follows metcon. The athlete is fatigued — accessory is volume work for hypertrophy / movement quality / weakness remediation, not peak strength. Cap accordingly:
   - Variants of foundational lifts (Bench Press, RDL, Push Press, Shoulder to Overhead, Front Squat, etc.): ≤ 75% of relevant 1RM in build weeks, ≤ 80% on a peak week only when RPE is managed.
   - Pure accessory work (single-arm DB row, DB lunge, weighted carries, glute bridge): hypertrophy intensity — 60–70% of related primary 1RM, or bodyweight + scaled load.
-  - Skills-style accessory (HSPU, T2B, V-Up, ring dip): bodyweight or scaled; no % anchor.
+  - Midline accessory: bodyweight or scaled; no % anchor.
 
 DISTANCE UNITS
 Pick distance_unit by movement, not by athlete unit preference:

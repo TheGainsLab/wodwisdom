@@ -31,6 +31,7 @@ import { MODELS } from "../model-profiles.ts";
 import { COUNTS_TOWARD_INSTRUCTION } from "../counts-toward.ts";
 import { athleteFileForWriter, athleteWordsElsewhere, restrictionsForPrompt } from "../athlete-file-text.ts";
 import { normalizeMetconTimeDomains } from "../metcon-composer.ts";
+import { buildLiftsBrief } from "../strength-plan.ts";
 import { DISPLAY_TO_LIFT_KEY } from "../lift-key.ts";
 
 /** Failure list shape from a hard-audit run (type-only; erased at runtime). */
@@ -399,7 +400,23 @@ export async function callWeekFill(
   const { vocabulary: _flatList, ...fillPayloadByBlock } = fillPayloadAll;
   const fillPayload = payload.vocabulary_by_block ? fillPayloadByBlock : fillPayloadAll;
   const payloadBlock = `ATHLETE PAYLOAD (JSON):\n${JSON.stringify(fillPayload, null, 2)}`;
-  const baseMessage = [thisWeekBlock, composedBlock, priorBlock, arcBlock, payloadBlock, ruleRecap]
+  // Accessory supports the strength work (founder, 2026-11-28). When the plan
+  // names what each accessory block supports, the writer is also shown where
+  // each of the athlete's lifts stands, as plain facts, so it can find the
+  // weak link. Plans without the field (older months, gym classes) get the
+  // message they always got.
+  const planNamesAccessory = (weekSkeleton?.days ?? []).some((d) => ((d as { accessory_focus?: string }).accessory_focus ?? "").trim() !== "");
+  const liftsBlock = planNamesAccessory
+    ? buildLiftsBrief({
+      heading: "ATHLETE'S LIFTS (for the ACCESSORY block: where each lift stands, to find the weak link the block should work)",
+      lifts: payload.lifts,
+      // deno-lint-ignore no-explicit-any
+      normative: (payload.athlete_model as any)?.normative ?? null,
+      goalText: payload.training_context.goal_text ?? null,
+      basics: payload.basics,
+    })
+    : "";
+  const baseMessage = [thisWeekBlock, composedBlock, priorBlock, arcBlock, payloadBlock, liftsBlock, ruleRecap]
     .filter(Boolean).join("\n\n");
   const userMessage = extraContext ? `${extraContext}\n\n---\n\n${baseMessage}` : baseMessage;
 

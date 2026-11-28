@@ -9,6 +9,7 @@ import { plannerDocument, tdiForPlanner } from "./planner-inputs.ts";
 import { V3_SKELETON_SYSTEM_PROMPT, V3_SKELETON_SYSTEM_PROMPT_CLASS } from "./v3-skeleton-prompt.ts";
 import { checkAllocationInvariants } from "./training-design-invariants.ts";
 import { CROSSFIT_PACK } from "./domain-packs/crossfit/index.ts";
+import { machineRowM8 } from "./stage3-machine-rows.ts";
 
 // deno-lint-ignore no-explicit-any
 type Any = any;
@@ -120,7 +121,7 @@ Deno.test("the individual planner chooses the lifts itself; the class planner te
     "never drop a lift because it is strong",
     "No lift family is left out of a month",
     "THE LISTS COVER CONDITIONING ONLY.",
-    "accessory, metcon (NOT the strength block and NOT the skills block)",
+    "DECLARE the coaching purpose of the METCON block this day",
   ]) assert(p.includes(want), want);
   for (const gone of ["STRENGTH EMPHASIS — how to bias", "strength_emphasis", "MAINTAIN PRIMARIES", "absolute_strength", "olympic_lifting · powerlifting_strength", "dedicated strength emphases"]) {
     assert(!p.includes(gone), `individual planner still says "${gone}"`);
@@ -173,4 +174,65 @@ Deno.test("a plan that leaves the strength and skills blocks out of block_intent
   const m8 = bad.failures.find((f: Any) => f.rule === "machine_row_m8");
   assert(m8 && m8.violations.every((v: string) => v.includes('declares "skills" but nothing says what it is for')));
   assertEquals(m8!.violations.length, 4);
+});
+
+// ── Accessory supports the strength work (founder, 2026-11-28) ──
+
+Deno.test("the planner names the lift each accessory block supports, and gymnastics skill work leaves accessory", async () => {
+  const p = V3_SKELETON_SYSTEM_PROMPT;
+  for (const want of [
+    "THE ACCESSORY BLOCK — IT SUPPORTS THE STRENGTH WORK",
+    "Set accessory_focus on every day that has an accessory block",
+    "It supports that day's lift, or another lift you are building this cycle",
+    "Gymnastics skill work belongs in the skills block, not here. Midline work is allowed in both.",
+    "DECLARE the coaching purpose of the METCON block this day",
+  ]) assert(p.includes(want), want);
+  assert(!p.includes("The accessory block complements the day's primary lift + supports the priorities."));
+  assert(!V3_SKELETON_SYSTEM_PROMPT_CLASS.includes("THE ACCESSORY BLOCK — IT SUPPORTS"));
+  const { V2_GENERATE_PROGRAM_SYSTEM_PROMPT: w } = await import("./v2-system-prompt.ts");
+  assert(w.includes("Accessory SUPPORTS THE STRENGTH WORK. The skeleton's accessory_focus names the lift the block supports"));
+  assert(w.includes("Gymnastics skill work (pull-up, muscle-up, handstand, dip and rope skills) belongs in the Skills block, not here."));
+  assert(w.includes("Midline work is allowed here as well as in Skills"));
+  assert(!w.includes("Don't re-derive the athlete's gaps here"));
+  assert(!w.includes("Skills-style accessory"));
+  const { buildEmitSkeletonTool } = await import("./v3-output-schema.ts");
+  const day = (buildEmitSkeletonTool(5).input_schema as Any).properties.weeks.items.properties.days.items.properties;
+  assertEquals(day.accessory_focus.type, "string");
+});
+
+Deno.test("an accessory block is accounted for by its accessory_focus; with neither a tag nor the field it is caught", () => {
+  const day = (extra: Any = {}) => ({
+    day_num: 1, day_intent: "day intent text", block_types: ["warm-up", "skills", "strength", "accessory", "metcon", "cool-down"],
+    primary_lift: "Deadlift", strength_scheme: "4x4 @75%", skill_names: ["L-Sit"], skill_focus: "holds", metcon_time_domain: "short",
+    accessory_focus: "Supports the deadlift: hamstrings",
+    block_intents: [{ block_type: "metcon", focus: "aerobic_capacity", purpose: "support" }],
+    ...extra,
+  });
+  const plan = (d: Any): Any => ({ weeks: [{ week_num: 1, weekly_intent: "build", days: [d] }] });
+  assertEquals(machineRowM8(plan(day())).violations, []);
+  const r = machineRowM8(plan(day({ accessory_focus: "  " })));
+  assertEquals(r.violations.length, 1);
+  assert(r.violations[0].includes('declares "accessory" but nothing says what it is for (no block_intents entry and no accessory_focus)'));
+});
+
+Deno.test("what the accessory block supports reaches the composer, the stored block, the dry-run text and the writer's lift facts", async () => {
+  const { deriveMetconSlots } = await import("./metcon-composer.ts");
+  const { planForBlock } = await import("./metcon-dry-run-text.ts");
+  const d: Any = {
+    day_num: 1, block_types: ["strength", "accessory", "metcon"], primary_lift: "Deadlift", metcon_time_domain: "short",
+    accessory_focus: "Supports the deadlift: hamstrings", block_intents: [{ block_type: "accessory", focus: "posterior_chain", purpose: "support" }],
+  };
+  const [slot] = deriveMetconSlots({ weeks: [{ week_num: 1, weekly_intent: "build", days: [d] }] } as Any);
+  assertEquals(slot.day_context.accessory_focuses, ["Supports the deadlift: hamstrings"]);
+  // A month planned before the field: the old tag is still passed on.
+  const [old] = deriveMetconSlots({ weeks: [{ week_num: 1, weekly_intent: "build", days: [{ ...d, accessory_focus: undefined }] }] } as Any);
+  assertEquals(old.day_context.accessory_focuses, ["posterior_chain"]);
+  assert(planForBlock(d, "accessory").startsWith("Supports the deadlift: hamstrings"));
+  const read = (rel: string) => Deno.readTextFileSync(new URL(rel, import.meta.url));
+  assert(read("./save-program-v3.ts").includes("if (daySkel.accessory_focus) base.focus = daySkel.accessory_focus;"));
+  const pipe = read("./engine/pipeline.ts");
+  assert(pipe.includes("const liftsBlock = planNamesAccessory"));
+  assert(pipe.includes("ATHLETE'S LIFTS (for the ACCESSORY block: where each lift stands, to find the weak link the block should work)"));
+  const brief = buildLiftsBrief({ heading: "H", lifts: { deadlift: 500 } });
+  assert(brief.startsWith("H\n"));
 });

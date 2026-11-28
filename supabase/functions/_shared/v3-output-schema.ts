@@ -106,6 +106,12 @@ export interface DaySkeleton {
    */
   skill_focus?: string;
   /**
+   * If an accessory block is present: the lift it supports and what it works
+   * (founder, 2026-11-28: accessory supports the strength work). Individual
+   * programs; older months and gym classes have none.
+   */
+  accessory_focus?: string;
+  /**
    * DECLARED coaching intent — one entry per focus-bearing block this day
    * (strength / skills / accessory / metcon). Each names the single FocusArea it
    * serves + its purpose (develop / maintain / support), so allocation is
@@ -183,6 +189,11 @@ function buildDaySkeletonSchema(daysPerWeek: number) {
         items: { type: "string", enum: [...PLAN_SKILL_OPTIONS] },
       },
       skill_focus: { type: "string", maxLength: 300 },
+      accessory_focus: {
+        type: "string",
+        maxLength: 200,
+        description: "Individual programs: REQUIRED on every day that has an accessory block. One line: the lift this block supports, and what it works to support it.",
+      },
       block_intents: {
         type: "array",
         description:

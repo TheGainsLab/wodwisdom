@@ -375,7 +375,7 @@ export function machineRowM6(skeleton: SkeletonOutput): MachineRowResult {
  *
  *  A block is accounted for by a block_intents entry OR by the planner's own
  *  typed decision for it (2026-11-28): the skills block by skill_names, the
- *  strength block by primary_lift. Individual programs no longer tag those
+ *  strength block by primary_lift, the accessory block by accessory_focus. Individual programs no longer tag those
  *  two blocks with a coach-state area, so they have no block_intents entry.
  *  Before this, the check rejected every such plan: a build would have used
  *  all three planner attempts and failed. */
@@ -389,11 +389,12 @@ export function machineRowM8(skeleton: SkeletonOutput): MachineRowResult {
       const decided = new Set<string>([
         ...(Array.isArray(named) && named.length > 0 ? ["skills"] : []),
         ...((day.primary_lift ?? "").trim() ? ["strength"] : []),
+        ...(((day as { accessory_focus?: string }).accessory_focus ?? "").trim() ? ["accessory"] : []),
       ]);
       for (const bt of day.block_types ?? []) {
         if (focusBearing.has(bt) && !intentTypes.has(bt) && !decided.has(bt)) {
           violations.push(
-            `Week ${wk.week_num} Day ${day.day_num}: block_types declares "${bt}" but nothing says what it is for (no block_intents entry${bt === "skills" ? " and no skill_names" : bt === "strength" ? " and no primary_lift" : ""}).`,
+            `Week ${wk.week_num} Day ${day.day_num}: block_types declares "${bt}" but nothing says what it is for (no block_intents entry${bt === "skills" ? " and no skill_names" : bt === "strength" ? " and no primary_lift" : bt === "accessory" ? " and no accessory_focus" : ""}).`,
           );
         }
       }

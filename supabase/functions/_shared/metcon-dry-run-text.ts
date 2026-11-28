@@ -65,6 +65,7 @@ export function planForBlock(daySkel: Loose, blockType: string): string {
     if (Array.isArray(daySkel.skill_names) && daySkel.skill_names.length) bits.push(`skills: ${daySkel.skill_names.join(" + ")}`);
     if (daySkel.skill_focus) bits.push(daySkel.skill_focus);
   }
+  if (blockType === "accessory" && daySkel.accessory_focus) bits.push(daySkel.accessory_focus);
   if (blockType === "metcon" && daySkel.metcon_time_domain) bits.push(`${daySkel.metcon_time_domain} (composed before the writer)`);
   for (const bi of (daySkel.block_intents ?? []).filter((b: Loose) => b.block_type === blockType)) {
     bits.push(`${bi.purpose} ${bi.focus}${bi.source_priority_rank ? ` (priority ${bi.source_priority_rank})` : ""}`);
